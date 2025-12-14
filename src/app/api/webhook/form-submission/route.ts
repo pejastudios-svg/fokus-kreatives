@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     // Get form details
     const { data: form } = await supabase
       .from('capture_forms')
-      .select('client_id, settings, fields')
+      .select('client_id, settings, fields, name')
       .eq('id', form_id)
       .single()
 
