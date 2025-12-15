@@ -15,13 +15,21 @@ export default function InvitePage() {
   const token = params.token as string
   const supabase = createClient()
 
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-  const [userData, setUserData] = useState<{ id: string, email: string, name: string, role: string } | null>(null)
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+const [isLoading, setIsLoading] = useState(true)
+const [isSubmitting, setIsSubmitting] = useState(false)
+const [error, setError] = useState('')
+const [success, setSuccess] = useState(false)
+type InvitedUser = {
+  id: string
+  email: string
+  name: string
+  role: string
+  client_id?: string | null
+}
+
+const [userData, setUserData] = useState<InvitedUser | null>(null)
+const [password, setPassword] = useState('')
+const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
     checkInvitation()
