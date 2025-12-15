@@ -24,7 +24,11 @@ import {
   Settings,
   ExternalLink,
   Zap,
-  FileText
+  FileText,
+  ChevronDown,
+  Square,       
+  Circle,     
+  Paperclip,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
