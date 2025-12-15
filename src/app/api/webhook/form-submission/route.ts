@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+interface CaptureFormField {
+  id: string
+  type: string
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -80,11 +85,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Schedule meeting if meeting field was included
-    const meetingField = form.fields.find(f => f.type === 'meeting')
-    if (meetingField && form_data[meetingField.id]) {
-      // This would integrate with your meeting scheduling system
-      console.log('Meeting booking requested:', form_data[meetingField.id])
-    }
+const fields = (form.fields || []) as CaptureFormField[]
+const meetingField = fields.find((f) => f.type === 'meeting')
+
+if (meetingField && form_data[meetingField.id]) {
+  // This would integrate with your meeting scheduling system
+  console.log('Meeting booking requested:', form_data[meetingField.id])
+}
 
     return NextResponse.json({ success: true, lead_id: lead.id })
 
