@@ -22,6 +22,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface Payment {
   id: string
+  client_id: string
   amount: number
   currency: string
   status: 'pending' | 'paid' | 'overdue' | 'cancelled'

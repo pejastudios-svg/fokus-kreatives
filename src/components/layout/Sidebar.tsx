@@ -25,6 +25,7 @@ const baseNavigation = [
   { name: 'Competitors', href: '/competitors', icon: Search },
   { name: 'Message Suggestions', href: '/automations', icon: MessageSquare },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Approvals', href: '/approvals', icon: ClipboardList }
 ]
 
 export function Sidebar() {

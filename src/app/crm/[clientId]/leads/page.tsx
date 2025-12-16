@@ -408,33 +408,43 @@ export default function CRMLeads() {
   }
 
   // Update field
-  // Update field
 const handleUpdateField = async (fieldId: string, updates: Partial<CustomField>) => {
-  const field = fields.find(f => f.id === fieldId)
+  const field = fields.find((f) => f.id === fieldId)
   if (!field) return
 
   // Clean updates - ensure options don't have null values and remove duplicates
   let cleanOptions = updates.options
   if (cleanOptions) {
-    // Remove nulls
-    cleanOptions = cleanOptions.filter(opt => opt && opt.value && opt.label)
+    // Remove nulls / invalids
+    cleanOptions = cleanOptions.filter(
+      (opt): opt is StatusOption =>
+        !!opt && typeof opt.value === 'string' && typeof opt.label === 'string'
+    )
+
     // Remove duplicates by value
     const seen = new Set<string>()
-    cleanOptions = cleanOptions.filter(opt => {
+    cleanOptions = cleanOptions.filter((opt) => {
       if (seen.has(opt.value)) return false
       seen.add(opt.value)
       return true
     })
   }
 
-  const cleanUpdates = {
-    ...updates,
-    options: cleanOptions
+  // Build updates in a type-safe way
+  const cleanUpdates: Partial<CustomField> = { ...updates }
+
+  // Only set options if caller intended to change options
+  if (updates.options !== undefined) {
+    // Ensure options is never undefined (only array or null)
+    cleanUpdates.options =
+      cleanOptions && cleanOptions.length > 0 ? cleanOptions : null
   }
 
   // Optimistic update
-  setFields(prev => prev.map(f => f.id === fieldId ? { ...f, ...cleanUpdates } : f))
-  setPendingFields(prev => new Set(prev).add(fieldId))
+  setFields((prev) =>
+    prev.map((f) => (f.id === fieldId ? { ...f, ...cleanUpdates } : f))
+  )
+  setPendingFields((prev) => new Set(prev).add(fieldId))
 
   try {
     const { error } = await supabase
@@ -445,13 +455,13 @@ const handleUpdateField = async (fieldId: string, updates: Partial<CustomField>)
     if (error) {
       console.error('Failed to update field:', error)
       // Rollback
-      setFields(prev => prev.map(f => f.id === fieldId ? field : f))
+      setFields((prev) => prev.map((f) => (f.id === fieldId ? field : f)))
     }
   } catch (err) {
     console.error('Failed to update field:', err)
-    setFields(prev => prev.map(f => f.id === fieldId ? field : f))
+    setFields((prev) => prev.map((f) => (f.id === fieldId ? field : f)))
   } finally {
-    setPendingFields(prev => {
+    setPendingFields((prev) => {
       const next = new Set(prev)
       next.delete(fieldId)
       return next

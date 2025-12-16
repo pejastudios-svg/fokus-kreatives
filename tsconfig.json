@@ -37,6 +37,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "src/lib/google-meet.ts",
+    "src/lib/zoom.ts"
   ]
 }

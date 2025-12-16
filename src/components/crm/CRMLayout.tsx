@@ -36,6 +36,7 @@ interface ClientInfo {
   id: string
   name: string
   business_name: string
+  archived_at?: string | null
 }
 
 // Simple cache to avoid re-fetching client info too often

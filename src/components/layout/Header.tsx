@@ -124,18 +124,29 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
     const formatNotificationText = (n: NotificationRow) => {
-    const data = n.data || {}
-    switch (n.type) {
-      case 'task_created':
-        return `Task created: ${data.title || ''}`
-      case 'task_status_changed':
-        return `Task "${data.title || ''}" moved to ${data.status || ''}`
-      case 'task_mentioned':
-        return `You were mentioned in a task`
-      default:
-        return 'Notification'
-    }
+  const data = n.data || {}
+  switch (n.type) {
+    case 'task_created':
+      return `Task created: ${data.title || ''}`
+    case 'task_status_changed':
+      return `Task "${data.title || ''}" moved to ${data.status || ''}`
+    case 'task_mentioned':
+      return `You were mentioned in a task`
+
+    case 'approval_created':
+      return `Approval created for ${data.clientName || 'client'}: ${
+        data.title || ''
+      }`
+
+    case 'approval_approved':
+      return `Approval approved for ${data.clientName || 'client'}: ${
+        data.title || ''
+      }`
+
+    default:
+      return 'Notification'
   }
+}
 
   return (
     <header className="flex items-center justify-between h-20 px-8 bg-white border-b border-gray-200">
@@ -188,10 +199,19 @@ export function Header({ title, subtitle }: HeaderProps) {
   markAsRead(n.id)
   setShowNotif(false)
 
-  // Navigate if taskId present in data
   const data = n.data || {}
+
+  // Navigate to task if available
   if (data.taskId) {
     router.push(`/tasks?taskId=${data.taskId}`)
+    return
+  }
+
+  // Navigate to approvals if this is an approval notification
+  if (n.type === 'approval_created' || n.type === 'approval_approved') {
+    // later: `/approvals/${data.approvalId}` when detail page exists
+    router.push('/approvals')
+    return
   }
 }}
                       className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${

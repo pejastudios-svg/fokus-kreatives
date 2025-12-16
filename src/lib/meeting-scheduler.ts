@@ -33,7 +33,10 @@ export async function scheduleMeeting(platform: string, meetingData: any, client
     return { success: true, meeting: data }
     
   } catch (error) {
-    console.error('Meeting scheduling error:', error)
-    return { success: false, error: error.message }
+  console.error('Meeting scheduling error:', error)
+  return {
+    success: false,
+    error: error instanceof Error ? error.message : 'Unknown error',
   }
+}
 }
