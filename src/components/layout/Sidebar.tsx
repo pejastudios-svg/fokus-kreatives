@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-const navigation = [
+const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Team', href: '/team', icon: UserCircle },
@@ -33,33 +33,47 @@ export function Sidebar() {
   const supabase = createClient()
   
   const [userName, setUserName] = useState('')
-  const [userPicture, setUserPicture] = useState<string | null>(null)
-  const [showUserMenu, setShowUserMenu] = useState(false)
+const [userPicture, setUserPicture] = useState<string | null>(null)
+const [userRole, setUserRole] = useState<string | null>(null)
+const [showUserMenu, setShowUserMenu] = useState(false)
 
   useEffect(() => {
     loadUserProfile()
   }, [])
 
   const loadUserProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data } = await supabase
-        .from('users')
-        .select('name, profile_picture_url')
-        .eq('id', user.id)
-        .single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (user) {
+    const { data } = await supabase
+      .from('users')
+      .select('name, profile_picture_url, role')
+      .eq('id', user.id)
+      .single()
 
-      if (data) {
-        setUserName(data.name || '')
-        setUserPicture(data.profile_picture_url)
-      }
+    if (data) {
+      setUserName(data.name || '')
+      setUserPicture(data.profile_picture_url)
+      setUserRole(data.role || null)
     }
   }
+}
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  const filteredNavigation = baseNavigation.filter((item) => {
+  if (item.name === 'Clients') {
+    // hide Clients for employees and guests
+    if (userRole === 'employee' || userRole === 'guest') {
+      return false
+    }
+  }
+  return true
+})
 
   return (
     <div className="flex flex-col h-full w-64 bg-brand-gradient">
@@ -76,8 +90,8 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2">
-        {navigation.map((item) => {
-          const isActive = pathname.startsWith(item.href)
+        {filteredNavigation.map((item) => {
+  const isActive = pathname.startsWith(item.href)
           return (
             <Link
               key={item.name}
