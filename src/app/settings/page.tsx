@@ -244,38 +244,6 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Notifications */}
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Bell className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <p className="font-medium text-gray-900">Email Notifications</p>
-                <p className="text-sm text-gray-500">Receive updates about your content</p>
-              </div>
-              <input
-                type="checkbox"
-                defaultChecked
-                className="h-5 w-5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
-              />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <p className="font-medium text-gray-900">New Lead Alerts</p>
-                <p className="text-sm text-gray-500">Get notified when new leads come in</p>
-              </div>
-              <input
-                type="checkbox"
-                defaultChecked
-                className="h-5 w-5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
-              />
-            </label>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   )
