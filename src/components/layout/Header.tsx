@@ -13,6 +13,8 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   const [profilePicture, setProfilePicture] = useState<string | null>(null)
   const [userName, setUserName] = useState<string>('')
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [userClientId, setUserClientId] = useState<string | null>(null)
   const supabase = createClient()
 
     interface NotificationRow {
@@ -40,17 +42,17 @@ export function Header({ title, subtitle }: HeaderProps) {
     data: { user },
   } = await supabase.auth.getUser()
   if (user) {
-    setCurrentUserId(user.id)
-
     const { data } = await supabase
       .from('users')
-      .select('name, profile_picture_url')
+      .select('name, profile_picture_url, role, client_id')
       .eq('id', user.id)
       .single()
 
     if (data) {
       setUserName(data.name || '')
       setProfilePicture(data.profile_picture_url)
+      setUserRole(data.role || null)
+      setUserClientId(data.client_id || null)
     }
   }
 }
@@ -143,6 +145,11 @@ export function Header({ title, subtitle }: HeaderProps) {
         data.title || ''
       }`
 
+      case 'approval_commented':
+  return `New comment on ${data.clientName || 'client'} approval: ${
+    data.title || ''
+  }`
+
     default:
       return 'Notification'
   }
@@ -199,20 +206,35 @@ export function Header({ title, subtitle }: HeaderProps) {
   markAsRead(n.id)
   setShowNotif(false)
 
-  const data = n.data || {}
+  const data = (n as any).data || {}
 
-  // Navigate to task if available
+  // Task notifications (if you still use them)
   if (data.taskId) {
     router.push(`/tasks?taskId=${data.taskId}`)
     return
   }
 
-  // Navigate to approvals if this is an approval notification
-  if (n.type === 'approval_created' || n.type === 'approval_approved') {
-    // later: `/approvals/${data.approvalId}` when detail page exists
-    router.push('/approvals')
+  // Approval notifications
+  if (
+    n.type === 'approval_created' ||
+    n.type === 'approval_approved' ||
+    n.type === 'approval_commented'
+  ) {
+    const approvalPath = data.approvalId
+      ? `/${data.approvalId}`
+      : ''
+
+    if (userRole === 'client') {
+      // Client → portal approvals
+      router.push(`/portal/approvals${approvalPath}`)
+    } else {
+      // Agency team → dashboard approvals
+      router.push(`/approvals${approvalPath}`)
+    }
     return
   }
+
+  // Default: nothing special
 }}
                       className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
                         !n.read_at ? 'bg-blue-50/60' : ''

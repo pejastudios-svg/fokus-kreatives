@@ -442,13 +442,13 @@ export default function ApprovalsPage() {
 
                       <div className="flex items-center gap-2">
   <Button
-    variant="outline"
-    size="sm"
-    onClick={() => router.push('/approvals')} // later: /approvals/[id]
-  >
-    <ExternalLink className="h-4 w-4 mr-1" />
-    Open
-  </Button>
+  variant="outline"
+  size="sm"
+  onClick={() => router.push(`/approvals/${a.id}`)}
+>
+  <ExternalLink className="h-4 w-4 mr-1" />
+  Open
+</Button>
   <Button
   size="sm"
   onClick={() =>

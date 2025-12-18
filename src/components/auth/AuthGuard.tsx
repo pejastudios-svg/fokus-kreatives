@@ -17,29 +17,36 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   useEffect(() => {
   const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-      
-    if (!user) {
-      router.push('/login')
-      return
-    }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    // ADD: ensure a users row exists
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (!userRow) {
-      await supabase.auth.signOut()
-      router.push('/login')
-      return
-    }
-
-    setIsAuthenticated(true)
-    setIsLoading(false)
+  if (!user) {
+    router.push('/login')
+    return
   }
+
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id, role, client_id')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!userRow) {
+    await supabase.auth.signOut()
+    router.push('/login')
+    return
+  }
+
+  if (userRow.role === 'client') {
+    setIsLoading(false)
+    router.push('/portal/approvals')
+    return
+  }
+
+  setIsAuthenticated(true)
+  setIsLoading(false)
+}
 
   checkAuth()
 

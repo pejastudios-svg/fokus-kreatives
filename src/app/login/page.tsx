@@ -41,13 +41,32 @@ export default function LoginPage() {
     })
 
     if (error) {
-      setError(error.message)
-      setIsLoading(false)
-      return
-    }
-
+  setError(error.message)
+  setIsLoading(false)
+  return
+}
+// Determine role and redirect accordingly
+const {
+  data: { user },
+} = await supabase.auth.getUser()
+if (user) {
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('role, client_id')
+    .eq('id', user.id)
+    .single()
+    if (userRow?.role === 'client') {
+    // Client: go to portal approvals
+    router.push('/portal/approvals')
+  } else {
+    // Agency team: go to main dashboard
     router.push('/dashboard')
   }
+} else {
+  router.push('/dashboard')
+}
+}
+    
 
   if (isChecking) {
     return (

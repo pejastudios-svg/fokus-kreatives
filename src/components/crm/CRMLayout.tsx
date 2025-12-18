@@ -53,8 +53,33 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   const router = useRouter()
   const params = useParams()
   const clientId = params.clientId as string
+  const STORAGE_KEY = `crm-notif-counts-${clientId}`
   const supabase = createClient()
-      const handleNavClick = (itemName: string) => {
+  const handleNavClick = (itemName: string, itemHref: string) => {
+  console.log(`Clicked ${itemName}, current path: ${pathname}, href: ${itemHref}`)
+  const handleNavClick = (itemName: string) => {
+  switch (itemName) {
+    case 'Leads':
+      // Mark leads as viewed and clear count
+      setLeadsViewed(true)
+      setNewLeadsCount(0)
+      break
+    case 'Meetings':
+      // Mark meetings as viewed and clear count
+      setMeetingsViewed(true)
+      setNewMeetingsCount(0)
+      break
+    default:
+      break
+  }
+}
+  
+  // Only clear counts if we're NOT already on this page
+  // Using includes() to match both "/leads" and "/leads/123" etc.
+  const isAlreadyOnPage = pathname.includes(itemHref)
+  
+  if (!isAlreadyOnPage) {
+    console.log(`Clearing counts for ${itemName}`)
     switch (itemName) {
       case 'Leads':
         setNewLeadsCount(0)
@@ -65,7 +90,10 @@ export function CRMLayout({ children }: CRMLayoutProps) {
       default:
         break
     }
+  } else {
+    console.log(`Already on ${itemName} page, not clearing counts`)
   }
+}
 
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -76,10 +104,34 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   const [userPicture, setUserPicture] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [leadsViewed, setLeadsViewed] = useState(false)
+  const [meetingsViewed, setMeetingsViewed] = useState(false)
 
     // New leads/meetings counts for this CRM
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   const [newMeetingsCount, setNewMeetingsCount] = useState(0)
+
+  useEffect(() => {
+  // When user navigates away from leads page, reset leads viewed status
+  if (!pathname.includes('/leads')) {
+    setLeadsViewed(false)
+  }
+  
+  // When user navigates away from meetings page, reset meetings viewed status
+  if (!pathname.includes('/meetings')) {
+    setMeetingsViewed(false)
+  }
+}, [pathname])
+
+useEffect(() => {
+  // When page loads, clear counts if we're on the relevant page
+  if (pathname.includes('/leads')) {
+    setNewLeadsCount(0)
+  }
+  if (pathname.includes('/meetings')) {
+    setNewMeetingsCount(0)
+  }
+}, []) // Empty dependency array means this runs once on mount
 
   // Popup notification for this CRM
   const [popup, setPopup] = useState<{
@@ -90,6 +142,41 @@ export function CRMLayout({ children }: CRMLayoutProps) {
 
   const popupTimerRef = useRef<NodeJS.Timeout | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+
+  // Load counts from localStorage on initial load
+useEffect(() => {
+  if (typeof window === 'undefined') return
+  
+  // Load counts
+  const savedLeadsCount = localStorage.getItem(`crm-${clientId}-leads-count`)
+  const savedMeetingsCount = localStorage.getItem(`crm-${clientId}-meetings-count`)
+  
+  if (savedLeadsCount) setNewLeadsCount(parseInt(savedLeadsCount))
+  if (savedMeetingsCount) setNewMeetingsCount(parseInt(savedMeetingsCount))
+  
+  // Load viewed status
+  const leadsViewedStatus = localStorage.getItem(`crm-${clientId}-leads-viewed`)
+  const meetingsViewedStatus = localStorage.getItem(`crm-${clientId}-meetings-viewed`)
+  
+  if (leadsViewedStatus === 'true') setLeadsViewed(true)
+  if (meetingsViewedStatus === 'true') setMeetingsViewed(true)
+}, [clientId])
+
+// Save counts to localStorage whenever they change
+useEffect(() => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(`crm-${clientId}-leads-count`, newLeadsCount.toString())
+  localStorage.setItem(`crm-${clientId}-meetings-count`, newMeetingsCount.toString())
+}, [clientId, newLeadsCount, newMeetingsCount])
+
+// Save viewed status
+useEffect(() => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(`crm-${clientId}-leads-viewed`, leadsViewed.toString())
+  localStorage.setItem(`crm-${clientId}-meetings-viewed`, meetingsViewed.toString())
+}, [clientId, leadsViewed, meetingsViewed])
+
 
     useEffect(() => {
     // Prepare notification sound for this CRM
@@ -246,21 +333,25 @@ export function CRMLayout({ children }: CRMLayoutProps) {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-        console.log('Realtime lead INSERT for CRM', clientId, payload)
-          const newLead = payload.new as any
-          const leadName =
-            newLead.data?.name ||
-            newLead.name ||
-            'New lead'
+  console.log('Realtime lead INSERT for CRM', clientId, payload)
+  const newLead = payload.new as any
+  const leadName =
+    newLead.data?.name ||
+    newLead.name ||
+    'New lead'
 
-          setNewLeadsCount((prev) => prev + 1)
-          setPopup({
-            type: 'lead',
-            title: 'New lead added',
-            subtitle: leadName,
-          })
-          playNotificationSound()
-        }
+            // Only increment if leads page hasn't been viewed
+  if (!leadsViewed) {
+    setNewLeadsCount((prev) => prev + 1)
+  }
+  
+  setPopup({
+    type: 'lead',
+    title: 'New lead added',
+    subtitle: leadName,
+  })
+  playNotificationSound()
+}
       )
       .subscribe()
 
@@ -276,18 +367,22 @@ export function CRMLayout({ children }: CRMLayoutProps) {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-        console.log('Realtime meeting INSERT for CRM', clientId, payload)
-          const newMeeting = payload.new as any
-          const meetingTitle = newMeeting.title || 'New meeting'
+  console.log('Realtime meeting INSERT for CRM', clientId, payload)
+  const newMeeting = payload.new as any
+  const meetingTitle = newMeeting.title || 'New meeting'
 
-          setNewMeetingsCount((prev) => prev + 1)
-          setPopup({
-            type: 'meeting',
-            title: 'New meeting scheduled',
-            subtitle: meetingTitle,
-          })
-          playNotificationSound()
-        }
+  // Only increment if meetings page hasn't been viewed
+  if (!meetingsViewed) {
+    setNewMeetingsCount((prev) => prev + 1)
+  }
+  
+  setPopup({
+    type: 'meeting',
+    title: 'New meeting scheduled',
+    subtitle: meetingTitle,
+  })
+  playNotificationSound()
+}
       )
       .subscribe()
 
@@ -417,67 +512,65 @@ export function CRMLayout({ children }: CRMLayoutProps) {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + '/')
 
-            const showLeadsBadge =
-              item.name === 'Leads' && newLeadsCount > 0
-            const showMeetingsBadge =
-              item.name === 'Meetings' && newMeetingsCount > 0
+            const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0 && !leadsViewed
+            const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0 && !meetingsViewed
 
             const badgeValue = (count: number) =>
               count > 9 ? '9+' : String(count)
 
             return sidebarOpen ? (
               <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => handleNavClick(item.name)}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
-                    : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
-                )}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                <span className="flex-1">{item.name}</span>
+  key={item.name}
+  href={item.href}
+  onClick={() => handleNavClick(item.name)}
+  className={cn(
+    'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
+    isActive
+      ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
+      : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
+  )}
+>
+  <item.icon className="h-5 w-5 flex-shrink-0" />
+  <span className="flex-1">{item.name}</span>
 
-                {showLeadsBadge && (
-                  <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold shadow-[0_0_8px_rgba(43,121,247,0.8)]">
-                    {badgeValue(newLeadsCount)}
-                  </span>
-                )}
-                {showMeetingsBadge && (
-                  <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold shadow-[0_0_8px_rgba(43,121,247,0.8)]">
-                    {badgeValue(newMeetingsCount)}
-                  </span>
-                )}
-              </Link>
+  {showLeadsBadge && (
+    <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold shadow-[0_0_8px_rgba(43,121,247,0.8)]">
+      {badgeValue(newLeadsCount)}
+    </span>
+  )}
+  {showMeetingsBadge && (
+    <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold shadow-[0_0_8px_rgba(43,121,247,0.8)]">
+      {badgeValue(newMeetingsCount)}
+    </span>
+  )}
+</Link>
             ) : (
               <Tooltip key={item.name} content={item.name} position="right">
-                <Link
-                  href={item.href}
-                  onClick={() => handleNavClick(item.name)}
-                  className={cn(
-                    'relative flex items-center justify-center p-3 rounded-xl transition-all duration-200',
-                    isActive
-                      ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
-                      : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
-                  )}
-                >
-                  <div className="relative">
-                    <item.icon className="h-5 w-5" />
-                    {showLeadsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center shadow-[0_0_6px_rgba(43,121,247,0.8)]">
-                        {badgeValue(newLeadsCount)}
-                      </span>
-                    )}
-                    {showMeetingsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center shadow-[0_0_6px_rgba(43,121,247,0.8)]">
-                        {badgeValue(newMeetingsCount)}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </Tooltip>
+  <Link
+    href={item.href}
+    onClick={() => handleNavClick(item.name)}
+    className={cn(
+      'relative flex items-center justify-center p-3 rounded-xl transition-all duration-200',
+      isActive
+        ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
+        : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
+    )}
+  >
+    <div className="relative">
+      <item.icon className="h-5 w-5" />
+      {showLeadsBadge && (
+        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center shadow-[0_0_6px_rgba(43,121,247,0.8)]">
+          {badgeValue(newLeadsCount)}
+        </span>
+      )}
+      {showMeetingsBadge && (
+        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center shadow-[0_0_6px_rgba(43,121,247,0.8)]">
+          {badgeValue(newMeetingsCount)}
+        </span>
+      )}
+    </div>
+  </Link>
+</Tooltip>
             )
           })}
         </nav>

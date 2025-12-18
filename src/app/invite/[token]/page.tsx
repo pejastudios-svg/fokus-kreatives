@@ -103,10 +103,11 @@ const [confirmPassword, setConfirmPassword] = useState('')
     }
 
     setTimeout(() => {
-  if (userData?.client_id) {
+  if (userData?.role === 'client') {
+    // Always send clients to portal approvals after invite activation
+    router.push('/portal/approvals')
+  } else if (userData?.client_id) {
     router.push(`/crm/${userData.client_id}/dashboard`)
-  } else if (userData?.role === 'client') {
-    router.push('/portal/dashboard')
   } else {
     router.push('/dashboard')
   }

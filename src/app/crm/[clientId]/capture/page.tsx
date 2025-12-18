@@ -59,6 +59,40 @@ export default function CRMCapturePages() {
   const [copyingId, setCopyingId] = useState<string | null>(null)
   const [pageToDelete, setPageToDelete] = useState<CapturePage | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [slugError, setSlugError] = useState<string | null>(null);
+  const checkSlugAvailability = async (slug: string) => {
+  if (!slug || editingPage) return; // Skip check if editing
+  
+  const { data, error } = await supabase
+    .from('capture_pages')
+    .select('id')
+    .eq('slug', slug)
+    .eq('client_id', clientId);
+
+  if (error) {
+    console.error('Error checking slug:', error);
+    return;
+  }
+
+  if (data && data.length > 0) {
+    setSlugError(`Slug "${slug}" is already taken.`);
+  } else {
+    setSlugError(null);
+  }
+};
+
+// Modify the slug change handler
+const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+  setForm(prev => ({ ...prev, slug: value }));
+  
+  // Check availability after a short delay
+  const timeoutId = setTimeout(() => {
+    checkSlugAvailability(value);
+  }, 500);
+  
+  return () => clearTimeout(timeoutId);
+};
 
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -132,37 +166,15 @@ export default function CRMCapturePages() {
   }
 
   const handleSave = async () => {
-    if (!form.name || !form.slug) return
-    setIsSaving(true)
+  if (!form.name || !form.slug) return;
+  setIsSaving(true);
 
-    try {
-      if (editingPage) {
-        const { error } = await supabase
-          .from('capture_pages')
-          .update({
-            name: form.name,
-            slug: form.slug,
-            headline: form.headline || null,
-            description: form.description || null,
-            lead_magnet_url: form.lead_magnet_url || null,
-            logo_url: form.logo_url || null,
-            is_active: form.is_active,
-            include_meeting: form.include_meeting,
-            calendly_url: form.calendly_url || null,
-          })
-          .eq('id', editingPage.id)
-
-        if (error) {
-          console.error('Update capture page error:', error)
-        } else {
-          setNotification('Capture page updated')
-          setTimeout(() => setNotification(null), 3000)
-          setShowModal(false)
-          await loadPages()
-        }
-      } else {
-        const { error } = await supabase.from('capture_pages').insert({
-          client_id: clientId,
+  try {
+    if (editingPage) {
+      // Update logic (same as before)
+      const { error } = await supabase
+        .from('capture_pages')
+        .update({
           name: form.name,
           slug: form.slug,
           headline: form.headline || null,
@@ -173,20 +185,70 @@ export default function CRMCapturePages() {
           include_meeting: form.include_meeting,
           calendly_url: form.calendly_url || null,
         })
+        .eq('id', editingPage.id);
 
-        if (error) {
-          console.error('Create capture page error:', error)
-        } else {
-          setNotification('Capture page created')
-          setTimeout(() => setNotification(null), 3000)
-          setShowModal(false)
-          await loadPages()
-        }
+      if (error) {
+        console.error('Update capture page error:', error);
+        // Show error to user
+        setNotification(`Error: ${error.message}`);
+        setTimeout(() => setNotification(null), 3000);
+      } else {
+        setNotification('Capture page updated');
+        setTimeout(() => setNotification(null), 3000);
+        setShowModal(false);
+        await loadPages();
       }
-    } finally {
-      setIsSaving(false)
+    } else {
+      // CREATE NEW PAGE - Check if slug exists first
+      const { data: existingPages, error: checkError } = await supabase
+        .from('capture_pages')
+        .select('id, slug')
+        .eq('slug', form.slug)
+        .eq('client_id', clientId);
+
+      if (checkError) {
+        console.error('Error checking slug:', checkError);
+        setNotification('Error checking availability');
+        setTimeout(() => setNotification(null), 3000);
+        return;
+      }
+
+      if (existingPages && existingPages.length > 0) {
+        // Slug already exists for this client
+        setNotification(`Slug "${form.slug}" is already taken. Please choose a different one.`);
+        setTimeout(() => setNotification(null), 3000);
+        return;
+      }
+
+      // Slug is unique, proceed with insert
+      const { error } = await supabase.from('capture_pages').insert({
+        client_id: clientId,
+        name: form.name,
+        slug: form.slug,
+        headline: form.headline || null,
+        description: form.description || null,
+        lead_magnet_url: form.lead_magnet_url || null,
+        logo_url: form.logo_url || null,
+        is_active: form.is_active,
+        include_meeting: form.include_meeting,
+        calendly_url: form.calendly_url || null,
+      });
+
+      if (error) {
+        console.error('Create capture page error:', JSON.stringify(error, null, 2));
+        setNotification(`Error: ${error.message}`);
+        setTimeout(() => setNotification(null), 3000);
+      } else {
+        setNotification('Capture page created');
+        setTimeout(() => setNotification(null), 3000);
+        setShowModal(false);
+        await loadPages();
+      }
     }
+  } finally {
+    setIsSaving(false);
   }
+};
 
   const handleDelete = async () => {
     if (!pageToDelete) return
@@ -376,9 +438,10 @@ export default function CRMCapturePages() {
                   label="Slug (URL)"
                   name="slug"
                   value={form.slug}
-                  onChange={handleFormChange}
+                  onChange={handleSlugChange}
                   placeholder="free-guide"
-                />
+                  error={slugError}
+                  />
                 <Input
                   label="Headline"
                   name="headline"
@@ -483,9 +546,13 @@ export default function CRMCapturePages() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSave} isLoading={isSaving}>
-                  Save
-                </Button>
+                <Button 
+  onClick={handleSave} 
+  isLoading={isSaving}
+  disabled={!!slugError || !form.name || !form.slug}
+>
+  Save
+</Button>
               </div>
             </div>
           </div>
