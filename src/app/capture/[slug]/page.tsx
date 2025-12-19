@@ -242,7 +242,7 @@ export default function PublicCapturePage() {
           ? 'After you book, confirm the date and time you scheduled'
           : 'Preferred meeting time'}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           label={
             pageInfo.calendly_url ? 'Date you scheduled' : 'Preferred date'
