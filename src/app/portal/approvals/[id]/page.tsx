@@ -134,6 +134,27 @@ export default function PortalApprovalDetailPage() {
     await init() // portal version: loads approval, items, assignees, comments, and user
 
     channel = supabase
+     .channel(`approval-live-${approvalId}`)
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approval_comments', filter: `approval_id=eq.${approvalId}` },
+    () => loadComments()
+  )
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approval_items', filter: `approval_id=eq.${approvalId}` },
+    () => {
+      loadItems()
+      loadApproval()
+    }
+  )
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approvals', filter: `id=eq.${approvalId}` },
+    () => loadApproval()
+  )
+  .subscribe()
+
       .channel(`portal-approval-comments-${approvalId}`)
       .on(
         'postgres_changes',
@@ -330,25 +351,12 @@ export default function PortalApprovalDetailPage() {
       } else {
         // If all items are approved, set approval to approved & sync ClickUp
         // If any item is pending, set approval to pending
-        const finalItems = await supabase
-          .from('approval_items')
-          .select('status')
-          .eq('approval_id', approvalId)
-
-        const allApproved =
-          finalItems.data?.length &&
-          finalItems.data.every((i: any) => i.status === 'approved')
-
-        await fetch('/api/approvals/approve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            approvalId,
-            actorId: currentUserId,
-            approved: allApproved,
-          }),
-        })
-        await loadApproval()
+        await fetch('/api/approvals/recompute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ approvalId, actorId: currentUserId }),
+})
+await loadApproval()
       }
     } catch (err) {
       console.error('Toggle item exception', err)
@@ -628,8 +636,8 @@ export default function PortalApprovalDetailPage() {
       <div className="p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
         {/* Top card */}
         <Card>
-  <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 break-words">
-    <div className="max-w-full">
+  <CardContent className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+  <div className="flex-1 min-w-0">
       {approval.description && (
         <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-words">
           {approval.description}
@@ -653,7 +661,7 @@ export default function PortalApprovalDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"

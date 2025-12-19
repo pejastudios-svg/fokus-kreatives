@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
+import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -90,9 +91,11 @@ export function PortalLayout({ children }: PortalLayoutProps) {
       
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+<main className="flex-1 overflow-auto">
+  {children}
+</main>
+
+<NotificationPopupListener />
     </div>
   )
 }

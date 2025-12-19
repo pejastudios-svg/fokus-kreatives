@@ -62,26 +62,27 @@ export function Header({ title, subtitle }: HeaderProps) {
   }, [])
 
   const loadNotifications = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20)
+  setCurrentUserId(user.id) // IMPORTANT so realtime subscription starts
 
-    if (error) {
-      console.error('Load notifications error:', error)
-      return
-    }
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', user.id)     // IMPORTANT: only this user's notifications
+    .order('created_at', { ascending: false })
+    .limit(20)
 
-    const rows = (data || []) as NotificationRow[]
-    setNotifications(rows)
-    setUnreadCount(rows.filter(n => !n.read_at).length)
+  if (error) {
+    console.error('Load notifications error:', error)
+    return
   }
+
+  const rows = (data || []) as NotificationRow[]
+  setNotifications(rows)
+  setUnreadCount(rows.filter(n => !n.read_at).length)
+}
 
   useEffect(() => {
   if (!currentUserId) return
@@ -146,9 +147,10 @@ export function Header({ title, subtitle }: HeaderProps) {
       }`
 
       case 'approval_commented':
-  return `New comment on ${data.clientName || 'client'} approval: ${
-    data.title || ''
-  }`
+  return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
+
+case 'approval_mention':
+  return `You were mentioned in an approval: ${data.title || ''}`
 
     default:
       return 'Notification'

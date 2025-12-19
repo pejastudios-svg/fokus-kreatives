@@ -17,6 +17,8 @@ import {
   Link as LinkIcon,
   ExternalLink,
   Loader2,
+  Trash2,
+  X,
 } from 'lucide-react'
 
 interface Client {
@@ -93,6 +95,9 @@ export default function ApprovalsPage() {
   mode: 'approve' | 'unapprove'
 } | null>(null)
 
+  const [deleteConfirm, setDeleteConfirm] = useState<Approval | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   useEffect(() => {
     init()
   }, [])
@@ -160,6 +165,8 @@ export default function ApprovalsPage() {
 
   setApprovals(mapped)
 }
+
+
 
   const filteredApprovals = approvals.filter((a) => {
     const q = searchQuery.toLowerCase()
@@ -331,6 +338,30 @@ export default function ApprovalsPage() {
   }
 }
 
+const handleDeleteApproval = async (approvalId: string) => {
+  setIsDeleting(true)
+  try {
+    const res = await fetch('/api/approvals/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approvalId }),
+    })
+    const data = await res.json()
+    if (!data.success) {
+      alert(data.error || 'Failed to delete approval')
+      return
+    }
+
+    setApprovals(prev => prev.filter(a => a.id !== approvalId))
+  } catch (err) {
+    console.error('Delete approval exception:', err)
+    alert('Failed to delete approval')
+  } finally {
+    setIsDeleting(false)
+    setDeleteConfirm(null)
+  }
+}
+
   return (
     <DashboardLayout>
       <Header
@@ -429,45 +460,39 @@ export default function ApprovalsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          isApproved
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}
-                      >
-                        {isApproved ? '✅ APPROVED' : '⏳ WAITING FOR FEEDBACK'}
-                      </span>
-
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => router.push(`/approvals/${a.id}`)}
+  >
+    <ExternalLink className="h-4 w-4 mr-1" />
+    Open
+  </Button>
+  <Button
+    size="sm"
+    onClick={() =>
+      setConfirmAction({
+        approvalId: a.id,
+        mode: isApproved ? 'unapprove' : 'approve',
+      })
+    }
+    isLoading={approvingId === a.id}
+    className="bg-[#2B79F7] hover:bg-[#1E54B7] shadow-premium"
+  >
+    {isApproved ? 'Approved' : 'Approve'}
+  </Button>
   <Button
   variant="outline"
   size="sm"
-  onClick={() => router.push(`/approvals/${a.id}`)}
+  className="border-red-200 text-red-600 hover:bg-red-50"
+  onClick={() => setDeleteConfirm(a)}
+  aria-label="Delete approval"
+  title="Delete"
 >
-  <ExternalLink className="h-4 w-4 mr-1" />
-  Open
-</Button>
-  <Button
-  size="sm"
-  onClick={() =>
-    setConfirmAction({
-      approvalId: a.id,
-      mode: isApproved ? 'unapprove' : 'approve',
-    })
-  }
-  isLoading={approvingId === a.id}
-  className={
-    isApproved
-      ? 'bg-[#2B79F7] hover:bg-[#1E54B7] shadow-premium'
-      : 'bg-[#2B79F7] hover:bg-[#1E54B7] shadow-premium'
-  }
->
-  {isApproved ? 'Approved' : 'Approve'}
+  <Trash2 className="h-4 w-4" />
 </Button>
 </div>
-                    </div>
                   </CardContent>
                 </Card>
               )
@@ -729,28 +754,22 @@ export default function ApprovalsPage() {
             : 'Revert approval?'}
         </h3>
       </div>
+
       <div className="px-4 py-3 text-sm text-gray-600">
         {confirmAction.mode === 'approve' ? (
           <p>
-            This will mark all assets in this approval as{' '}
-            <span className="font-semibold">Approved</span> and update the
-            linked ClickUp task (if any) to{' '}
-            <span className="font-semibold">✅ APPROVED</span>.
+            This will mark all assets as <span className="font-semibold">Approved</span> and update
+            the linked ClickUp task (if any).
           </p>
         ) : (
           <p>
-            This will revert this approval back to{' '}
-            <span className="font-semibold">⏳ WAITING FOR FEEDBACK</span> and
-            update the linked ClickUp task accordingly.
+            This will revert this approval back to <span className="font-semibold">Waiting</span>.
           </p>
         )}
       </div>
+
       <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setConfirmAction(null)}
-        >
+        <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
           Cancel
         </Button>
         <Button
@@ -764,6 +783,50 @@ export default function ApprovalsPage() {
           }}
         >
           {confirmAction.mode === 'approve' ? 'Yes, approve' : 'Yes, revert'}
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
+{deleteConfirm && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+    <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm shadow-2xl">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">Delete Approval?</h3>
+        <button
+          type="button"
+          onClick={() => setDeleteConfirm(null)}
+          className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="px-4 py-3 text-sm text-gray-600">
+        <p>
+          This will permanently delete{' '}
+          <span className="font-semibold">“{deleteConfirm.title}”</span> and all attached assets and
+          comments. This cannot be undone.
+        </p>
+      </div>
+
+      <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDeleteConfirm(null)}
+          disabled={isDeleting}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => handleDeleteApproval(deleteConfirm.id)}
+          isLoading={isDeleting}
+          className="bg-red-600 hover:bg-red-500"
+        >
+          Delete
         </Button>
       </div>
     </div>

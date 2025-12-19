@@ -105,6 +105,7 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [leadsViewed, setLeadsViewed] = useState(false)
+  const [countsLoaded, setCountsLoaded] = useState(false)
   const [meetingsViewed, setMeetingsViewed] = useState(false)
 
     // New leads/meetings counts for this CRM
@@ -151,31 +152,37 @@ useEffect(() => {
   // Load counts
   const savedLeadsCount = localStorage.getItem(`crm-${clientId}-leads-count`)
   const savedMeetingsCount = localStorage.getItem(`crm-${clientId}-meetings-count`)
-  
+
   if (savedLeadsCount) setNewLeadsCount(parseInt(savedLeadsCount))
   if (savedMeetingsCount) setNewMeetingsCount(parseInt(savedMeetingsCount))
   
   // Load viewed status
   const leadsViewedStatus = localStorage.getItem(`crm-${clientId}-leads-viewed`)
   const meetingsViewedStatus = localStorage.getItem(`crm-${clientId}-meetings-viewed`)
-  
+
   if (leadsViewedStatus === 'true') setLeadsViewed(true)
   if (meetingsViewedStatus === 'true') setMeetingsViewed(true)
+
+  setCountsLoaded(true)
 }, [clientId])
 
 // Save counts to localStorage whenever they change
 useEffect(() => {
   if (typeof window === 'undefined') return
+  if (!countsLoaded) return
+
   localStorage.setItem(`crm-${clientId}-leads-count`, newLeadsCount.toString())
   localStorage.setItem(`crm-${clientId}-meetings-count`, newMeetingsCount.toString())
-}, [clientId, newLeadsCount, newMeetingsCount])
+}, [clientId, newLeadsCount, newMeetingsCount, countsLoaded])
 
 // Save viewed status
 useEffect(() => {
   if (typeof window === 'undefined') return
+  if (!countsLoaded) return
+
   localStorage.setItem(`crm-${clientId}-leads-viewed`, leadsViewed.toString())
   localStorage.setItem(`crm-${clientId}-meetings-viewed`, meetingsViewed.toString())
-}, [clientId, leadsViewed, meetingsViewed])
+}, [clientId, leadsViewed, meetingsViewed, countsLoaded])
 
 
     useEffect(() => {

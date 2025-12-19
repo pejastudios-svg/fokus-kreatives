@@ -135,6 +135,26 @@ export default function ApprovalDetailPage() {
 
     // Set up realtime for comments on this approval
     channel = supabase
+  .channel(`approval-live-${approvalId}`)
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approval_comments', filter: `approval_id=eq.${approvalId}` },
+    () => loadComments()
+  )
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approval_items', filter: `approval_id=eq.${approvalId}` },
+    () => {
+      loadItems()
+      loadApproval()
+    }
+  )
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'approvals', filter: `id=eq.${approvalId}` },
+    () => loadApproval()
+  )
+  .subscribe()
       .channel(`approval-comments-${approvalId}`)
       .on(
         'postgres_changes',
@@ -335,25 +355,12 @@ export default function ApprovalDetailPage() {
       } else {
         // If all items are approved, set approval to approved & sync ClickUp
         // If any item is pending, set approval to pending
-        const finalItems = await supabase
-          .from('approval_items')
-          .select('status')
-          .eq('approval_id', approvalId)
-
-        const allApproved =
-          finalItems.data?.length &&
-          finalItems.data.every((i: any) => i.status === 'approved')
-
-        await fetch('/api/approvals/approve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            approvalId,
-            actorId: currentUserId,
-            approved: allApproved,
-          }),
-        })
-        await loadApproval()
+        await fetch('/api/approvals/recompute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ approvalId, actorId: currentUserId }),
+})
+await loadApproval()
       }
     } catch (err) {
       console.error('Toggle item exception', err)

@@ -108,6 +108,54 @@ export async function POST(req: NextRequest) {
       console.error('Approval comment in-app notification error:', notifyErr)
     }
 
+    // 4b) Mention-specific notifications (@FirstName)
+try {
+  const mentionedFirstNames = content
+    .split(/\s+/)
+    .filter(w => w.startsWith('@') && w.length > 1)
+    .map(w => w.slice(1).toLowerCase())
+
+  if (
+    mentionedFirstNames.length > 0 &&
+    uniqueWatcherIds.length > 0
+  ) {
+    const { data: mentionableUsers } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', uniqueWatcherIds)
+
+    const mentionedIds =
+      (mentionableUsers || [])
+        .filter(u => {
+          const first = (u.name || '')
+            .split(' ')[0]
+            .toLowerCase()
+          return mentionedFirstNames.includes(first)
+        })
+        .map(u => u.id)
+
+    if (mentionedIds.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds: mentionedIds,
+          type: 'approval_mention',
+          data: {
+            approvalId,
+            title: approval?.title || '',
+            clientName: clientDisplayName,
+            commentPreview: content.slice(0, 120),
+            actorId: userId,
+          },
+        }),
+      })
+    }
+  }
+} catch (mentionErr) {
+  console.error('Approval mention notification error:', mentionErr)
+}
+
     // 5) Email notifications via Apps Script
     try {
       const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
