@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
       .eq('id', approvalId)
       .single()
 
+  const relClients: any = (approval as any)?.clients
+  const clientDisplayName =
+  (Array.isArray(relClients)
+    ? relClients[0]?.business_name || relClients[0]?.name
+    : relClients?.business_name || relClients?.name) || 'Client'
+
     if (apprErr || !approval) {
       return NextResponse.json({ success: false, error: 'Approval not found' }, { status: 404 })
     }
@@ -36,6 +42,7 @@ export async function POST(req: NextRequest) {
 
     const allApproved = (items || []).length > 0 && (items || []).every((i: any) => i.status === 'approved')
     const newStatus = allApproved ? 'approved' : 'pending'
+    const statusWas = approval.status
 
     // Only write if changed
     if (approval.status !== newStatus) {
@@ -44,6 +51,92 @@ export async function POST(req: NextRequest) {
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', approvalId)
     }
+
+    // Notify + email when it transitions to approved
+if (statusWas !== 'approved' && newStatus === 'approved') {
+  // Load assignees
+  const { data: assigneesRows } = await supabase
+    .from('approval_assignees')
+    .select('user_id')
+    .eq('approval_id', approvalId)
+
+  const assigneeIds = Array.from(
+    new Set((assigneesRows || []).map((r: any) => r.user_id).filter(Boolean))
+  ).filter((id) => id !== actorId)
+
+  // In-app notification (drives popup + sound)
+  if (assigneeIds.length > 0) {
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userIds: assigneeIds,
+        type: 'approval_approved',
+        data: {
+          approvalId,
+          title: approval.title,
+          clientName: clientDisplayName,
+        },
+      }),
+    })
+
+    // Emails via Apps Script, split client/team URLs
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .in('id', assigneeIds)
+
+    const clientEmails = (users || [])
+      .filter((u: any) => u.role === 'client')
+      .map((u: any) => u.email)
+      .filter(Boolean)
+
+    const teamEmails = (users || [])
+      .filter((u: any) => u.role !== 'client')
+      .map((u: any) => u.email)
+      .filter(Boolean)
+
+    const secret = process.env.APPS_SCRIPT_SECRET
+    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
+    const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+
+    if (secret && clientEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_approved',
+          payload: {
+            secret,
+            to: clientEmails,
+            clientName: clientDisplayName,
+            approvalTitle: approval.title,
+            approvalId,
+            url: portalUrl,
+          },
+        }),
+      })
+    }
+
+    if (secret && teamEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_approved',
+          payload: {
+            secret,
+            to: teamEmails,
+            clientName: clientDisplayName,
+            approvalTitle: approval.title,
+            approvalId,
+            url: agencyUrl,
+          },
+        }),
+      })
+    }
+  }
+}
 
     if (approval.clickup_task_id) {
       await updateClickUpStatus(

@@ -61,12 +61,10 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   const handleNavClick = (itemName: string) => {
   switch (itemName) {
     case 'Leads':
-      // Mark leads as viewed and clear count
       setLeadsViewed(true)
       setNewLeadsCount(0)
       break
     case 'Meetings':
-      // Mark meetings as viewed and clear count
       setMeetingsViewed(true)
       setNewMeetingsCount(0)
       break

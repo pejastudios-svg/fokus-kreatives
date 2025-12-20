@@ -440,7 +440,7 @@ const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                   value={form.slug}
                   onChange={handleSlugChange}
                   placeholder="free-guide"
-                  error={slugError}
+                  error={slugError ?? undefined}
                   />
                 <Input
                   label="Headline"
