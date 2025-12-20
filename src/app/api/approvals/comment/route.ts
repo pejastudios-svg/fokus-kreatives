@@ -7,37 +7,51 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function extractMentions(text: string): string[] {
+  const re = /@([a-zA-Z0-9_]+)/g
+  const out: string[] = []
+  for (const m of text.matchAll(re)) {
+    if (m[1]) out.push(m[1].toLowerCase())
+  }
+  return Array.from(new Set(out))
+}
+
+function normalizeKey(s: string) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9_]/g, '')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const {
-      approvalId,
-      approvalItemId,
-      userId,
-      content,
-      fileUrl,
-      fileName,
-      parentCommentId,
-    } = body
 
-    if (!approvalId || !userId || !content) {
+    const approvalId = body.approvalId as string
+    const approvalItemId = (body.approvalItemId as string | null) || null
+    const userId = body.userId as string
+    const contentRaw = (body.content || '').toString()
+    const fileUrl = (body.fileUrl as string | null) || null
+    const fileName = (body.fileName as string | null) || null
+    const parentCommentId = (body.parentCommentId as string | null) || null
+
+    const content = contentRaw.trim()
+
+    if (!approvalId || !userId || (!content && !fileUrl)) {
       return NextResponse.json(
-        { success: false, error: 'Missing approvalId, userId, or content' },
+        { success: false, error: 'Missing approvalId, userId, or content/file' },
         { status: 400 }
       )
     }
 
-    // Insert comment
+    // 1) Insert comment
     const { data: commentRow, error: insertError } = await supabase
       .from('approval_comments')
       .insert({
         approval_id: approvalId,
-        approval_item_id: approvalItemId || null,
+        approval_item_id: approvalItemId,
         user_id: userId,
-        content,
-        file_url: fileUrl || null,
-        file_name: fileName || null,
-        parent_comment_id: parentCommentId || null,
+        content: content || '',
+        file_url: fileUrl,
+        file_name: fileName,
+        parent_comment_id: parentCommentId,
       })
       .select()
       .single()
@@ -50,116 +64,149 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Load approval + client for context
+    // 2) Load approval + client name
     const { data: approval } = await supabase
       .from('approvals')
-      .select(
-        'id, title, client_id, clients(name, business_name)'
-      )
+      .select('id, title, client_id, clients(name, business_name)')
       .eq('id', approvalId)
       .single()
 
+    const relClients: any = (approval as any)?.clients
     const clientDisplayName =
-      (approval?.clients?.business_name as string) ||
-      (approval?.clients?.name as string) ||
-      'Client'
+      (Array.isArray(relClients)
+        ? relClients[0]?.business_name || relClients[0]?.name
+        : relClients?.business_name || relClients?.name) || 'Client'
 
-    // Load assignees with user info (for mention matching)
-const { data: assigneesRows } = await supabase
-  .from('approval_assignees')
-  .select('user_id, users(name, email)')
-  .eq('approval_id', approvalId)
+    // Mentions-only notifications (if no @mentions, notify nobody)
+    const mentionTokens = extractMentions(content)
+    if (mentionTokens.length === 0) {
+      return NextResponse.json({ success: true, comment: commentRow })
+    }
 
-const mentionTokens = extractMentions(content)
+    // 3) Load approval assignees (to resolve mentions to user IDs)
+    const { data: assigneesRows } = await supabase
+      .from('approval_assignees')
+      .select('user_id, users(name, email)')
+      .eq('approval_id', approvalId)
 
-// Build map: token -> userId
-const tokenToUserId = new Map<string, string>()
-for (const row of assigneesRows || []) {
-  const u = (row as any).users
-  const userId = (row as any).user_id as string
-  const name = (Array.isArray(u) ? u[0]?.name : u?.name) || ''
-  const email = (Array.isArray(u) ? u[0]?.email : u?.email) || ''
+    const tokenToUserId = new Map<string, string>()
 
-  const first = normalizeKey(name.split(' ')[0] || '')
-  const full = normalizeKey(name.replace(/\s+/g, ''))
-  const emailLocal = normalizeKey((email.split('@')[0] || ''))
+    for (const row of assigneesRows || []) {
+      const u = (row as any).users
+      const uid = (row as any).user_id as string
 
-  if (first) tokenToUserId.set(first, userId)
-  if (full) tokenToUserId.set(full, userId)
-  if (emailLocal) tokenToUserId.set(emailLocal, userId)
-}
+      const name = (Array.isArray(u) ? u[0]?.name : u?.name) || ''
+      const email = (Array.isArray(u) ? u[0]?.email : u?.email) || ''
 
-// Mention targets ONLY
-const mentionTargetIds = Array.from(
-  new Set(
-    mentionTokens
-      .map(t => tokenToUserId.get(normalizeKey(t)))
-      .filter(Boolean) as string[]
-  )
-).filter((id) => id !== userId) // don't notify the commenter
+      const first = normalizeKey(name.split(' ')[0] || '')
+      const full = normalizeKey(name.replace(/\s+/g, ''))
+      const emailLocal = normalizeKey((email.split('@')[0] || ''))
 
-    const watcherIds = (assigneesRows || []).map((r: any) => r.user_id).filter(Boolean)
-    const uniqueWatcherIds = Array.from(new Set(watcherIds))
+      if (first) tokenToUserId.set(first, uid)
+      if (full) tokenToUserId.set(full, uid)
+      if (emailLocal) tokenToUserId.set(emailLocal, uid)
+    }
 
-    // In-app notifications: approval_mention (mentions only)
-try {
-  if (mentionTargetIds.length > 0) {
-    await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userIds: mentionTargetIds,
-        type: 'approval_mention',
-        data: {
-          approvalId,
-          itemId: approvalItemId || null,
-          clientName: clientDisplayName,
-          title: approval?.title || '',
-          commentId: commentRow.id,
-          contentSnippet: content.length > 120 ? content.slice(0, 120) + '...' : content,
-        },
-      }),
-    })
-  }
-} catch (notifyErr) {
-  console.error('Approval mention in-app notification error:', notifyErr)
-}
+    const mentionTargetIds = Array.from(
+      new Set(
+        mentionTokens
+          .map((t) => tokenToUserId.get(normalizeKey(t)))
+          .filter(Boolean) as string[]
+      )
+    ).filter((id) => id !== userId)
 
-// Email notifications: approval_mention (mentions only)
-try {
-  const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
-  const secret = process.env.APPS_SCRIPT_SECRET
+    if (mentionTargetIds.length === 0) {
+      return NextResponse.json({ success: true, comment: commentRow })
+    }
 
-  if (scriptUrl && secret && mentionTargetIds.length > 0) {
-    const { data: mentionUsers } = await supabase
-      .from('users')
-      .select('id, email')
-      .in('id', mentionTargetIds)
-
-    const emails = (mentionUsers || [])
-      .map((u: any) => u.email)
-      .filter((e: string | null) => !!e)
-
-    if (emails.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+    // 4) In-app notifications (drives popup + sound)
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          userIds: mentionTargetIds,
           type: 'approval_mention',
-          payload: {
-            secret,
-            to: emails,
+          data: {
+            approvalId,
+            title: approval?.title || '',
             clientName: clientDisplayName,
-            approvalTitle: approval?.title || '',
-            commentSnippet: content.length > 200 ? content.slice(0, 200) + '...' : content,
+            commentId: commentRow.id,
+            itemId: approvalItemId,
+            contentSnippet: content.length > 120 ? content.slice(0, 120) + '...' : content,
           },
         }),
       })
+    } catch (notifyErr) {
+      console.error('Approval mention in-app notification error:', notifyErr)
     }
-  }
-} catch (emailErr) {
-  console.error('Approval mention email notification error:', emailErr)
-}
+
+    // 5) Email notifications (mentions only; split client/team URLs)
+    try {
+      const secret = process.env.APPS_SCRIPT_SECRET
+      if (!secret) {
+        console.warn('APPS_SCRIPT_SECRET not configured')
+        return NextResponse.json({ success: true, comment: commentRow })
+      }
+
+      const { data: mentionUsers } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .in('id', mentionTargetIds)
+
+      const clientEmails = (mentionUsers || [])
+        .filter((u: any) => u.role === 'client')
+        .map((u: any) => u.email)
+        .filter(Boolean)
+
+      const teamEmails = (mentionUsers || [])
+        .filter((u: any) => u.role !== 'client')
+        .map((u: any) => u.email)
+        .filter(Boolean)
+
+      const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
+      const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+
+      if (clientEmails.length > 0) {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'approval_mention',
+            payload: {
+              secret,
+              to: clientEmails,
+              clientName: clientDisplayName,
+              approvalTitle: approval?.title || '',
+              approvalId,
+              commentSnippet: content.length > 200 ? content.slice(0, 200) + '...' : content,
+              url: portalUrl,
+            },
+          }),
+        })
+      }
+
+      if (teamEmails.length > 0) {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'approval_mention',
+            payload: {
+              secret,
+              to: teamEmails,
+              clientName: clientDisplayName,
+              approvalTitle: approval?.title || '',
+              approvalId,
+              commentSnippet: content.length > 200 ? content.slice(0, 200) + '...' : content,
+              url: agencyUrl,
+            },
+          }),
+        })
+      }
+    } catch (emailErr) {
+      console.error('Approval mention email notification error:', emailErr)
+    }
 
     return NextResponse.json({ success: true, comment: commentRow })
   } catch (err: any) {
@@ -169,16 +216,4 @@ try {
       { status: 500 }
     )
   }
-  function extractMentions(text: string): string[] {
-  const out: string[] = []
-  const re = /@([a-zA-Z0-9_]+)/g
-  for (const m of text.matchAll(re)) {
-    out.push((m[1] || '').toLowerCase())
-  }
-  return Array.from(new Set(out))
-}
-
-function normalizeKey(s: string) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9_]/g, '')
-}
 }

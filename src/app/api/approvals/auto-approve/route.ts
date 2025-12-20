@@ -7,48 +7,53 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function POST(req: NextRequest) {
-  // Optional simple protection
-  const auth = req.headers.get('authorization') || ''
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url)
+  const secret = url.searchParams.get('secret')
+  const envSecret = process.env.CRON_SECRET
+  const vercelCron = req.headers.get('x-vercel-cron')
+
+  if (envSecret && !vercelCron && secret !== envSecret) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const now = new Date().toISOString()
+  const nowIso = new Date().toISOString()
 
   const { data: approvals, error } = await supabase
     .from('approvals')
     .select('id, clickup_task_id, title, client_id, clients(name, business_name)')
     .eq('status', 'pending')
     .not('auto_approve_at', 'is', null)
-    .lte('auto_approve_at', now)
+    .lte('auto_approve_at', nowIso)
 
   if (error) {
+    console.error('auto-approve load approvals error', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
+
+  let processed = 0
 
   for (const a of approvals || []) {
     const approvalId = a.id as string
 
-    // approve all items
+    // Approve all items
     await supabase
       .from('approval_items')
-      .update({ status: 'approved', updated_at: now })
+      .update({ status: 'approved', updated_at: nowIso })
       .eq('approval_id', approvalId)
 
-    // approve approval
+    // Approve approval
     await supabase
       .from('approvals')
-      .update({ status: 'approved', updated_at: now })
+      .update({ status: 'approved', updated_at: nowIso })
       .eq('id', approvalId)
 
-    // clickup
+    // ClickUp approved
     if (a.clickup_task_id) {
       await updateClickUpStatus(a.clickup_task_id as string, 'approved')
     }
 
-    // notify assignees
+    // Notify assignees (in-app + email)
     const { data: assignees } = await supabase
       .from('approval_assignees')
       .select('user_id')
@@ -71,16 +76,24 @@ export async function POST(req: NextRequest) {
         }),
       })
 
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'approval_approved',
-          payload: { to: userIds, clientName, approvalTitle: a.title },
-        }),
-      })
+      // emails
+      const { data: users } = await supabase.from('users').select('id, email').in('id', userIds)
+      const emails = (users || []).map((u: any) => u.email).filter(Boolean)
+
+      if (emails.length > 0) {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'approval_approved',
+            payload: { to: emails, clientName, approvalTitle: a.title, approvalId },
+          }),
+        })
+      }
     }
+
+    processed++
   }
 
-  return NextResponse.json({ success: true, processed: (approvals || []).length })
+  return NextResponse.json({ success: true, processed })
 }

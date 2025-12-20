@@ -22,6 +22,32 @@ export default function PortalApprovalsPage() {
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [clientId, setClientId] = useState<string | null>(null)
+  useEffect(() => {
+  if (!clientId) return
+
+  let t: any = null
+  const reload = () => {
+    if (t) clearTimeout(t)
+    t = setTimeout(() => {
+      loadApprovals(clientId)
+    }, 250)
+  }
+
+  const channel = supabase
+    .channel(`portal-approvals-list-${clientId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'approvals', filter: `client_id=eq.${clientId}` },
+      () => reload()
+    )
+    .subscribe()
+
+  return () => {
+    if (t) clearTimeout(t)
+    supabase.removeChannel(channel)
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [clientId])
 
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)

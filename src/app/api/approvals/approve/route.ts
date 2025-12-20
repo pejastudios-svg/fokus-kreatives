@@ -126,39 +126,66 @@ export async function POST(req: NextRequest) {
       }
 
       // 7) Email notifications via Apps Script
-      try {
-        const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
-        const secret = process.env.APPS_SCRIPT_SECRET
+try {
+  const secret = process.env.APPS_SCRIPT_SECRET
+  if (secret && uniqueWatcherIds.length > 0) {
+    const { data: watcherUsers } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .in('id', uniqueWatcherIds)
 
-        if (scriptUrl && secret && uniqueWatcherIds.length > 0) {
-          const { data: watcherUsers } = await supabase
-            .from('users')
-            .select('id, email')
-            .in('id', uniqueWatcherIds)
+    const clientEmails = (watcherUsers || [])
+      .filter((u: any) => u.role === 'client')
+      .map((u: any) => u.email)
+      .filter((e: string | null) => !!e)
 
-          const emails = (watcherUsers || [])
-            .map((u: any) => u.email)
-            .filter((e: string | null) => !!e)
+    const teamEmails = (watcherUsers || [])
+      .filter((u: any) => u.role !== 'client')
+      .map((u: any) => u.email)
+      .filter((e: string | null) => !!e)
 
-          if (emails.length > 0) {
-            await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'approval_approved',
-                payload: {
-                  secret,
-                  to: emails,
-                  clientName: clientDisplayName,
-                  approvalTitle: approval.title,
-                },
-              }),
-            })
-          }
-        }
-      } catch (emailErr) {
-        console.error('Approval approved email notification error:', emailErr)
-      }
+    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
+    const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+
+    if (clientEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_approved',
+          payload: {
+            secret,
+            to: clientEmails,
+            clientName: clientDisplayName,
+            approvalTitle: approval.title,
+            approvalId,
+            url: portalUrl,
+          },
+        }),
+      })
+    }
+
+    if (teamEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_approved',
+          payload: {
+            secret,
+            to: teamEmails,
+            clientName: clientDisplayName,
+            approvalTitle: approval.title,
+            approvalId,
+            url: agencyUrl,
+          },
+        }),
+      })
+    }
+  }
+} catch (emailErr) {
+  console.error('Approval approved email notification error:', emailErr)
+}
     }
 
     return NextResponse.json({ success: true })

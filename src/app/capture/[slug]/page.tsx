@@ -140,7 +140,7 @@ export default function PublicCapturePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-lg overflow-x-hidden">
         <Card>
           <CardContent className="p-6 md:p-8">
             {/* Logo at top center */}
@@ -242,28 +242,29 @@ export default function PublicCapturePage() {
           ? 'After you book, confirm the date and time you scheduled'
           : 'Preferred meeting time'}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <Input
-          label={
-            pageInfo.calendly_url ? 'Date you scheduled' : 'Preferred date'
-          }
-          name="meeting_date"
-          type="date"
-          value={form.meeting_date}
-          onChange={handleChange}
-          required
-        />
-        <Input
-          label={
-            pageInfo.calendly_url ? 'Time you scheduled' : 'Preferred time'
-          }
-          name="meeting_time"
-          type="time"
-          value={form.meeting_time}
-          onChange={handleChange}
-          required
-        />
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-full">
+  <div className="min-w-0">
+    <Input
+      label={pageInfo.calendly_url ? 'Date you scheduled' : 'Preferred date'}
+      name="meeting_date"
+      type="date"
+      value={form.meeting_date}
+      onChange={handleChange}
+      required
+    />
+  </div>
+
+  <div className="min-w-0">
+    <Input
+      label={pageInfo.calendly_url ? 'Time you scheduled' : 'Preferred time'}
+      name="meeting_time"
+      type="time"
+      value={form.meeting_time}
+      onChange={handleChange}
+      required
+    />
+  </div>
+</div>
       {pageInfo.calendly_url && (
         <p className="text-xs text-gray-500">
           We’ll use this date and time to confirm your meeting date.

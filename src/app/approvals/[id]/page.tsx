@@ -131,31 +131,10 @@ export default function ApprovalDetailPage() {
   let channel: any = null
 
   const run = async () => {
-    await init() // loads approval, items, assignees, comments
+    await init()
 
-    // Set up realtime for comments on this approval
     channel = supabase
-  .channel(`approval-live-${approvalId}`)
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'approval_comments', filter: `approval_id=eq.${approvalId}` },
-    () => loadComments()
-  )
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'approval_items', filter: `approval_id=eq.${approvalId}` },
-    () => {
-      loadItems()
-      loadApproval()
-    }
-  )
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'approvals', filter: `id=eq.${approvalId}` },
-    () => loadApproval()
-  )
-  .subscribe()
-      .channel(`approval-comments-${approvalId}`)
+      .channel(`portal-approval-live-${approvalId}`)
       .on(
         'postgres_changes',
         {
@@ -164,10 +143,30 @@ export default function ApprovalDetailPage() {
           table: 'approval_comments',
           filter: `approval_id=eq.${approvalId}`,
         },
+        () => loadComments()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'approval_items',
+          filter: `approval_id=eq.${approvalId}`,
+        },
         () => {
-          // On any insert/update/delete, just reload comments
-          loadComments()
+          loadItems()
+          loadApproval()
         }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'approvals',
+          filter: `id=eq.${approvalId}`,
+        },
+        () => loadApproval()
       )
       .subscribe()
   }
@@ -175,10 +174,9 @@ export default function ApprovalDetailPage() {
   run()
 
   return () => {
-    if (channel) {
-      supabase.removeChannel(channel)
-    }
+    if (channel) supabase.removeChannel(channel)
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [approvalId])
 
   const init = async () => {

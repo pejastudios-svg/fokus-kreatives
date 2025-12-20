@@ -152,6 +152,9 @@ export function Header({ title, subtitle }: HeaderProps) {
 case 'approval_mention':
   return `You were mentioned in an approval: ${data.title || ''}`
 
+case 'approval_reminder':
+  return `Approval reminder: ${data.title || ''}`
+
     default:
       return 'Notification'
   }
@@ -218,23 +221,19 @@ case 'approval_mention':
 
   // Approval notifications
   if (
-    n.type === 'approval_created' ||
-    n.type === 'approval_approved' ||
-    n.type === 'approval_commented'
-  ) {
-    const approvalPath = data.approvalId
-      ? `/${data.approvalId}`
-      : ''
-
-    if (userRole === 'client') {
-      // Client → portal approvals
-      router.push(`/portal/approvals${approvalPath}`)
-    } else {
-      // Agency team → dashboard approvals
-      router.push(`/approvals${approvalPath}`)
-    }
-    return
+  n.type === 'approval_created' ||
+  n.type === 'approval_approved' ||
+  n.type === 'approval_mention' ||
+  n.type === 'approval_reminder'
+) {
+  const approvalId = data.approvalId
+  if (userRole === 'client') {
+    router.push(approvalId ? `/portal/approvals/${approvalId}` : `/portal/approvals`)
+  } else {
+    router.push(approvalId ? `/approvals/${approvalId}` : `/approvals`)
   }
+  return
+}
 
   // Default: nothing special
 }}

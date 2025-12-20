@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useParams } from 'next/navigation'
+import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -679,6 +680,7 @@ useEffect(() => {
           </div>
         </div>
       )}
+      <NotificationPopupListener />
     </div>
   )
 }

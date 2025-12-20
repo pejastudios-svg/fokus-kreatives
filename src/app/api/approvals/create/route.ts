@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         clickup_task_name: clickupTaskName || null,
         status: 'pending', // initial internal status; externally "WAITING FOR FEEDBACK"
         auto_approve_at: autoApproveAt,
+        auto_approve_minutes: autoApproveMinutes || null,
       })
       .select()
       .single()
@@ -207,42 +208,70 @@ export async function POST(req: NextRequest) {
     }
 
     // 5) Email notifications via Apps Script
-    try {
-      const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
-      const secret = process.env.APPS_SCRIPT_SECRET
+try {
+  const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
+  const secret = process.env.APPS_SCRIPT_SECRET
 
-      if (scriptUrl && secret) {
-        // Collect emails for watchers
-        const { data: watcherUsers } = await supaAdmin
-          .from('users')
-          .select('id, email')
-          .in('id', assigneeRows.map((r) => r.user_id))
+  if (scriptUrl && secret) {
+    const { data: watcherUsers } = await supaAdmin
+      .from('users')
+      .select('id, email, role')
+      .in('id', assigneeRows.map((r) => r.user_id))
 
-        const emails = (watcherUsers || [])
-          .map((u: any) => u.email)
-          .filter((e: string | null) => !!e)
+    const clientEmails = (watcherUsers || [])
+      .filter((u: any) => u.role === 'client')
+      .map((u: any) => u.email)
+      .filter((e: string | null) => !!e)
 
-        if (emails.length > 0) {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_created',
-              payload: {
-                secret,
-                to: emails,
-                clientName: clientDisplayName,
-                approvalTitle: title,
-              },
-            }),
-          })
-        }
-      } else {
-        console.warn('Apps Script not configured for approval emails')
-      }
-    } catch (emailErr) {
-      console.error('Approval email notification error:', emailErr)
+    const teamEmails = (watcherUsers || [])
+      .filter((u: any) => u.role !== 'client')
+      .map((u: any) => u.email)
+      .filter((e: string | null) => !!e)
+
+    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
+    const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+
+    if (clientEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_created',
+          payload: {
+            secret,
+            to: clientEmails,
+            clientName: clientDisplayName,
+            approvalTitle: title,
+            approvalId,
+            url: portalUrl,
+          },
+        }),
+      })
     }
+
+    if (teamEmails.length > 0) {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'approval_created',
+          payload: {
+            secret,
+            to: teamEmails,
+            clientName: clientDisplayName,
+            approvalTitle: title,
+            approvalId,
+            url: agencyUrl,
+          },
+        }),
+      })
+    }
+  } else {
+    console.warn('Apps Script not configured for approval emails')
+  }
+} catch (emailErr) {
+  console.error('Approval email notification error:', emailErr)
+}
 
     return NextResponse.json({
       success: true,

@@ -88,6 +88,8 @@ export default function ApprovalsPage() {
   ])
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
+  const [assigneeSearchOpen, setAssigneeSearchOpen] = useState(false)
+  const [assigneeSearch, setAssigneeSearch] = useState('')
 
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<{
@@ -135,6 +137,64 @@ export default function ApprovalsPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+  let t: any = null
+
+  const reload = () => {
+    if (t) clearTimeout(t)
+    t = setTimeout(() => {
+      loadApprovals(selectedClientId || undefined)
+    }, 250)
+  }
+
+  const channel = supabase
+    .channel('approvals-list-live')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'approvals' },
+      () => reload()
+    )
+    .subscribe()
+
+  return () => {
+    if (t) clearTimeout(t)
+    supabase.removeChannel(channel)
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [selectedClientId])
+
+  const roleRank: Record<string, number> = {
+  admin: 0,
+  manager: 1,
+  employee: 2,
+  guest: 3,
+  client: 4,
+}
+
+const sortedTeamUsers = [...teamUsers].sort((a, b) => {
+  const ra = roleRank[a.role] ?? 99
+  const rb = roleRank[b.role] ?? 99
+  if (ra !== rb) return ra - rb
+  const an = (a.name || a.email || '').toLowerCase()
+  const bn = (b.name || b.email || '').toLowerCase()
+  return an.localeCompare(bn)
+})
+
+const topAssignees = sortedTeamUsers.slice(0, 3)
+
+const searchResults = assigneeSearchOpen
+  ? sortedTeamUsers
+      .filter((u) => {
+        // exclude top 3 so it stays clean (they're already visible)
+        if (topAssignees.some((t) => t.id === u.id)) return false
+        const q = assigneeSearch.trim().toLowerCase()
+        if (!q) return false
+        const hay = `${u.name || ''} ${u.email || ''} ${u.role || ''}`.toLowerCase()
+        return hay.includes(q)
+      })
+      .slice(0, 5)
+  : []
 
   const loadApprovals = async (clientId?: string) => {
     const query = supabase
@@ -680,48 +740,103 @@ const handleDeleteApproval = async (approvalId: string) => {
                 </div>
 
                 {/* Assignees */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assign internal team (optional)
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                    {teamUsers.map((u) => {
-                      const selected = selectedAssigneeIds.includes(u.id)
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => toggleAssignee(u.id)}
-                          className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-left border ${
-                            selected
-                              ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#1E293B]'
-                              : 'bg-white border-gray-200 text-gray-700 hover:border-[#2B79F7]'
-                          }`}
-                        >
-                          {u.profile_picture_url ? (
-                            <img
-                              src={u.profile_picture_url}
-                              alt={u.name}
-                              className="h-5 w-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-700">
-                              {u.name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <span className="truncate">
-                            {u.name || u.email}
-                          </span>
-                        </button>
-                      )
-                    })}
-                    {teamUsers.length === 0 && (
-                      <p className="text-xs text-gray-400 col-span-full">
-                        No team members found.
-                      </p>
-                    )}
-                  </div>
-                </div>
+<div>
+  <div className="flex items-center justify-between mb-1">
+    <label className="block text-sm font-medium text-gray-700">
+      Assign internal team
+      <span className="text-gray-400 font-normal"> (optional)</span>
+    </label>
+
+    <button
+      type="button"
+      onClick={() => {
+        setAssigneeSearchOpen((v) => !v)
+        setAssigneeSearch('')
+      }}
+      className="p-2 rounded-lg border border-gray-200 hover:border-[#2B79F7] text-gray-500 hover:text-[#2B79F7] transition-colors"
+      title="Search team"
+      aria-label="Search team"
+    >
+      <Search className="h-4 w-4" />
+    </button>
+  </div>
+
+  {/* Top 3 users */}
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border border-gray-200 rounded-lg p-2">
+    {topAssignees.map((u) => {
+      const selected = selectedAssigneeIds.includes(u.id)
+      return (
+        <button
+          key={u.id}
+          type="button"
+          onClick={() => toggleAssignee(u.id)}
+          className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-left border ${
+            selected
+              ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#1E293B]'
+              : 'bg-white border-gray-200 text-gray-700 hover:border-[#2B79F7]'
+          }`}
+        >
+          {u.profile_picture_url ? (
+            <img
+              src={u.profile_picture_url}
+              alt={u.name}
+              className="h-5 w-5 rounded-full object-cover"
+            />
+          ) : (
+            <div className="h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-700">
+              {(u.name || u.email || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span className="truncate">{u.name || u.email}</span>
+        </button>
+      )
+    })}
+  </div>
+
+  {/* Fold-out search */}
+  {assigneeSearchOpen && (
+    <div className="mt-2 border border-gray-200 rounded-lg p-2">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          value={assigneeSearch}
+          onChange={(e) => setAssigneeSearch(e.target.value)}
+          placeholder="Search team members..."
+          className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+        />
+      </div>
+
+      {assigneeSearch.trim() && (
+        <div className="mt-2 space-y-1">
+          {searchResults.length === 0 ? (
+            <p className="text-xs text-gray-400 px-2 py-1">No matches</p>
+          ) : (
+            searchResults.map((u) => {
+              const selected = selectedAssigneeIds.includes(u.id)
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => toggleAssignee(u.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-left border ${
+                    selected
+                      ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#1E293B]'
+                      : 'bg-white border-gray-200 text-gray-700 hover:border-[#2B79F7]'
+                  }`}
+                >
+                  <span className="truncate flex-1">
+                    {u.name || u.email} <span className="text-gray-400">· {u.role}</span>
+                  </span>
+                  {selected && <span className="text-[#2B79F7] font-semibold">Selected</span>}
+                </button>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
                 {/* Footer */}
                 <div className="flex justify-end gap-3 pt-4">

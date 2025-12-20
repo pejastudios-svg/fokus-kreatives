@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             data: {
               approvalId,
               title: approval.title,
-              clientName,
+               clientName: clientDisplayName,
               actorId: actorId || null,
             },
           }),
