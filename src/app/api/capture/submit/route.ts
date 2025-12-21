@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
       email,
       phone,
       notes,
+      values,
       meeting_date,
       meeting_time,
     } = await req.json()
@@ -131,27 +132,30 @@ export async function POST(req: NextRequest) {
       emails,
     } = await getNotificationTargets(clientId)
 
+   const v = (values && typeof values === 'object') ? values : {}
+
     // 2) Insert into capture_submissions (store raw data as well)
-    const submissionData = {
-      name: name || null,
-      email: email || null,
-      phone: phone || null,
-      notes: notes || null,
-      meeting_date: page.include_meeting ? meeting_date || null : null,
-      meeting_time: page.include_meeting ? meeting_time || null : null,
-    }
+const submissionData = {
+  ...v, // store all dynamic fields
+  name: (v.name ?? name) || null,
+  email: (v.email ?? email) || null,
+  phone: (v.phone ?? phone) || null,
+  notes: (v.notes ?? notes) || null,
+  meeting_date: page.include_meeting ? meeting_date || null : null,
+  meeting_time: page.include_meeting ? meeting_time || null : null,
+}
 
     const { error: subError } = await supabase
       .from('capture_submissions')
       .insert({
-        capture_page_id: page.id,
-        client_id: clientId,
-        name: name || null,
-        email: email || null,
-        phone: phone || null,
-        notes: notes || null,
-        data: submissionData,
-      })
+  capture_page_id: page.id,
+  client_id: clientId,
+  name: submissionData.name,
+  email: submissionData.email,
+  phone: submissionData.phone,
+  notes: submissionData.notes,
+  data: submissionData,
+})
 
     if (subError) {
       console.error('Capture submission error:', subError)
@@ -166,15 +170,15 @@ export async function POST(req: NextRequest) {
     const nextPosition = existingLeads ? existingLeads.length : 0
     const today = new Date().toISOString().split('T')[0]
 
-    const leadData = {
-      name: name || 'Unknown',
-      email: email || null,
-      phone: phone || null,
-      status: 'new',
-      source: `capture:${slug}`,
-      date_added: today,
-      notes: notes || null,
-    }
+const leadData = {
+  ...submissionData,
+  name: submissionData.name || 'Unknown',
+  email: submissionData.email || null,
+  phone: submissionData.phone || null,
+  status: 'new',
+  source: `capture:${slug}`,
+  date_added: today,
+}
 
     const { error: leadError } = await supabase
       .from('leads')

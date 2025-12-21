@@ -17,6 +17,17 @@
   --brand-lightest: #E8F1FF;
 }
 
+input, textarea, select {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+input[type="date"], input[type="time"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* Light Theme */
 :root, .light {
   --bg-primary: #ffffff;

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -20,8 +22,8 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
   .from('capture_pages')
   .select(
-    'id, client_id, name, slug, headline, description, lead_magnet_url, is_active, logo_url, include_meeting, calendly_url'
-  )
+  'id, client_id, name, slug, headline, description, lead_magnet_url, is_active, logo_url, banner_url, include_meeting, calendly_url, fields, theme'
+)
   .eq('slug', slug)
   .eq('is_active', true)
   .single()
