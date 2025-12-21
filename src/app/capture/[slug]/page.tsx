@@ -99,6 +99,8 @@ export default function PublicCapturePage() {
             theme: page.theme || null,
           })
         }
+        console.log('CAPTURE INFO PAGE FIELDS:', page.fields)
+        console.log('CAPTURE INFO THEME:', page.theme)
       } catch (err) {
         console.error('Failed to load capture page info:', err)
         setError('This page is not available.')
@@ -376,7 +378,7 @@ export default function PublicCapturePage() {
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-gray-800">
                         {pageInfo.calendly_url
-                          ? 'After you book, confirm the date and time you scheduled'
+                          ? 'After you book, please confirm the date and time you scheduled'
                           : 'Preferred meeting time'}
                       </p>
 

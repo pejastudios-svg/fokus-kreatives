@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
     const { data: page, error: pageError } = await supabase
       .from('capture_pages')
       .select(
-        'id, client_id, name, slug, headline, description, lead_magnet_url, include_meeting, calendly_url'
-      )
+  'id, client_id, name, slug, headline, description, lead_magnet_url, include_meeting, calendly_url, fields, theme, banner_url, logo_url'
+)
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
