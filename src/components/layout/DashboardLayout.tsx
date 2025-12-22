@@ -2,6 +2,7 @@
 
 import { Sidebar } from './Sidebar'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
+import { PageTransition } from '@/components/ui/PageTransition'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 
 interface DashboardLayoutProps {
@@ -14,7 +15,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   <div className="flex h-screen bg-gray-50">
     <Sidebar />
     <main className="flex-1 overflow-auto bg-gray-100">
-      <div className="page-enter">{children}</div>
+      <PageTransition>
+  {children}
+</PageTransition>
     </main>
 
     <NotificationPopupListener />

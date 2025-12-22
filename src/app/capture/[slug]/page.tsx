@@ -61,6 +61,64 @@ function normalizeFields(f: any): CaptureField[] {
   }))
 }
 
+function detectEmbed(raw?: string) {
+  const url = (raw || '').trim()
+  if (!url) return { kind: 'none' as const, src: '' }
+
+  // Direct images
+  if (/\.(png|jpe?g|gif|webp)$/i.test(url)) {
+    return { kind: 'image' as const, src: url }
+  }
+
+  // Direct video
+  if (/\.(mp4|webm|ogg)$/i.test(url)) {
+    return { kind: 'video' as const, src: url }
+  }
+
+  // Google Drive file => preview
+  if (url.includes('drive.google.com')) {
+    const m1 = url.match(/\/file\/d\/([^/]+)/)
+    if (m1?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m1[1]}/preview` }
+    const m2 = url.match(/[?&]id=([^&]+)/)
+    if (m2?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m2[1]}/preview` }
+  }
+
+  // YouTube
+  if (url.includes('youtube.com/watch')) {
+    const m = url.match(/[?&]v=([^&]+)/)
+    if (m?.[1]) return { kind: 'iframe' as const, src: `https://www.youtube.com/embed/${m[1]}` }
+  }
+  if (url.includes('youtu.be/')) {
+    const m = url.match(/youtu\.be\/([^?]+)/)
+    if (m?.[1]) return { kind: 'iframe' as const, src: `https://www.youtube.com/embed/${m[1]}` }
+  }
+
+  // YouTube Shorts
+if (url.includes('youtube.com/shorts/')) {
+  const m = url.match(/youtube\.com\/shorts\/([^?\/]+)/)
+  if (m?.[1]) return { kind: 'iframe' as const, src: `https://www.youtube.com/embed/${m[1]}` }
+}
+  // Vimeo
+  if (url.includes('vimeo.com/')) {
+    const m = url.match(/vimeo\.com\/(\d+)/)
+    if (m?.[1]) return { kind: 'iframe' as const, src: `https://player.vimeo.com/video/${m[1]}` }
+  }
+
+  // Loom
+  if (url.includes('loom.com/share/')) {
+    const m = url.match(/loom\.com\/share\/([^?]+)/)
+    if (m?.[1]) return { kind: 'iframe' as const, src: `https://www.loom.com/embed/${m[1]}` }
+  }
+
+  // TikTok/Instagram often block iframe. We'll show a link fallback.
+  if (url.includes('tiktok.com') || url.includes('instagram.com')) {
+    return { kind: 'link' as const, src: url }
+  }
+
+  // Default: try iframe
+  return { kind: 'iframe' as const, src: url }
+}
+
 export default function PublicCapturePage() {
   const params = useParams()
   const slug = params.slug as string
@@ -96,11 +154,17 @@ export default function PublicCapturePage() {
             calendly_url: page.calendly_url || null,
             lead_magnet_url: page.lead_magnet_url || null,
             fields: page.fields || null,
-            theme: page.theme || null,
+            theme: (() => {
+            const t = page.theme
+            if (!t) return null
+            if (typeof t === 'string') {
+            try { return JSON.parse(t) } catch { return null }
+            }
+            return t
+            })(),
           })
         }
-        console.log('CAPTURE INFO PAGE FIELDS:', page.fields)
-        console.log('CAPTURE INFO THEME:', page.theme)
+
       } catch (err) {
         console.error('Failed to load capture page info:', err)
         setError('This page is not available.')
@@ -134,6 +198,13 @@ export default function PublicCapturePage() {
     if (f === 'poppins') return { fontFamily: 'Poppins, system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }
     return { fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Poppins, sans-serif' }
   }, [pageInfo])
+
+  const fontClass =
+  pageInfo?.theme?.fontFamily === 'poppins'
+    ? 'font-poppins'
+    : pageInfo?.theme?.fontFamily === 'inter'
+    ? 'font-inter'
+    : ''
 
   const setValue = (id: string, val: any) => setValues((prev) => ({ ...prev, [id]: val }))
 
@@ -213,8 +284,7 @@ export default function PublicCapturePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 overflow-x-hidden" style={{ ...bgStyle, ...fontStyle }}>
-      <div className="w-full max-w-lg overflow-x-hidden">
+<div className={`min-h-screen flex items-center justify-center p-4 overflow-x-hidden ${fontClass}`} style={bgStyle}>      <div className="w-full max-w-lg overflow-x-hidden">
         <Card>
           <CardContent className="p-6 md:p-8">
             {/* Banner + logo */}
@@ -265,18 +335,52 @@ export default function PublicCapturePage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {fields.map((f) => {
                   if (f.type === 'embed') {
-                    if (!f.embedUrl) return null
-                    return (
-                      <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden">
-                        <iframe
-                          src={f.embedUrl}
-                          className="w-full border-0"
-                          style={{ height: f.embedHeight || 520 }}
-                          loading="lazy"
-                          title={f.label || 'Embed'}
-                        />
-                      </div>
-                    )
+                    const embed = detectEmbed(f.embedUrl)
+
+if (embed.kind === 'image') {
+  return (
+    <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden">
+      <img src={embed.src} alt={f.label} className="w-full h-auto object-contain" />
+    </div>
+  )
+}
+
+if (embed.kind === 'video') {
+  return (
+    <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden bg-black">
+      <video src={embed.src} controls className="w-full h-auto" />
+    </div>
+  )
+}
+
+if (embed.kind === 'link') {
+  return (
+    <div key={f.id} className="rounded-lg border border-gray-200 p-4 bg-gray-50">
+      <p className="text-sm text-gray-700 font-medium">{f.label || 'Embed'}</p>
+      <p className="text-xs text-gray-500 mt-1">
+        This provider may block embedding on external sites. Open it here:
+      </p>
+      <a href={embed.src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#2B79F7] hover:underline break-all">
+        {embed.src}
+      </a>
+    </div>
+  )
+}
+
+// iframe
+return (
+  <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden">
+    <iframe
+      src={embed.src}
+      className="w-full border-0"
+      style={{ height: f.embedHeight || 520 }}
+      loading="lazy"
+      title={f.label || 'Embed'}
+      allow="autoplay; fullscreen; picture-in-picture"
+      allowFullScreen
+    />
+  </div>
+)
                   }
 
                   if (f.type === 'textarea') {

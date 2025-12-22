@@ -131,6 +131,7 @@ export default function CRMCapturePages() {
   const supabase = createClient()
 
   const [tab, setTab] = useState<'pages' | 'submissions'>('pages')
+  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRow | null>(null)
 
   // pages
   const [pages, setPages] = useState<CapturePage[]>([])
@@ -148,6 +149,8 @@ export default function CRMCapturePages() {
 
   // submissions
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
+  const [submissionToDelete, setSubmissionToDelete] = useState<SubmissionRow | null>(null)
+  const [deletingSubmission, setDeletingSubmission] = useState(false)
   const [subLoading, setSubLoading] = useState(false)
   const [subSearch, setSubSearch] = useState('')
   const [subPageId, setSubPageId] = useState<string>('') // filter by page
@@ -361,7 +364,7 @@ export default function CRMCapturePages() {
             include_meeting: form.include_meeting,
             calendly_url: form.calendly_url || null,
             fields: form.fields,
-            theme: form.theme,
+            theme: null,
           })
           .eq('id', editingPage.id)
 
@@ -527,6 +530,44 @@ export default function CRMCapturePages() {
       return hay.includes(q)
     })
   }, [submissions, subSearch])
+
+  function buildFieldLabelMap(fields: any): Record<string, string> {
+  const map: Record<string, string> = {}
+  if (!Array.isArray(fields)) return map
+  for (const f of fields) {
+    if (!f?.id) continue
+    map[String(f.id)] = String(f.label || f.id)
+  }
+  return map
+}
+
+function prettyKey(k: string) {
+  return k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+const deleteSubmission = async () => {
+  if (!submissionToDelete) return
+  setDeletingSubmission(true)
+
+  const id = submissionToDelete.id
+  const prev = submissions
+  setSubmissions((s) => s.filter((x) => x.id !== id))
+
+  try {
+    const { error } = await supabase
+      .from('capture_submissions')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Delete submission error:', error)
+      setSubmissions(prev) // rollback
+    }
+  } finally {
+    setDeletingSubmission(false)
+    setSubmissionToDelete(null)
+  }
+}
 
   return (
     <CRMLayout>
@@ -766,6 +807,7 @@ export default function CRMCapturePages() {
                           <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Email</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Phone</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Meeting</th>
+                          <th className="w-16 px-4 py-3 text-xs font-semibold text-gray-400 uppercase"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#334155]">
@@ -773,7 +815,11 @@ export default function CRMCapturePages() {
                           const d = s.data || {}
                           const hasMeeting = !!(d.meeting_date && d.meeting_time)
                           return (
-                            <tr key={s.id} className="hover:bg-[#24324A]">
+                            <tr
+                            key={s.id}
+                            className="hover:bg-[#24324A] cursor-pointer"
+                            onClick={() => setSelectedSubmission(s)}
+                            >
                               <td className="px-4 py-3 text-sm text-gray-300">
                                 {new Date(s.created_at).toLocaleString()}
                               </td>
@@ -791,6 +837,19 @@ export default function CRMCapturePages() {
                                   </span>
                                 )}
                               </td>
+                              <td className="px-4 py-3 text-right">
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation()
+      setSubmissionToDelete(s)
+    }}
+    className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+    title="Delete submission"
+  >
+    <Trash2 className="h-4 w-4" />
+  </button>
+</td>
                             </tr>
                           )
                         })}
@@ -911,124 +970,8 @@ export default function CRMCapturePages() {
                   </div>
 
                   <p className="text-xs text-gray-400">
-                    If only logo → it appears centered at top. If banner + logo → logo overlays bottom-left of banner.
+                    Upload one or both
                   </p>
-                </div>
-
-                {/* Theme */}
-                <div className="border-t border-[#334155] pt-5 space-y-4">
-                  <div className="flex items-center gap-2 text-white font-semibold">
-                    <Type className="h-4 w-4 text-[#2B79F7]" />
-                    Theme
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-200 mb-1">Background</label>
-                      <select
-                        value={form.theme.background.type}
-                        onChange={(e) => setBg({ type: e.target.value as any })}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                      >
-                        <option value="solid">Solid</option>
-                        <option value="gradient">Gradient</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-200 mb-1">Font</label>
-                      <select
-                        value={form.theme.fontFamily}
-                        onChange={(e) => setTheme({ fontFamily: e.target.value as any })}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                      >
-                        <option value="system">System</option>
-                        <option value="inter">Inter</option>
-                        <option value="poppins">Poppins</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {form.theme.background.type === 'solid' ? (
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm text-gray-200">Color</label>
-                      <input
-                        type="color"
-                        value={form.theme.background.color || '#f9fafb'}
-                        onChange={(e) => setBg({ color: e.target.value })}
-                        className="h-10 w-10 rounded border border-[#334155] bg-[#0F172A]"
-                      />
-                      <input
-                        value={form.theme.background.color || '#f9fafb'}
-                        onChange={(e) => setBg({ color: e.target.value })}
-                        className="flex-1 px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-xs text-gray-300">From</label>
-                        <input
-                          type="color"
-                          value={form.theme.background.from || '#2B79F7'}
-                          onChange={(e) => setBg({ from: e.target.value })}
-                          className="h-10 w-10 rounded border border-[#334155] bg-[#0F172A]"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs text-gray-300">To</label>
-                        <input
-                          type="color"
-                          value={form.theme.background.to || '#143A80'}
-                          onChange={(e) => setBg({ to: e.target.value })}
-                          className="h-10 w-10 rounded border border-[#334155] bg-[#0F172A]"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs text-gray-300">Direction</label>
-                        <select
-                          value={form.theme.background.direction || '135deg'}
-                          onChange={(e) => setBg({ direction: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                        >
-                          <option value="135deg">Diagonal</option>
-                          <option value="180deg">Top → Bottom</option>
-                          <option value="90deg">Left → Right</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-200 mb-1">Text color</label>
-                      <select
-                        value={form.theme.textMode}
-                        onChange={(e) => setTheme({ textMode: e.target.value as any })}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                      >
-                        <option value="auto">Auto</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                    </div>
-
-                    {form.theme.textMode === 'custom' && (
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm text-gray-200">Custom</label>
-                        <input
-                          type="color"
-                          value={form.theme.textColor || '#111827'}
-                          onChange={(e) => setTheme({ textColor: e.target.value })}
-                          className="h-10 w-10 rounded border border-[#334155] bg-[#0F172A]"
-                        />
-                        <input
-                          value={form.theme.textColor || '#111827'}
-                          onChange={(e) => setTheme({ textColor: e.target.value })}
-                          className="flex-1 px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* Fields */}
@@ -1290,6 +1233,89 @@ export default function CRMCapturePages() {
           </div>
         )}
       </div>
+      {selectedSubmission && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
+        <h3 className="text-lg font-semibold text-white">Submission Details</h3>
+        <button
+          onClick={() => setSelectedSubmission(null)}
+          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="px-6 py-4 space-y-4">
+        <p className="text-xs text-gray-400">
+          Submitted: {new Date(selectedSubmission.created_at).toLocaleString()}
+        </p>
+
+        <div className="rounded-xl border border-[#334155] bg-[#0F172A] p-4">
+          <p className="text-sm font-semibold text-white mb-3">All fields</p>
+          <div className="space-y-2">
+            {(() => {
+  const page = pages.find((p) => p.id === selectedSubmission.capture_page_id)
+  const labelMap = buildFieldLabelMap(page?.fields)
+
+  return Object.entries(selectedSubmission.data || {}).map(([k, v]) => {
+    const label = labelMap[k] || prettyKey(k)
+
+    return (
+      <div key={k} className="flex gap-3 text-sm">
+        <div className="w-48 text-gray-400 break-words">{label}</div>
+        <div className="flex-1 text-gray-200 break-words">
+          {v === null || v === undefined || String(v) === '' ? '—' : String(v)}
+        </div>
+      </div>
+    )
+  })
+})()}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#334155] bg-[#0F172A] p-4">
+          <p className="text-sm font-semibold text-white mb-2">Raw JSON</p>
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
+            {JSON.stringify(selectedSubmission.data || {}, null, 2)}
+          </pre>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+{submissionToDelete && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
+        <h3 className="text-lg font-semibold text-white">Delete Submission</h3>
+        <button
+          onClick={() => setSubmissionToDelete(null)}
+          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="px-6 py-4 text-sm text-gray-300">
+        Are you sure you want to delete this submission? This cannot be undone.
+      </div>
+
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+        <Button variant="outline" onClick={() => setSubmissionToDelete(null)} disabled={deletingSubmission}>
+          Cancel
+        </Button>
+        <Button
+          onClick={deleteSubmission}
+          isLoading={deletingSubmission}
+          className="bg-red-600 hover:bg-red-500"
+        >
+          Delete
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
     </CRMLayout>
   )
 }

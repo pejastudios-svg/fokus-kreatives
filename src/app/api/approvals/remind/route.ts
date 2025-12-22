@@ -87,7 +87,7 @@ await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
     data: {
   approvalId,
   title: a.title,
-  clientName: clientName,
+  clientName: clientDisplayName,
 },
   }),
 })
@@ -116,7 +116,7 @@ if (secret && clientEmails.length > 0) {
       payload: {
         secret,
         to: clientEmails,
-        clientName: clientName,
+        clientName: clientDisplayName,
         approvalTitle: a.title,
         approvalId,
         reminderLabel: label,
@@ -135,7 +135,7 @@ if (secret && teamEmails.length > 0) {
       payload: {
         secret,
         to: teamEmails,
-        clientName: clientName,
+        clientName: clientDisplayName,
         approvalTitle: a.title,
         approvalId,
         reminderLabel: label,

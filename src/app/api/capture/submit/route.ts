@@ -109,9 +109,7 @@ export async function POST(req: NextRequest) {
     // 1) Find the capture page
     const { data: page, error: pageError } = await supabase
       .from('capture_pages')
-      .select(
-  'id, client_id, name, slug, headline, description, lead_magnet_url, include_meeting, calendly_url, fields, theme, banner_url, logo_url'
-)
+      .select('id, client_id, name, slug, headline, description, lead_magnet_url, include_meeting, calendly_url, fields')
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
@@ -143,6 +141,15 @@ const submissionData = {
   notes: (v.notes ?? notes) || null,
   meeting_date: page.include_meeting ? meeting_date || null : null,
   meeting_time: page.include_meeting ? meeting_time || null : null,
+}
+
+const fieldsArr = (page as any).fields
+const fieldLabels: Record<string, string> = {}
+if (Array.isArray(fieldsArr)) {
+  for (const f of fieldsArr) {
+    if (!f?.id) continue
+    fieldLabels[String(f.id)] = String(f.label || f.id)
+  }
 }
 
     const { error: subError } = await supabase
@@ -297,6 +304,7 @@ const leadData = {
                 pageName: page.name || slug,
                 slug,
                 formData: submissionData,
+                fieldLabels,
                 clientName: clientDisplayName,
               },
             }),

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useParams } from 'next/navigation'
+import { PageTransition } from '@/components/ui/PageTransition'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { cn } from '@/lib/utils'
 import {
@@ -646,9 +647,9 @@ useEffect(() => {
 
       {/* Main Content */}
       <main className="flex-1 min-h-0 overflow-auto bg-[#0F172A] transition-colors duration-200">
-        <div className="page-enter min-h-full">
-          {children}
-        </div>
+        <PageTransition>
+  <div className="min-h-full">{children}</div>
+</PageTransition>
       </main>
             {/* Popup notification for this CRM */}
       {popup && (
