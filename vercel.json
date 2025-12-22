@@ -1,6 +1,0 @@
-{
-  "crons": [
-    { "path": "/api/approvals/auto-approve", "schedule": "*/15 * * * *" },
-    { "path": "/api/approvals/remind", "schedule": "0 * * * *" }
-  ]
-}

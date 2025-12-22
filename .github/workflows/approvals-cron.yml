@@ -1,0 +1,21 @@
+name: Approvals Cron
+
+on:
+  schedule:
+    # every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-approve (due approvals)
+        run: |
+          curl -fsS "$APP_URL/api/approvals/auto-approve?secret=$CRON_SECRET"
+      - name: Send reminders (if due)
+        run: |
+          curl -fsS "$APP_URL/api/approvals/remind?secret=$CRON_SECRET"
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
