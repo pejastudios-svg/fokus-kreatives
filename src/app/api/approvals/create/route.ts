@@ -4,24 +4,21 @@ import { createClient } from '@supabase/supabase-js'
 import { fetchClickUpTaskName, updateClickUpStatus } from '@/app/api/clickup/helpers'
 
 export const dynamic = 'force-dynamic'
-
-console.log('[CRON] approvals/remind hit', new Date().toISOString(), {
-  hasVercelCron: !!req.headers.get('x-vercel-cron'),
-})
+export const runtime = 'nodejs'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Shape of the request body we expect from the frontend
 type CreateApprovalBody = {
+  creatorId: string
   clientId: string
   title: string
-  description?: string
-  clickupTaskId?: string
+  description?: string | null
+  clickupTaskId?: string | null
   autoApproveMinutes?: number | null
-  assigneeIds?: string[]         // agency user IDs
+  assigneeIds?: string[]
   items: {
     title: string
     url: string
@@ -34,6 +31,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as CreateApprovalBody
 
     const {
+      creatorId,
       clientId,
       title,
       description,
@@ -43,28 +41,15 @@ export async function POST(req: NextRequest) {
       items,
     } = body
 
-    if (!clientId || !title || !items || items.length === 0) {
+    if (!creatorId || !clientId || !title || !items || items.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Missing clientId, title, or items' },
+        { success: false, error: 'Missing creatorId, clientId, title, or items' },
         { status: 400 }
       )
     }
 
-    // Get current user (creator)
-    const supaAdmin = supabase // using service client, but we need auth user from header if you want
-    // In app/api with service key you don't have auth context,
-    // so pass creatorId from frontend instead (safer).
-    // For now, assume frontend sends creatorId in body (we'll adapt).
-    const creatorId = (body as any).creatorId as string | undefined
-    if (!creatorId) {
-      return NextResponse.json(
-        { success: false, error: 'Missing creatorId' },
-        { status: 400 }
-      )
-    }
-
-    // Fetch client info (for notifications)
-    const { data: clientRow, error: clientError } = await supaAdmin
+    // Client info
+    const { data: clientRow, error: clientError } = await supabase
       .from('clients')
       .select('id, name, business_name')
       .eq('id', clientId)
@@ -79,14 +64,14 @@ export async function POST(req: NextRequest) {
 
     const clientDisplayName = clientRow.business_name || clientRow.name || 'Client'
 
-    // If ClickUp task ID provided, fetch name and set status to WAITING
+    // ClickUp name + set task to WAITING
     let clickupTaskName: string | null = null
     if (clickupTaskId) {
       clickupTaskName = await fetchClickUpTaskName(clickupTaskId)
       await updateClickUpStatus(clickupTaskId, 'waiting')
     }
 
-    // Calculate auto-approve timestamp if provided
+    // Auto approve timestamp
     let autoApproveAt: string | null = null
     if (autoApproveMinutes && autoApproveMinutes > 0) {
       const now = new Date()
@@ -95,7 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1) Insert approval
-    const { data: approvalRow, error: approvalError } = await supaAdmin
+    const { data: approvalRow, error: approvalError } = await supabase
       .from('approvals')
       .insert({
         client_id: clientId,
@@ -104,7 +89,7 @@ export async function POST(req: NextRequest) {
         description: description || null,
         clickup_task_id: clickupTaskId || null,
         clickup_task_name: clickupTaskName || null,
-        status: 'pending', // initial internal status; externally "WAITING FOR FEEDBACK"
+        status: 'pending',
         auto_approve_at: autoApproveAt,
         auto_approve_minutes: autoApproveMinutes || null,
       })
@@ -131,57 +116,41 @@ export async function POST(req: NextRequest) {
       position: index,
     }))
 
-    const { error: itemsError } = await supaAdmin
+    const { error: itemsError } = await supabase
       .from('approval_items')
       .insert(itemsToInsert)
 
-    if (itemsError) {
-      console.error('Approval items insert error:', itemsError)
-    }
+    if (itemsError) console.error('Approval items insert error:', itemsError)
 
-    // 3) Insert assignees (creator, internal assignees, client user)
+    // 3) Assignees
     const assigneeRows: any[] = []
 
-    // Creator
-    assigneeRows.push({
-      approval_id: approvalId,
-      user_id: creatorId,
-      role: 'creator',
-    })
+    // creator
+    assigneeRows.push({ approval_id: approvalId, user_id: creatorId, role: 'creator' })
 
-    // Internal assignees
+    // internal assignees
     for (const uid of assigneeIds) {
       if (!uid) continue
-      assigneeRows.push({
-        approval_id: approvalId,
-        user_id: uid,
-        role: 'assignee',
-      })
+      assigneeRows.push({ approval_id: approvalId, user_id: uid, role: 'assignee' })
     }
 
-    // Client portal user(s) - role 'client'
-    const { data: clientUsers } = await supaAdmin
+    // client portal users
+    const { data: clientUsers } = await supabase
       .from('users')
       .select('id')
       .eq('client_id', clientId)
       .eq('role', 'client')
 
     for (const cu of clientUsers || []) {
-      assigneeRows.push({
-        approval_id: approvalId,
-        user_id: cu.id,
-        role: 'client',
-      })
+      assigneeRows.push({ approval_id: approvalId, user_id: cu.id, role: 'client' })
     }
 
     if (assigneeRows.length > 0) {
-      const { error: assigneesError } = await supaAdmin
+      const { error: assigneesError } = await supabase
         .from('approval_assignees')
         .insert(assigneeRows)
 
-      if (assigneesError) {
-        console.error('Approval assignees insert error:', assigneesError)
-      }
+      if (assigneesError) console.error('Approval assignees insert error:', assigneesError)
     }
 
     // 4) In-app notifications
@@ -195,7 +164,9 @@ export async function POST(req: NextRequest) {
       const uniqueWatcherIds = Array.from(new Set(watcherIds))
 
       if (uniqueWatcherIds.length > 0) {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+
+        await fetch(`${appUrl}/api/notifications/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -210,79 +181,75 @@ export async function POST(req: NextRequest) {
         })
       }
     } catch (notifyErr) {
-      console.error('Approval in-app notification error:', notifyErr)
+      console.error('Approval created in-app notification error:', notifyErr)
     }
 
-    // 5) Email notifications via Apps Script
-try {
-  const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
-  const secret = process.env.APPS_SCRIPT_SECRET
+    // 5) Email notifications via Apps Script (/api/notify-email)
+    try {
+      const secret = process.env.APPS_SCRIPT_SECRET
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
 
-  if (scriptUrl && secret) {
-    const { data: watcherUsers } = await supaAdmin
-      .from('users')
-      .select('id, email, role')
-      .in('id', assigneeRows.map((r) => r.user_id))
+      if (secret) {
+        const watcherIds = assigneeRows.map((r) => r.user_id)
+        const { data: watcherUsers } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .in('id', watcherIds)
 
-    const clientEmails = (watcherUsers || [])
-      .filter((u: any) => u.role === 'client')
-      .map((u: any) => u.email)
-      .filter((e: string | null) => !!e)
+        const clientEmails = (watcherUsers || [])
+          .filter((u: any) => u.role === 'client')
+          .map((u: any) => u.email)
+          .filter(Boolean)
 
-    const teamEmails = (watcherUsers || [])
-      .filter((u: any) => u.role !== 'client')
-      .map((u: any) => u.email)
-      .filter((e: string | null) => !!e)
+        const teamEmails = (watcherUsers || [])
+          .filter((u: any) => u.role !== 'client')
+          .map((u: any) => u.email)
+          .filter(Boolean)
 
-    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
-    const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+        const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+        const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
-    if (clientEmails.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'approval_created',
-          payload: {
-            secret,
-            to: clientEmails,
-            clientName: clientDisplayName,
-            approvalTitle: title,
-            approvalId,
-            url: portalUrl,
-          },
-        }),
-      })
+        if (clientEmails.length > 0) {
+          await fetch(`${appUrl}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_created',
+              payload: {
+                secret,
+                to: clientEmails,
+                clientName: clientDisplayName,
+                approvalTitle: title,
+                approvalId,
+                url: portalUrl,
+              },
+            }),
+          })
+        }
+
+        if (teamEmails.length > 0) {
+          await fetch(`${appUrl}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_created',
+              payload: {
+                secret,
+                to: teamEmails,
+                clientName: clientDisplayName,
+                approvalTitle: title,
+                approvalId,
+                url: agencyUrl,
+              },
+            }),
+          })
+        }
+      }
+    } catch (emailErr) {
+      console.error('Approval created email notification error:', emailErr)
     }
 
-    if (teamEmails.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'approval_created',
-          payload: {
-            secret,
-            to: teamEmails,
-            clientName: clientDisplayName,
-            approvalTitle: title,
-            approvalId,
-            url: agencyUrl,
-          },
-        }),
-      })
-    }
-  } else {
-    console.warn('Apps Script not configured for approval emails')
-  }
-} catch (emailErr) {
-  console.error('Approval email notification error:', emailErr)
-}
-
-    return NextResponse.json({
-      success: true,
-      approvalId,
-    })
+    return NextResponse.json({ success: true, approvalId })
   } catch (err: any) {
     console.error('Create approval error:', err)
     return NextResponse.json(
