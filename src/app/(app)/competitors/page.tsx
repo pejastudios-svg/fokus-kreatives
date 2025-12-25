@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -127,7 +126,7 @@ export default function CompetitorsPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Header 
         title="Competitor Research" 
         subtitle="Analyze competitors and steal their best strategies"
@@ -300,6 +299,6 @@ export default function CompetitorsPage() {
           </Card>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

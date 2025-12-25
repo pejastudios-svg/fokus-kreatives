@@ -318,7 +318,7 @@ export default function PublicCapturePage() {
             {success ? (
               <div className="space-y-4">
                 <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm">
-                  You’re in! Check your email for more details.
+                  You’re in! Let's Keep Going.
                 </p>
                 {leadMagnetUrl && (
                   <a

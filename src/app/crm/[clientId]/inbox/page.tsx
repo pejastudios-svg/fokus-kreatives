@@ -1,12 +1,9 @@
 'use client'
 
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 
 export default function CRMInboxPage() {
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         <Card>
           <CardContent className="py-12 text-center text-gray-400">
             <p className="text-sm">
@@ -18,6 +15,4 @@ export default function CRMInboxPage() {
           </CardContent>
         </Card>
       </div>
-    </CRMLayout>
-  )
 }

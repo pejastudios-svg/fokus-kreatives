@@ -39,8 +39,19 @@ export default function ClientsPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [notification, setNotification] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  useEffect(() => {
+  (async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
+    setUserRole(data?.role || null)
+  })()
+}, [])
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set())
   const menuRef = useRef<HTMLDivElement>(null)
+  const canCreateClients = userRole === 'admin' || userRole === 'manager'
+  const canDeleteClients = userRole === 'admin' // manager cannot delete clients (per your latest rule)
   const supabase = createClient()
   const router = useRouter()
 
@@ -243,14 +254,14 @@ export default function ClientsPage() {
     </div>
   </div>
 
-  {!showArchived && (
-    <Link href="/clients/new">
-      <Button className="btn-premium">
-        <Plus className="h-5 w-5 mr-2" />
-        Add Client
-      </Button>
-    </Link>
-  )}
+{!showArchived && canCreateClients && (
+  <Link href="/clients/new">
+    <Button className="btn-premium">
+      <Plus className="h-5 w-5 mr-2" />
+      Add Client
+    </Button>
+  </Link>
+)}
 </div>
 
         {/* Clients Grid */}
@@ -353,7 +364,7 @@ export default function ClientsPage() {
                           </button>
                           
                           <div className="my-1 border-t border-theme-primary"></div>
-                          
+                          {canDeleteClients && (
                           <button 
                             onClick={() => handleDelete(client.id)}
                             className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
@@ -361,6 +372,7 @@ export default function ClientsPage() {
                             <Trash2 className="h-4 w-4" />
                             Delete Client
                           </button>
+                          )}
                         </div>
                       )}
                     </div>

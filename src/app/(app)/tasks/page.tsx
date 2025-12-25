@@ -1,12 +1,11 @@
 'use client'
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 
 export default function TasksPage() {
   return (
-    <DashboardLayout>
+    <>
       <Header
         title="Tasks"
         subtitle="The task system is currently disabled."
@@ -18,6 +17,6 @@ export default function TasksPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

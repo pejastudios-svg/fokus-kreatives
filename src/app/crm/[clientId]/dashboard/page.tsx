@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Loading } from '@/components/ui/Loading'
 import { 
   Users, 
@@ -56,8 +55,8 @@ interface RecentPayment {
 }
 
 export default function CRMDashboard() {
-  const params = useParams()
-  const clientId = params.clientId as string
+const params = useParams()
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -179,13 +178,9 @@ export default function CRMDashboard() {
   }
 
   if (isLoading) {
-    return (
-      <CRMLayout>
-        <div className="flex items-center justify-center h-full">
+    return <div className="flex items-center justify-center h-full">
           <Loading size="lg" text="Loading dashboard..." />
         </div>
-      </CRMLayout>
-    )
   }
 
   const statCards = [
@@ -227,9 +222,7 @@ export default function CRMDashboard() {
     },
   ]
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
@@ -421,6 +414,4 @@ export default function CRMDashboard() {
           </div>
         </div>
       </div>
-    </CRMLayout>
-  )
 }

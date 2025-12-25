@@ -13,12 +13,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <AuthGuard>
   <div className="flex h-screen bg-gray-50">
+  <div className="hidden md:block">
     <Sidebar />
-    <main className="flex-1 overflow-auto bg-gray-100">
-      <PageTransition>
-  {children}
-</PageTransition>
-    </main>
+  </div>
+
+  <main className="flex-1 overflow-auto bg-gray-100">
+    <PageTransition>{children}</PageTransition>
+  </main>
 
     <NotificationPopupListener />
   </div>

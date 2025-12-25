@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
 import {
@@ -55,8 +54,8 @@ const statusConfig = {
 }
 
 export default function CRMRevenue() {
-  const params = useParams()
-  const clientId = params.clientId as string
+const params = useParams()
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -410,18 +409,12 @@ export default function CRMRevenue() {
   }
 
   if (isLoading) {
-    return (
-      <CRMLayout>
-        <div className="flex items-center justify-center h-full">
+    return <div className="flex items-center justify-center h-full">
           <Loading size="lg" text="Loading revenue..." />
         </div>
-      </CRMLayout>
-    )
   }
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -876,8 +869,6 @@ export default function CRMRevenue() {
           </Modal>
         )}
       </div>
-    </CRMLayout>
-  )
 }
 
 // Modal Component – bigger, centered, clean overlay

@@ -33,6 +33,17 @@ export default function ClientDetailPage() {
   const router = useRouter()
   const clientId = params.id as string
   const supabase = createClient()
+  const [userRole, setUserRole] = useState<string | null>(null)
+  useEffect(() => {
+  (async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
+    setUserRole(data?.role || null)
+  })()
+}, [supabase])
+  const canArchiveClient = userRole === 'admin' || userRole === 'manager'
+  const canDeleteClient = userRole === 'admin'
 
   const [client, setClient] = useState<Client | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -79,6 +90,7 @@ export default function ClientDetailPage() {
     fetchClient()
     fetchPortalUser()
   }, [clientId])
+  
 
   const fetchClient = async () => {
   const { data, error } = await supabase
@@ -107,17 +119,28 @@ export default function ClientDetailPage() {
   setIsLoading(false)
 }
 
-  const fetchPortalUser = async () => {
-    const { data } = await supabase
-      .from('users')
-      .select('invitation_token, invitation_accepted')
-      .eq('client_id', clientId)
-      .single()
 
-    if (data && data.invitation_token && !data.invitation_accepted) {
-      setPortalLink(`${window.location.origin}/invite/${data.invitation_token}`)
-    }
+  const fetchPortalUser = async () => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('invitation_token, invitation_accepted, created_at')
+    .eq('client_id', clientId)
+    .eq('role', 'client') // IMPORTANT: only the client portal user
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('fetchPortalUser error:', error)
+    return
   }
+
+  if (data && data.invitation_token && !data.invitation_accepted) {
+    setPortalLink(`${window.location.origin}/invite/${data.invitation_token}`)
+  } else {
+    setPortalLink(null)
+  }
+}
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -150,7 +173,8 @@ export default function ClientDetailPage() {
     setIsDeleting(true)
 
     // Delete associated users first
-    await supabase.from('users').delete().eq('client_id', clientId)
+    const { error: usersDelErr } = await supabase.from('users').delete().eq('client_id', clientId)
+if (usersDelErr) console.error('Failed to delete client users:', usersDelErr)
     
     const { error } = await supabase
       .from('clients')
@@ -212,23 +236,18 @@ export default function ClientDetailPage() {
     <Sparkles className="h-4 w-4 mr-2" />
     Create Content
   </Button>
-  <Button
-    variant="ghost"
-    onClick={handleArchive}
-    isLoading={isArchiving}
-    className="text-yellow-500 hover:bg-yellow-50"
-  >
+{canArchiveClient && (
+  <Button variant="ghost" onClick={handleArchive} isLoading={isArchiving} className="text-yellow-500 hover:bg-yellow-50">
     Archive
   </Button>
-  <Button
-    variant="ghost"
-    onClick={handleDelete}
-    isLoading={isDeleting}
-    className="text-red-500 hover:bg-red-50"
-  >
+)}
+
+{canDeleteClient && (
+  <Button variant="ghost" onClick={handleDelete} isLoading={isDeleting} className="text-red-500 hover:bg-red-50">
     <Trash2 className="h-4 w-4 mr-2" />
     Delete
   </Button>
+)}
 </div>
         </div>
 

@@ -1,5 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import Groq from 'groq-sdk'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+async function sleep(ms: number) {
+  await new Promise((r) => setTimeout(r, ms))
+}
+
+async function tryAcquireLock(key: string, ttlMs: number): Promise<boolean> {
+  const now = new Date()
+  const lockedUntil = new Date(now.getTime() + ttlMs).toISOString()
+
+  const { data: existing, error: selErr } = await supabaseAdmin
+    .from('ai_locks')
+    .select('locked_until')
+    .eq('key', key)
+    .maybeSingle()
+
+  if (selErr) {
+    // Fail open if lock table is unavailable (don’t block generation)
+    console.warn('ai_locks select error:', selErr)
+    return true
+  }
+
+  if (existing?.locked_until && new Date(existing.locked_until) > now) {
+    return false
+  }
+
+  const { error: upErr } = await supabaseAdmin
+    .from('ai_locks')
+    .upsert({ key, locked_until: lockedUntil })
+
+  if (upErr) {
+    console.warn('ai_locks upsert error:', upErr)
+    return true
+  }
+
+  return true
+}
+
+async function releaseLock(key: string): Promise<void> {
+  try {
+    await supabaseAdmin
+      .from('ai_locks')
+      .update({ locked_until: new Date(0).toISOString() })
+      .eq('key', key)
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function groqWithRetry<T>(makeCall: () => Promise<T>): Promise<T> {
+  const maxAttempts = 4
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await makeCall()
+    } catch (err: any) {
+      const status = err?.status || err?.statusCode
+      const msg = (err?.message || '').toLowerCase()
+
+      const is429 =
+        status === 429 ||
+        msg.includes('rate_limit') ||
+        msg.includes('tokens per minute') ||
+        msg.includes('tpm')
+
+      if (!is429 || attempt === maxAttempts) throw err
+
+      const wait = Math.min(1500 * Math.pow(2, attempt - 1), 8000) + Math.floor(Math.random() * 250)
+      await sleep(wait)
+    }
+  }
+  throw new Error('Retry failed')
+}
 
 // Comprehensive hook formulas
 const hookFormulas = [
@@ -118,7 +198,7 @@ const hookFormulas = [
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY
-  
+
   if (!apiKey) {
     return NextResponse.json(
       { success: false, error: 'GROQ_API_KEY not found' },
@@ -128,7 +208,20 @@ export async function POST(request: NextRequest) {
 
   const groq = new Groq({ apiKey })
 
+  const lockKey = 'generate-global'
+  let gotLock = false
+
   try {
+    // Acquire lock here (INSIDE try)
+    gotLock = await tryAcquireLock(lockKey, 45_000)
+
+    if (!gotLock) {
+      return NextResponse.json(
+        { success: false, error: 'Generator busy. Try again in a few seconds.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { clientInfo, contentType, contentPillar, idea, quantity, competitorInsights } = body
 
@@ -141,7 +234,7 @@ export async function POST(request: NextRequest) {
     }
 
     const defaultMax = 10
-    const requested = quantity && quantity > 0 ? quantity : 1
+    const requested = 1
     const maxForThisType = maxByType[contentType] ?? defaultMax
     const safeQuantity = Math.min(requested, maxForThisType)
 
@@ -478,15 +571,17 @@ ${formatGuide}
 
 Now create ${safeQuantity} exceptional ${contentType}(s) that people will actually want to watch until the end. GO!`
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.85,
-      max_tokens: 5000,
-    })
+     const completion = await groqWithRetry(() =>
+      groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.85,
+        max_tokens: 5000,
+      })
+    )
 
     const content = completion.choices[0]?.message?.content
 
@@ -498,14 +593,12 @@ Now create ${safeQuantity} exceptional ${contentType}(s) that people will actual
     }
 
     return NextResponse.json({ success: true, content })
-
   } catch (error: any) {
     console.error('Generation Error:', error)
 
     const status = error?.status || error?.statusCode
     const message = error?.message || error?.error?.message || ''
 
-    // Groq TPM / token-size style limits can come back as 413 or with code "rate_limit_exceeded"
     const isTokenLimit =
       status === 413 ||
       status === 429 ||
@@ -525,11 +618,13 @@ Now create ${safeQuantity} exceptional ${contentType}(s) that people will actual
     }
 
     return NextResponse.json(
-      {
-        success: false,
-        error: message || 'Generation failed. Please try again.',
-      },
+      { success: false, error: message || 'Generation failed. Please try again.' },
       { status: 500 }
     )
+  } finally {
+    // Always release lock if we acquired it
+    if (gotLock) {
+      await releaseLock(lockKey)
+    }
   }
 }

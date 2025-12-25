@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -25,8 +24,8 @@ type NotificationSettings = {
 }
 
 export default function CRMSettingsPage() {
-  const params = useParams()
-  const clientId = params.clientId as string
+const params = useParams()
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   // Workspace notification toggles
@@ -204,9 +203,7 @@ export default function CRMSettingsPage() {
     setSavingPassword(false)
   }
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {/* Alerts */}
         {alert && (
           <div
@@ -227,7 +224,7 @@ export default function CRMSettingsPage() {
 
         <h1 className="text-2xl font-bold text-white mb-6">Workspace Settings</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           {/* Workspace Notifications */}
           <Card className="bg-[#1E293B] border-[#334155]">
             <CardHeader className="flex flex-row items-center gap-2">
@@ -257,50 +254,6 @@ export default function CRMSettingsPage() {
                         setNotifications(prev => ({
                           ...prev,
                           meetings: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 rounded border-gray-500 text-[#2B79F7] focus:ring-[#2B79F7]"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div>
-                      <p className="font-medium text-gray-100">
-                        Form submit notifications
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        When someone submits a capture page
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.capture_submissions ?? true}
-                      onChange={e =>
-                        setNotifications(prev => ({
-                          ...prev,
-                          capture_submissions: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 rounded border-gray-500 text-[#2B79F7] focus:ring-[#2B79F7]"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div>
-                      <p className="font-medium text-gray-100">
-                        Lead notifications
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        When new leads are added or updated
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.leads ?? true}
-                      onChange={e =>
-                        setNotifications(prev => ({
-                          ...prev,
-                          leads: e.target.checked,
                         }))
                       }
                       className="h-5 w-5 rounded border-gray-500 text-[#2B79F7] focus:ring-[#2B79F7]"
@@ -446,6 +399,4 @@ export default function CRMSettingsPage() {
           </div>
         </div>
       </div>
-    </CRMLayout>
-  )
 }

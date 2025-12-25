@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
@@ -35,8 +34,8 @@ interface Meeting {
 }
 
 export default function CRMMeetingsPage() {
-  const params = useParams()
-  const clientId = params.clientId as string
+const params = useParams()
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -256,13 +255,9 @@ export default function CRMMeetingsPage() {
   }
 
   if (isLoading) {
-    return (
-      <CRMLayout>
-        <div className="flex items-center justify-center h-full">
+    return <div className="flex items-center justify-center h-full">
           <Loading size="lg" text="Loading meetings..." />
         </div>
-      </CRMLayout>
-    )
   }
 
   const handleDeleteMeeting = async () => {
@@ -294,9 +289,7 @@ export default function CRMMeetingsPage() {
   }
 }
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -647,8 +640,7 @@ export default function CRMMeetingsPage() {
             </div>
           </div>
         )}
-      </div>
-      {meetingToDelete && (
+        {meetingToDelete && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
@@ -691,6 +683,5 @@ export default function CRMMeetingsPage() {
     </div>
   </div>
 )}
-    </CRMLayout>
-  )
+      </div>
 }

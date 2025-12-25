@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -127,11 +126,76 @@ function normalizeFields(f: any): CaptureField[] {
 
 export default function CRMCapturePages() {
   const params = useParams()
-  const clientId = params.clientId as string
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   const [tab, setTab] = useState<'pages' | 'submissions'>('pages')
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRow | null>(null)
+const [crmRole, setCrmRole] = useState<'admin' | 'manager'>('manager')
+const [roleReady, setRoleReady] = useState(false)
+const [isClientUser, setIsClientUser] = useState(false)
+
+// ✅ This controls Create/Edit/Delete in Capture Pages
+const canEditCapture = crmRole === 'admin' || isClientUser
+
+useEffect(() => {
+  let cancelled = false
+  setRoleReady(false)
+
+  ;(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !clientId) return
+
+      const { data: userRow, error: userErr } = await supabase
+        .from('users')
+        .select('role, is_agency_user, client_id')
+        .eq('id', user.id)
+        .single()
+
+      if (userErr) {
+        console.error('Capture role load user error:', userErr)
+        return
+      }
+
+      const isClient = userRow?.role === 'client'
+      if (!cancelled) setIsClientUser(isClient)
+
+      // ✅ Clients are full admins in their own CRM
+      if (isClient) {
+        if (!cancelled) setCrmRole('admin')
+        return
+      }
+
+      // ✅ Agency admins are admins everywhere
+      if (userRow?.role === 'admin' && userRow?.is_agency_user) {
+        if (!cancelled) setCrmRole('admin')
+        return
+      }
+
+      // ✅ Everyone else: membership role
+      const { data: mem, error: memErr } = await supabase
+        .from('client_memberships')
+        .select('role')
+        .eq('client_id', clientId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (memErr) console.error('Capture role load membership error:', memErr)
+
+      if (!cancelled) setCrmRole(mem?.role === 'admin' ? 'admin' : 'manager')
+    } catch (e) {
+      console.error('Capture role load exception:', e)
+    } finally {
+      if (!cancelled) setRoleReady(true)
+    }
+  })()
+
+  return () => {
+    cancelled = true
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [clientId])
 
   // pages
   const [pages, setPages] = useState<CapturePage[]>([])
@@ -569,9 +633,7 @@ const deleteSubmission = async () => {
   }
 }
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {notification && (
           <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
@@ -615,10 +677,12 @@ const deleteSubmission = async () => {
               Submissions
             </button>
 
-            <Button onClick={openNewModal}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Capture Page
-            </Button>
+            {canEditCapture && (
+  <Button onClick={openNewModal}>
+    <Plus className="h-4 w-4 mr-2" />
+    New Capture Page
+  </Button>
+)}
           </div>
         </div>
 
@@ -703,6 +767,7 @@ const deleteSubmission = async () => {
                           </Button>
 
                           <div className="flex items-center gap-2">
+                            {canEditCapture && (
                             <button
                               onClick={() => openEditModal(page)}
                               className="p-2 rounded-lg bg-[#0F172A] text-gray-300 hover:text-white hover:bg-[#111827] transition-colors"
@@ -710,6 +775,8 @@ const deleteSubmission = async () => {
                             >
                               <Edit3 className="h-4 w-4" />
                             </button>
+                )}
+                {canEditCapture && (
                             <button
                               onClick={() => setPageToDelete(page)}
                               className="p-2 rounded-lg bg-[#0F172A] text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -717,6 +784,7 @@ const deleteSubmission = async () => {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
+                )}
                           </div>
                         </div>
                       </CardContent>
@@ -838,18 +906,17 @@ const deleteSubmission = async () => {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation()
-      setSubmissionToDelete(s)
-    }}
-    className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
-    title="Delete submission"
-  >
-    <Trash2 className="h-4 w-4" />
-  </button>
-</td>
+                               {canEditCapture && (
+                               <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setSubmissionToDelete(s) }}
+                              className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+                                title="Delete submission"
+                                   >
+                                   <Trash2 className="h-4 w-4" />
+                                     </button>
+                                       )}
+                              </td>
                             </tr>
                           )
                         })}
@@ -1190,9 +1257,9 @@ const deleteSubmission = async () => {
                 <Button variant="outline" onClick={() => setShowModal(false)} disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave} isLoading={isSaving} disabled={!!slugError || !form.name || !form.slug}>
-                  Save
-                </Button>
+                <Button onClick={handleSave} isLoading={isSaving} disabled={!canEditCapture || !!slugError || !form.name || !form.slug}>
+  Save
+</Button>
               </div>
             </div>
           </div>
@@ -1232,8 +1299,7 @@ const deleteSubmission = async () => {
             </div>
           </div>
         )}
-      </div>
-      {selectedSubmission && (
+         {selectedSubmission && (
   <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
     <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
@@ -1316,6 +1382,5 @@ const deleteSubmission = async () => {
     </div>
   </div>
 )}
-    </CRMLayout>
-  )
+</div>  
 }

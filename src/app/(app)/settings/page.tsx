@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -106,7 +105,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Header 
         title="Settings" 
         subtitle="Manage your account and preferences"
@@ -245,6 +244,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

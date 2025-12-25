@@ -2,7 +2,6 @@ name: Approvals Cron
 
 on:
   schedule:
-    # every 15 minutes
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
@@ -10,6 +9,10 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - name: Debug env
+        run: |
+          echo "APP_URL=$APP_URL"
+          echo "Has CRON_SECRET? ${#CRON_SECRET}"
       - name: Auto-approve (due approvals)
         run: |
           curl -fsS "$APP_URL/api/approvals/auto-approve?secret=$CRON_SECRET"

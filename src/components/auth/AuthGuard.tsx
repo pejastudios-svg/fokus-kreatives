@@ -28,7 +28,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   const { data: userRow } = await supabase
     .from('users')
-    .select('id, role, client_id')
+    .select('id, role, client_id, is_agency_user')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -38,14 +38,37 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return
   }
 
-  if (userRow.role === 'client') {
-    setIsLoading(false)
-    router.push('/portal/approvals')
-    return
-  }
+if (userRow.role === 'client') {
+  setIsLoading(false)
+  router.push('/portal/approvals')
+  return
+}
 
+// ✅ Agency users stay in agency app
+if (userRow.is_agency_user) {
   setIsAuthenticated(true)
   setIsLoading(false)
+  return
+}
+
+// not agency user: send to first CRM
+const { data: mem } = await supabase
+  .from('client_memberships')
+  .select('client_id')
+  .eq('user_id', user.id)
+  .limit(1)
+  .maybeSingle()
+
+setIsLoading(false)
+
+if (mem?.client_id) {
+  router.push(`/crm/${mem.client_id}/dashboard`)
+  return
+}
+
+await supabase.auth.signOut()
+router.push('/login')
+return
 }
 
   checkAuth()

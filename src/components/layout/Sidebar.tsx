@@ -66,15 +66,7 @@ const [showUserMenu, setShowUserMenu] = useState(false)
     router.push('/login')
   }
 
-  const filteredNavigation = baseNavigation.filter((item) => {
-  if (item.name === 'Clients') {
-    // hide Clients for employees and guests
-    if (userRole === 'employee' || userRole === 'guest') {
-      return false
-    }
-  }
-  return true
-})
+const filteredNavigation = baseNavigation
 
   return (
     <div className="flex flex-col h-full w-64 bg-brand-gradient">

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -151,7 +150,7 @@ etc.`,
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Header 
         title="Message Suggestions" 
         subtitle="AI-generated DM templates for your content"
@@ -336,6 +335,6 @@ etc.`,
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

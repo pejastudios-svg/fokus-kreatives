@@ -2,98 +2,139 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url)
-  const secret = url.searchParams.get('secret')
-  const envSecret = process.env.CRON_SECRET
-  const vercelCron = req.headers.get('x-vercel-cron')
+  try {
+    const url = new URL(req.url)
+    const secret = url.searchParams.get('secret')
+    const envSecret = process.env.CRON_SECRET
 
-  if (envSecret && !vercelCron && secret !== envSecret) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const nowIso = new Date().toISOString()
-
-  const { data: approvals, error } = await supabase
-    .from('approvals')
-    .select('id, clickup_task_id, title, client_id, clients(name, business_name)')
-    .eq('status', 'pending')
-    .not('auto_approve_at', 'is', null)
-    .lte('auto_approve_at', nowIso)
-
-  if (error) {
-    console.error('auto-approve load approvals error', error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  }
-
-  let processed = 0
-
-  for (const a of approvals || []) {
-    const approvalId = a.id as string
-
-    // Approve all items
-    await supabase
-      .from('approval_items')
-      .update({ status: 'approved', updated_at: nowIso })
-      .eq('approval_id', approvalId)
-
-    // Approve approval
-    await supabase
-      .from('approvals')
-      .update({ status: 'approved', updated_at: nowIso })
-      .eq('id', approvalId)
-
-    // ClickUp approved
-    if (a.clickup_task_id) {
-      await updateClickUpStatus(a.clickup_task_id as string, 'approved')
+    if (envSecret && secret !== envSecret) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Notify assignees (in-app + email)
-    const { data: assignees } = await supabase
-      .from('approval_assignees')
-      .select('user_id')
-      .eq('approval_id', approvalId)
+    const nowIso = new Date().toISOString()
 
-    const userIds = Array.from(new Set((assignees || []).map((r: any) => r.user_id).filter(Boolean)))
+    const { data: approvals, error } = await supabase
+      .from('approvals')
+      .select('id, clickup_task_id, title, client_id, clients(name, business_name)')
+      .eq('status', 'pending')
+      .not('auto_approve_at', 'is', null)
+      .lte('auto_approve_at', nowIso)
 
-    const relClients: any = (a as any).clients
-    const clientName =
-      (Array.isArray(relClients) ? relClients[0]?.business_name || relClients[0]?.name : relClients?.business_name || relClients?.name) || 'Client'
+    if (error) {
+      console.error('[auto-approve] select error', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
 
-    if (userIds.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds,
-          type: 'approval_approved',
-          data: { approvalId, title: a.title, clientName, actorId: null },
-        }),
-      })
+    let processed = 0
 
-      // emails
-      const { data: users } = await supabase.from('users').select('id, email').in('id', userIds)
-      const emails = (users || []).map((u: any) => u.email).filter(Boolean)
+    for (const a of approvals || []) {
+      const approvalId = a.id as string
 
-      if (emails.length > 0) {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+      await supabase
+        .from('approval_items')
+        .update({ status: 'approved', updated_at: nowIso })
+        .eq('approval_id', approvalId)
+
+      await supabase
+        .from('approvals')
+        .update({ status: 'approved', updated_at: nowIso })
+        .eq('id', approvalId)
+
+      if (a.clickup_task_id) {
+        await updateClickUpStatus(a.clickup_task_id as string, 'approved')
+      }
+
+      // notify assignees
+      const { data: assignees } = await supabase
+        .from('approval_assignees')
+        .select('user_id')
+        .eq('approval_id', approvalId)
+
+      const userIds = Array.from(new Set((assignees || []).map((r: any) => r.user_id).filter(Boolean)))
+
+      const relClients: any = (a as any).clients
+      const clientName =
+        (Array.isArray(relClients) ? relClients[0]?.business_name || relClients[0]?.name : relClients?.business_name || relClients?.name) || 'Client'
+
+      if (userIds.length > 0) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+        const secret2 = process.env.APPS_SCRIPT_SECRET
+
+        await fetch(`${appUrl}/api/notifications/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            userIds,
             type: 'approval_approved',
-            payload: { to: emails, clientName, approvalTitle: a.title, approvalId },
+            data: { approvalId, title: a.title, clientName },
           }),
         })
+
+        if (secret2) {
+          const { data: users } = await supabase
+            .from('users')
+            .select('id, email, role')
+            .in('id', userIds)
+
+          const clientEmails = (users || []).filter((u: any) => u.role === 'client').map((u: any) => u.email).filter(Boolean)
+          const teamEmails = (users || []).filter((u: any) => u.role !== 'client').map((u: any) => u.email).filter(Boolean)
+
+          const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+          const agencyUrl = `${appUrl}/approvals/${approvalId}`
+
+          if (clientEmails.length) {
+            await fetch(`${appUrl}/api/notify-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'approval_approved',
+                payload: {
+                  secret: secret2,
+                  to: clientEmails,
+                  clientName,
+                  approvalTitle: a.title,
+                  approvalId,
+                  url: portalUrl,
+                },
+              }),
+            })
+          }
+
+          if (teamEmails.length) {
+            await fetch(`${appUrl}/api/notify-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'approval_approved',
+                payload: {
+                  secret: secret2,
+                  to: teamEmails,
+                  clientName,
+                  approvalTitle: a.title,
+                  approvalId,
+                  url: agencyUrl,
+                },
+              }),
+            })
+          }
+        }
       }
+
+      processed++
     }
 
-    processed++
+    return NextResponse.json({ success: true, processed })
+  } catch (err: any) {
+    console.error('[auto-approve] error', err)
+    return NextResponse.json({ success: false, error: err?.message || 'Server error' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true, processed })
 }

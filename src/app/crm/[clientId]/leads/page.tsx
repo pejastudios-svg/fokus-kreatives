@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
 import { 
@@ -132,8 +131,8 @@ const getFieldOptions = (field: CustomField): StatusOption[] => {
 }
 
 export default function CRMLeads() {
-  const params = useParams()
-  const clientId = params.clientId as string
+const params = useParams()
+  const clientId = ((params as any).clientid || (params as any).clientId) as string
   const supabase = createClient()
 
   // Data state
@@ -593,18 +592,12 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
   }))
 
   if (isLoading) {
-    return (
-      <CRMLayout>
-        <div className="flex items-center justify-center h-full">
+    return <div className="flex items-center justify-center h-full">
           <Loading size="lg" text="Loading leads..." />
         </div>
-      </CRMLayout>
-    )
   }
 
-  return (
-    <CRMLayout>
-      <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-6 lg:p-8 min-h-full">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
@@ -1177,8 +1170,6 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           />
         )}
       </div>
-    </CRMLayout>
-  )
 }
 
 // Status Badge Component

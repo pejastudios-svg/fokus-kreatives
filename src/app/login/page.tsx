@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent } from '@/components/ui/Card'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
@@ -15,6 +16,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState('')
+  const searchParams = useSearchParams()
+  const nextUrl = searchParams.get('next')
   const router = useRouter()
   const supabase = createClient()
 
@@ -45,6 +48,10 @@ export default function LoginPage() {
   setIsLoading(false)
   return
 }
+if (nextUrl) {
+  router.push(nextUrl)
+  return
+}
 // Determine role and redirect accordingly
 const {
   data: { user },
@@ -66,6 +73,7 @@ if (user) {
   router.push('/dashboard')
 }
 }
+
     
 
   if (isChecking) {

@@ -127,6 +127,7 @@ export function ContentCreationEngine() {
   }
 
   const handleGenerate = async () => {
+    setQuantity(1)
     if (!selectedClient) {
       setError('Please select a client first')
       return
@@ -157,7 +158,7 @@ export function ContentCreationEngine() {
           contentType: contentTypes.find(t => t.id === selectedType)?.name || selectedType,
           contentPillar: contentPillars.find(p => p.id === selectedPillar)?.name || selectedPillar,
           idea: ideaInput,
-          quantity: quantity,
+          quantity: 1,
           competitorInsights: selectedClient.competitor_insights || '',
         }),
       })
@@ -303,35 +304,7 @@ export function ContentCreationEngine() {
         </CardContent>
       </Card>
 
-      {/* Quantity Slider */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
-            <span className="text-2xl font-bold text-[#2B79F7]">{quantity}</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <input
-              type="range"
-              min="1"
-              max="50"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2B79F7]"
-            />
-            <div className="flex justify-between text-xs text-gray-400">
-              <span>1</span>
-              <span>10</span>
-              <span>20</span>
-              <span>30</span>
-              <span>40</span>
-              <span>50</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      
 
       {/* Generate Button */}
       <div className="flex justify-center pt-4">

@@ -18,9 +18,8 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const secret = url.searchParams.get('secret')
   const envSecret = process.env.CRON_SECRET
-  const vercelCron = req.headers.get('x-vercel-cron')
 
-  if (envSecret && !vercelCron && secret !== envSecret) {
+   if (envSecret && secret !== envSecret) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -87,7 +86,7 @@ await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
     data: {
   approvalId,
   title: a.title,
-  clientName: clientDisplayName,
+  clientName: clientName,
 },
   }),
 })
@@ -116,7 +115,7 @@ if (secret && clientEmails.length > 0) {
       payload: {
         secret,
         to: clientEmails,
-        clientName: clientDisplayName,
+        clientName: clientName,
         approvalTitle: a.title,
         approvalId,
         reminderLabel: label,
@@ -135,7 +134,7 @@ if (secret && teamEmails.length > 0) {
       payload: {
         secret,
         to: teamEmails,
-        clientName: clientDisplayName,
+        clientName: clientName,
         approvalTitle: a.title,
         approvalId,
         reminderLabel: label,

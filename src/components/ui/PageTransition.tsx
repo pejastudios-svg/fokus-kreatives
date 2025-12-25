@@ -8,7 +8,6 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
   const [key, setKey] = useState(pathname)
 
   useEffect(() => {
-    // Force a re-key on pathname change so CSS animation plays
     setKey(pathname)
   }, [pathname])
 

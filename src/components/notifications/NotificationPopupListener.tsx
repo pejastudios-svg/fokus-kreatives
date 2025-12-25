@@ -23,7 +23,7 @@ export function NotificationPopupListener() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    audioRef.current = new Audio('/notifications.mp3')
+    audioRef.current = new Audio(`/notifications.mp3?v=${Date.now()}`)
   }, [])
 
   const playSound = () => {
