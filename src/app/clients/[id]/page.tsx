@@ -84,6 +84,8 @@ export default function ClientDetailPage() {
     unique_mechanisms: '',
     social_proof: '',
     competitor_insights: '',
+    website_url: '',
+    content_tier: 'beginner',
   })
 
   useEffect(() => {
@@ -113,7 +115,9 @@ export default function ClientDetailPage() {
       key_stories: data.key_stories || '',
       unique_mechanisms: data.unique_mechanisms || '',
       social_proof: data.social_proof || '',
-      competitor_insights: data.competitor_insights || '',  // Add this
+      competitor_insights: data.competitor_insights || '',  
+      website_url: data.website_url || '',
+      content_tier: data.content_tier || 'beginner',
     })
   }
   setIsLoading(false)
@@ -358,8 +362,37 @@ if (usersDelErr) console.error('Failed to delete client users:', usersDelErr)
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
+              <Input
+  label="Website URL (optional)"
+  name="website_url"
+  value={(formData as any).website_url || ''}
+  onChange={handleChange}
+  placeholder="https://example.com"
+/>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Client Tier
+  </label>
+  <select
+    name="content_tier"
+    value={(formData as any).content_tier || 'beginner'}
+    onChange={(e) =>
+      setFormData((prev: any) => ({ ...prev, content_tier: e.target.value }))
+    }
+    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+  >
+    <option value="beginner">Beginner</option>
+    <option value="mid">Mid</option>
+    <option value="advanced">Advanced</option>
+  </select>
+  <p className="mt-1 text-xs text-gray-500">
+    Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
+  </p>
+</div>
             </CardContent>
           </Card>
+
 
           {/* Brand Document - TEXT FIELD */}
           <Card>

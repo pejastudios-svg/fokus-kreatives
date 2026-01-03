@@ -33,6 +33,8 @@ export default function NewClientPage() {
     key_stories: '',
     unique_mechanisms: '',
     social_proof: '',
+    website_url: '',
+   content_tier: 'beginner',
   })
 
   // Only admins can create clients (per your current rule)
@@ -109,6 +111,8 @@ export default function NewClientPage() {
           key_stories: formData.key_stories,
           unique_mechanisms: formData.unique_mechanisms,
           social_proof: formData.social_proof,
+          website_url: formData.website_url || null,
+          content_tier: formData.content_tier || 'beginner',
         })
         .select()
         .single()
@@ -324,6 +328,34 @@ export default function NewClientPage() {
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
                 />
               </div>
+              <Input
+  label="Website URL (optional)"
+  name="website_url"
+  value={(formData as any).website_url || ''}
+  onChange={handleChange}
+  placeholder="https://example.com"
+/>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Client Tier
+  </label>
+  <select
+    name="content_tier"
+    value={(formData as any).content_tier || 'beginner'}
+    onChange={(e) =>
+      setFormData((prev: any) => ({ ...prev, content_tier: e.target.value }))
+    }
+    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+  >
+    <option value="beginner">Beginner</option>
+    <option value="mid">Mid</option>
+    <option value="advanced">Advanced</option>
+  </select>
+  <p className="mt-1 text-xs text-gray-500">
+    Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
+  </p>
+</div>
             </CardContent>
           </Card>
 

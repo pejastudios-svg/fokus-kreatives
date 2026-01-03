@@ -15,6 +15,8 @@ import {
   LogOut,
   ChevronDown,
   ClipboardList,
+  InstagramIcon,
+  Calendar1Icon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -24,8 +26,8 @@ const baseNavigation = [
   { name: 'Team', href: '/team', icon: UserCircle },
   { name: 'Competitors', href: '/competitors', icon: Search },
   { name: 'Message Suggestions', href: '/automations', icon: MessageSquare },
+  { name: 'Approvals', href: '/approvals', icon: ClipboardList },
   { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'Approvals', href: '/approvals', icon: ClipboardList }
 ]
 
 export function Sidebar() {

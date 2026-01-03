@@ -83,6 +83,14 @@ async function groqWithRetry<T>(makeCall: () => Promise<T>): Promise<T> {
 
 // Comprehensive hook formulas
 const hookFormulas = [
+  'You think X… but it’s actually Y',
+  'If I were you”: “If I had to start from 0 in [niche], I’d do this…',
+  'You’re doing [thing] wrong — here’s the fix',
+  'I almost quit when… then this happened',
+  'Here’s what changed when we did ONE thing…',
+  'You don’t need [common belief] — you need this instead',
+  'Steal this script for when someone says…',
+  '3 signs your content isn’t converting (and the quick fix)',
   'Want to double your {outcome}? This is how you do it.',
   'Stop. What you\'re doing isn\'t working.',
   'Everyone does {X}. They\'re wrong.',
@@ -95,7 +103,7 @@ const hookFormulas = [
   'Bet you didn\'t know this about {topic}.',
   'The industry hides this from you.',
   'I was broke until I discovered this.',
-  'My client paid $10K for this. Free for you.',
+  'My client paid ${believable amount} for this. Free for you.',
   '{Common belief} is completely wrong.',
   'Nobody talks about this strategy.',
   'This is the video right here. This guy uploaded a hack for all the {niche} out there.',
@@ -555,7 +563,6 @@ ${contentPillar}
 ${idea ? `## SPECIFIC TOPIC/ANGLE
 ${idea}` : ''}
 
-${formatGuide}
 
 ${formatGuide}
 
