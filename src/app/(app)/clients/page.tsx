@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -238,12 +237,12 @@ export default function ClientsPage() {
   )
 
   return (
-    <DashboardLayout>
+    <>
       <Header 
         title="Clients" 
         subtitle="Manage your client accounts"
       />
-      <div className="p-8">
+      <div className="p-8 animate-in fade-in">
         {/* Notification Toast */}
         {notification && (
           <div className="fixed top-4 right-4 z-50 animate-in fade-in-up duration-300">
@@ -472,6 +471,6 @@ export default function ClientsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

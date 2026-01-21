@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -459,7 +458,7 @@ function ApprovalsSkeleton() {
 }
 
   return (
-    <DashboardLayout>
+    <>
       <Header
         title="Approvals"
         subtitle="Send assets for client approval and track ClickUp status"
@@ -979,6 +978,6 @@ function ApprovalsSkeleton() {
     </div>
   </div>
 )}
-    </DashboardLayout>
+    </>
   )
 }
