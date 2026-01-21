@@ -182,7 +182,8 @@ if (!clientId) {
 
     setUserName(userRow.name || email || 'User')
     setUserEmail(email || '')
-    setUserPicture(userRow.profile_picture_url || null)
+    // FIX: Fallback to Google/Auth picture if the database field is empty
+    setUserPicture(userRow.profile_picture_url || user.user_metadata?.avatar_url || null)
 
     // ✅ Allow managers/employees to access this CRM if they have membership
 if (role !== 'client' && role !== 'admin') {
@@ -477,6 +478,7 @@ if (role !== 'client' && role !== 'admin') {
               alt={userName} 
               width={32} 
               height={32} 
+              unoptimized
               className="rounded-full object-cover ring-2 ring-[#2B79F7]" 
               />
               ) : (

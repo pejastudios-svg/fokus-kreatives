@@ -49,7 +49,8 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         if (data) {
           setUserName(data.name || '')
-          setProfilePicture(data.profile_picture_url)
+          // FIX: Fallback to Google/Auth picture if DB is empty
+          setProfilePicture(data.profile_picture_url || user.user_metadata?.avatar_url || null)
           setUserRole(data.role || null)
         }
       }
@@ -279,6 +280,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               alt={userName}
               width={40}
               height={40}
+              unoptimized
               className="rounded-full object-cover ring-2 ring-gray-200"
             />
           ) : (

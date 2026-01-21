@@ -53,7 +53,8 @@ export function Sidebar() {
 
         if (data) {
           setUserName(data.name || '')
-          setUserPicture(data.profile_picture_url)
+          // FIX: Fallback to Google/Auth picture if the database field is empty
+          setUserPicture(data.profile_picture_url || user.user_metadata?.avatar_url || null)
         }
       }
     }
@@ -115,6 +116,7 @@ export function Sidebar() {
                 alt={userName} 
                 width={32}
                 height={32}
+                unoptimized
                 className="h-8 w-8 rounded-full object-cover ring-2 ring-white/20" 
               />
             ) : (
