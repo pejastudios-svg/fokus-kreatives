@@ -348,6 +348,7 @@ export default function ClientsPage() {
                           alt={client.name}
                           width={48}
                           height={48}
+                          unoptimized
                           className="rounded-full object-cover ring-2 ring-theme-primary"
                         />
                       ) : (
