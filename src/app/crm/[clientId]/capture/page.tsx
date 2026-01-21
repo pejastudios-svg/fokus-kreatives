@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading'
 import {
   Plus,
   Link as LinkIcon,
@@ -631,6 +632,37 @@ const deleteSubmission = async () => {
   }
 }
 
+function CaptureSkeleton() {
+  return (
+    <div className="space-y-4 animate-in fade-in">
+      {[1, 2, 3].map((i) => (
+        <Card key={i} className="bg-[#1E293B] border-[#334155]">
+          <CardContent className="p-5 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 w-full">
+              <Skeleton className="h-10 w-10 rounded-lg bg-[#334155]" />
+              <div className="space-y-2 w-full max-w-md">
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-32 bg-[#334155]" />
+                  <Skeleton className="h-5 w-16 rounded-full bg-[#334155]" />
+                </div>
+                <Skeleton className="h-4 w-48 bg-[#334155]" />
+                <Skeleton className="h-3 w-64 bg-[#334155]" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-8 w-24 bg-[#334155]" />
+              <div className="flex gap-2 justify-end">
+                <Skeleton className="h-8 w-8 rounded-lg bg-[#334155]" />
+                <Skeleton className="h-8 w-8 rounded-lg bg-[#334155]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
   return <div className="p-6 lg:p-8 min-h-full">
         {notification && (
           <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 flex items-center gap-2">
@@ -687,9 +719,7 @@ const deleteSubmission = async () => {
         {tab === 'pages' && (
           <>
             {isLoading ? (
-              <Card>
-                <CardContent className="py-10 text-center text-gray-400">Loading...</CardContent>
-              </Card>
+              <CaptureSkeleton />
             ) : pages.length === 0 ? (
               <Card>
                 <CardContent className="py-10 text-center text-gray-400">

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading'
 import {
   Plus,
   Search,
@@ -16,7 +17,6 @@ import {
   Clock,
   Link as LinkIcon,
   ExternalLink,
-  Loader2,
   Trash2,
   X,
 } from 'lucide-react'
@@ -434,6 +434,30 @@ const handleDeleteApproval = async (approvalId: string) => {
   }
 }
 
+function ApprovalsSkeleton() {
+  return (
+    <div className="space-y-4 animate-in fade-in">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <CardContent className="p-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 w-full">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="space-y-2 w-full max-w-md">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
   return (
     <DashboardLayout>
       <Header
@@ -483,12 +507,7 @@ const handleDeleteApproval = async (approvalId: string) => {
 
         {/* Approvals list */}
         {isLoading ? (
-          <Card>
-            <CardContent className="py-10 text-center text-gray-500">
-              <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
-              Loading approvals...
-            </CardContent>
-          </Card>
+          <ApprovalsSkeleton />
         ) : filteredApprovals.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-gray-500">

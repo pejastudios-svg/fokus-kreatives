@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading'
 
 export default function SettingsPage() {
   const [name, setName] = useState('')
@@ -23,16 +24,17 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true) // Add this
   const supabase = useMemo(() => createClient(), [])
 
 
 
   const loadUserData = useCallback(async () => {
-  const { data: { user } } = await supabase.auth.getUser()
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-  if (!user) return
-
-  setEmail(user.email || '')
+    setEmail(user.email || '')
 
   const { data: userData, error } = await supabase
     .from('users')
@@ -49,11 +51,13 @@ export default function SettingsPage() {
     setName(userData.name || '')
     setProfilePicture(userData.profile_picture_url || '')
   }
+} finally {
+    setIsLoading(false)
+  }
 }, [supabase])
 
 
 useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   void loadUserData()
 }, [loadUserData])
 
@@ -115,6 +119,42 @@ useEffect(() => {
     setTimeout(() => setNotification(null), 3000)
   }
 
+function SettingsSkeleton() {
+  return (
+    <div className="max-w-4xl animate-in fade-in">
+      <Card className="mb-6">
+        <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-6">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+            <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+          </div>
+          <div className="flex justify-end"><Skeleton className="h-10 w-32" /></div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
+        <CardContent className="space-y-4">
+           <Skeleton className="h-10 w-full" />
+           <div className="grid grid-cols-2 gap-4">
+             <Skeleton className="h-10 w-full" />
+             <Skeleton className="h-10 w-full" />
+           </div>
+           <div className="flex justify-end"><Skeleton className="h-10 w-40" /></div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
   return (
     <>
       <Header 
@@ -131,131 +171,137 @@ useEffect(() => {
           </div>
         )}
 
-        {/* Profile Settings */}
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center gap-2">
-            <User className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-6">
-              {profilePicture ? (
-  <Image
-    src={profilePicture}
-    alt="Profile"
-    width={80}
-    height={80}
-    className="h-20 w-20 rounded-full object-cover"
-  />
-) : (
-                <div className="h-20 w-20 rounded-full bg-brand-gradient flex items-center justify-center text-white text-2xl font-bold">
-                  {name.charAt(0)?.toUpperCase() || 'U'}
+        {isLoading ? (
+          <SettingsSkeleton />
+        ) : (
+          <>
+            {/* Profile Settings */}
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <User className="h-5 w-5 text-[#2B79F7]" />
+                <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center gap-6">
+                  {profilePicture ? (
+                    <Image
+                      src={profilePicture}
+                      alt="Profile"
+                      width={80}
+                      height={80}
+                      className="h-20 w-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-brand-gradient flex items-center justify-center text-white text-2xl font-bold">
+                      {name.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <FileUpload
+                      label="Upload Profile Picture"
+                      folder="profile-pictures"
+                      accept="image/*"
+                      onUpload={(url) => setProfilePicture(url)}
+                    />
+                    <Input
+                      label="Or use URL"
+                      value={profilePicture}
+                      onChange={(e) => setProfilePicture(e.target.value)}
+                      placeholder="https://example.com/photo.jpg"
+                    />
+                  </div>
                 </div>
-              )}
-              <div className="flex-1 space-y-2">
-  <FileUpload
-    label="Upload Profile Picture"
-    folder="profile-pictures"
-    accept="image/*"
-    onUpload={(url) => setProfilePicture(url)}
-  />
-  <Input
-    label="Or use URL"
-    value={profilePicture}
-    onChange={(e) => setProfilePicture(e.target.value)}
-    placeholder="https://example.com/photo.jpg"
-  />
-</div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={email}
-                disabled
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSaveProfile} isLoading={isSaving}>
-                Save Profile
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Full Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <Input
+                    label="Email"
+                    type="email"
+                    value={email}
+                    disabled
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleSaveProfile} isLoading={isSaving}>
+                    Save Profile
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Password */}
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Lock className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Input
-                label="Current Password"
-                type={showCurrentPassword ? 'text' : 'password'}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
-              >
-                {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="relative">
-                <Input
-                  label="New Password"
-                  type={showNewPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
-                >
-                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-              <div className="relative">
-                <Input
-                  label="Confirm New Password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleChangePassword} 
-                isLoading={isChangingPassword}
-                disabled={!newPassword || !confirmPassword}
-              >
-                Change Password
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Password */}
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <Lock className="h-5 w-5 text-[#2B79F7]" />
+                <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Input
+                    label="Current Password"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="relative">
+                    <Input
+                      label="New Password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                    >
+                      {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      label="Confirm New Password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleChangePassword} 
+                    isLoading={isChangingPassword}
+                    disabled={!newPassword || !confirmPassword}
+                  >
+                    Change Password
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </>
   )

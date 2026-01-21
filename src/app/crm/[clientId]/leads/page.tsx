@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { Loading } from '@/components/ui/Loading'
+import { Skeleton } from '@/components/ui/Loading'
 import { 
   Plus, 
   GripVertical, 
@@ -593,10 +593,43 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     count: filteredLeads.filter(l => l.data?.status === status.value).length,
   }))
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full">
-          <Loading size="lg" text="Loading leads..." />
+  function LeadsSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
+      <div className="flex justify-between mb-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
+          <Skeleton className="h-4 w-24 bg-[#334155]" />
         </div>
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-64 rounded-xl bg-[#334155]" />
+          <Skeleton className="h-10 w-32 rounded-xl bg-[#334155]" />
+        </div>
+      </div>
+
+      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
+        <div className="border-b border-[#334155] bg-[#0F172A] p-4 flex gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-4 w-32 bg-[#334155]" />
+          ))}
+        </div>
+        <div className="divide-y divide-[#334155]">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="p-4 flex gap-4">
+              <Skeleton className="h-4 w-32 bg-[#334155]" />
+              <Skeleton className="h-4 w-48 bg-[#334155]" />
+              <Skeleton className="h-4 w-24 bg-[#334155]" />
+              <Skeleton className="h-6 w-20 rounded-full bg-[#334155]" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+  if (isLoading) {
+    return <LeadsSkeleton />
   }
 
   return <div className="p-6 lg:p-8 min-h-full">

@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Loading } from '@/components/ui/Loading'
+import { Skeleton } from '@/components/ui/Loading' 
 import Image from 'next/image'
 import { 
   Plus, 
@@ -200,6 +200,37 @@ export default function ClientsPage() {
     }
   }
 
+  function ClientsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <Card key={i} className="card-premium h-48">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <Skeleton className="h-8 w-8 rounded" />
+            </div>
+            <div className="space-y-2 mt-4">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
+            <div className="mt-6 flex gap-2">
+              <Skeleton className="h-9 flex-1 rounded-lg" />
+              <Skeleton className="h-9 flex-1 rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.business_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -277,9 +308,7 @@ export default function ClientsPage() {
 
         {/* Clients Grid */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loading size="lg" text="Loading clients..." />
-          </div>
+          <ClientsSkeleton />
         ) : filteredClients.length === 0 ? (
           <Card className="card-premium">
             <CardContent className="py-12 text-center">

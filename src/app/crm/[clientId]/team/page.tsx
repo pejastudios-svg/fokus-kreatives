@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
-import { Loading } from '@/components/ui/Loading'
+import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Users, Trash2, Shield, Search, X, CheckCircle, AlertCircle, Copy, Mail } from 'lucide-react'
 
@@ -346,12 +346,48 @@ export default function CRMTeamPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loading size="lg" text="Loading team..." />
+  function TeamSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
+      <div className="flex justify-between mb-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
+          <Skeleton className="h-4 w-48 bg-[#334155]" />
+        </div>
+        <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
       </div>
-    )
+
+      <Skeleton className="h-10 w-80 mb-4 rounded-xl bg-[#334155]" />
+
+      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
+        <div className="border-b border-[#334155] bg-[#0F172A] p-4 flex gap-4">
+          <Skeleton className="h-4 w-32 bg-[#334155]" />
+          <Skeleton className="h-4 w-32 bg-[#334155]" />
+          <Skeleton className="h-4 w-32 bg-[#334155]" />
+        </div>
+        <div className="divide-y divide-[#334155]">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-full bg-[#334155]" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-32 bg-[#334155]" />
+                  <Skeleton className="h-3 w-48 bg-[#334155]" />
+                </div>
+              </div>
+              <Skeleton className="h-6 w-24 rounded-full bg-[#334155]" />
+              <Skeleton className="h-6 w-20 rounded-full bg-[#334155]" />
+              <Skeleton className="h-4 w-24 bg-[#334155]" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+  if (isLoading) {
+    return <TeamSkeleton />
   }
 
   return (

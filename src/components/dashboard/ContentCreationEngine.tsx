@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Sparkles, FileText, Film, LayoutGrid, MessageCircle, Zap, Copy, Check, RefreshCw, Plus, Trash2, X, History } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BrandProfile, defaultBrandProfile } from '../clients/brandProfile'
+import { Skeleton } from '@/components/ui/Loading'
 
 interface Client {
   id: string
@@ -109,6 +110,7 @@ function renderCtaText(keyword: string, text: string) {
 export function ContentCreationEngine() {
   const supabase = useMemo(() => createClient(), [])
 
+  const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState('')
   const [selectedClientProfile, setSelectedClientProfile] = useState<BrandProfile | null>(null)
@@ -162,9 +164,13 @@ export function ContentCreationEngine() {
   }, [selectedType])
 
   const fetchClients = useCallback(async () => {
-    const { data, error } = await supabase.from('clients').select('*').order('name')
-    if (error) console.error('fetchClients error:', error)
-    if (data) setClients(data as Client[])
+    try {
+      const { data, error } = await supabase.from('clients').select('*').order('name')
+      if (error) console.error('fetchClients error:', error)
+      if (data) setClients(data as Client[])
+    } finally {
+      setIsLoading(false)
+    }
   }, [supabase])
 
   useEffect(() => {
@@ -386,6 +392,62 @@ export function ContentCreationEngine() {
     } finally {
       setCtaDeletingId(null)
     }
+  }
+
+  function ContentCreationEngineSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Client Select Skeleton */}
+      <Card>
+        <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+        <CardContent>
+          <Skeleton className="h-11 w-full" />
+        </CardContent>
+      </Card>
+
+      {/* Content Type Skeleton */}
+      <Card>
+        <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pillars Skeleton */}
+      <Card>
+        <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+        <CardContent>
+          <Skeleton className="h-4 w-64 mb-3" />
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Inputs Skeleton */}
+      <Card>
+        <CardHeader><Skeleton className="h-6 w-24" /></CardHeader>
+        <CardContent>
+          <Skeleton className="h-10 w-full mb-2" />
+          <Skeleton className="h-4 w-48" />
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-center pt-2">
+        <Skeleton className="h-12 w-48 rounded-lg" />
+      </div>
+    </div>
+  )
+}
+
+  if (isLoading) {
+    return <ContentCreationEngineSkeleton />
   }
 
   return (

@@ -74,6 +74,6 @@ export function InlineLoading({ text }: { text?: string }) {
 // Skeleton loader for content
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
-    <div className={`shimmer rounded ${className}`} />
+    <div className={`animate-pulse bg-gray-200/80 rounded ${className}`} />
   )
 }

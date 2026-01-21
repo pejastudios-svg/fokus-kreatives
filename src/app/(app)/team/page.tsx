@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Loading } from '@/components/ui/Loading'
+import { Skeleton } from '@/components/ui/Loading' 
 import { Input } from '@/components/ui/Input'
 import { Plus, Mail, Shield, Trash2, X, CheckCircle, AlertCircle, Copy, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -227,13 +227,49 @@ export default function TeamPage() {
     }
   }
 
+function TeamSkeleton() {
+  return (
+    <div className="animate-in fade-in space-y-6">
+      <div className="flex justify-between">
+        <Skeleton className="h-10 w-80 rounded-lg" />
+        <Skeleton className="h-10 w-40 rounded-lg" />
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <div className="border-b px-6 py-4 bg-gray-50 flex gap-4">
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-4 w-1/4" />
+          </div>
+          <div className="divide-y">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                </div>
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-8 rounded" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
   if (isLoading) {
     return (
       <div className="p-8">
         <Header title="Team" subtitle="Manage agency team members and permissions" />
-        <div className="flex items-center justify-center mt-10">
-          <Loading size="lg" text="Loading team..." />
-        </div>
+        <TeamSkeleton />
       </div>
     )
   }

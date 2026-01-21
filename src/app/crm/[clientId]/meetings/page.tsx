@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { Loading } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading'
 import {
   Plus,
   Calendar,
@@ -258,10 +258,45 @@ export default function CRMMeetingsPage() {
     }
   }
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full">
-          <Loading size="lg" text="Loading meetings..." />
+  function MeetingsSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
+      <div className="flex justify-between mb-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
+          <Skeleton className="h-4 w-48 bg-[#334155]" />
         </div>
+        <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+      </div>
+
+      <div className="flex gap-3 mb-6">
+        <Skeleton className="h-8 w-24 rounded-full bg-[#334155]" />
+        <Skeleton className="h-8 w-24 rounded-full bg-[#334155]" />
+      </div>
+
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1E293B] rounded-2xl border border-[#334155] p-4 flex justify-between">
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-10 rounded-lg bg-[#334155]" />
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-48 bg-[#334155]" />
+                <Skeleton className="h-4 w-32 bg-[#334155]" />
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <Skeleton className="h-6 w-24 rounded-full bg-[#334155]" />
+              <Skeleton className="h-4 w-16 bg-[#334155]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+  if (isLoading) {
+    return <MeetingsSkeleton />
   }
 
   const handleDeleteMeeting = async () => {

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
+import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import {
   User,
@@ -31,6 +32,7 @@ export default function CRMSettingsPage() {
   const supabase = createClient()
 
   // Workspace notification toggles
+  const [isLoading, setIsLoading] = useState(true) 
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
   const [notifications, setNotifications] = useState<NotificationSettings>({
     meetings: true,
@@ -123,10 +125,14 @@ export default function CRMSettingsPage() {
       }
     }
 
-    if (clientId) {
-      loadWorkspaceSettings()
+    const init = async () => {
+        if (clientId) {
+            await loadWorkspaceSettings()
+        }
+        await loadUserProfile()
+        setIsLoading(false)
     }
-    loadUserProfile()
+    init()
 
     return () => {
       mounted = false
@@ -217,6 +223,27 @@ export default function CRMSettingsPage() {
     setSavingPassword(false)
   }
 
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      {[1, 2, 3].map((i) => (
+        <Card key={i} className="bg-[#1E293B] border-[#334155]">
+          <CardHeader>
+            <Skeleton className="h-6 w-48 bg-[#334155]" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-12 w-full bg-[#334155]" />
+            <Skeleton className="h-12 w-full bg-[#334155]" />
+            <div className="flex justify-end">
+                <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
   return <div className="p-6 lg:p-8 min-h-full">
         {/* Alerts */}
         {alert && (
@@ -238,7 +265,10 @@ export default function CRMSettingsPage() {
 
         <h1 className="text-2xl font-bold text-white mb-6">Workspace Settings</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+      {isLoading ? (
+        <SettingsSkeleton />
+      ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           {/* Workspace Notifications */}
           <Card className="bg-[#1E293B] border-[#334155]">
             <CardHeader className="flex flex-row items-center gap-2">
@@ -415,5 +445,6 @@ export default function CRMSettingsPage() {
             </Card>
           </div>
         </div>
+        )}
       </div>
 }

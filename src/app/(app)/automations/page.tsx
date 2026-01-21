@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Plus, MessageCircle, Copy, Trash2, X, Check, Sparkles, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading'
 
 interface Client {
   id: string
@@ -43,6 +44,7 @@ export default function AutomationsPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Derived state (avoids setState-in-effect patterns)
   const selectedClient = useMemo(() => {
@@ -51,17 +53,16 @@ export default function AutomationsPage() {
   }, [selectedClientId, clients])
 
   const fetchClients = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('id, name, business_name, industry, target_audience')
-      .order('name')
-
-    if (error) {
-      console.error('fetchClients error:', error)
-      return
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('id, name, business_name, industry, target_audience')
+        .order('name')
+      
+      if (data) setClients(data as Client[])
+    } finally {
+      setIsLoading(false)
     }
-
-    if (data) setClients(data as Client[])
   }, [supabase])
 
   const fetchTemplates = useCallback(
@@ -189,13 +190,41 @@ etc.`,
     await fetchTemplates(selectedClientId)
   }
 
+  function AutomationSkeleton() {
+  return (
+    <div className="animate-in fade-in space-y-6">
+      <Card>
+        <CardContent className="py-4 flex justify-between">
+           <Skeleton className="h-10 w-80" />
+           <Skeleton className="h-10 w-48" />
+        </CardContent>
+      </Card>
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-48" />
+        {[1, 2, 3].map(i => (
+            <Card key={i}>
+                <CardContent className="py-6 space-y-3">
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                </CardContent>
+            </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
   return (
     <>
       <Header title="Message Suggestions" subtitle="AI-generated DM templates for your content" />
 
       <div className="p-8">
-        <Card className="mb-6">
-          <CardContent className="py-4">
+        {isLoading ? (
+          <AutomationSkeleton />
+        ) : (
+          <Card className="mb-6">
+            <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="w-80">
                 <select
@@ -219,6 +248,7 @@ etc.`,
             </div>
           </CardContent>
         </Card>
+        )}
 
         {selectedClientId && (
           <div className="space-y-4">

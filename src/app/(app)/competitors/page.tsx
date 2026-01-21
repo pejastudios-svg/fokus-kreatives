@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Search, Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/Loading' 
 
 interface Client {
   id: string
@@ -29,14 +30,19 @@ export default function CompetitorsPage() {
   // Fix: Memoize supabase client to prevent infinite loop
   const supabase = useMemo(() => createClient(), [])
   const [transcript, setTranscript] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
 
   // Fix: Wrap fetchClients in useCallback to include it in dependencies
   const fetchClients = useCallback(async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, business_name, industry')
-      .order('name')
-    if (data) setClients(data)
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('id, name, business_name, industry')
+        .order('name')
+      if (data) setClients(data)
+    } finally {
+      setIsLoading(false)
+    }
   }, [supabase])
 
   // Fix: Added fetchClients to dependency array
@@ -128,6 +134,37 @@ export default function CompetitorsPage() {
     }
   }
 
+function CompetitorSkeleton() {
+  return (
+    <Card className="mb-6 animate-in fade-in">
+      <CardHeader>
+        <Skeleton className="h-6 w-48" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+        <div className="space-y-2">
+           <Skeleton className="h-4 w-64" />
+           <Skeleton className="h-32 w-full" />
+        </div>
+        <Skeleton className="h-10 w-48" />
+      </CardContent>
+    </Card>
+  )
+}
+
   return (
     <>
       <Header 
@@ -146,6 +183,9 @@ export default function CompetitorsPage() {
         )}
 
         {/* Input Section */}
+        {isLoading ? (
+          <CompetitorSkeleton />
+        ) : (
         <Card className="mb-6">
           <CardHeader>
             <h3 className="text-lg font-semibold text-gray-900">Analyze Competitor</h3>
@@ -238,6 +278,7 @@ export default function CompetitorsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Loading State */}
         {isAnalyzing && (

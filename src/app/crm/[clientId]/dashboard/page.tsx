@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Loading } from '@/components/ui/Loading'
+import { Skeleton } from '@/components/ui/Loading'
 import { 
   Users, 
   DollarSign, 
@@ -168,10 +168,54 @@ export default function CRMDashboard() {
     loadDashboardData()
   }, [clientId, supabase])
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full">
-          <Loading size="lg" text="Loading dashboard..." />
+  function DashboardSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
+      <div className="mb-8">
+        <Skeleton className="h-8 w-48 bg-[#334155] mb-2" />
+        <Skeleton className="h-4 w-64 bg-[#334155]" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+            <div className="flex justify-between mb-4">
+              <Skeleton className="h-12 w-12 rounded-xl bg-[#334155]" />
+              <Skeleton className="h-5 w-12 bg-[#334155]" />
+            </div>
+            <Skeleton className="h-8 w-24 mb-2 bg-[#334155]" />
+            <Skeleton className="h-4 w-32 bg-[#334155]" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-[#1E293B] rounded-2xl border border-[#334155] p-6 h-80">
+          <div className="flex justify-between mb-6">
+            <Skeleton className="h-6 w-32 bg-[#334155]" />
+            <Skeleton className="h-4 w-16 bg-[#334155]" />
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-8 w-full bg-[#334155]" />
+            ))}
+          </div>
         </div>
+        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6 h-80">
+          <Skeleton className="h-6 w-32 mb-6 bg-[#334155]" />
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl bg-[#334155]" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+  if (isLoading) {
+    return <DashboardSkeleton />
   }
 
   const statCards = [
