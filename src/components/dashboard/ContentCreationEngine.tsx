@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Sparkles, FileText, Film, LayoutGrid, MessageCircle, Zap, Copy, Check, RefreshCw, Plus, Trash2, X } from 'lucide-react'
+import { Sparkles, FileText, Film, LayoutGrid, MessageCircle, Zap, Copy, Check, RefreshCw, Plus, Trash2, X, History } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { BrandProfile, defaultBrandProfile } from '../clients/brandProfile'
 
 interface Client {
   id: string
@@ -21,6 +22,8 @@ interface Client {
   social_proof: string
   competitor_insights: string
   content_tier: 'beginner' | 'mid' | 'advanced'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  brand_profile?: any 
 }
 
 type ClientCTA = {
@@ -33,12 +36,20 @@ type ClientCTA = {
   created_at: string
 }
 
+type SavedScript = {
+  id: string
+  script: string
+  created_at: string
+  content_pillar: string
+  idea_input: string
+}
+
 const contentTypes = [
-  { id: 'longform', name: 'Long-form Script', icon: FileText, description: '10-12 min videos' },
-  { id: 'shortform', name: 'Short-form Script', icon: Film, description: '45-60 sec videos' },
-  { id: 'carousel', name: 'Carousel', icon: LayoutGrid, description: '10-slide posts' },
-  { id: 'story', name: 'Story Post', icon: MessageCircle, description: '3-part stories' },
-  { id: 'engagement', name: 'Engagement Reel', icon: Zap, description: 'Viral reels' },
+  { id: 'Long-form Script', name: 'Long-form Script', icon: FileText, description: '10-12 min videos' },
+  { id: 'Short-form Script', name: 'Short-form Script', icon: Film, description: '45-60 sec videos' },
+  { id: 'Carousel', name: 'Carousel', icon: LayoutGrid, description: '10-slide posts' },
+  { id: 'Story Post', name: 'Story Post', icon: MessageCircle, description: '3-part stories' },
+  { id: 'Engagement Reel', name: 'Engagement Reel', icon: Zap, description: 'Viral reels' },
 ]
 
 const contentPillars = [
@@ -86,11 +97,8 @@ function renderCtaText(keyword: string, text: string) {
 
   let out = t
 
-  // Replace {KEYWORD}
-  if (kw) out = out.replaceAll('{KEYWORD}', kw)
-
-  // Replace {CONTENT} (or {GUIDE}, etc) i.e. {<keyword>}
   if (kw) {
+    out = out.replaceAll('{KEYWORD}', kw)
     const token = new RegExp(`\\{\\s*${kw}\\s*\\}`, 'gi')
     out = out.replace(token, kw)
   }
@@ -103,13 +111,15 @@ export function ContentCreationEngine() {
 
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState('')
+  const [selectedClientProfile, setSelectedClientProfile] = useState<BrandProfile | null>(null)
+
   const selectedClient = useMemo(
     () => clients.find(c => c.id === selectedClientId) || null,
     [clients, selectedClientId]
   )
 
-  const [selectedType, setSelectedType] = useState('')
-  const [selectedPillar, setSelectedPillar] = useState('')
+  const [selectedType, setSelectedType] = useState('Short-form Script')
+  const [selectedPillar, setSelectedPillar] = useState('educational')
   const [recommendedPillars, setRecommendedPillars] = useState<string[]>([])
 
   const [ideaInput, setIdeaInput] = useState('')
@@ -124,28 +134,42 @@ export function ContentCreationEngine() {
   const [ctas, setCtas] = useState<ClientCTA[]>([])
   const [includeCta, setIncludeCta] = useState(true)
   const [selectedCtaId, setSelectedCtaId] = useState<string>('')
-  const selectedCta = useMemo(
-    () => ctas.find(c => c.id === selectedCtaId) || null,
-    [ctas, selectedCtaId]
-  )
-
-  // Custom CTA (one-off)
+  
+  // Custom CTA
   const [customKeyword, setCustomKeyword] = useState('')
   const [customCtaText, setCustomCtaText] = useState('')
 
-  // CTA modal (save to library)
+  // Modal States
   const [showCtaModal, setShowCtaModal] = useState(false)
   const [ctaName, setCtaName] = useState('')
   const [ctaKeyword, setCtaKeyword] = useState('')
   const [ctaText, setCtaText] = useState('')
   const [ctaSaving, setCtaSaving] = useState(false)
   const [ctaDeletingId, setCtaDeletingId] = useState<string | null>(null)
+  
+  // Reference Script State (NEW)
+  const [showRefModal, setShowRefModal] = useState(false)
+  const [referenceScript, setReferenceScript] = useState<SavedScript | null>(null)
+  const [recentScripts, setRecentScripts] = useState<SavedScript[]>([])
+
   const [includeMeta, setIncludeMeta] = useState(true)
 
+  const needsReference = selectedPillar === 'series' || selectedPillar === 'doubledown'
+
   useEffect(() => {
-  if (selectedType === 'story') setIncludeMeta(false)
-  else setIncludeMeta(true)
-}, [selectedType])
+    if (selectedType === 'Story Post') setIncludeMeta(false)
+    else setIncludeMeta(true)
+  }, [selectedType])
+
+  const fetchClients = useCallback(async () => {
+    const { data, error } = await supabase.from('clients').select('*').order('name')
+    if (error) console.error('fetchClients error:', error)
+    if (data) setClients(data as Client[])
+  }, [supabase])
+
+  useEffect(() => {
+    fetchClients()
+  }, [fetchClients])
 
   useEffect(() => {
     if (!selectedClient) {
@@ -155,103 +179,84 @@ export function ContentCreationEngine() {
       return
     }
 
-    // Tier -> recommended pillar (auto-select, but user can override)
+    // MAP FLAT DB TO BRAND PROFILE
+    const baseProfile = defaultBrandProfile()
+    const profile: BrandProfile = selectedClient.brand_profile || {
+        ...baseProfile,
+        business: {
+            ...baseProfile.business,
+            industry: selectedClient.industry || '',
+            problem_solved: selectedClient.brand_doc_text || '' 
+        },
+        audience: {
+            ...baseProfile.audience,
+            work_roles: selectedClient.target_audience || 'Professionals',
+            pain_points: [selectedClient.target_audience || '', '', '', '', '']
+        },
+        voice: {
+            ...baseProfile.voice,
+            traits: selectedClient.dos_and_donts || 'Professional'
+        },
+        final: {
+            ...baseProfile.final,
+            anything_else: `
+              Topics Library: ${selectedClient.topics_library || ''}
+              Key Stories: ${selectedClient.key_stories || ''}
+              Unique Mechanisms: ${selectedClient.unique_mechanisms || ''}
+              Social Proof: ${selectedClient.social_proof || ''}
+              Competitor Insights: ${selectedClient.competitor_insights || ''}
+            `
+        }
+    }
+    setSelectedClientProfile(profile)
+
+    // Tier recommendations
     const tier = selectedClient.content_tier || 'beginner'
     const tierToPillars: Record<typeof tier, string[]> = {
-  beginner: ['educational', 'storytelling'],
-  mid: ['educational', 'storytelling'],
-  advanced: ['educational', 'storytelling', 'authority'],
-}
-
-const rec = tierToPillars[tier] || ['educational', 'storytelling']
-setRecommendedPillars(rec)
-
-// auto-select first recommended if user hasn't picked anything yet
-if (!selectedPillar) setSelectedPillar(rec[0])
+      beginner: ['educational', 'storytelling'],
+      mid: ['educational', 'storytelling'],
+      advanced: ['educational', 'storytelling', 'authority'],
+    }
+    const rec = tierToPillars[tier] || ['educational', 'storytelling']
+    setRecommendedPillars(rec)
+    if (!selectedPillar) setSelectedPillar(rec[0])
 
     loadClientCtas(selectedClient.id)
-  }, [selectedClientId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchClients = useCallback(async () => {
-  const { data, error } = await supabase
-    .from('clients')
-    .select(
-      'id,name,business_name,industry,target_audience,brand_doc_text,dos_and_donts,topics_library,key_stories,unique_mechanisms,social_proof,competitor_insights,content_tier'
-    )
-    .order('name')
-
-  if (error) {
-    console.error('fetchClients error:', error)
-    return
-  }
-
-  const rows = (data || []) as Client[]
-  setClients(rows)
-
-  const storedClientId = sessionStorage.getItem('selectedClientId')
-  if (storedClientId && rows.some((c) => c.id === storedClientId)) {
-    setSelectedClientId(storedClientId)
-    sessionStorage.removeItem('selectedClientId')
-  }
-}, [supabase])
-
-useEffect(() => {
-  fetchClients()
-}, [fetchClients])
+    loadRecentScripts(selectedClient.id)
+  }, [selectedClientId, clients]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadClientCtas = async (clientId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('client_ctas')
       .select('*')
       .eq('client_id', clientId)
       .eq('active', true)
       .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Load CTAs error:', error)
-      setCtas([])
-      return
-    }
-
     setCtas((data || []) as ClientCTA[])
   }
 
-  const buildClientContext = (client: Client) => {
-    let context = ''
-
-    context += `CLIENT: ${client.name} from ${client.business_name}\n`
-    if (client.industry) context += `INDUSTRY: ${client.industry}\n`
-    if (client.target_audience) context += `TARGET AUDIENCE: ${client.target_audience}\n\n`
-
-    if (client.brand_doc_text) context += `BRAND GUIDELINES:\n${client.brand_doc_text}\n\n`
-    if (client.dos_and_donts) context += `CONTENT RULES (MUST FOLLOW):\n${client.dos_and_donts}\n\n`
-    if (client.topics_library) context += `TOPICS LIBRARY:\n${client.topics_library}\n\n`
-
-    // Stories must come from here (no fabricated proof)
-    if (client.key_stories) context += `KEY STORIES (USE THESE, DO NOT INVENT RESULTS):\n${client.key_stories}\n\n`
-
-    if (client.unique_mechanisms) context += `UNIQUE METHODS/FRAMEWORKS:\n${client.unique_mechanisms}\n\n`
-    if (client.social_proof) context += `PROOF/RESULTS (ONLY IF PRESENT, DO NOT INVENT):\n${client.social_proof}\n\n`
-    if (client.competitor_insights) context += `COMPETITOR INSIGHTS:\n${client.competitor_insights}\n\n`
-
-    return context.trim() || 'General business helping clients succeed.'
+  const loadRecentScripts = async (clientId: string) => {
+    const { data } = await supabase
+        .from('content')
+        .select('id, script, created_at, content_pillar, idea_input')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+    if (data) setRecentScripts(data)
   }
 
+  const selectedCta = ctas.find(c => c.id === selectedCtaId) || null
+
   const computedCtaText = useMemo(() => {
-    // Priority: selected saved CTA > custom CTA
-    if (selectedCta) {
-      return renderCtaText(selectedCta.keyword, selectedCta.cta_text)
-    }
-    if (customCtaText.trim()) {
-      return renderCtaText(customKeyword, customCtaText)
-    }
+    if (selectedCta) return renderCtaText(selectedCta.keyword, selectedCta.cta_text)
+    if (customCtaText.trim()) return renderCtaText(customKeyword, customCtaText)
     return ''
   }, [selectedCta, customKeyword, customCtaText])
 
   const finalCtaText = includeCta ? computedCtaText.trim() : ''
 
   const handleGenerate = async () => {
-    if (!selectedClient) {
+    if (!selectedClient || !selectedClientProfile) {
       setError('Please select a client first')
       return
     }
@@ -263,28 +268,29 @@ useEffect(() => {
       setError('Please select a content pillar')
       return
     }
+    if (needsReference && !referenceScript) {
+        setError('Please select a reference script for this strategy.')
+        return
+    }
 
     setIsGenerating(true)
     setError('')
     setGeneratedContent('')
 
     try {
-      const clientContext = buildClientContext(selectedClient)
-
-      const response = await fetch('/api/generate', {
+      const response = await fetch('/api/scripts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: selectedClient.id,
+          clientProfile: selectedClientProfile, // PASS RICH PROFILE
           includeMeta,
-          clientInfo: clientContext,
           contentType: contentTypes.find(t => t.id === selectedType)?.name || selectedType,
-          contentPillar: contentPillars.find(p => p.id === selectedPillar)?.name || selectedPillar,
-          idea: ideaInput,
+          contentPillar: contentPillars.find(p => p.id === selectedPillar)?.id || selectedPillar,
+          ideaInput: ideaInput,
           quantity,
-          competitorInsights: selectedClient.competitor_insights || '',
+          referenceScript: referenceScript?.script || null,
           tier: selectedClient.content_tier || 'beginner',
-          // IMPORTANT: if empty => API will omit CTA block entirely
           ctaText: finalCtaText ? finalCtaText : null,
         }),
       })
@@ -293,29 +299,32 @@ useEffect(() => {
 
       if (data.success) {
         setGeneratedContent(data.content)
-
         const publishingPack = extractPublishingPack(data.content)
 
-await supabase.from('content').insert({
-  client_id: selectedClient.id,
-  content_type: selectedType,
-  content_pillar: selectedPillar,
-  content_type_label: contentTypes.find(t => t.id === selectedType)?.name || selectedType,
-  content_pillar_label: contentPillars.find(p => p.id === selectedPillar)?.name || selectedPillar,
-  tier: selectedClient.content_tier || 'beginner',
-  include_meta: includeMeta,
-  cta_text: finalCtaText || null,
-  cta_keyword: (selectedCta?.keyword || customKeyword || null),
-  script: data.content,
-  idea_input: ideaInput,
-  publishing_pack: publishingPack,
-})
+        await supabase.from('content').insert({
+          client_id: selectedClient.id,
+          content_type: selectedType,
+          content_pillar: selectedPillar,
+          content_type_label: contentTypes.find(t => t.id === selectedType)?.name || selectedType,
+          content_pillar_label: contentPillars.find(p => p.id === selectedPillar)?.name || selectedPillar,
+          tier: selectedClient.content_tier || 'beginner',
+          include_meta: includeMeta,
+          cta_text: finalCtaText || null,
+          cta_keyword: (selectedCta?.keyword || customKeyword || null),
+          script: data.content,
+          idea_input: ideaInput,
+          publishing_pack: publishingPack,
+        })
+
+        // Refresh scripts list immediately so it shows in history
+        loadRecentScripts(selectedClient.id)
+
       } else {
         setError(data.error || 'Failed to generate content')
       }
     } catch (err) {
       console.error('Generation error:', err)
-      setError('Failed to connect to AI service. Check GROQ_API_KEY in .env.local')
+      setError('Failed to connect to AI service.')
     } finally {
       setIsGenerating(false)
     }
@@ -328,7 +337,6 @@ await supabase.from('content').insert({
   }
 
   const openSaveCtaModal = () => {
-    // Pre-fill modal with currently typed custom CTA if present
     setCtaName('')
     setCtaKeyword(normalizeKeyword(customKeyword))
     setCtaText(customCtaText)
@@ -339,41 +347,29 @@ await supabase.from('content').insert({
     if (!selectedClient) return
     const kw = normalizeKeyword(ctaKeyword)
     const txt = (ctaText || '').trim()
-    if (!kw) {
-      alert('Keyword is required (A-Z / 0-9, max 8 chars).')
-      return
-    }
-    if (!txt) {
-      alert('CTA text is required.')
-      return
-    }
+    if (!kw || !txt) return alert('Keyword and CTA text required.')
 
     setCtaSaving(true)
     try {
       const { data, error } = await supabase
-  .from('client_ctas')
-  .insert({
-    client_id: selectedClient.id,
-    name: (ctaName || kw).trim(),
-    keyword: kw,
-    cta_text: txt,
-    active: true,
-  })
-  .select()
-  .single()
+        .from('client_ctas')
+        .insert({
+          client_id: selectedClient.id,
+          name: (ctaName || kw).trim(),
+          keyword: kw,
+          cta_text: txt,
+          active: true,
+        })
+        .select()
+        .single()
 
-      if (error) {
-        console.error('Save CTA error:', error)
-        alert(error.message || 'Failed to save CTA')
-        return
-      }
-
+      if (error) throw error
       setShowCtaModal(false)
-      setCtaName('')
-      setCtaKeyword('')
-      setCtaText('')
+      setCtaName(''); setCtaKeyword(''); setCtaText('')
       await loadClientCtas(selectedClient.id)
       if (data?.id) setSelectedCtaId(data.id)
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      alert(err.message)
     } finally {
       setCtaSaving(false)
     }
@@ -381,17 +377,10 @@ await supabase.from('content').insert({
 
   const deleteCta = async (id: string) => {
     if (!selectedClient) return
-    const ok = confirm('Delete this CTA from the library?')
-    if (!ok) return
-
+    if (!confirm('Delete this CTA from the library?')) return
     setCtaDeletingId(id)
     try {
-      const { error } = await supabase.from('client_ctas').delete().eq('id', id)
-      if (error) {
-        console.error('Delete CTA error:', error)
-        alert(error.message || 'Failed to delete')
-        return
-      }
+      await supabase.from('client_ctas').delete().eq('id', id)
       if (selectedCtaId === id) setSelectedCtaId('')
       await loadClientCtas(selectedClient.id)
     } finally {
@@ -491,6 +480,34 @@ await supabase.from('content').insert({
               )
             })}
           </div>
+
+          {/* Reference Script Selector */}
+          {needsReference && (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl animate-in fade-in">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                            {selectedPillar === 'series' ? 'Select Previous Part:' : 'Select Script to Mimic:'}
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => setShowRefModal(true)}>
+                            <History className="h-4 w-4 mr-2" />
+                            Browse History
+                        </Button>
+                    </div>
+                    
+                    {referenceScript ? (
+                        <div className="text-sm bg-white p-2 border rounded flex justify-between items-center">
+                            <span className="truncate max-w-[80%]">{referenceScript.idea_input.substring(0, 50)}...</span>
+                            <button onClick={() => setReferenceScript(null)} className="text-red-500 hover:text-red-700">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="text-sm text-red-500 italic">
+                            * Please select a script to continue.
+                        </div>
+                    )}
+                </div>
+            )}
         </CardContent>
       </Card>
 
@@ -523,7 +540,7 @@ await supabase.from('content').insert({
           <textarea
             value={ideaInput}
             onChange={(e) => setIdeaInput(e.target.value)}
-            placeholder="Type the exact topic/angle you want..."
+            placeholder="Type the exact topic/angle you want... (Paste draft here to polish)"
             rows={4}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
           />
@@ -709,6 +726,38 @@ await supabase.from('content').insert({
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Reference Modal */}
+      {showRefModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col">
+                <CardHeader className="flex justify-between flex-row items-center border-b">
+                    <h3 className="font-bold">Select Reference Script</h3>
+                    <button onClick={() => setShowRefModal(false)}><X className="h-5 w-5" /></button>
+                </CardHeader>
+                <div className="overflow-y-auto p-4 space-y-2">
+                    {recentScripts.map(s => (
+                        <button 
+                            key={s.id}
+                            onClick={() => {
+                                setReferenceScript(s)
+                                setShowRefModal(false)
+                            }}
+                            className="w-full text-left p-3 hover:bg-gray-50 border rounded-lg transition-colors group"
+                        >
+                            <div className="font-medium text-gray-900 group-hover:text-[#2B79F7]">
+                                {s.idea_input.substring(0, 60) || 'No Title'}...
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                                <span>{new Date(s.created_at).toLocaleDateString()}</span>
+                                <span className="bg-gray-100 px-1.5 rounded">{s.content_pillar}</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </Card>
         </div>
       )}
     </div>
