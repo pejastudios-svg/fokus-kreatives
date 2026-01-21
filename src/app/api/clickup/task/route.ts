@@ -23,10 +23,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, name })
-  } catch (err: any) {
+    } catch (err: unknown) {
     console.error('ClickUp task lookup error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

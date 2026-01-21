@@ -1,7 +1,22 @@
-// src/app/api/approvals/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
+
+// Types for Supabase responses
+interface ClientRef {
+  name: string | null
+  business_name: string | null
+}
+
+interface AssigneeRow {
+  user_id: string
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+  role: string
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,14 +55,15 @@ export async function POST(req: NextRequest) {
 
     // Safely extract client display name from joined clients relation
     let clientDisplayName = 'Client'
-    const relClients: any = (approval as any).clients
+    // Cast approval to a shape that includes the clients relation
+    const relClients = (approval as unknown as { clients: ClientRef | ClientRef[] }).clients
 
     if (Array.isArray(relClients) && relClients.length > 0) {
       clientDisplayName =
         relClients[0].business_name || relClients[0].name || 'Client'
-    } else if (relClients) {
+    } else if (relClients && !Array.isArray(relClients)) {
       clientDisplayName =
-        relClients.business_name || relClients.name || 'Client'
+        (relClients as ClientRef).business_name || (relClients as ClientRef).name || 'Client'
     }
 
     if (approved && approval.status === 'approved') {
@@ -100,7 +116,7 @@ export async function POST(req: NextRequest) {
         .select('user_id')
         .eq('approval_id', approvalId)
 
-      const watcherIds = (assigneesRows || []).map((r: any) => r.user_id).filter(Boolean)
+            const watcherIds = (assigneesRows || []).map((r: AssigneeRow) => r.user_id).filter(Boolean)
       const uniqueWatcherIds = Array.from(new Set(watcherIds))
 
       // 6) In-app notifications
@@ -135,13 +151,13 @@ try {
       .in('id', uniqueWatcherIds)
 
     const clientEmails = (watcherUsers || [])
-      .filter((u: any) => u.role === 'client')
-      .map((u: any) => u.email)
+      .filter((u: UserRow) => u.role === 'client')
+      .map((u: UserRow) => u.email)
       .filter((e: string | null) => !!e)
 
     const teamEmails = (watcherUsers || [])
-      .filter((u: any) => u.role !== 'client')
-      .map((u: any) => u.email)
+      .filter((u: UserRow) => u.role !== 'client')
+      .map((u: UserRow) => u.email)
       .filter((e: string | null) => !!e)
 
     const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
@@ -189,10 +205,11 @@ try {
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Approval approve error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

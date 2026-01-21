@@ -3,6 +3,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchClickUpTaskName, updateClickUpStatus } from '@/app/api/clickup/helpers'
 
+interface AssigneeInsert {
+  approval_id: string
+  user_id: string
+  role: 'creator' | 'assignee' | 'client'
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+  role: string
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -123,7 +135,7 @@ export async function POST(req: NextRequest) {
     if (itemsError) console.error('Approval items insert error:', itemsError)
 
     // 3) Assignees
-    const assigneeRows: any[] = []
+    const assigneeRows: AssigneeInsert[] = []
 
     // creator
     assigneeRows.push({ approval_id: approvalId, user_id: creatorId, role: 'creator' })
@@ -158,7 +170,7 @@ export async function POST(req: NextRequest) {
       const watcherIds = [
         creatorId,
         ...assigneeIds,
-        ...(clientUsers || []).map((u: any) => u.id),
+        ...(clientUsers || []).map((u: { id: string }) => u.id),
       ].filter(Boolean)
 
       const uniqueWatcherIds = Array.from(new Set(watcherIds))
@@ -197,13 +209,13 @@ export async function POST(req: NextRequest) {
           .in('id', watcherIds)
 
         const clientEmails = (watcherUsers || [])
-          .filter((u: any) => u.role === 'client')
-          .map((u: any) => u.email)
+          .filter((u: UserRow) => u.role === 'client')
+          .map((u: UserRow) => u.email)
           .filter(Boolean)
 
         const teamEmails = (watcherUsers || [])
-          .filter((u: any) => u.role !== 'client')
-          .map((u: any) => u.email)
+          .filter((u: UserRow) => u.role !== 'client')
+          .map((u: UserRow) => u.email)
           .filter(Boolean)
 
         const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
@@ -250,10 +262,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, approvalId })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Create approval error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

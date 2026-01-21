@@ -1,19 +1,52 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
+
+import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
+import { defaultBrandProfile } from '@/components/clients/brandProfile'
+import type { BrandProfile } from '@/components/clients/brandProfile'
+
+type ClientTier = 'beginner' | 'mid' | 'advanced'
+
+type NewClientFormData = {
+  name: string
+  email: string
+  business_name: string
+  industry: string
+  target_audience: string
+  brand_doc_text: string
+  dos_and_donts: string
+  topics_library: string
+  key_stories: string
+  unique_mechanisms: string
+  social_proof: string
+  website_url: string
+  content_tier: ClientTier
+  brand_profile: BrandProfile
+}
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  return 'Unknown error'
+}
 
 export default function NewClientPage() {
   const router = useRouter()
-  const supabase = createClient()
+
+  // ✅ stable instance across renders (prevents effect loops)
+  const supabase = useMemo(() => createClient(), [])
 
   const [isLoading, setIsLoading] = useState(false)
   const [roleLoading, setRoleLoading] = useState(true)
@@ -21,7 +54,7 @@ export default function NewClientPage() {
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<NewClientFormData>({
     name: '',
     email: '',
     business_name: '',
@@ -34,29 +67,29 @@ export default function NewClientPage() {
     unique_mechanisms: '',
     social_proof: '',
     website_url: '',
-   content_tier: 'beginner',
+    content_tier: 'beginner',
+    brand_profile: defaultBrandProfile(),
   })
 
   // Only admins can create clients (per your current rule)
   const canCreateClient = userRole === 'admin'
 
-  // ✅ Load current user's role ONCE, correctly
+  // ✅ Load current user's role once
   useEffect(() => {
     let cancelled = false
 
     ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
         if (!user) {
           if (!cancelled) setUserRole(null)
           return
         }
 
-        const { data, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle()
+        const { data, error } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
 
         if (error) {
           console.error('Role lookup failed:', error.code, error.message, error)
@@ -76,14 +109,14 @@ export default function NewClientPage() {
   }, [supabase])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setNotification(null)
 
-    // ✅ Permission checks BEFORE starting the loading spinner
     if (roleLoading) {
       setNotification({ type: 'error', message: 'Loading permissions… try again in a second.' })
       return
@@ -113,6 +146,7 @@ export default function NewClientPage() {
           social_proof: formData.social_proof,
           website_url: formData.website_url || null,
           content_tier: formData.content_tier || 'beginner',
+          brand_profile: formData.brand_profile,
         })
         .select()
         .single()
@@ -160,20 +194,12 @@ export default function NewClientPage() {
       const { error: fieldsError } = await supabase.from('custom_fields').insert(defaultFields)
       if (fieldsError) console.warn('Failed to create default fields:', fieldsError)
 
-      // Step 3/4/5: Channels (keep your existing behavior, but don’t fail the whole flow)
+      // Step 3/4/5: Channels (keep behavior; don’t fail whole flow)
       try {
-        const { data: masterUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', 'fokuskreatives@gmail.com')
-          .maybeSingle()
+        const { data: masterUser } = await supabase.from('users').select('id').eq('email', 'fokuskreatives@gmail.com').maybeSingle()
 
         if (masterUser?.id) {
-          const { data: masterClient } = await supabase
-            .from('clients')
-            .select('id')
-            .ilike('name', '%fokus%')
-            .maybeSingle()
+          const { data: masterClient } = await supabase.from('clients').select('id').ilike('name', '%fokus%').maybeSingle()
 
           if (masterClient?.id) {
             const { error: channelError } = await supabase.from('channels').insert({
@@ -238,10 +264,12 @@ export default function NewClientPage() {
             console.warn('Failed to create portal user:', userError)
             setNotification({ type: 'success', message: `Client created! (Portal invite failed: ${userError.message})` })
           } else {
-            setNotification({ type: 'success', message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}` })
+            setNotification({
+              type: 'success',
+              message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}`,
+            })
           }
         } else {
-          // If email exists as team user, don’t overwrite
           if (existing.role !== 'client') {
             setNotification({
               type: 'success',
@@ -263,7 +291,10 @@ export default function NewClientPage() {
               console.warn('Failed to update portal user:', updateErr)
               setNotification({ type: 'success', message: `Client created! (Portal invite failed: ${updateErr.message})` })
             } else {
-              setNotification({ type: 'success', message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}` })
+              setNotification({
+                type: 'success',
+                message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}`,
+              })
             }
           }
         }
@@ -272,9 +303,9 @@ export default function NewClientPage() {
       }
 
       setTimeout(() => router.push('/clients'), 1500)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Unexpected error:', err)
-      setNotification({ type: 'error', message: `Unexpected error: ${err?.message || 'Unknown error'}` })
+      setNotification({ type: 'error', message: `Unexpected error: ${getErrorMessage(err)}` })
     } finally {
       setIsLoading(false)
     }
@@ -296,7 +327,11 @@ export default function NewClientPage() {
               notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             }`}
           >
-            {notification.type === 'success' ? <CheckCircle className="h-5 w-5 mt-0.5" /> : <AlertCircle className="h-5 w-5 mt-0.5" />}
+            {notification.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 mt-0.5" />
+            ) : (
+              <AlertCircle className="h-5 w-5 mt-0.5" />
+            )}
             <span className="break-all">{notification.message}</span>
           </div>
         )}
@@ -309,12 +344,32 @@ export default function NewClientPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Client Name" name="name" value={formData.name} onChange={handleChange} placeholder="John Smith" required />
-                <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} placeholder="Smith Consulting" required />
+                <Input
+                  label="Business Name"
+                  name="business_name"
+                  value={formData.business_name}
+                  onChange={handleChange}
+                  placeholder="Smith Consulting"
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Client Email (for portal access)" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="john@example.com" />
-                <Input label="Industry/Niche" name="industry" value={formData.industry} onChange={handleChange} placeholder="Business Coaching, Real Estate, Fitness..." />
+                <Input
+                  label="Client Email (for portal access)"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="john@example.com"
+                />
+                <Input
+                  label="Industry/Niche"
+                  name="industry"
+                  value={formData.industry}
+                  onChange={handleChange}
+                  placeholder="Business Coaching, Real Estate, Fitness..."
+                />
               </div>
 
               <div className="w-full">
@@ -328,34 +383,46 @@ export default function NewClientPage() {
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
                 />
               </div>
-              <Input
-  label="Website URL (optional)"
-  name="website_url"
-  value={(formData as any).website_url || ''}
-  onChange={handleChange}
-  placeholder="https://example.com"
-/>
 
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Client Tier
-  </label>
-  <select
-    name="content_tier"
-    value={(formData as any).content_tier || 'beginner'}
-    onChange={(e) =>
-      setFormData((prev: any) => ({ ...prev, content_tier: e.target.value }))
-    }
-    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-  >
-    <option value="beginner">Beginner</option>
-    <option value="mid">Mid</option>
-    <option value="advanced">Advanced</option>
-  </select>
-  <p className="mt-1 text-xs text-gray-500">
-    Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
-  </p>
-</div>
+              <Input
+                label="Website URL (optional)"
+                name="website_url"
+                value={formData.website_url}
+                onChange={handleChange}
+                placeholder="https://example.com"
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client Tier</label>
+                <select
+                  name="content_tier"
+                  value={formData.content_tier}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, content_tier: e.target.value as ClientTier }))}
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="mid">Mid</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold text-gray-900">Brand Profile Builder</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Fill this once. The AI uses it to write on-brand scripts without guessing.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <BrandProfileForm
+                value={formData.brand_profile}
+                onChange={(next) => setFormData((prev) => ({ ...prev, brand_profile: next }))}
+              />
             </CardContent>
           </Card>
 

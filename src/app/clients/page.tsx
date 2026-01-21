@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
+import Image from 'next/image'
 import { 
   Plus, 
   Search, 
@@ -33,6 +34,10 @@ interface Client {
 }
 
 export default function ClientsPage() {
+  // Fix: Memoize supabase to stable object reference
+  const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
+
   const [clients, setClients] = useState<Client[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -40,24 +45,50 @@ export default function ClientsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [notification, setNotification] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
-  useEffect(() => {
-  (async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
-    setUserRole(data?.role || null)
-  })()
-}, [])
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set())
+  
   const menuRef = useRef<HTMLDivElement>(null)
+  
   const canCreateClients = userRole === 'admin' || userRole === 'manager'
-  const canDeleteClients = userRole === 'admin' // manager cannot delete clients (per your latest rule)
-  const supabase = createClient()
-  const router = useRouter()
+  const canDeleteClients = userRole === 'admin'
 
+  // Fix: Load user role
   useEffect(() => {
-  fetchClients(showArchived)
-}, [showArchived])
+    const loadUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
+      setUserRole(data?.role || null)
+    }
+    loadUserRole()
+  }, [supabase])
+
+  // Fix: Wrap fetchClients in useCallback to include it in dependencies
+  const fetchClients = useCallback(async (archived = false) => {
+    setIsLoading(true)
+    
+    const query = supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (archived) {
+      query.not('archived_at', 'is', null) // archived only
+    } else {
+      query.is('archived_at', null) // active only
+    }
+
+    // Fix: Removed unused 'error' variable
+    const { data } = await query
+
+    if (data) setClients(data)
+    setIsLoading(false)
+  }, [supabase])
+
+  // Fix: Added fetchClients to dependency array
+  useEffect(() => {
+    fetchClients(showArchived)
+  }, [showArchived, fetchClients])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -74,26 +105,6 @@ export default function ClientsPage() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [openMenuId])
-
-  const fetchClients = async (archived = false) => {
-  setIsLoading(true)
-  
-  const query = supabase
-    .from('clients')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (archived) {
-    query.not('archived_at', 'is', null) // archived only
-  } else {
-    query.is('archived_at', null) // active only
-  }
-
-  const { data, error } = await query
-
-  if (data) setClients(data)
-  setIsLoading(false)
-}
 
   const showNotification = (message: string) => {
     setNotification(message)
@@ -117,25 +128,25 @@ export default function ClientsPage() {
   }
 
   const handleUnarchive = async (clientId: string) => {
-  const confirmed = window.confirm(
-    'Unarchive this client and reopen their CRM?'
-  )
-  if (!confirmed) return
+    const confirmed = window.confirm(
+      'Unarchive this client and reopen their CRM?'
+    )
+    if (!confirmed) return
 
-  const { error } = await supabase
-    .from('clients')
-    .update({ archived_at: null })
-    .eq('id', clientId)
+    const { error } = await supabase
+      .from('clients')
+      .update({ archived_at: null })
+      .eq('id', clientId)
 
-  if (error) {
-    console.error('Unarchive error:', error)
-    showNotification('Failed to unarchive client')
-    return
+    if (error) {
+      console.error('Unarchive error:', error)
+      showNotification('Failed to unarchive client')
+      return
+    }
+
+    showNotification('Client unarchived')
+    fetchClients(true) // reload archived list
   }
-
-  showNotification('Client unarchived')
-  fetchClients(true) // reload archived list
-}
 
   const handleCopyCRMLink = async (clientId: string) => {
     const link = `${window.location.origin}/crm/${clientId}/dashboard`
@@ -214,55 +225,55 @@ export default function ClientsPage() {
 
         {/* Actions Bar */}
         <div className="flex items-center justify-between mb-6">
-  <div className="flex items-center gap-4">
-    {/* View toggle */}
-    <div className="inline-flex rounded-xl border border-theme-primary bg-theme-card">
-      <button
-        type="button"
-        onClick={() => setShowArchived(false)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-l-xl ${
-          !showArchived
-            ? 'bg-theme-primary text-theme-inverse'
-            : 'text-theme-secondary hover:bg-theme-tertiary'
-        }`}
-      >
-        Active
-      </button>
-      <button
-        type="button"
-        onClick={() => setShowArchived(true)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-r-xl ${
-          showArchived
-            ? 'bg-theme-primary text-theme-inverse'
-            : 'text-theme-secondary hover:bg-theme-tertiary'
-        }`}
-      >
-        Archived
-      </button>
-    </div>
+          <div className="flex items-center gap-4">
+            {/* View toggle */}
+            <div className="inline-flex rounded-xl border border-theme-primary bg-theme-card">
+              <button
+                type="button"
+                onClick={() => setShowArchived(false)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-l-xl ${
+                  !showArchived
+                    ? 'bg-theme-primary text-theme-inverse'
+                    : 'text-theme-secondary hover:bg-theme-tertiary'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowArchived(true)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-r-xl ${
+                  showArchived
+                    ? 'bg-theme-primary text-theme-inverse'
+                    : 'text-theme-secondary hover:bg-theme-tertiary'
+                }`}
+              >
+                Archived
+              </button>
+            </div>
 
-    {/* Search */}
-    <div className="relative w-80">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-theme-tertiary" />
-      <input
-        type="text"
-        placeholder="Search clients..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full pl-9 pr-4 py-2.5 input-premium"
-      />
-    </div>
-  </div>
+            {/* Search */}
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-theme-tertiary" />
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 input-premium"
+              />
+            </div>
+          </div>
 
-{!showArchived && canCreateClients && (
-  <Link href="/clients/new">
-    <Button className="btn-premium">
-      <Plus className="h-5 w-5 mr-2" />
-      Add Client
-    </Button>
-  </Link>
-)}
-</div>
+          {!showArchived && canCreateClients && (
+            <Link href="/clients/new">
+              <Button className="btn-premium">
+                <Plus className="h-5 w-5 mr-2" />
+                Add Client
+              </Button>
+            </Link>
+          )}
+        </div>
 
         {/* Clients Grid */}
         {isLoading ? (
@@ -303,10 +314,13 @@ export default function ClientsPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       {client.profile_picture_url ? (
-                        <img 
+                        // Fix: Replaced img with Next.js Image
+                        <Image 
                           src={client.profile_picture_url}
                           alt={client.name}
-                          className="h-12 w-12 rounded-full object-cover ring-2 ring-theme-primary"
+                          width={48}
+                          height={48}
+                          className="rounded-full object-cover ring-2 ring-theme-primary"
                         />
                       ) : (
                         <div className="h-12 w-12 rounded-full bg-brand-gradient flex items-center justify-center text-white font-semibold text-lg">
@@ -392,37 +406,37 @@ export default function ClientsPage() {
 
                   {/* Quick Actions */}
                   <div className="mt-4 pt-4 border-t border-theme-primary flex gap-2">
-  {!showArchived && (
-    <>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="flex-1"
-        onClick={() => handleViewProfile(client.id)}
-      >
-        View Profile
-      </Button>
-      <Button 
-        size="sm" 
-        className="flex-1 btn-premium"
-        onClick={() => handleCreateContent(client.id)}
-      >
-        <Sparkles className="h-4 w-4 mr-1" />
-        Create
-      </Button>
-    </>
-  )}
+                    {!showArchived && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleViewProfile(client.id)}
+                        >
+                          View Profile
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          className="flex-1 btn-premium"
+                          onClick={() => handleCreateContent(client.id)}
+                        >
+                          <Sparkles className="h-4 w-4 mr-1" />
+                          Create
+                        </Button>
+                      </>
+                    )}
 
-  {showArchived && (
-    <Button
-      size="sm"
-      className="flex-1"
-      onClick={() => handleUnarchive(client.id)}
-    >
-      Unarchive
-    </Button>
-  )}
-</div>
+                    {showArchived && (
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleUnarchive(client.id)}
+                      >
+                        Unarchive
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

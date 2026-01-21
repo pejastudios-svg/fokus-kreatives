@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import Image from 'next/image'
 import { UserCircle, Bell } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -14,107 +15,119 @@ export function Header({ title, subtitle }: HeaderProps) {
   const [profilePicture, setProfilePicture] = useState<string | null>(null)
   const [userName, setUserName] = useState<string>('')
   const [userRole, setUserRole] = useState<string | null>(null)
-  const [userClientId, setUserClientId] = useState<string | null>(null)
-  const supabase = createClient()
+  
+  // Memoize supabase to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), [])
+  
+  const router = useRouter()
 
-    interface NotificationRow {
+  interface NotificationRow {
     id: string
     type: string
-    data: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: Record<string, any>
     read_at: string | null
     created_at: string
   }
 
   const [notifications, setNotifications] = useState<NotificationRow[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [showNotif, setShowNotif] = useState(false)
 
+  // 1. Load User Profile (Runs once on mount)
   useEffect(() => {
-    loadUserProfile()
-  }, [])
+    const loadUserProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('name, profile_picture_url, role')
+          .eq('id', user.id)
+          .single()
 
-
-  const router = useRouter()
-  
-  const loadUserProfile = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (user) {
-    const { data } = await supabase
-      .from('users')
-      .select('name, profile_picture_url, role, client_id')
-      .eq('id', user.id)
-      .single()
-
-    if (data) {
-      setUserName(data.name || '')
-      setProfilePicture(data.profile_picture_url)
-      setUserRole(data.role || null)
-      setUserClientId(data.client_id || null)
-    }
-  }
-}
-
-    useEffect(() => {
-    loadNotifications()
-  }, [])
-
-  const loadNotifications = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  setCurrentUserId(user.id) // IMPORTANT so realtime subscription starts
-
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', user.id)     // IMPORTANT: only this user's notifications
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  if (error) {
-    console.error('Load notifications error:', error)
-    return
-  }
-
-  const rows = (data || []) as NotificationRow[]
-  setNotifications(rows)
-  setUnreadCount(rows.filter(n => !n.read_at).length)
-}
-
-  useEffect(() => {
-  if (!currentUserId) return
-
-  const channel = supabase
-    .channel(`notifications-${currentUserId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${currentUserId}`,
-      },
-      payload => {
-        console.log('Realtime: notification change', payload)
-        // Just refresh notifications list silently
-        loadNotifications()
+        if (data) {
+          setUserName(data.name || '')
+          setProfilePicture(data.profile_picture_url)
+          setUserRole(data.role || null)
+        }
       }
-    )
-    .subscribe()
+    }
+    loadUserProfile()
+  }, [supabase])
 
-  return () => {
-    supabase.removeChannel(channel)
-  }
-}, [supabase, currentUserId])
+  // 2. Load Notifications & Setup Realtime (Runs once user is known)
+  useEffect(() => {
+    let isMounted = true
 
-    const markAsRead = async (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
+    const setupNotifications = async () => {
+      // Get user ID first
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Define fetch function inside the effect to avoid dependency cycles
+      const fetchNotifications = async () => {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (error) {
+          console.error('Load notifications error:', error)
+          return
+        }
+
+        if (isMounted) {
+          const rows = (data || []) as NotificationRow[]
+          setNotifications(rows)
+          setUnreadCount(rows.filter((n) => !n.read_at).length)
+        }
+      }
+
+      // Initial fetch
+      await fetchNotifications()
+
+      // Setup Realtime Subscription
+      const channel = supabase
+        .channel(`notifications-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            console.log('Realtime: notification change')
+            // Reuse the local fetch function
+            fetchNotifications()
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+
+    const cleanupPromise = setupNotifications()
+
+    return () => {
+      isMounted = false
+      cleanupPromise.then((cleanup) => cleanup && cleanup())
+    }
+  }, [supabase])
+
+  const markAsRead = async (id: string) => {
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
     )
-    setUnreadCount(prev => Math.max(0, prev - 1))
+    setUnreadCount((prev) => Math.max(0, prev - 1))
 
     const { error } = await supabase
       .from('notifications')
@@ -126,39 +139,39 @@ export function Header({ title, subtitle }: HeaderProps) {
     }
   }
 
-    const formatNotificationText = (n: NotificationRow) => {
-  const data = n.data || {}
-  switch (n.type) {
-    case 'task_created':
-      return `Task created: ${data.title || ''}`
-    case 'task_status_changed':
-      return `Task "${data.title || ''}" moved to ${data.status || ''}`
-    case 'task_mentioned':
-      return `You were mentioned in a task`
+  const formatNotificationText = (n: NotificationRow) => {
+    const data = n.data || {}
+    switch (n.type) {
+      case 'task_created':
+        return `Task created: ${data.title || ''}`
+      case 'task_status_changed':
+        return `Task "${data.title || ''}" moved to ${data.status || ''}`
+      case 'task_mentioned':
+        return `You were mentioned in a task`
 
-    case 'approval_created':
-      return `Approval created for ${data.clientName || 'client'}: ${
-        data.title || ''
-      }`
+      case 'approval_created':
+        return `Approval created for ${data.clientName || 'client'}: ${
+          data.title || ''
+        }`
 
-    case 'approval_approved':
-      return `Approval approved for ${data.clientName || 'client'}: ${
-        data.title || ''
-      }`
+      case 'approval_approved':
+        return `Approval approved for ${data.clientName || 'client'}: ${
+          data.title || ''
+        }`
 
       case 'approval_commented':
-  return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
+        return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
 
-case 'approval_mention':
-  return `You were mentioned in an approval: ${data.title || ''}`
+      case 'approval_mention':
+        return `You were mentioned in an approval: ${data.title || ''}`
 
-case 'approval_reminder':
-  return `Approval reminder: ${data.title || ''}`
+      case 'approval_reminder':
+        return `Approval reminder: ${data.title || ''}`
 
-    default:
-      return 'Notification'
+      default:
+        return 'Notification'
+    }
   }
-}
 
   return (
     <header className="flex items-center justify-between h-20 px-8 bg-white border-b border-gray-200">
@@ -172,7 +185,7 @@ case 'approval_reminder':
         <div className="relative">
           <button
             type="button"
-            onClick={() => setShowNotif(prev => !prev)}
+            onClick={() => setShowNotif((prev) => !prev)}
             className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors"
           >
             <Bell className="h-5 w-5 text-gray-500" />
@@ -203,40 +216,38 @@ case 'approval_reminder':
                     No notifications yet.
                   </p>
                 ) : (
-                  notifications.map(n => (
+                  notifications.map((n) => (
                     <button
                       key={n.id}
                       type="button"
                       onClick={() => {
-  markAsRead(n.id)
-  setShowNotif(false)
+                        markAsRead(n.id)
+                        setShowNotif(false)
 
-  const data = (n as any).data || {}
+                        const data = n.data || {}
 
-  // Task notifications (if you still use them)
-  if (data.taskId) {
-    router.push(`/tasks?taskId=${data.taskId}`)
-    return
-  }
+                        // Task notifications
+                        if (data.taskId) {
+                          router.push(`/tasks?taskId=${data.taskId}`)
+                          return
+                        }
 
-  // Approval notifications
-  if (
-  n.type === 'approval_created' ||
-  n.type === 'approval_approved' ||
-  n.type === 'approval_mention' ||
-  n.type === 'approval_reminder'
-) {
-  const approvalId = data.approvalId
-  if (userRole === 'client') {
-    router.push(approvalId ? `/portal/approvals/${approvalId}` : `/portal/approvals`)
-  } else {
-    router.push(approvalId ? `/approvals/${approvalId}` : `/approvals`)
-  }
-  return
-}
-
-  // Default: nothing special
-}}
+                        // Approval notifications
+                        if (
+                          n.type === 'approval_created' ||
+                          n.type === 'approval_approved' ||
+                          n.type === 'approval_mention' ||
+                          n.type === 'approval_reminder'
+                        ) {
+                          const approvalId = data.approvalId
+                          if (userRole === 'client') {
+                            router.push(approvalId ? `/portal/approvals/${approvalId}` : `/portal/approvals`)
+                          } else {
+                            router.push(approvalId ? `/approvals/${approvalId}` : `/approvals`)
+                          }
+                          return
+                        }
+                      }}
                       className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
                         !n.read_at ? 'bg-blue-50/60' : ''
                       }`}
@@ -263,10 +274,12 @@ case 'approval_reminder':
         {/* User */}
         <div className="flex items-center gap-3">
           {profilePicture ? (
-            <img 
+            <Image
               src={profilePicture}
               alt={userName}
-              className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-200"
+              width={40}
+              height={40}
+              className="rounded-full object-cover ring-2 ring-gray-200"
             />
           ) : (
             <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center">

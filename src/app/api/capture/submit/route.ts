@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+interface NotificationSettings {
+  meetings?: boolean
+  capture_submissions?: boolean
+  leads?: boolean
+  [key: string]: boolean | undefined
+}
+
+interface UserRow {
+  email: string | null
+  role: string
+  client_id: string | null
+}
+
+interface CaptureField {
+  id: string
+  label: string
+}
+
+interface MeetingRow {
+  id: string
+  title: string
+  date_time: string
+  location_url: string | null
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -16,9 +41,9 @@ async function getNotificationTargets(clientId: string) {
 
   if (clientError || !client) {
     console.error('getNotificationTargets: client error', clientError)
-    return {
+        return {
       clientDisplayName: 'Client',
-      notificationSettings: {} as any,
+      notificationSettings: {} as NotificationSettings,
       emails: [] as string[],
     }
   }
@@ -61,7 +86,7 @@ async function getNotificationTargets(clientId: string) {
   }
 
   // If CRM team exists, also include them (client/admin/manager for this client)
-  const hasCrmTeam = (clientUsers || []).some((u: any) =>
+  const hasCrmTeam = (clientUsers || []).some((u: UserRow) =>
     ['client', 'admin', 'manager'].includes(u.role)
   )
 
@@ -104,7 +129,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const origin = new URL(req.url).origin
 
     // 1) Find the capture page
     const { data: page, error: pageError } = await supabase
@@ -143,14 +167,15 @@ const submissionData = {
   meeting_time: page.include_meeting ? meeting_time || null : null,
 }
 
-const fieldsArr = (page as any).fields
-const fieldLabels: Record<string, string> = {}
-if (Array.isArray(fieldsArr)) {
-  for (const f of fieldsArr) {
-    if (!f?.id) continue
-    fieldLabels[String(f.id)] = String(f.label || f.id)
-  }
-}
+    const capturePage = page as unknown as { fields: CaptureField[] }
+    const fieldsArr = capturePage.fields
+    const fieldLabels: Record<string, string> = {}
+    if (Array.isArray(fieldsArr)) {
+      for (const f of fieldsArr) {
+        if (!f?.id) continue
+        fieldLabels[String(f.id)] = String(f.label || f.id)
+      }
+    }
 
     const { error: subError } = await supabase
       .from('capture_submissions')
@@ -200,7 +225,7 @@ const leadData = {
     }
 
     // 4) Optionally create a meeting if meeting fields are present
-    let createdMeeting: any = null
+    let createdMeeting: MeetingRow | null = null
 
     if (page.include_meeting && meeting_date && meeting_time) {
       try {
@@ -259,7 +284,7 @@ const leadData = {
       if (!scriptUrl || !secret) {
         console.error('Capture notifications: Apps Script not configured')
       } else if (emails.length > 0) {
-        const ns = notificationSettings as any
+        const ns = notificationSettings as NotificationSettings
 
         // 5a) Meeting created (from capture)
         const meetingsEnabled = ns.meetings !== false
@@ -339,11 +364,12 @@ const leadData = {
     return NextResponse.json({
       success: true,
       lead_magnet_url: page.lead_magnet_url || null,
-    })
-  } catch (err: any) {
+        })
+  } catch (err: unknown) {
     console.error('Capture submit error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

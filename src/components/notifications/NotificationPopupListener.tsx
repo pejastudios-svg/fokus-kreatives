@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
@@ -8,12 +8,13 @@ import { X } from 'lucide-react'
 type NotifRow = {
   id: string
   type: string
-  data: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>
   created_at: string
 }
 
 export function NotificationPopupListener() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
 
   const [popup, setPopup] = useState<NotifRow | null>(null)
@@ -106,7 +107,7 @@ export function NotificationPopupListener() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] max-w-sm">
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm">
       <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <button

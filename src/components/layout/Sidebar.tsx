@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -15,8 +15,6 @@ import {
   LogOut,
   ChevronDown,
   ClipboardList,
-  InstagramIcon,
-  Calendar1Icon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -33,42 +31,42 @@ const baseNavigation = [
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  
+  // Memoize supabase to prevent infinite loops in useEffect
+  const supabase = useMemo(() => createClient(), [])
   
   const [userName, setUserName] = useState('')
-const [userPicture, setUserPicture] = useState<string | null>(null)
-const [userRole, setUserRole] = useState<string | null>(null)
-const [showUserMenu, setShowUserMenu] = useState(false)
+  const [userPicture, setUserPicture] = useState<string | null>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
+  // Load User Profile
   useEffect(() => {
-    loadUserProfile()
-  }, [])
+    const loadUserProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('name, profile_picture_url')
+          .eq('id', user.id)
+          .single()
 
-  const loadUserProfile = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (user) {
-    const { data } = await supabase
-      .from('users')
-      .select('name, profile_picture_url, role')
-      .eq('id', user.id)
-      .single()
-
-    if (data) {
-      setUserName(data.name || '')
-      setUserPicture(data.profile_picture_url)
-      setUserRole(data.role || null)
+        if (data) {
+          setUserName(data.name || '')
+          setUserPicture(data.profile_picture_url)
+        }
+      }
     }
-  }
-}
+    loadUserProfile()
+  }, [supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-const filteredNavigation = baseNavigation
+  const filteredNavigation = baseNavigation
 
   return (
     <div className="flex flex-col h-full w-64 bg-brand-gradient">
@@ -86,7 +84,7 @@ const filteredNavigation = baseNavigation
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2">
         {filteredNavigation.map((item) => {
-  const isActive = pathname.startsWith(item.href)
+          const isActive = pathname.startsWith(item.href)
           return (
             <Link
               key={item.name}
@@ -113,7 +111,13 @@ const filteredNavigation = baseNavigation
             className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-white/10 transition-all duration-200"
           >
             {userPicture ? (
-              <img src={userPicture} alt={userName} className="h-8 w-8 rounded-full object-cover ring-2 ring-white/20" />
+              <Image 
+                src={userPicture} 
+                alt={userName} 
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover ring-2 ring-white/20" 
+              />
             ) : (
               <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-semibold">
                 {userName.charAt(0).toUpperCase() || 'U'}

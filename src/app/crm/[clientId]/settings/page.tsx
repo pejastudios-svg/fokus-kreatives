@@ -1,7 +1,7 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -24,8 +24,10 @@ type NotificationSettings = {
 }
 
 export default function CRMSettingsPage() {
-const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const params = useParams()
+  // Fix: safely cast params to avoid 'any' error
+  const routeParams = params as Record<string, string>
+  const clientId = routeParams.clientid || routeParams.clientId
   const supabase = createClient()
 
   // Workspace notification toggles
@@ -46,7 +48,8 @@ const params = useParams()
   const [savingProfile, setSavingProfile] = useState(false)
 
   // Password
-  const [currentPassword, setCurrentPassword] = useState('')
+  // Fix: Removed unused 'currentPassword' variable
+  const [, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -60,69 +63,80 @@ const params = useParams()
   } | null>(null)
 
   useEffect(() => {
+    let mounted = true
+
+    const loadWorkspaceSettings = async () => {
+      if (!clientId) return
+      setWorkspaceLoading(true)
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('notification_settings')
+        .eq('id', clientId)
+        .single()
+
+      if (mounted) {
+        if (error) {
+          console.error('Load workspace settings error:', error)
+        } else {
+          const ns = (data?.notification_settings || {}) as NotificationSettings
+          setNotifications({
+            meetings: ns.meetings ?? true,
+            capture_submissions: ns.capture_submissions ?? true,
+            leads: ns.leads ?? true,
+          })
+        }
+        setWorkspaceLoading(false)
+      }
+    }
+
+    const loadUserProfile = async () => {
+      setProfileLoading(true)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (mounted) setProfileLoading(false)
+        return
+      }
+
+      if (mounted) {
+        setUserId(user.id)
+        setProfileEmail(user.email || '')
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('name, profile_picture_url')
+        .eq('id', user.id)
+        .single()
+
+      if (mounted) {
+        if (error) {
+          console.error('Load user profile error:', error)
+        } else if (data) {
+          setProfileName(data.name || '')
+          setProfilePicture(data.profile_picture_url || '')
+        }
+        setProfileLoading(false)
+      }
+    }
+
     if (clientId) {
       loadWorkspaceSettings()
     }
     loadUserProfile()
+
+    return () => {
+      mounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
   const showAlert = (type: 'success' | 'error', message: string) => {
     setAlert({ type, message })
     setTimeout(() => setAlert(null), 3000)
-  }
-
-  // Load workspace settings (per client)
-  const loadWorkspaceSettings = async () => {
-    setWorkspaceLoading(true)
-    const { data, error } = await supabase
-      .from('clients')
-      .select('notification_settings')
-      .eq('id', clientId)
-      .single()
-
-    if (error) {
-      console.error('Load workspace settings error:', error)
-    } else {
-      const ns = (data?.notification_settings || {}) as NotificationSettings
-      setNotifications({
-        meetings: ns.meetings ?? true,
-        capture_submissions: ns.capture_submissions ?? true,
-        leads: ns.leads ?? true,
-      })
-    }
-
-    setWorkspaceLoading(false)
-  }
-
-  // Load user profile (current user)
-  const loadUserProfile = async () => {
-    setProfileLoading(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      setProfileLoading(false)
-      return
-    }
-
-    setUserId(user.id)
-    setProfileEmail(user.email || '')
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('name, profile_picture_url')
-      .eq('id', user.id)
-      .single()
-
-    if (error) {
-      console.error('Load user profile error:', error)
-    } else if (data) {
-      setProfileName(data.name || '')
-      setProfilePicture(data.profile_picture_url || '')
-    }
-
-    setProfileLoading(false)
   }
 
   const saveWorkspaceSettings = async () => {
@@ -290,10 +304,13 @@ const params = useParams()
                   <>
                     <div className="flex items-center gap-4">
                       {profilePicture ? (
-                        <img
+                          <Image
                           src={profilePicture}
                           alt={profileName}
+                          width={48}
+                          height={48}
                           className="h-12 w-12 rounded-full object-cover"
+                          unoptimized
                         />
                       ) : (
                         <div className="h-12 w-12 rounded-full bg-brand-gradient flex items-center justify-center text-white font-semibold">

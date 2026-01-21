@@ -25,7 +25,7 @@ export default function PortalApprovalsPage() {
   useEffect(() => {
   if (!clientId) return
 
-  let t: any = null
+  let t: ReturnType<typeof setTimeout> | null = null
   const reload = () => {
     if (t) clearTimeout(t)
     t = setTimeout(() => {

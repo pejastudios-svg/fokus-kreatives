@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
@@ -34,8 +34,9 @@ interface Meeting {
 }
 
 export default function CRMMeetingsPage() {
-const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const params = useParams()
+  // Fix: Cast params to Record<string, string> instead of any
+  const clientId = ((params as Record<string, string>).clientid || (params as Record<string, string>).clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -56,16 +57,11 @@ const params = useParams()
   const [locationUrl, setLocationUrl] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [clientName, setClientName] = useState<string | null>(null)
-  const [notificationSettings, setNotificationSettings] = useState<any>({})
+  // Fix: Specific type instead of any
+  const [notificationSettings, setNotificationSettings] = useState<{ meetings?: boolean }>({})
 
-    useEffect(() => {
-    if (clientId) {
-      loadMeetings()
-      loadUserAndClient()
-    }
-  }, [clientId])
-
-    const loadUserAndClient = async () => {
+  // Fix: Wrap functions in useCallback to satisfy useEffect dependencies
+  const loadUserAndClient = useCallback(async () => {
     // Current user for "to" address
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
@@ -83,9 +79,9 @@ const params = useParams()
       setClientName(client.business_name || client.name || null)
       setNotificationSettings(client.notification_settings || {})
     }
-  }
+  }, [clientId, supabase])
 
-  const loadMeetings = async () => {
+  const loadMeetings = useCallback(async () => {
     setIsLoading(true)
 
     const { data, error } = await supabase
@@ -102,7 +98,15 @@ const params = useParams()
 
     setMeetings((data || []) as Meeting[])
     setIsLoading(false)
-  }
+  }, [clientId, supabase])
+
+  // Fix: Added dependencies to dependency array
+  useEffect(() => {
+    if (clientId) {
+      loadMeetings()
+      loadUserAndClient()
+    }
+  }, [clientId, loadMeetings, loadUserAndClient])
 
   const filteredMeetings = meetings.filter((m) => {
     const now = new Date()
@@ -656,7 +660,7 @@ const params = useParams()
         <p className="text-sm text-gray-300">
           Are you sure you want to delete the meeting{' '}
           <span className="font-semibold text-white">
-            "{meetingToDelete.title}"
+            &quot;{meetingToDelete.title}&quot;
           </span>
           ?
         </p>

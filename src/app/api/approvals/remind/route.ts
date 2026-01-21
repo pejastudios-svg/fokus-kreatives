@@ -1,16 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function hours(n: number) {
-  return n * 60 * 60 * 1000
-}
 function days(n: number) {
   return n * 24 * 60 * 60 * 1000
+}
+
+type ClientRel = {
+  name: string | null
+  business_name: string | null
+}
+
+type ApprovalRow = {
+  id: string
+  title: string
+  client_id: string
+  auto_approve_at: string | null
+  auto_approve_minutes: number | null
+  reminder_3day_sent_at: string | null
+  reminder_1day_sent_at: string | null
+  clients: ClientRel | ClientRel[] | null
+}
+
+function getClientDisplayName(rel: ApprovalRow['clients']): string {
+  if (Array.isArray(rel)) {
+    return rel[0]?.business_name || rel[0]?.name || 'Client'
+  }
+  return rel?.business_name || rel?.name || 'Client'
 }
 
 export async function GET(req: NextRequest) {
@@ -19,14 +42,14 @@ export async function GET(req: NextRequest) {
   const secret = url.searchParams.get('secret')
   const envSecret = process.env.CRON_SECRET
 
-   if (envSecret && secret !== envSecret) {
+  if (envSecret && secret !== envSecret) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   const now = new Date()
 
   // Only pending approvals with auto_approve_at set
-  const { data: approvals, error } = await supabase
+  const { data, error } = await supabase
     .from('approvals')
     .select(
       'id, title, client_id, auto_approve_at, auto_approve_minutes, reminder_3day_sent_at, reminder_1day_sent_at, clients(name, business_name)'
@@ -39,19 +62,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 
+  const approvals = (data || []) as ApprovalRow[]
   let sent = 0
 
-  for (const a of approvals || []) {
-    const approvalId = a.id as string
-    const autoAt = a.auto_approve_at ? new Date(a.auto_approve_at as string) : null
-    const mins = a.auto_approve_minutes as number | null
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+  const appsScriptSecret = process.env.APPS_SCRIPT_SECRET
+
+  for (const a of approvals) {
+    const approvalId = a.id
+    const autoAt = a.auto_approve_at ? new Date(a.auto_approve_at) : null
+    const mins = a.auto_approve_minutes
 
     if (!autoAt || !mins) continue
+
+    const clientName = getClientDisplayName(a.clients)
 
     // Reminder rules:
     // - 24h: no reminders
     // - 3 days: 1 day before
-    // - 7 days: "third day" (day 3 after creation ≈ 4 days before expiry) AND 1 day before
+    // - 7 days: "third day" (window ~4 days before expiry) AND 1 day before expiry
     const is24h = mins === 24 * 60
     const is3d = mins === 3 * 24 * 60
     const is7d = mins === 7 * 24 * 60
@@ -60,89 +89,95 @@ export async function GET(req: NextRequest) {
 
     const msToAuto = autoAt.getTime() - now.getTime()
 
-    // helper to send reminder to assignees
-    const sendReminder = async (label: string, setField: 'reminder_3day_sent_at' | 'reminder_1day_sent_at') => {
+    const sendReminder = async (
+      label: string,
+      setField: 'reminder_3day_sent_at' | 'reminder_1day_sent_at'
+    ) => {
       // Load assignees
       const { data: assignees } = await supabase
         .from('approval_assignees')
         .select('user_id')
         .eq('approval_id', approvalId)
 
-      const userIds = Array.from(new Set((assignees || []).map((r: any) => r.user_id).filter(Boolean)))
+      const userIds = Array.from(
+        new Set((assignees || []).map((r) => r.user_id).filter(Boolean))
+      ) as string[]
+
       if (userIds.length === 0) return
 
-      // emails
-      const secret = process.env.APPS_SCRIPT_SECRET
-const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
-const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+      const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
-// Create in-app notification rows so popup+sound triggers
-await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    userIds: userIds, // all assignees
-    type: 'approval_reminder',
-    data: {
-  approvalId,
-  title: a.title,
-  clientName: clientName,
-},
-  }),
-})
+      // Create in-app notification rows so popup+sound triggers
+      await fetch(`${appUrl}/api/notifications/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds,
+          type: 'approval_reminder',
+          data: {
+            approvalId,
+            title: a.title,
+            clientName,
+          },
+        }),
+      })
 
-const { data: users } = await supabase
-  .from('users')
-  .select('id, email, role')
-  .in('id', userIds)
+      // Email split (client vs team)
+      if (appsScriptSecret) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .in('id', userIds)
 
-const clientEmails = (users || [])
-  .filter((u: any) => u.role === 'client')
-  .map((u: any) => u.email)
-  .filter(Boolean)
+        const clientEmails = (users || [])
+          .filter((u) => u.role === 'client')
+          .map((u) => u.email)
+          .filter((e): e is string => !!e)
 
-const teamEmails = (users || [])
-  .filter((u: any) => u.role !== 'client')
-  .map((u: any) => u.email)
-  .filter(Boolean)
+        const teamEmails = (users || [])
+          .filter((u) => u.role !== 'client')
+          .map((u) => u.email)
+          .filter((e): e is string => !!e)
 
-if (secret && clientEmails.length > 0) {
-  await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'approval_reminder',
-      payload: {
-        secret,
-        to: clientEmails,
-        clientName: clientName,
-        approvalTitle: a.title,
-        approvalId,
-        reminderLabel: label,
-        url: portalUrl,
-      },
-    }),
-  })
-}
+        if (clientEmails.length > 0) {
+          await fetch(`${appUrl}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_reminder',
+              payload: {
+                secret: appsScriptSecret,
+                to: clientEmails,
+                clientName,
+                approvalTitle: a.title,
+                approvalId,
+                reminderLabel: label,
+                url: portalUrl,
+              },
+            }),
+          })
+        }
 
-if (secret && teamEmails.length > 0) {
-  await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'approval_reminder',
-      payload: {
-        secret,
-        to: teamEmails,
-        clientName: clientName,
-        approvalTitle: a.title,
-        approvalId,
-        reminderLabel: label,
-        url: agencyUrl,
-      },
-    }),
-  })
-}
+        if (teamEmails.length > 0) {
+          await fetch(`${appUrl}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_reminder',
+              payload: {
+                secret: appsScriptSecret,
+                to: teamEmails,
+                clientName,
+                approvalTitle: a.title,
+                approvalId,
+                reminderLabel: label,
+                url: agencyUrl,
+              },
+            }),
+          })
+        }
+      }
 
       // mark sent so it doesn't repeat
       await supabase

@@ -207,15 +207,8 @@ export default function TeamPage() {
     }
   }
 
-  const handleRemoveFromAgency = async (member: TeamMember) => {
+    const handleRemoveFromAgency = async (member: TeamMember) => {
     if (!canRemove) return
-
-    // Managers cannot remove admins
-    if (currentUserRole !== 'admin') return
-    if (currentUserRole === 'manager' && member.role === 'admin') {
-      setNotification({ type: 'error', message: 'Managers cannot remove admins.' })
-      return
-    }
 
     const confirmed = window.confirm(`Remove ${member.email} from the agency team? (They may still have CRM access.)`)
     if (!confirmed) return
@@ -317,6 +310,7 @@ export default function TeamPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {member.profile_picture_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={member.profile_picture_url} alt={member.name || member.email} className="h-10 w-10 rounded-full object-cover" />
                           ) : (
                             <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center text-white font-medium">

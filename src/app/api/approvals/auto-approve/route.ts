@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
 
+// Types for Supabase responses
+interface ClientRef {
+  name: string | null
+  business_name: string | null
+}
+
+interface AssigneeRow {
+  user_id: string
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+  role: string
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -59,11 +75,19 @@ export async function GET(req: NextRequest) {
         .select('user_id')
         .eq('approval_id', approvalId)
 
-      const userIds = Array.from(new Set((assignees || []).map((r: any) => r.user_id).filter(Boolean)))
+      const userIds = Array.from(new Set((assignees || []).map((r: AssigneeRow) => r.user_id).filter(Boolean)))
 
-      const relClients: any = (a as any).clients
-      const clientName =
-        (Array.isArray(relClients) ? relClients[0]?.business_name || relClients[0]?.name : relClients?.business_name || relClients?.name) || 'Client'
+      // Cast 'a' to a shape with clients
+      const approvalWithClients = a as unknown as { clients: ClientRef | ClientRef[] | null }
+      const relClients = approvalWithClients.clients
+      
+      let clientName = 'Client'
+      if (Array.isArray(relClients) && relClients.length > 0) {
+        clientName = relClients[0]?.business_name || relClients[0]?.name || 'Client'
+      } else if (relClients && !Array.isArray(relClients)) {
+        const singleClient = relClients as ClientRef
+        clientName = singleClient.business_name || singleClient.name || 'Client'
+      }
 
       if (userIds.length > 0) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
@@ -85,8 +109,8 @@ export async function GET(req: NextRequest) {
             .select('id, email, role')
             .in('id', userIds)
 
-          const clientEmails = (users || []).filter((u: any) => u.role === 'client').map((u: any) => u.email).filter(Boolean)
-          const teamEmails = (users || []).filter((u: any) => u.role !== 'client').map((u: any) => u.email).filter(Boolean)
+          const clientEmails = (users || []).filter((u: UserRow) => u.role === 'client').map((u: UserRow) => u.email).filter(Boolean)
+          const teamEmails = (users || []).filter((u: UserRow) => u.role !== 'client').map((u: UserRow) => u.email).filter(Boolean)
 
           const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
           const agencyUrl = `${appUrl}/approvals/${approvalId}`
@@ -133,8 +157,9 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, processed })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[auto-approve] error', err)
-    return NextResponse.json({ success: false, error: err?.message || 'Server error' }, { status: 500 })
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 })
   }
 }

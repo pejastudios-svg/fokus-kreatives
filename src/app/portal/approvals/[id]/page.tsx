@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 // src/app/approvals/[id]/page.tsx
 'use client'
 
@@ -9,17 +10,14 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
+import { RealtimeChannel } from '@supabase/supabase-js'
 import {
   Loader2,
-  CheckCircle,
-  Clock,
-  Edit3,
-  Save,
   X,
-  Trash2,
   MessageCircle,
   Paperclip,
   Copy,
+  Pencil,
 } from 'lucide-react'
 
 interface ApprovalDetail {
@@ -128,9 +126,9 @@ export default function PortalApprovalDetailPage() {
 } | null>(null)
 
   useEffect(() => {
-  let channel: any = null
+    let channel: RealtimeChannel | null = null
 
-  const run = async () => {
+    const run = async () => {
     await init()
 
     channel = supabase
@@ -251,56 +249,77 @@ export default function PortalApprovalDetailPage() {
   }
 
   const loadAssignees = async () => {
-  const { data, error } = await supabase
-    .from('approval_assignees')
-    .select('id, role, user_id, users(name, email, profile_picture_url)')
-    .eq('approval_id', approvalId)
+    const { data, error } = await supabase
+      .from('approval_assignees')
+      .select('id, role, user_id, users(name, email, profile_picture_url)')
+      .eq('approval_id', approvalId)
 
-  if (error) {
-    console.error('Load assignees error:', error)
-    return
+    if (error) {
+      console.error('Load assignees error:', error)
+      return
+    }
+
+    type AssigneeRow = {
+      id: string
+      role: string
+      user_id: string
+      users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
+    }
+
+    const mapped: Assignee[] = ((data as unknown) as AssigneeRow[] || []).map((row) => ({
+      id: row.id,
+      role: row.role,
+      user_id: row.user_id,
+      users: Array.isArray(row.users) ? row.users[0] : row.users,
+    }))
+
+    setAssignees(mapped)
   }
-
-  const mapped: Assignee[] = (data || []).map((row: any) => ({
-    id: row.id,
-    role: row.role,
-    user_id: row.user_id,
-    users: Array.isArray(row.users) ? row.users[0] : row.users,
-  }))
-
-  setAssignees(mapped)
-}
 
   const loadComments = async () => {
-  const { data, error } = await supabase
-    .from('approval_comments')
-    .select(
-      'id, approval_id, approval_item_id, user_id, content, file_url, file_name, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
-    )
-    .eq('approval_id', approvalId)
-    .order('created_at', { ascending: true })
+    const { data, error } = await supabase
+      .from('approval_comments')
+      .select(
+        'id, approval_id, approval_item_id, user_id, content, file_url, file_name, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
+      )
+      .eq('approval_id', approvalId)
+      .order('created_at', { ascending: true })
 
-  if (error) {
-    console.error('Load comments error:', error)
-    return
+    if (error) {
+      console.error('Load comments error:', error)
+      return
+    }
+
+    type CommentRow = {
+      id: string
+      approval_id: string
+      approval_item_id: string | null
+      user_id: string
+      content: string
+      file_url: string | null
+      file_name: string | null
+      resolved: boolean
+      parent_comment_id: string | null
+      created_at: string
+      users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
+    }
+
+    const mapped: Comment[] = ((data as unknown) as CommentRow[] || []).map((row) => ({
+      id: row.id,
+      approval_id: row.approval_id,
+      approval_item_id: row.approval_item_id,
+      user_id: row.user_id,
+      content: row.content,
+      file_url: row.file_url,
+      file_name: row.file_name,
+      resolved: row.resolved,
+      parent_comment_id: row.parent_comment_id,
+      created_at: row.created_at,
+      users: Array.isArray(row.users) ? row.users[0] : row.users,
+    }))
+
+    setComments(mapped)
   }
-
-  const mapped: Comment[] = (data || []).map((row: any) => ({
-    id: row.id,
-    approval_id: row.approval_id,
-    approval_item_id: row.approval_item_id,
-    user_id: row.user_id,
-    content: row.content,
-    file_url: row.file_url,
-    file_name: row.file_name,
-    resolved: row.resolved,
-    parent_comment_id: row.parent_comment_id,
-    created_at: row.created_at,
-    users: Array.isArray(row.users) ? row.users[0] : row.users,
-  }))
-
-  setComments(mapped)
-}
 
   const mentionUsers = Array.from(
   new Map(
@@ -318,6 +337,49 @@ export default function PortalApprovalDetailPage() {
 )
 
   const canEditItems = currentUserRole && currentUserRole !== 'client'
+
+  // --- New Edit Item Functions ---
+  const startEditItem = (item: ApprovalItem) => {
+    setEditingItemId(item.id)
+    setEditItemTitle(item.title)
+    setEditItemUrl(item.url)
+    setEditItemComment(item.initial_comment || '')
+  }
+
+  const cancelEditItem = () => {
+    setEditingItemId(null)
+    setEditItemTitle('')
+    setEditItemUrl('')
+    setEditItemComment('')
+  }
+
+  const saveItem = async () => {
+    if (!editingItemId) return
+
+    try {
+      const { error } = await supabase
+        .from('approval_items')
+        .update({
+          title: editItemTitle,
+          url: editItemUrl,
+          initial_comment: editItemComment,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingItemId)
+
+      if (error) {
+        console.error('Update item error:', error)
+        alert('Failed to update item')
+      } else {
+        await loadItems()
+        cancelEditItem()
+      }
+    } catch (err) {
+      console.error('Update item exception', err)
+      alert('Failed to update item')
+    }
+  }
+  // -------------------------------
 
   const handleCopyLink = async () => {
     try {
@@ -360,56 +422,6 @@ await loadApproval()
     } catch (err) {
       console.error('Toggle item exception', err)
       await loadItems()
-    }
-  }
-
-  const startEditItem = (item: ApprovalItem) => {
-    setEditingItemId(item.id)
-    setEditItemTitle(item.title || '')
-    setEditItemUrl(item.url || '')
-    setEditItemComment(item.initial_comment || '')
-  }
-
-  const cancelEditItem = () => {
-    setEditingItemId(null)
-    setEditItemTitle('')
-    setEditItemUrl('')
-    setEditItemComment('')
-  }
-
-  const saveEditItem = async (itemId: string) => {
-    if (!canEditItems) return
-
-    const title = editItemTitle.trim()
-    const url = editItemUrl.trim()
-    const comment = editItemComment.trim()
-
-    if (!url) {
-      alert('URL is required')
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('approval_items')
-        .update({
-          title: title || null,
-          url,
-          initial_comment: comment || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', itemId)
-
-      if (error) {
-        console.error('Save edit item error:', error)
-        alert('Failed to save changes')
-      } else {
-        await loadItems()
-        cancelEditItem()
-      }
-    } catch (err) {
-      console.error('Save edit item exception', err)
-      alert('Failed to save changes')
     }
   }
 
@@ -638,7 +650,7 @@ await loadApproval()
   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
   <div className="flex-1 min-w-0">
       {approval.description && (
-        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-words">
+        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-all">
           {approval.description}
         </p>
       )}
@@ -660,7 +672,7 @@ await loadApproval()
                 )}
               </div>
             </div>
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -681,18 +693,18 @@ await loadApproval()
 
             return (
               <Card key={item.id}>
-                <CardHeader className="flex flex-row items-center justify-between gap-3 break-words">
-  <div className="flex-1 min-w-0">
-    <h3 className="text-sm font-semibold text-gray-900 break-words">
-      {item.title || 'Untitled asset'}
-    </h3>
-    {item.initial_comment && (
-      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">
-        {item.initial_comment}
-      </p>
-    )}
-  </div>
-  <div className="flex items-center gap-2 flex-shrink-0">
+                <CardHeader className="flex flex-row items-start justify-between gap-3 break-all">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 break-all">
+                      {item.title || 'Untitled asset'}
+                    </h3>
+                    {item.initial_comment && (
+                      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all">
+                        {item.initial_comment}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         isApproved
@@ -702,6 +714,20 @@ await loadApproval()
                     >
                       {isApproved ? 'Approved' : 'Pending'}
                     </span>
+                    
+                    {/* EDIT BUTTON (Fixes canEditItems unused error) */}
+                    {canEditItems && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => startEditItem(item)}
+                        disabled={editingItemId === item.id}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    )}
+
                     <Button
                       size="sm"
                       variant="outline"
@@ -740,6 +766,22 @@ await loadApproval()
                             rows={3}
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
+                        </div>
+                        {/* SAVE / CANCEL BUTTONS (Fixes setEditingItemId unused error) */}
+                        <div className="flex justify-end gap-2 mt-2">
+                           <Button 
+                             size="sm" 
+                             variant="outline" 
+                             onClick={cancelEditItem}
+                           >
+                             Cancel
+                           </Button>
+                           <Button 
+                             size="sm" 
+                             onClick={saveItem}
+                           >
+                             Save Changes
+                           </Button>
                         </div>
                       </div>
                     ) : (
@@ -831,120 +873,120 @@ await loadApproval()
                                   </div>
                                 ) : (
                                   <>
-                                  {/* Reply preview if this comment is a reply */}
-    {c.parent_comment_id && (() => {
-      const parent = comments.find((p) => p.id === c.parent_comment_id)
-      if (!parent) return null
-      const parentAuthor = parent.users?.name || parent.users?.email || 'User'
-      const snippet = parent.content.length > 80
-        ? parent.content.slice(0, 80) + '...'
-        : parent.content
+                                    {/* Reply preview if this comment is a reply */}
+                                    {c.parent_comment_id && (() => {
+                                      const parent = comments.find((p) => p.id === c.parent_comment_id)
+                                      if (!parent) return null
+                                      const parentAuthor = parent.users?.name || parent.users?.email || 'User'
+                                      const snippet = parent.content.length > 80
+                                        ? parent.content.slice(0, 80) + '...'
+                                        : parent.content
 
-      return (
-        <div className="mb-1 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
-          Replying to <span className="font-semibold">{parentAuthor}</span>:
-          {' '}
-          <span className="italic">"{snippet}"</span>
-        </div>
-      )
-    })()}
+                                      return (
+                                        <div className="mb-1 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
+                                          Replying to <span className="font-semibold">{parentAuthor}</span>:
+                                          {' '}
+                                          <span className="italic">&quot;{snippet}&quot;</span>
+                                        </div>
+                                      )
+                                    })()}
 
-    <p className="mt-0.5 text-gray-700 break-words">
-      {formatComment(c.content)}
-    </p>
-    {c.file_url && (
-  <div className="mt-1">
-    {(() => {
-      const name = c.file_name || c.file_url
-      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(name)
+                                    <p className="mt-0.5 text-gray-700 break-all">
+                                      {formatComment(c.content)}
+                                    </p>
+                                    {c.file_url && (
+                                      <div className="mt-1">
+                                        {(() => {
+                                          const name = c.file_name || c.file_url
+                                          const isImage = /\.(png|jpe?g|gif|webp)$/i.test(name)
 
-      if (isImage) {
-        return (
-          <div className="space-y-1">
-            <img
-              src={c.file_url || ''}
-              alt={c.file_name || 'Image'}
-              className="max-h-40 rounded-lg border border-gray-200 cursor-pointer"
-              onClick={() => {
-                setPreviewImageUrl(c.file_url!)
-                setPreviewImageName(c.file_name || 'Image')
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setPreviewImageUrl(c.file_url!)
-                setPreviewImageName(c.file_name || 'Image')
-              }}
-              className="inline-flex items-center gap-1 text-[11px] text-[#2B79F7] hover:underline"
-            >
-              <Paperclip className="h-3 w-3" />
-              <span>{c.file_name || 'View image'}</span>
-            </button>
-          </div>
-        )
-      }
+                                          if (isImage) {
+                                            return (
+                                              <div className="space-y-1">
+                                                <img
+                                                  src={c.file_url || ''}
+                                                  alt={c.file_name || 'Image'}
+                                                  className="max-h-40 rounded-lg border border-gray-200 cursor-pointer"
+                                                  onClick={() => {
+                                                    setPreviewImageUrl(c.file_url!)
+                                                    setPreviewImageName(c.file_name || 'Image')
+                                                  }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setPreviewImageUrl(c.file_url!)
+                                                    setPreviewImageName(c.file_name || 'Image')
+                                                  }}
+                                                  className="inline-flex items-center gap-1 text-[11px] text-[#2B79F7] hover:underline"
+                                                >
+                                                  <Paperclip className="h-3 w-3" />
+                                                  <span>{c.file_name || 'View image'}</span>
+                                                </button>
+                                              </div>
+                                            )
+                                          }
 
-      return (
-        <a
-          href={c.file_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] text-[#2B79F7] hover:underline"
-        >
-          <Paperclip className="h-3 w-3" />
-          <span>{c.file_name || 'Attachment'}</span>
-        </a>
-      )
-    })()}
-  </div>
-)}
+                                          return (
+                                            <a
+                                              href={c.file_url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 text-[11px] text-[#2B79F7] hover:underline"
+                                            >
+                                              <Paperclip className="h-3 w-3" />
+                                              <span>{c.file_name || 'Attachment'}</span>
+                                            </a>
+                                          )
+                                        })()}
+                                      </div>
+                                    )}
                                     <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
-  <button
-    type="button"
-    onClick={() => toggleResolveComment(c)}
-    className={`px-2 py-0.5 rounded-full border ${
-      c.resolved
-        ? 'border-green-500 text-green-600 bg-green-50'
-        : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
-    }`}
-    disabled={resolvingCommentId === c.id}
-  >
-    {c.resolved ? 'Resolved' : 'Mark resolved'}
-  </button>
-  <button
-    type="button"
-    onClick={() =>
-      setReplyTarget({
-        itemId: item.id,
-        commentId: c.id,
-        userName: c.users?.name || c.users?.email || 'User',
-      })
-    }
-    className="hover:text-[#2B79F7]"
-  >
-    Reply
-  </button>
-  {isOwner && (
-    <>
-      <button
-        type="button"
-        onClick={() => startEditComment(c)}
-        className="hover:text-[#2B79F7]"
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={() => deleteComment(c)}
-        className="hover:text-red-500"
-        disabled={deletingCommentId === c.id}
-      >
-        Delete
-      </button>
-    </>
-  )}
-</div>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleResolveComment(c)}
+                                        className={`px-2 py-0.5 rounded-full border ${
+                                          c.resolved
+                                            ? 'border-green-500 text-green-600 bg-green-50'
+                                            : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
+                                        }`}
+                                        disabled={resolvingCommentId === c.id}
+                                      >
+                                        {c.resolved ? 'Resolved' : 'Mark resolved'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setReplyTarget({
+                                            itemId: item.id,
+                                            commentId: c.id,
+                                            userName: c.users?.name || c.users?.email || 'User',
+                                          })
+                                        }
+                                        className="hover:text-[#2B79F7]"
+                                      >
+                                        Reply
+                                      </button>
+                                      {isOwner && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => startEditComment(c)}
+                                            className="hover:text-[#2B79F7]"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteComment(c)}
+                                            className="hover:text-red-500"
+                                            disabled={deletingCommentId === c.id}
+                                          >
+                                            Delete
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </>
                                 )}
                               </div>
@@ -956,115 +998,115 @@ await loadApproval()
 
                     {/* New comment input */}
                     <div className="border border-gray-200 rounded-lg p-2 space-y-2">
-  {replyTarget && replyTarget.itemId === item.id && (
-    <p className="text-[10px] text-gray-500">
-      Replying to <span className="font-semibold">{replyTarget.userName}</span>
-      {' '}
-      <button
-        type="button"
-        onClick={() => setReplyTarget(null)}
-        className="text-red-500 hover:underline ml-1"
-      >
-        Cancel
-      </button>
-    </p>
-  )}
-  <textarea
-    value={newCommentText[item.id] || ''}
-    onChange={(e) =>
-      handleNewCommentChange(item.id, e.target.value)
-    }
-    rows={2}
-    className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
-    placeholder="Leave a comment... use @name to tag someone."
-  />
-  {mentionTargetItemId === item.id && mentionQuery && (
-  <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
-    {mentionUsers
-      .filter((u) =>
-        u.name.toLowerCase().includes(mentionQuery)
-      )
-      .slice(0, 5)
-      .map((u) => (
-        <button
-          key={u.id}
-          type="button"
-          onClick={() => {
-            const current = newCommentText[item.id] || ''
-            const parts = current.split(/\s/)
-            parts[parts.length - 1] = '@' + u.name.split(' ')[0]
-            const next = parts.join(' ') + ' '
-            setNewCommentText((prev) => ({
-              ...prev,
-              [item.id]: next,
-            }))
-            setMentionTargetItemId(null)
-            setMentionQuery('')
-          }}
-          className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
-        >
-          {u.profile_picture_url ? (
-            <img
-              src={u.profile_picture_url}
-              alt={u.name}
-              className="h-4 w-4 rounded-full object-cover"
-            />
-          ) : (
-            <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
-              {u.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="truncate">{u.name}</span>
-        </button>
-      ))}
-    {mentionUsers.filter((u) =>
-      u.name.toLowerCase().includes(mentionQuery)
-    ).length === 0 && (
-      <p className="px-2 py-1 text-gray-400">
-        No matches
-      </p>
-    )}
-  </div>
-)}
-  {commentFile && (
-    <p className="text-[10px] text-gray-500">
-      Attached: {commentFile.name}{' '}
-      <button
-        type="button"
-        onClick={() => setCommentFile(null)}
-        className="text-red-500 hover:underline"
-      >
-        Remove
-      </button>
-    </p>
-  )}
-  <div className="flex items-center justify-between">
-    <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
-      <Paperclip className="h-3 w-3" />
-      <span>Attach file</span>
-      <input
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0] || null
-          setCommentFile(file)
-        }}
-      />
-    </label>
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => sendComment(item.id)}
-      isLoading={sendingCommentForItem === item.id}
-      disabled={
-        !commentFile &&
-        !(newCommentText[item.id] || '').trim()
-      }
-    >
-      Send
-    </Button>
-  </div>
-</div>
+                      {replyTarget && replyTarget.itemId === item.id && (
+                        <p className="text-[10px] text-gray-500">
+                          Replying to <span className="font-semibold">{replyTarget.userName}</span>
+                          {' '}
+                          <button
+                            type="button"
+                            onClick={() => setReplyTarget(null)}
+                            className="text-red-500 hover:underline ml-1"
+                          >
+                            Cancel
+                          </button>
+                        </p>
+                      )}
+                      <textarea
+                        value={newCommentText[item.id] || ''}
+                        onChange={(e) =>
+                          handleNewCommentChange(item.id, e.target.value)
+                        }
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                        placeholder="Leave a comment... use @name to tag someone."
+                      />
+                      {mentionTargetItemId === item.id && mentionQuery && (
+                        <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+                          {mentionUsers
+                            .filter((u) =>
+                              u.name.toLowerCase().includes(mentionQuery)
+                            )
+                            .slice(0, 5)
+                            .map((u) => (
+                              <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => {
+                                  const current = newCommentText[item.id] || ''
+                                  const parts = current.split(/\s/)
+                                  parts[parts.length - 1] = '@' + u.name.split(' ')[0]
+                                  const next = parts.join(' ') + ' '
+                                  setNewCommentText((prev) => ({
+                                    ...prev,
+                                    [item.id]: next,
+                                  }))
+                                  setMentionTargetItemId(null)
+                                  setMentionQuery('')
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
+                              >
+                                {u.profile_picture_url ? (
+                                  <img
+                                    src={u.profile_picture_url}
+                                    alt={u.name}
+                                    className="h-4 w-4 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
+                                    {u.name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="truncate">{u.name}</span>
+                              </button>
+                            ))}
+                          {mentionUsers.filter((u) =>
+                            u.name.toLowerCase().includes(mentionQuery)
+                          ).length === 0 && (
+                            <p className="px-2 py-1 text-gray-400">
+                              No matches
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {commentFile && (
+                        <p className="text-[10px] text-gray-500">
+                          Attached: {commentFile.name}{' '}
+                          <button
+                            type="button"
+                            onClick={() => setCommentFile(null)}
+                            className="text-red-500 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+                          <Paperclip className="h-3 w-3" />
+                          <span>Attach file</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null
+                              setCommentFile(file)
+                            }}
+                          />
+                        </label>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => sendComment(item.id)}
+                          isLoading={sendingCommentForItem === item.id}
+                          disabled={
+                            !commentFile &&
+                            !(newCommentText[item.id] || '').trim()
+                          }
+                        >
+                          Send
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

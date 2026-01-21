@@ -14,6 +14,12 @@ type UpdateCommentBody = {
   actorId: string
 }
 
+type CommentUpdates = {
+  updated_at: string
+  content?: string
+  resolved?: boolean
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as UpdateCommentBody
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Optional: prevent others from editing content (only owner):
-    const updates: any = { updated_at: new Date().toISOString() }
+    const updates: CommentUpdates = { updated_at: new Date().toISOString() }
 
     if (typeof content === 'string' && content.trim() !== '' && comment.user_id === actorId) {
       updates.content = content.trim()
@@ -66,10 +72,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Update approval comment error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

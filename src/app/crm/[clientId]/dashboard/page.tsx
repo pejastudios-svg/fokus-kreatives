@@ -7,15 +7,11 @@ import {
   Users, 
   DollarSign, 
   Calendar, 
-  MessageSquare, 
-  TrendingUp, 
-  TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
   Clock,
   CheckCircle,
   XCircle,
-  BarChart3,
   Activity,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -36,7 +32,7 @@ interface DashboardStats {
 
 interface RecentLead {
   id: string
-  data: Record<string, any>
+  data: Record<string, unknown>
   created_at: string
 }
 
@@ -47,16 +43,11 @@ interface UpcomingMeeting {
   duration_minutes: number
 }
 
-interface RecentPayment {
-  id: string
-  amount: number
-  status: string
-  created_at: string
-}
+// Removed unused RecentPayment interface
 
 export default function CRMDashboard() {
-const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const params = useParams()
+  const clientId = (params?.clientId || params?.clientid) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -74,108 +65,108 @@ const params = useParams()
   })
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
   const [upcomingMeetings, setUpcomingMeetings] = useState<UpcomingMeeting[]>([])
-  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
   const [leadsByStatus, setLeadsByStatus] = useState<{ status: string; count: number; color: string }[]>([])
 
   useEffect(() => {
-    if (clientId) loadDashboardData()
-  }, [clientId])
+    if (!clientId) return
 
-  const loadDashboardData = async () => {
-    setIsLoading(true)
+    const loadDashboardData = async () => {
+      setIsLoading(true)
 
-    try {
-      // Load leads
-      const { data: leads } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
+      try {
+        // Load leads
+        const { data: leads } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
 
-      // Load payments
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
+        // Load payments
+        const { data: payments } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
 
-      // Load meetings
-      const { data: meetings } = await supabase
-        .from('meetings')
-        .select('*')
-        .eq('client_id', clientId)
-        .gte('date_time', new Date().toISOString())
-        .order('date_time', { ascending: true })
-        .limit(5)
+        // Load meetings
+        const { data: meetings } = await supabase
+          .from('meetings')
+          .select('*')
+          .eq('client_id', clientId)
+          .gte('date_time', new Date().toISOString())
+          .order('date_time', { ascending: true })
+          .limit(5)
 
-      // Load custom fields for status colors
-      const { data: customFields } = await supabase
-        .from('custom_fields')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('field_type', 'status')
-        .single()
+        // Load custom fields for status colors
+        const { data: customFields } = await supabase
+          .from('custom_fields')
+          .select('*')
+          .eq('client_id', clientId)
+          .eq('field_type', 'status')
+          .single()
 
-      // Calculate stats
-      const now = new Date()
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+        // Calculate stats
+        const now = new Date()
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-      const allLeads = leads || []
-      const newLeadsThisWeek = allLeads.filter(l => new Date(l.created_at) > weekAgo).length
-      const closedDeals = allLeads.filter(l => l.data?.status === 'closed').length
-      const lostDeals = allLeads.filter(l => l.data?.status === 'lost').length
+        const allLeads = (leads || []) as RecentLead[]
+        const newLeadsThisWeek = allLeads.filter(l => new Date(l.created_at) > weekAgo).length
+        const closedDeals = allLeads.filter(l => (l.data?.status as string) === 'closed').length
+        const lostDeals = allLeads.filter(l => (l.data?.status as string) === 'lost').length
 
-      const allPayments = payments || []
-      const paidPayments = allPayments.filter(p => p.status === 'paid')
-      const totalRevenue = paidPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
-      const revenueThisMonth = paidPayments
-        .filter(p => new Date(p.created_at) >= monthStart)
-        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-      const pendingPayments = allPayments.filter(p => p.status === 'pending' || p.status === 'overdue').length
+        const allPayments = payments || []
+        const paidPayments = allPayments.filter(p => p.status === 'paid')
+        const totalRevenue = paidPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+        const revenueThisMonth = paidPayments
+          .filter(p => new Date(p.created_at) >= monthStart)
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+        const pendingPayments = allPayments.filter(p => p.status === 'pending' || p.status === 'overdue').length
 
-      // Calculate leads by status
-      const statusOptions = customFields?.options || [
-        { value: 'new', label: 'New', color: '#3B82F6' },
-        { value: 'contacted', label: 'Contacted', color: '#F59E0B' },
-        { value: 'qualified', label: 'Qualified', color: '#8B5CF6' },
-        { value: 'proposal', label: 'Proposal', color: '#EC4899' },
-        { value: 'closed', label: 'Closed', color: '#10B981' },
-        { value: 'lost', label: 'Lost', color: '#EF4444' },
-      ]
+        // Calculate leads by status
+        const defaultOptions = [
+          { value: 'new', label: 'New', color: '#3B82F6' },
+          { value: 'contacted', label: 'Contacted', color: '#F59E0B' },
+          { value: 'qualified', label: 'Qualified', color: '#8B5CF6' },
+          { value: 'proposal', label: 'Proposal', color: '#EC4899' },
+          { value: 'closed', label: 'Closed', color: '#10B981' },
+          { value: 'lost', label: 'Lost', color: '#EF4444' },
+        ]
 
-      const leadsByStatusData = statusOptions.map((status: any) => ({
-        status: status.label,
-        count: allLeads.filter(l => l.data?.status === status.value).length,
-        color: status.color,
-      }))
+        const statusOptions = (customFields?.options || defaultOptions) as { value: string; label: string; color: string }[]
 
-      setStats({
-        totalLeads: allLeads.length,
-        newLeadsThisWeek,
-        leadsChange: newLeadsThisWeek > 0 ? Math.round((newLeadsThisWeek / Math.max(allLeads.length - newLeadsThisWeek, 1)) * 100) : 0,
-        totalRevenue,
-        revenueThisMonth,
-        revenueChange: 12, // Placeholder
-        upcomingMeetings: meetings?.length || 0,
-        pendingPayments,
-        closedDeals,
-        lostDeals,
-      })
+        const leadsByStatusData = statusOptions.map((status) => ({
+          status: status.label,
+          count: allLeads.filter(l => (l.data?.status as string) === status.value).length,
+          color: status.color,
+        }))
 
-      setRecentLeads(allLeads.slice(0, 5))
-      setUpcomingMeetings(meetings || [])
-      setRecentPayments(allPayments.slice(0, 5))
-      setLeadsByStatus(leadsByStatusData)
+        setStats({
+          totalLeads: allLeads.length,
+          newLeadsThisWeek,
+          leadsChange: newLeadsThisWeek > 0 ? Math.round((newLeadsThisWeek / Math.max(allLeads.length - newLeadsThisWeek, 1)) * 100) : 0,
+          totalRevenue,
+          revenueThisMonth,
+          revenueChange: 12, // Placeholder
+          upcomingMeetings: meetings?.length || 0,
+          pendingPayments,
+          closedDeals,
+          lostDeals,
+        })
 
-    } catch (err) {
-      console.error('Failed to load dashboard:', err)
-    } finally {
-      setIsLoading(false)
+        setRecentLeads(allLeads.slice(0, 5))
+        setUpcomingMeetings((meetings || []) as UpcomingMeeting[])
+        setLeadsByStatus(leadsByStatusData)
+
+      } catch (err) {
+        console.error('Failed to load dashboard:', err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+
+    loadDashboardData()
+  }, [clientId, supabase])
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full">
@@ -358,12 +349,13 @@ const params = useParams()
                 recentLeads.map((lead) => (
                   <div key={lead.id} className="flex items-center justify-between p-4 hover:bg-[#334155]/30 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white font-medium">
-                        {(lead.data?.name || 'L').charAt(0).toUpperCase()}
+                      {/* Fixed: bg-gradient-to-br -> bg-linear-to-br */}
+                      <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white font-medium">
+                        {((lead.data?.name as string) || 'L').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-white">{lead.data?.name || 'Unknown'}</p>
-                        <p className="text-sm text-gray-400">{lead.data?.email || 'No email'}</p>
+                        <p className="font-medium text-white">{(lead.data?.name as string) || 'Unknown'}</p>
+                        <p className="text-sm text-gray-400">{(lead.data?.email as string) || 'No email'}</p>
                       </div>
                     </div>
                     <span className="text-xs text-gray-500">

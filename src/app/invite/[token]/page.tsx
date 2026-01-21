@@ -82,7 +82,16 @@ export default function InvitePage() {
             console.error('crm invite info error:', memErr)
             setCrmInviteInfo(null)
           } else if (mem?.role && mem?.client_id) {
-            const c: any = (mem as any).clients
+            // Define the structure of the client data to satisfy TypeScript
+            type ClientRef = { name: string | null; business_name: string | null }
+            
+            // Cast mem to a specific type containing the clients relationship
+            const membershipWithClients = mem as unknown as { 
+              clients: ClientRef | ClientRef[] | null 
+            }
+            
+            const c = membershipWithClients.clients
+
             const clientName =
               (Array.isArray(c) ? c[0]?.business_name || c[0]?.name : c?.business_name || c?.name) || ''
             setCrmInviteInfo({ role: mem.role, clientId: mem.client_id, clientName })

@@ -102,6 +102,7 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const init = async () => {
@@ -139,7 +140,7 @@ export default function ApprovalsPage() {
   }
 
   useEffect(() => {
-  let t: any = null
+  let t: ReturnType<typeof setTimeout> | null = null
 
   const reload = () => {
     if (t) clearTimeout(t)
@@ -212,21 +213,32 @@ const searchResults = assigneeSearchOpen
     return
   }
 
-  const mapped: Approval[] = (data || []).map((row: any) => ({
-    id: row.id,
-    client_id: row.client_id,
-    title: row.title,
-    clickup_task_id: row.clickup_task_id,
-    clickup_task_name: row.clickup_task_name,
-    status: row.status,
-    created_at: row.created_at,
-    clients: Array.isArray(row.clients) ? row.clients[0] : row.clients,
-  }))
+    const mapped: Approval[] = (data || []).map((row: unknown) => {
+    const r = row as {
+      id: string
+      client_id: string
+      title: string
+      clickup_task_id: string | null
+      clickup_task_name: string | null
+      status: string
+      created_at: string
+      clients: { name: string; business_name: string } | { name: string; business_name: string }[] | null
+    }
+    return {
+      id: r.id,
+      client_id: r.client_id,
+      title: r.title,
+      clickup_task_id: r.clickup_task_id,
+      clickup_task_name: r.clickup_task_name,
+      status: r.status,
+      created_at: r.created_at,
+      // Fix: Convert null to undefined to match Approval interface
+      clients: (Array.isArray(r.clients) ? r.clients[0] : r.clients) || undefined,
+    }
+  })
 
   setApprovals(mapped)
 }
-
-
 
   const filteredApprovals = approvals.filter((a) => {
     const q = searchQuery.toLowerCase()
@@ -777,6 +789,7 @@ const handleDeleteApproval = async (approvalId: string) => {
           }`}
         >
           {u.profile_picture_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={u.profile_picture_url}
               alt={u.name}
@@ -905,7 +918,7 @@ const handleDeleteApproval = async (approvalId: string) => {
 )}
 
 {deleteConfirm && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
     <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm shadow-2xl">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">Delete Approval?</h3>

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, Zap, MessageCircle, Copy, Trash2, X, Check, Sparkles, Loader2 } from 'lucide-react'
+import { Plus, MessageCircle, Copy, Trash2, X, Check, Sparkles, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Client {
@@ -24,50 +24,91 @@ interface MessageTemplate {
   created_at: string
 }
 
+interface AutomationRow {
+  id: string
+  client_id: string
+  keyword: string
+  response_content: string
+  created_at: string
+}
+
 export default function AutomationsPage() {
+  const supabase = useMemo(() => createClient(), [])
+
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState('')
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [templates, setTemplates] = useState<MessageTemplate[]>([])
   const [showModal, setShowModal] = useState(false)
   const [newKeyword, setNewKeyword] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const supabase = createClient()
 
-  useEffect(() => {
-    fetchClients()
-  }, [])
-
-  useEffect(() => {
-    if (selectedClientId) {
-      const client = clients.find(c => c.id === selectedClientId)
-      setSelectedClient(client || null)
-      fetchTemplates()
-    }
+  // Derived state (avoids setState-in-effect patterns)
+  const selectedClient = useMemo(() => {
+    if (!selectedClientId) return null
+    return clients.find((c) => c.id === selectedClientId) ?? null
   }, [selectedClientId, clients])
 
-  const fetchClients = async () => {
-    const { data } = await supabase.from('clients').select('id, name, business_name, industry, target_audience').order('name')
-    if (data) setClients(data)
-  }
+  const fetchClients = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name, business_name, industry, target_audience')
+      .order('name')
 
-  const fetchTemplates = async () => {
-    const { data } = await supabase
-      .from('automations')
-      .select('*')
-      .eq('client_id', selectedClientId)
-    if (data) {
-      setTemplates(data.map(t => ({
-        id: t.id,
-        client_id: t.client_id,
-        keyword: t.keyword,
-        message: t.response_content,
-        created_at: t.created_at
-      })))
+    if (error) {
+      console.error('fetchClients error:', error)
+      return
     }
-  }
+
+    if (data) setClients(data as Client[])
+  }, [supabase])
+
+  const fetchTemplates = useCallback(
+    async (clientId: string) => {
+      const { data, error } = await supabase.from('automations').select('*').eq('client_id', clientId)
+
+      if (error) {
+        console.error('fetchTemplates error:', error)
+        return
+      }
+
+      if (data) {
+  const rows = data as unknown as AutomationRow[]
+
+  setTemplates(
+    rows.map((t) => ({
+      id: t.id,
+      client_id: t.client_id,
+      keyword: t.keyword,
+      message: t.response_content,
+      created_at: t.created_at,
+    }))
+  )
+} else {
+  setTemplates([])
+}
+    },
+    [supabase]
+  )
+
+  useEffect(() => {
+    // keep lints happy (deps included) and avoid sync state changes in effect body
+    queueMicrotask(() => {
+      void fetchClients()
+    })
+  }, [fetchClients])
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setTemplates([])
+      return
+    }
+
+    queueMicrotask(() => {
+      void fetchTemplates(selectedClientId)
+    })
+  }, [selectedClientId, fetchTemplates])
 
   const generateMessages = async () => {
     if (!selectedClient || !newKeyword) return
@@ -104,15 +145,14 @@ etc.`,
         }),
       })
 
-      const data = await response.json()
-      
+      const data = (await response.json()) as { success?: boolean; content?: string }
+
       if (data.success && data.content) {
-        // Parse the messages from the response
         const messages = data.content
           .split(/MESSAGE \d+:/i)
-          .filter((m: string) => m.trim())
-          .map((m: string) => m.trim())
-        
+          .filter((m) => m.trim())
+          .map((m) => m.trim())
+
         setGeneratedMessages(messages.slice(0, 5))
       }
     } catch (error) {
@@ -132,7 +172,7 @@ etc.`,
       active: true,
     })
 
-    fetchTemplates()
+    await fetchTemplates(selectedClientId)
     setShowModal(false)
     setNewKeyword('')
     setGeneratedMessages([])
@@ -146,17 +186,14 @@ etc.`,
 
   const handleDelete = async (id: string) => {
     await supabase.from('automations').delete().eq('id', id)
-    fetchTemplates()
+    await fetchTemplates(selectedClientId)
   }
 
   return (
     <>
-      <Header 
-        title="Message Suggestions" 
-        subtitle="AI-generated DM templates for your content"
-      />
+      <Header title="Message Suggestions" subtitle="AI-generated DM templates for your content" />
+
       <div className="p-8">
-        {/* Client Selection */}
         <Card className="mb-6">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -174,6 +211,7 @@ etc.`,
                   ))}
                 </select>
               </div>
+
               <Button onClick={() => setShowModal(true)} disabled={!selectedClientId}>
                 <Plus className="h-5 w-5 mr-2" />
                 Generate New Templates
@@ -182,11 +220,10 @@ etc.`,
           </CardContent>
         </Card>
 
-        {/* Saved Templates */}
         {selectedClientId && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">Saved Templates</h3>
-            
+
             {templates.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
@@ -207,12 +244,9 @@ etc.`,
                         </div>
                         <p className="text-gray-700">{template.message}</p>
                       </div>
+
                       <div className="flex items-center gap-2 ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCopy(template.id, template.message)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleCopy(template.id, template.message)}>
                           {copiedId === template.id ? (
                             <>
                               <Check className="h-4 w-4 mr-1" />
@@ -225,6 +259,7 @@ etc.`,
                             </>
                           )}
                         </Button>
+
                         <button
                           onClick={() => handleDelete(template.id)}
                           className="p-2 rounded-lg bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors"
@@ -240,7 +275,6 @@ etc.`,
           </div>
         )}
 
-        {/* How To Use */}
         <Card className="mt-8">
           <CardHeader>
             <h3 className="text-lg font-semibold text-gray-900">How To Use</h3>
@@ -251,14 +285,18 @@ etc.`,
                 <div className="h-10 w-10 rounded-full bg-[#E8F1FF] flex items-center justify-center mx-auto mb-3">
                   <span className="text-[#2B79F7] font-bold">1</span>
                 </div>
-                <p className="text-sm text-gray-600">Add a CTA to your content: "Comment GUIDE for the free PDF"</p>
+                <p className="text-sm text-gray-600">
+                  Add a CTA to your content: &quot;Comment GUIDE for the free PDF&quot;
+                </p>
               </div>
+
               <div className="text-center">
                 <div className="h-10 w-10 rounded-full bg-[#E8F1FF] flex items-center justify-center mx-auto mb-3">
                   <span className="text-[#2B79F7] font-bold">2</span>
                 </div>
                 <p className="text-sm text-gray-600">Generate AI message templates for that keyword</p>
               </div>
+
               <div className="text-center">
                 <div className="h-10 w-10 rounded-full bg-[#E8F1FF] flex items-center justify-center mx-auto mb-3">
                   <span className="text-[#2B79F7] font-bold">3</span>
@@ -269,18 +307,24 @@ etc.`,
           </CardContent>
         </Card>
 
-        {/* Generate Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <Card className="w-full max-w-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-gray-900">Generate Message Templates</h3>
-                  <button onClick={() => { setShowModal(false); setGeneratedMessages([]); setNewKeyword('') }} className="p-1 hover:bg-gray-100 rounded">
+                  <button
+                    onClick={() => {
+                      setShowModal(false)
+                      setGeneratedMessages([])
+                      setNewKeyword('')
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded"
+                  >
                     <X className="h-5 w-5 text-gray-400" />
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   <Input
                     label="Trigger Keyword"
@@ -288,10 +332,10 @@ etc.`,
                     onChange={(e) => setNewKeyword(e.target.value.toUpperCase())}
                     placeholder="GUIDE, TIPS, FREE, etc."
                   />
-                  
+
                   {!generatedMessages.length && (
-                    <Button 
-                      onClick={generateMessages} 
+                    <Button
+                      onClick={generateMessages}
                       isLoading={isGenerating}
                       disabled={!newKeyword}
                       className="w-full"
@@ -311,8 +355,9 @@ etc.`,
                   {generatedMessages.length > 0 && (
                     <div className="space-y-3">
                       <p className="text-sm font-medium text-gray-700">Choose a template to save:</p>
+
                       {generatedMessages.map((msg, idx) => (
-                        <div 
+                        <div
                           key={idx}
                           className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-[#2B79F7] cursor-pointer transition-colors"
                           onClick={() => saveTemplate(msg)}
@@ -326,7 +371,14 @@ etc.`,
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button variant="outline" onClick={() => { setShowModal(false); setGeneratedMessages([]); setNewKeyword('') }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowModal(false)
+                      setGeneratedMessages([])
+                      setNewKeyword('')
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>

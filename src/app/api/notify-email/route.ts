@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+interface NotificationPayload {
+  secret?: string
+  [key: string]: unknown
+}
+
 export async function POST(req: NextRequest) {
   try {
     const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
@@ -14,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const type = body?.type as string
-    const payload = (body?.payload || {}) as Record<string, any>
+    const payload = (body?.payload || {}) as NotificationPayload
 
     if (!type) {
       return NextResponse.json(
@@ -57,10 +62,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('notify-email route error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

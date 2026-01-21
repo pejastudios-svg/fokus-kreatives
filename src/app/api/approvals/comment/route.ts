@@ -2,6 +2,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// Types for Supabase responses
+interface ClientRef {
+  name: string | null
+  business_name: string | null
+}
+
+interface UserProfile {
+  name: string | null
+  email: string | null
+}
+
+interface AssigneeRow {
+  user_id: string
+  users: UserProfile | UserProfile[] | null
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+  role: string
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -71,11 +93,16 @@ export async function POST(req: NextRequest) {
       .eq('id', approvalId)
       .single()
 
-    const relClients: any = (approval as any)?.clients
-    const clientDisplayName =
-      (Array.isArray(relClients)
-        ? relClients[0]?.business_name || relClients[0]?.name
-        : relClients?.business_name || relClients?.name) || 'Client'
+    const approvalWithClients = approval as unknown as { clients: ClientRef | ClientRef[] | null }
+    const relClients = approvalWithClients?.clients
+    
+    let clientDisplayName = 'Client'
+    if (Array.isArray(relClients) && relClients.length > 0) {
+      clientDisplayName = relClients[0]?.business_name || relClients[0]?.name || 'Client'
+    } else if (relClients && !Array.isArray(relClients)) {
+      const singleClient = relClients as ClientRef
+      clientDisplayName = singleClient.business_name || singleClient.name || 'Client'
+    }
 
     // Mentions-only notifications (if no @mentions, notify nobody)
     const mentionTokens = extractMentions(content)
@@ -91,9 +118,9 @@ export async function POST(req: NextRequest) {
 
     const tokenToUserId = new Map<string, string>()
 
-    for (const row of assigneesRows || []) {
-      const u = (row as any).users
-      const uid = (row as any).user_id as string
+    for (const row of (assigneesRows || []) as unknown as AssigneeRow[]) {
+      const u = row.users
+      const uid = row.user_id
 
       const name = (Array.isArray(u) ? u[0]?.name : u?.name) || ''
       const email = (Array.isArray(u) ? u[0]?.email : u?.email) || ''
@@ -155,13 +182,13 @@ export async function POST(req: NextRequest) {
         .in('id', mentionTargetIds)
 
       const clientEmails = (mentionUsers || [])
-        .filter((u: any) => u.role === 'client')
-        .map((u: any) => u.email)
+        .filter((u: UserRow) => u.role === 'client')
+        .map((u: UserRow) => u.email)
         .filter(Boolean)
 
       const teamEmails = (mentionUsers || [])
-        .filter((u: any) => u.role !== 'client')
-        .map((u: any) => u.email)
+        .filter((u: UserRow) => u.role !== 'client')
+        .map((u: UserRow) => u.email)
         .filter(Boolean)
 
       const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
@@ -209,10 +236,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, comment: commentRow })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Create comment error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

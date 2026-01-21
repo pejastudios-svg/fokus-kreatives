@@ -63,8 +63,9 @@ export async function updateClickUpStatus(taskId: string, waitingOrApproved: 'wa
     }
 
     return { success: true }
-  } catch (err: any) {
+    } catch (err: unknown) {
     console.error('ClickUp updateStatus error', err)
-    return { success: false, error: err?.message || 'Unknown error' }
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+    return { success: false, error: errorMessage }
   }
 }

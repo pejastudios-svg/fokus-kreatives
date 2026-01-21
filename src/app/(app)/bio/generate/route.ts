@@ -113,7 +113,7 @@ function buildBioTemplates(opts: {
   linkLine: string
 }): BioTemplate[] {
   const {
-    displayName, industry, targetAudience, socialProof, uniqueMechanisms, tier, linkLine
+    displayName, industry, socialProof, uniqueMechanisms, tier, linkLine
   } = opts
 
   const category = pickCategory(industry)
@@ -293,8 +293,16 @@ export async function POST(req: NextRequest) {
 
     // Guarantee 8 always
     return NextResponse.json({ success: true, templates })
-  } catch (e: any) {
-    console.error('bio/generate error', e)
-    return NextResponse.json({ success: false, error: e?.message || 'Server error' }, { status: 500 })
-  }
+ } catch (e: unknown) {
+  console.error('bio/generate error', e)
+
+  const message =
+    e instanceof Error
+      ? e.message
+      : typeof e === 'object' && e !== null && 'message' in e
+        ? String((e as Record<string, unknown>).message)
+        : 'Server error'
+
+  return NextResponse.json({ success: false, error: message }, { status: 500 })
+}
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
@@ -23,7 +24,8 @@ type MemberRow = {
 
 export default function CRMTeamPage() {
   const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+   const routeParams = params as Record<string, string>
+  const clientId = routeParams.clientid || routeParams.clientId
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -125,11 +127,25 @@ export default function CRMTeamPage() {
     }
 
     const rows: MemberRow[] = (data || [])
-      .map((m: any) => {
-        const u = Array.isArray(m.users) ? m.users[0] : m.users
+      .map((m) => {
+        type DbUser = {
+          id: string
+          email: string
+          name: string | null
+          profile_picture_url: string | null
+          invitation_token: string | null
+          invitation_accepted: boolean
+          created_at: string
+        }
+        // Cast to expected shape to avoid implicit any
+        const item = m as { role: string; users: DbUser | DbUser[] | null }
+        const u = Array.isArray(item.users) ? item.users[0] : item.users
+        
         if (!u?.id) return null
-        const r = m.role as string
+        
+        const r = item.role
         const crmRole: CRMRole = r === 'admin' ? 'admin' : 'manager'
+        
         return {
           id: u.id,
           email: u.email,
@@ -141,7 +157,7 @@ export default function CRMTeamPage() {
           crm_role: crmRole,
         }
       })
-      .filter(Boolean)
+      .filter((row): row is MemberRow => row !== null)
 
     // sort newest first
     rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -430,7 +446,14 @@ export default function CRMTeamPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {member.profile_picture_url ? (
-                          <img src={member.profile_picture_url} alt={member.name || member.email} className="h-9 w-9 rounded-full object-cover" />
+                          <Image 
+                            src={member.profile_picture_url} 
+                            alt={member.name || member.email} 
+                            width={36} 
+                            height={36} 
+                            className="h-9 w-9 rounded-full object-cover" 
+                            unoptimized 
+                          />
                         ) : (
                           <div className="h-9 w-9 rounded-full bg-brand-gradient flex items-center justify-center text-white text-sm font-medium">
                             {avatarLetter}

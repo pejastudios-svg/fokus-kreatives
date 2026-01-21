@@ -2,6 +2,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// Types for Supabase responses
+interface ClientRef {
+  name: string | null
+  business_name: string | null
+}
+
+interface AssigneeRow {
+  user_id: string
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -64,13 +79,17 @@ export async function POST(req: NextRequest) {
       .single()
 
     let clientDisplayName = 'Client'
-    const relClients: any = approval?.clients
+    // Cast approval to unknown first, then to the shape we expect
+    const approvalWithClients = approval as unknown as { clients: ClientRef | ClientRef[] | null }
+    const relClients = approvalWithClients?.clients
+
     if (Array.isArray(relClients) && relClients.length > 0) {
       clientDisplayName =
         relClients[0].business_name || relClients[0].name || 'Client'
-    } else if (relClients) {
+    } else if (relClients && !Array.isArray(relClients)) {
+      const singleClient = relClients as ClientRef
       clientDisplayName =
-        relClients.business_name || relClients.name || 'Client'
+        singleClient.business_name || singleClient.name || 'Client'
     }
 
     // 3) Load watchers (creator, assignees, client portal users)
@@ -80,7 +99,7 @@ export async function POST(req: NextRequest) {
       .eq('approval_id', approvalId)
 
     const watcherIds = (assigneesRows || [])
-      .map((r: any) => r.user_id)
+      .map((r: AssigneeRow) => r.user_id)
       .filter(Boolean)
 
     const uniqueWatcherIds = Array.from(new Set(watcherIds))
@@ -168,7 +187,7 @@ try {
           .in('id', uniqueWatcherIds)
 
         const emails = (watcherUsers || [])
-          .map((u: any) => u.email)
+          .map((u: UserRow) => u.email)
           .filter((e: string | null) => !!e)
 
         if (emails.length > 0) {
@@ -193,10 +212,11 @@ try {
     }
 
     return NextResponse.json({ success: true, comment: commentRow })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Create approval comment error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

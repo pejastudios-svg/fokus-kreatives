@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -26,12 +26,23 @@ export default function CompetitorsPage() {
   const [analysis, setAnalysis] = useState('')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  const supabase = createClient()
+  // Fix: Memoize supabase client to prevent infinite loop
+  const supabase = useMemo(() => createClient(), [])
   const [transcript, setTranscript] = useState('')
 
+  // Fix: Wrap fetchClients in useCallback to include it in dependencies
+  const fetchClients = useCallback(async () => {
+    const { data } = await supabase
+      .from('clients')
+      .select('id, name, business_name, industry')
+      .order('name')
+    if (data) setClients(data)
+  }, [supabase])
+
+  // Fix: Added fetchClients to dependency array
   useEffect(() => {
     fetchClients()
-  }, [])
+  }, [fetchClients])
 
   useEffect(() => {
     if (selectedClientId) {
@@ -39,14 +50,6 @@ export default function CompetitorsPage() {
       setSelectedClient(client || null)
     }
   }, [selectedClientId, clients])
-
-  const fetchClients = async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, business_name, industry')
-      .order('name')
-    if (data) setClients(data)
-  }
 
   const handleAnalyze = async () => {
     if (!selectedClient || !competitorHandle) return
@@ -215,7 +218,7 @@ export default function CompetitorsPage() {
               </Button>
               {analysis && (
                 <Button 
-                  variant="outline"
+                  variant="outline" 
                   onClick={handleSaveToClient}
                   isLoading={isSaving}
                 >

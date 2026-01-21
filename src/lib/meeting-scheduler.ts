@@ -1,7 +1,12 @@
 // lib/meeting-scheduler.ts
 import { createClient } from '@/lib/supabase/client'
 
-export async function scheduleMeeting(platform: string, meetingData: any, clientId: string) {
+export async function scheduleMeeting(
+  platform: string, 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  meetingData: Record<string, any>, 
+  clientId: string
+) {
   let meetingUrl = ''
   
   try {
@@ -33,10 +38,10 @@ export async function scheduleMeeting(platform: string, meetingData: any, client
     return { success: true, meeting: data }
     
   } catch (error) {
-  console.error('Meeting scheduling error:', error)
-  return {
-    success: false,
-    error: error instanceof Error ? error.message : 'Unknown error',
+    console.error('Meeting scheduling error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
   }
-}
 }

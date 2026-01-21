@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Loading } from '@/components/ui/Loading'
@@ -33,7 +33,7 @@ interface Payment {
   lead_id: string | null
   created_at: string
   lead?: {
-    data: Record<string, any>
+    data: Record<string, unknown>
   }
   is_recurring?: boolean
   recurrence_type?: 'days' | 'weeks' | 'months' | null
@@ -43,7 +43,7 @@ interface Payment {
 
 interface LeadOption {
   id: string
-  data: Record<string, any>
+  data: Record<string, unknown>
 }
 
 const statusConfig = {
@@ -54,8 +54,8 @@ const statusConfig = {
 }
 
 export default function CRMRevenue() {
-const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const params = useParams()
+  const clientId = ((params as Record<string, string>).clientid || (params as Record<string, string>).clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -69,7 +69,7 @@ const params = useParams()
   const [leadSearch, setLeadSearch] = useState('')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
-    // Logged-in user email (for notifications)
+  // Logged-in user email (for notifications)
   const [userEmail, setUserEmail] = useState<string | null>(null)
 
   useEffect(() => {
@@ -85,7 +85,7 @@ const params = useParams()
   const [newPayment, setNewPayment] = useState({
     amount: '',
     currency: 'USD',
-    status: 'pending' as const,
+    status: 'pending' as Payment['status'],
     due_date: '',
     notes: '',
     invoice_number: '',
@@ -95,14 +95,8 @@ const params = useParams()
     recurrence_interval: 1,
   })
 
-  useEffect(() => {
-    if (clientId) {
-      loadPayments()
-      loadLeads()
-    }
-  }, [clientId])
-
-  const loadPayments = async () => {
+  // Define loaders using useCallback to fix dependency warnings
+  const loadPayments = useCallback(async () => {
     setIsLoading(true)
     const { data } = await supabase
       .from('payments')
@@ -111,16 +105,18 @@ const params = useParams()
       .order('created_at', { ascending: false })
 
     const now = new Date()
-    const processed: Payment[] = (data || []).map((p: any) => {
-      if (p.status === 'pending' && p.due_date && new Date(p.due_date) < now) {
-        return { ...p, status: 'overdue' as const }
+    // Explicit cast to Payment[] to handle the unknown lead data
+    const processed: Payment[] = (data || []).map((p) => {
+      const payment = p as Payment
+      if (payment.status === 'pending' && payment.due_date && new Date(payment.due_date) < now) {
+        return { ...payment, status: 'overdue' as const }
       }
-      return p
+      return payment
     })
 
     setPayments(processed)
 
-    // Compute next upcoming payment: pending + future due_date
+    // Compute next upcoming payment
     const upcoming = processed
       .filter(p => p.status === 'pending' && p.due_date && new Date(p.due_date) >= now)
       .sort(
@@ -131,9 +127,9 @@ const params = useParams()
 
     setNextPayment(upcoming[0] || null)
     setIsLoading(false)
-  }
+  }, [clientId, supabase])
 
-  const loadLeads = async () => {
+  const loadLeads = useCallback(async () => {
     const { data } = await supabase
       .from('leads')
       .select('id, data')
@@ -141,14 +137,23 @@ const params = useParams()
       .order('created_at', { ascending: false })
 
     setLeads((data || []) as LeadOption[])
-  }
+  }, [clientId, supabase])
 
+  useEffect(() => {
+    if (clientId) {
+      loadPayments()
+      loadLeads()
+    }
+  }, [clientId, loadPayments, loadLeads])
+
+  // Fix: Safe casting of unknown lead data
   const filteredLeadOptions = useMemo(() => {
     const q = leadSearch.toLowerCase()
     return leads.filter((lead) => {
-      const name = (lead.data?.name || '').toLowerCase()
-      const email = (lead.data?.email || '').toLowerCase()
-      const platform = (lead.data?.platform || '').toLowerCase()
+      const data = (lead.data || {}) as Record<string, string>
+      const name = (data.name || '').toLowerCase()
+      const email = (data.email || '').toLowerCase()
+      const platform = (data.platform || '').toLowerCase()
       return (
         !q ||
         name.includes(q) ||
@@ -158,74 +163,79 @@ const params = useParams()
     })
   }, [leads, leadSearch])
 
-    const handleAddPayment = async () => {
+  const handleAddPayment = async () => {
     if (!newPayment.amount) return
+    setIsSavingPayment(true)
 
-    const { data, error } = await supabase
-      .from('payments')
-      .insert({
-        client_id: clientId,
-        lead_id: selectedLeadId || null,
-        amount: parseFloat(newPayment.amount),
-        currency: newPayment.currency,
-        status: newPayment.status,
-        due_date: newPayment.due_date || null,
-        notes: newPayment.notes || null,
-        invoice_number: newPayment.invoice_number || null,
-        reminder_enabled: newPayment.reminder_enabled,
-        is_recurring: newPayment.is_recurring,
-        recurrence_type: newPayment.is_recurring ? newPayment.recurrence_type : null,
-        recurrence_interval: newPayment.is_recurring ? newPayment.recurrence_interval : null,
-        recurring_count: 0,
-      })
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          client_id: clientId,
+          lead_id: selectedLeadId || null,
+          amount: parseFloat(newPayment.amount),
+          currency: newPayment.currency,
+          status: newPayment.status,
+          due_date: newPayment.due_date || null,
+          notes: newPayment.notes || null,
+          invoice_number: newPayment.invoice_number || null,
+          reminder_enabled: newPayment.reminder_enabled,
+          is_recurring: newPayment.is_recurring,
+          recurrence_type: newPayment.is_recurring ? newPayment.recurrence_type : null,
+          recurrence_interval: newPayment.is_recurring ? newPayment.recurrence_interval : null,
+          recurring_count: 0,
+        })
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Failed to add payment:', error)
-      return
-    }
-
-    if (data) {
-      // Update local state
-      setPayments(prev => [data as Payment, ...prev])
-      setShowAddModal(false)
-      setNewPayment({
-        amount: '',
-        currency: 'USD',
-        status: 'pending',
-        due_date: '',
-        notes: '',
-        invoice_number: '',
-        reminder_enabled: true,
-        is_recurring: false,
-        recurrence_type: 'months',
-        recurrence_interval: 1,
-      })
-      setSelectedLeadId(null)
-      setLeadSearch('')
-
-      // Fire-and-forget email notification
-      try {
-        if (userEmail) {
-          await fetch('/api/notify-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'payment_created',
-              payload: {
-                to: userEmail,
-                amount: data.amount,
-                currency: data.currency,
-                dueDate: data.due_date,
-                clientName: '', // optional: wire client name later
-              },
-            }),
-          })
-        }
-      } catch (err) {
-        console.error('Failed to send payment_created email', err)
+      if (error) {
+        console.error('Failed to add payment:', error)
+        return
       }
+
+      if (data) {
+        // Update local state
+        setPayments(prev => [data as Payment, ...prev])
+        setShowAddModal(false)
+        setNewPayment({
+          amount: '',
+          currency: 'USD',
+          status: 'pending',
+          due_date: '',
+          notes: '',
+          invoice_number: '',
+          reminder_enabled: true,
+          is_recurring: false,
+          recurrence_type: 'months',
+          recurrence_interval: 1,
+        })
+        setSelectedLeadId(null)
+        setLeadSearch('')
+
+        // Email notification
+        try {
+          if (userEmail) {
+            await fetch('/api/notify-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'payment_created',
+                payload: {
+                  to: userEmail,
+                  amount: data.amount,
+                  currency: data.currency,
+                  dueDate: data.due_date,
+                  clientName: '', 
+                },
+              }),
+            })
+          }
+        } catch (err) {
+          console.error('Failed to send payment_created email', err)
+        }
+      }
+    } finally {
+      setIsSavingPayment(false)
     }
   }
 
@@ -264,7 +274,6 @@ const params = useParams()
       updates.paid_date = null
     }
 
-    // Optimistic update
     const updated = payments.map(p =>
       p.id === paymentId ? { ...p, ...updates } : p
     )
@@ -281,7 +290,7 @@ const params = useParams()
       return
     }
 
-    // If paid & recurring, create next payment
+    // Handle recurring logic
     if (
       status === 'paid' &&
       payment.is_recurring &&
@@ -322,7 +331,6 @@ const params = useParams()
       }
     }
 
-    // Recompute nextPayment from updated list
     const now = new Date()
     const processed = updated.map(p => {
       if (p.status === 'pending' && p.due_date && new Date(p.due_date) < now) {
@@ -347,7 +355,6 @@ const params = useParams()
 
     const newValue = !payment.reminder_enabled
 
-    // Optimistic
     const updated = payments.map(p =>
       p.id === paymentId ? { ...p, reminder_enabled: newValue } : p
     )
@@ -409,466 +416,474 @@ const params = useParams()
   }
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full">
-          <Loading size="lg" text="Loading revenue..." />
-        </div>
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loading size="lg" text="Loading revenue..." />
+      </div>
+    )
   }
 
-  return <div className="p-6 lg:p-8 min-h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Revenue</h1>
-            <p className="text-gray-400 mt-1">Track payments and invoices</p>
-          </div>
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Payment
-          </Button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {nextPayment && (
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Next Payment</h3>
-              <p className="text-2xl font-bold text-white">
-                ${nextPayment.amount.toLocaleString()}{' '}
-                <span className="text-sm text-gray-400">{nextPayment.currency}</span>
-              </p>
-              <p className="text-gray-400 mt-1">
-                Due on {new Date(nextPayment.due_date as string).toLocaleDateString()}
-              </p>
-              {nextPayment.notes && (
-                <p className="text-gray-500 text-sm mt-2">{nextPayment.notes}</p>
-              )}
-            </div>
-          )}
-
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-400" />
-              </div>
-              <span className="text-gray-400 text-sm">Total Revenue</span>
-            </div>
-            <p className="text-3xl font-bold text-white">
-              ${stats.total.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-blue-400" />
-              </div>
-              <span className="text-gray-400 text-sm">This Month</span>
-            </div>
-            <p className="text-3xl font-bold text-white">
-              ${stats.thisMonth.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-yellow-500/20 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-400" />
-              </div>
-              <span className="text-gray-400 text-sm">Pending</span>
-            </div>
-            <p className="text-3xl font-bold text-yellow-400">
-              ${stats.pending.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-              </div>
-              <span className="text-gray-400 text-sm">Overdue</span>
-            </div>
-            <p className="text-3xl font-bold text-red-400">
-              ${stats.overdue.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {/* Filter */}
-        <div className="flex gap-2 mb-6">
-          {(['all', 'pending', 'paid', 'overdue'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-[#2B79F7] text-white'
-                  : 'bg-[#1E293B] text-gray-400 hover:text-white border border-[#334155]'
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* Payments Table */}
-        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#334155] bg-[#0F172A]">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Amount
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Lead
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Status
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Due Date
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Invoice
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Notes
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
-                  Reminder
-                </th>
-                <th className="w-20" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#334155]">
-              {filteredPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
-                    <DollarSign className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-                    <p className="text-gray-400">No payments found</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredPayments.map((payment) => {
-  const config = statusConfig[payment.status]
-  const isTemp = payment.id.startsWith('temp-')
-
   return (
-    <tr
-      key={payment.id}
-      className={`hover:bg-[#334155]/30 transition-colors group ${
-        isTemp ? 'opacity-60 pointer-events-none' : ''
-      }`}
-    >
-                      <td className="px-6 py-4">
-                        <span className="text-xl font-bold text-white">
-                          ${payment.amount.toLocaleString()}
-                        </span>
-                        <span className="text-gray-500 text-sm ml-1">
-                          {payment.currency}
-                        </span>
-                      </td>
+    <div className="p-6 lg:p-8 min-h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Revenue</h1>
+          <p className="text-gray-400 mt-1">Track payments and invoices</p>
+        </div>
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Payment
+        </Button>
+      </div>
 
-                      <td className="px-6 py-4 text-gray-300">
-                        {payment.lead?.data?.name || '—'}
-                        {payment.lead?.data?.email && (
-                          <div className="text-xs text-gray-500">
-                            {payment.lead.data.email}
-                          </div>
-                        )}
-                      </td>
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {nextPayment && (
+          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+            <h3 className="text-lg font-semibold text-white mb-2">Next Payment</h3>
+            <p className="text-2xl font-bold text-white">
+              ${nextPayment.amount.toLocaleString()}{' '}
+              <span className="text-sm text-gray-400">{nextPayment.currency}</span>
+            </p>
+            <p className="text-gray-400 mt-1">
+              Due on {new Date(nextPayment.due_date as string).toLocaleDateString()}
+            </p>
+            {nextPayment.notes && (
+              <p className="text-gray-500 text-sm mt-2">{nextPayment.notes}</p>
+            )}
+          </div>
+        )}
 
-                      <td className="px-6 py-4">
-                        <select
-                          value={payment.status}
-                          onChange={(e) =>
-                            handleUpdateStatus(
-                              payment.id,
-                              e.target.value as Payment['status']
-                            )
-                          }
-                          className={`${config.bg} text-sm font-medium px-3 py-1.5 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]`}
-                          style={{ color: config.color }}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="paid">Paid</option>
-                          <option value="overdue">Overdue</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-300">
-                        {payment.due_date
-                          ? new Date(payment.due_date).toLocaleDateString()
-                          : '—'}
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-400">
-                        {payment.invoice_number || '—'}
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-400 max-w-xs truncate">
-                        {payment.notes || '—'}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggleReminder(payment.id)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            payment.reminder_enabled
-                              ? 'bg-[#2B79F7]/20 text-[#2B79F7]'
-                              : 'bg-gray-700 text-gray-400'
-                          }`}
-                        >
-                          {payment.reminder_enabled ? (
-                            <Bell className="h-4 w-4" />
-                          ) : (
-                            <BellOff className="h-4 w-4" />
-                          )}
-                        </button>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleDeletePayment(payment.id)}
-                          className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-green-400" />
+            </div>
+            <span className="text-gray-400 text-sm">Total Revenue</span>
+          </div>
+          <p className="text-3xl font-bold text-white">
+            ${stats.total.toLocaleString()}
+          </p>
         </div>
 
-        {/* Add Payment Modal */}
-        {showAddModal && (
-          <Modal onClose={() => setShowAddModal(false)} title="Add Payment">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Amount
-                  </label>
-                  <input
-                    type="number"
-                    value={newPayment.amount}
-                    onChange={(e) =>
-                      setNewPayment({ ...newPayment, amount: e.target.value })
-                    }
-                    placeholder="0.00"
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={newPayment.currency}
-                    onChange={(e) =>
-                      setNewPayment({ ...newPayment, currency: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="NGN">NGN</option>
-                  </select>
-                </div>
-              </div>
+        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-blue-400" />
+            </div>
+            <span className="text-gray-400 text-sm">This Month</span>
+          </div>
+          <p className="text-3xl font-bold text-white">
+            ${stats.thisMonth.toLocaleString()}
+          </p>
+        </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Status
-                  </label>
-                  <select
-                    value={newPayment.status}
-                    onChange={(e) =>
-                      setNewPayment({
-                        ...newPayment,
-                        status: e.target.value as any,
-                      })
-                    }
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newPayment.due_date}
-                    onChange={(e) =>
-                      setNewPayment({ ...newPayment, due_date: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  />
-                </div>
-              </div>
+        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <Clock className="h-5 w-5 text-yellow-400" />
+            </div>
+            <span className="text-gray-400 text-sm">Pending</span>
+          </div>
+          <p className="text-3xl font-bold text-yellow-400">
+            ${stats.pending.toLocaleString()}
+          </p>
+        </div>
 
-              {/* Lead selector */}
+        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+            </div>
+            <span className="text-gray-400 text-sm">Overdue</span>
+          </div>
+          <p className="text-3xl font-bold text-red-400">
+            ${stats.overdue.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-2 mb-6">
+        {(['all', 'pending', 'paid', 'overdue'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              filter === f
+                ? 'bg-[#2B79F7] text-white'
+                : 'bg-[#1E293B] text-gray-400 hover:text-white border border-[#334155]'
+            }`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Payments Table */}
+      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#334155] bg-[#0F172A]">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Amount
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Lead
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Status
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Due Date
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Invoice
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Notes
+              </th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+                Reminder
+              </th>
+              <th className="w-20" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#334155]">
+            {filteredPayments.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center">
+                  <DollarSign className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No payments found</p>
+                </td>
+              </tr>
+            ) : (
+              filteredPayments.map((payment) => {
+                const config = statusConfig[payment.status]
+                const isTemp = payment.id.startsWith('temp-')
+                const leadData = (payment.lead?.data || {}) as Record<string, string>
+
+                return (
+                  <tr
+                    key={payment.id}
+                    className={`hover:bg-[#334155]/30 transition-colors group ${
+                      isTemp ? 'opacity-60 pointer-events-none' : ''
+                    }`}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="text-xl font-bold text-white">
+                        ${payment.amount.toLocaleString()}
+                      </span>
+                      <span className="text-gray-500 text-sm ml-1">
+                        {payment.currency}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-300">
+                      {leadData.name || '—'}
+                      {leadData.email && (
+                        <div className="text-xs text-gray-500">
+                          {leadData.email}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <select
+                        value={payment.status}
+                        onChange={(e) =>
+                          handleUpdateStatus(
+                            payment.id,
+                            e.target.value as Payment['status']
+                          )
+                        }
+                        className={`${config.bg} text-sm font-medium px-3 py-1.5 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]`}
+                        style={{ color: config.color }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-300">
+                      {payment.due_date
+                        ? new Date(payment.due_date).toLocaleDateString()
+                        : '—'}
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-400">
+                      {payment.invoice_number || '—'}
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-400 max-w-xs truncate">
+                      {payment.notes || '—'}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggleReminder(payment.id)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          payment.reminder_enabled
+                            ? 'bg-[#2B79F7]/20 text-[#2B79F7]'
+                            : 'bg-gray-700 text-gray-400'
+                        }`}
+                      >
+                        {payment.reminder_enabled ? (
+                          <Bell className="h-4 w-4" />
+                        ) : (
+                          <BellOff className="h-4 w-4" />
+                        )}
+                      </button>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleDeletePayment(payment.id)}
+                        className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Payment Modal */}
+      {showAddModal && (
+        <Modal onClose={() => setShowAddModal(false)} title="Add Payment">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Lead (optional)
-                </label>
-                <div className="relative mb-2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <input
-                    type="text"
-                    value={leadSearch}
-                    onChange={(e) => setLeadSearch(e.target.value)}
-                    placeholder="Search leads by name, email, platform..."
-                    className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  />
-                </div>
-                <select
-                  value={selectedLeadId || ''}
-                  onChange={(e) =>
-                    setSelectedLeadId(e.target.value || null)
-                  }
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                >
-                  <option value="">No lead linked</option>
-                  {filteredLeadOptions.map((lead) => (
-                    <option key={lead.id} value={lead.id}>
-                      {(lead.data?.name || 'Unnamed') +
-                        (lead.data?.email ? ` — ${lead.data.email}` : '')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Invoice Number
+                  Amount
                 </label>
                 <input
-                  type="text"
-                  value={newPayment.invoice_number}
+                  type="number"
+                  value={newPayment.amount}
                   onChange={(e) =>
-                    setNewPayment({
-                      ...newPayment,
-                      invoice_number: e.target.value,
-                    })
+                    setNewPayment({ ...newPayment, amount: e.target.value })
                   }
-                  placeholder="INV-001"
+                  placeholder="0.00"
                   className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Notes
+                  Currency
                 </label>
-                <textarea
-                  value={newPayment.notes}
+                <select
+                  value={newPayment.currency}
                   onChange={(e) =>
-                    setNewPayment({ ...newPayment, notes: e.target.value })
+                    setNewPayment({ ...newPayment, currency: e.target.value })
                   }
-                  placeholder="Payment notes..."
-                  rows={3}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
-                />
+                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                >
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="NGN">NGN</option>
+                </select>
               </div>
+            </div>
 
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newPayment.reminder_enabled}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Status
+                </label>
+                <select
+                  value={newPayment.status}
                   onChange={(e) =>
                     setNewPayment({
                       ...newPayment,
-                      reminder_enabled: e.target.checked,
+                      status: e.target.value as Payment['status'],
                     })
                   }
-                  className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
-                />
-                <span className="text-gray-300">Enable payment reminders</span>
-              </label>
-
-              {/* Recurring Payment */}
-              <div className="border-t border-[#334155] pt-4 mt-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newPayment.is_recurring}
-                    onChange={(e) =>
-                      setNewPayment(prev => ({
-                        ...prev,
-                        is_recurring: e.target.checked,
-                      }))
-                    }
-                    className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
-                  />
-                  <span className="text-gray-200 text-sm">
-                    Make this a recurring payment
-                  </span>
+                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Due Date
                 </label>
-
-                {newPayment.is_recurring && (
-                  <div className="mt-3 grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">
-                        Every
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={newPayment.recurrence_interval}
-                        onChange={(e) =>
-                          setNewPayment(prev => ({
-                            ...prev,
-                            recurrence_interval: Number(e.target.value) || 1,
-                          }))
-                        }
-                        className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-400 mb-1">
-                        Frequency
-                      </label>
-                      <select
-                        value={newPayment.recurrence_type}
-                        onChange={(e) =>
-                          setNewPayment(prev => ({
-                            ...prev,
-                            recurrence_type: e.target.value as 'days' | 'weeks' | 'months',
-                          }))
-                        }
-                        className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                      >
-                        <option value="days">Day(s)</option>
-                        <option value="weeks">Week(s)</option>
-                        <option value="months">Month(s)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                <input
+                  type="date"
+                  value={newPayment.due_date}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, due_date: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#334155]">
-              <Button
-  onClick={handleAddPayment}
-  isLoading={isSavingPayment}
->
-  Add Payment
-</Button>
+            {/* Lead selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Lead (optional)
+              </label>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  value={leadSearch}
+                  onChange={(e) => setLeadSearch(e.target.value)}
+                  placeholder="Search leads by name, email, platform..."
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                />
+              </div>
+              <select
+                value={selectedLeadId || ''}
+                onChange={(e) =>
+                  setSelectedLeadId(e.target.value || null)
+                }
+                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              >
+                <option value="">No lead linked</option>
+                {filteredLeadOptions.map((lead) => {
+                  const data = (lead.data || {}) as Record<string, string>
+                  return (
+                    <option key={lead.id} value={lead.id}>
+                      {(data.name || 'Unnamed') +
+                        (data.email ? ` — ${data.email}` : '')}
+                    </option>
+                  )
+                })}
+              </select>
             </div>
-          </Modal>
-        )}
-      </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                value={newPayment.invoice_number}
+                onChange={(e) =>
+                  setNewPayment({
+                    ...newPayment,
+                    invoice_number: e.target.value,
+                  })
+                }
+                placeholder="INV-001"
+                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Notes
+              </label>
+              <textarea
+                value={newPayment.notes}
+                onChange={(e) =>
+                  setNewPayment({ ...newPayment, notes: e.target.value })
+                }
+                placeholder="Payment notes..."
+                rows={3}
+                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+              />
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newPayment.reminder_enabled}
+                onChange={(e) =>
+                  setNewPayment({
+                    ...newPayment,
+                    reminder_enabled: e.target.checked,
+                  })
+                }
+                className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
+              />
+              <span className="text-gray-300">Enable payment reminders</span>
+            </label>
+
+            {/* Recurring Payment */}
+            <div className="border-t border-[#334155] pt-4 mt-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newPayment.is_recurring}
+                  onChange={(e) =>
+                    setNewPayment(prev => ({
+                      ...prev,
+                      is_recurring: e.target.checked,
+                    }))
+                  }
+                  className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
+                />
+                <span className="text-gray-200 text-sm">
+                  Make this a recurring payment
+                </span>
+              </label>
+
+              {newPayment.is_recurring && (
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      Every
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newPayment.recurrence_interval}
+                      onChange={(e) =>
+                        setNewPayment(prev => ({
+                          ...prev,
+                          recurrence_interval: Number(e.target.value) || 1,
+                        }))
+                      }
+                      className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      Frequency
+                    </label>
+                    <select
+                      value={newPayment.recurrence_type}
+                      onChange={(e) =>
+                        setNewPayment(prev => ({
+                          ...prev,
+                          recurrence_type: e.target.value as 'days' | 'weeks' | 'months',
+                        }))
+                      }
+                      className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    >
+                      <option value="days">Day(s)</option>
+                      <option value="weeks">Week(s)</option>
+                      <option value="months">Month(s)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#334155]">
+            <Button
+              onClick={handleAddPayment}
+              isLoading={isSavingPayment}
+            >
+              Add Payment
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
 }
 
 // Modal Component – bigger, centered, clean overlay

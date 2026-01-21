@@ -38,10 +38,6 @@ const CONTENT_TYPES = [
   'Engagement Reel',
 ] as const
 
-function safeUpper(s: string) {
-  return (s || '').toUpperCase()
-}
-
 export default function CalendarsPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -194,7 +190,7 @@ export default function CalendarsPage() {
 try {
   data = JSON.parse(text)
 } catch (err) {
-  console.error('Failed to parse JSON from /api/calendars/create')
+  console.error('Failed to parse JSON from /api/calendars/create', err)
   console.error('First 800 chars of response:', text.slice(0, 800))
   setError('Server returned invalid JSON. Check console for details.')
   return

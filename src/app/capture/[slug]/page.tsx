@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -46,10 +47,22 @@ function defaultFields(): CaptureField[] {
   ]
 }
 
-function normalizeFields(f: any): CaptureField[] {
+interface RawFieldData {
+  id?: unknown;
+  type?: unknown;
+  label?: unknown;
+  required?: unknown;
+  placeholder?: unknown;
+  description?: unknown;
+  options?: unknown;
+  embedUrl?: unknown;
+  embedHeight?: unknown;
+}
+
+function normalizeFields(f: unknown): CaptureField[] {
   if (!Array.isArray(f) || f.length === 0) return defaultFields()
-  return f.map((x: any) => ({
-    id: String(x.id),
+  return (f as RawFieldData[]).map((x) => ({
+    id: String(x.id || ''),
     type: (x.type as FieldType) || 'text',
     label: String(x.label || 'Field'),
     required: !!x.required,
@@ -130,7 +143,7 @@ export default function PublicCapturePage() {
   const [success, setSuccess] = useState(false)
   const [leadMagnetUrl, setLeadMagnetUrl] = useState<string | null>(null)
 
-  const [values, setValues] = useState<Record<string, any>>({})
+    const [values, setValues] = useState<Record<string, string>>({})
   const [meeting_date, setMeetingDate] = useState('')
   const [meeting_time, setMeetingTime] = useState('')
 
@@ -206,7 +219,7 @@ export default function PublicCapturePage() {
     ? 'font-inter'
     : ''
 
-  const setValue = (id: string, val: any) => setValues((prev) => ({ ...prev, [id]: val }))
+    const setValue = (id: string, val: string) => setValues((prev) => ({ ...prev, [id]: val }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -317,8 +330,8 @@ export default function PublicCapturePage() {
 
             {success ? (
               <div className="space-y-4">
-                <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm">
-                  You’re in! Let's Keep Going.
+                                <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm">
+                  You&rsquo;re in! Let&apos;s Keep Going.
                 </p>
                 {leadMagnetUrl && (
                   <a

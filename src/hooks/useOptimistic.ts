@@ -15,7 +15,8 @@ export function useOptimistic<T>(initialData: T) {
     errors: new Map(),
   })
 
-  const optimisticUpdate = useCallback(async <K extends keyof T>(
+  // Fixed: Removed unused generic <K extends keyof T>
+  const optimisticUpdate = useCallback(async (
     key: string,
     updateFn: () => T | Partial<T>,
     asyncFn: () => Promise<void>,

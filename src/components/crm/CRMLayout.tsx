@@ -36,11 +36,6 @@ interface ClientInfo {
   archived_at?: string | null
 }
 
-const SUPER_ADMINS = [
-  'jedidiahbenenoch@gmail.com',
-  'fokuskreatives@gmail.com',
-]
-
 export function CRMLayout({ children }: CRMLayoutProps) {
   const pathname = usePathname()
   const pathnameRef = useRef(pathname)
@@ -50,7 +45,7 @@ useEffect(() => {
 }, [pathname])
   const router = useRouter()
   const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const clientId = (params.clientid || params.clientId) as string
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -169,7 +164,7 @@ if (!clientId) {
 
     const { data: userRow } = await supabase
       .from('users')
-      .select('role, email, name, profile_picture_url, client_id')
+      .select('role, email, name, profile_picture_url, client_id, is_agency_user')
       .eq('id', user.id)
       .single()
 
@@ -196,7 +191,7 @@ if (role !== 'client' && role !== 'admin') {
     .maybeSingle()
 
   if (mem) {
-    setUserRole(mem.role as any) // crm role
+    setUserRole(mem.role as Role)
     await loadClientInfo()
     setIsAuthorized(true)
     return
@@ -224,22 +219,23 @@ if (role !== 'client' && role !== 'admin') {
     }
 
     // If not agency admin and not client, allow membership-based access
-if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agency_user)) {
-  const { data: mem } = await supabase
-    .from('client_memberships')
-    .select('role')
-    .eq('client_id', clientId)
-    .eq('user_id', user.id)
-    .maybeSingle()
+    // (Clients are handled in the block above, so we don't need to check role !== 'client')
+    if (!(role === 'admin' && !userClientId && userRow.is_agency_user)) {
+      const { data: mem } = await supabase
+        .from('client_memberships')
+        .select('role')
+        .eq('client_id', clientId)
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-  if (mem?.role) {
-    setUserRole(mem.role as any)
-    await loadClientInfo()
-    setIsAuthorized(true)
-    setIsLoading(false)
-    return
-  }
-}
+      if (mem?.role) {
+        setUserRole(mem.role as Role)
+        await loadClientInfo()
+        setIsAuthorized(true)
+        setIsLoading(false)
+        return
+      }
+    }
 
     // Non-client (manager/employee) must match client_id for now
     if (!userClientId || userClientId !== clientId) {
@@ -254,7 +250,7 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
   } finally {
     setIsLoading(false)
   }
-}, [clientId, router, supabase, loadClientInfo])
+}, [clientId, router, supabase, loadClientInfo, params])
 
   useEffect(() => {
     if (clientId) checkAccess()
@@ -270,8 +266,9 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'leads', filter: `client_id=eq.${clientId}` },
         (payload) => {
-  const newLead = payload.new as any
-  const leadName = newLead?.data?.name || newLead?.name || 'New lead'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const newLead = payload.new as any
+          const leadName = newLead?.data?.name || newLead?.name || 'New lead'
 
   const onLeadsPage = pathnameRef.current.startsWith(`/crm/${clientId}/leads`)
 
@@ -292,8 +289,9 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'meetings', filter: `client_id=eq.${clientId}` },
         (payload) => {
-  const m = payload.new as any
-  const title = m?.title || 'New meeting'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const m = payload.new as any
+          const title = m?.title || 'New meeting'
 
   const onMeetingsPage = pathnameRef.current.startsWith(`/crm/${clientId}/meetings`)
 
@@ -401,7 +399,7 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
                     : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
                 )}
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
+                <item.icon className="h-5 w-5 shrink-0" />
                 <span className="flex-1">{item.name}</span>
 
                 {showLeadsBadge && (
@@ -430,12 +428,12 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
                   <div className="relative">
                     <item.icon className="h-5 w-5" />
                     {showLeadsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
+                      <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
                         {badgeValue(newLeadsCount)}
                       </span>
                     )}
                     {showMeetingsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
+                      <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
                         {badgeValue(newMeetingsCount)}
                       </span>
                     )}
@@ -457,9 +455,15 @@ if (role !== 'client' && !(role === 'admin' && !userClientId && userRow.is_agenc
               )}
             >
               {userPicture ? (
-                <img src={userPicture} alt={userName} className="h-8 w-8 rounded-full object-cover ring-2 ring-[#2B79F7]" />
+               <Image 
+              src={userPicture} 
+              alt={userName} 
+              width={32} 
+              height={32} 
+              className="rounded-full object-cover ring-2 ring-[#2B79F7]" 
+              />
               ) : (
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white text-sm font-semibold">
+                <div className="h-8 w-8 rounded-full bg-linear-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white text-sm font-semibold">
                   {(userName || userEmail || 'U').charAt(0).toUpperCase()}
                 </div>
               )}

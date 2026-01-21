@@ -9,14 +9,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
+import { RealtimeChannel } from '@supabase/supabase-js'
 import {
   Loader2,
-  CheckCircle,
-  Clock,
   Edit3,
   Save,
   X,
-  Trash2,
   MessageCircle,
   Paperclip,
   Copy,
@@ -127,8 +125,8 @@ export default function ApprovalDetailPage() {
   userName: string
 } | null>(null)
 
-  useEffect(() => {
-  let channel: any = null
+   useEffect(() => {
+  let channel: RealtimeChannel | null = null
 
   const run = async () => {
     await init()
@@ -261,12 +259,20 @@ export default function ApprovalDetailPage() {
     return
   }
 
-  const mapped: Assignee[] = (data || []).map((row: any) => ({
-    id: row.id,
-    role: row.role,
-    user_id: row.user_id,
-    users: Array.isArray(row.users) ? row.users[0] : row.users,
-  }))
+  const mapped: Assignee[] = (data || []).map((row: unknown) => {
+    const r = row as {
+      id: string
+      role: string
+      user_id: string
+      users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
+    }
+    return {
+      id: r.id,
+      role: r.role,
+      user_id: r.user_id,
+      users: Array.isArray(r.users) ? r.users[0] : r.users,
+    }
+  })
 
   setAssignees(mapped)
 }
@@ -285,19 +291,34 @@ export default function ApprovalDetailPage() {
     return
   }
 
-  const mapped: Comment[] = (data || []).map((row: any) => ({
-    id: row.id,
-    approval_id: row.approval_id,
-    approval_item_id: row.approval_item_id,
-    user_id: row.user_id,
-    content: row.content,
-    file_url: row.file_url,
-    file_name: row.file_name,
-    resolved: row.resolved,
-    parent_comment_id: row.parent_comment_id,
-    created_at: row.created_at,
-    users: Array.isArray(row.users) ? row.users[0] : row.users,
-  }))
+  const mapped: Comment[] = (data || []).map((row: unknown) => {
+    const r = row as {
+      id: string
+      approval_id: string
+      approval_item_id: string | null
+      user_id: string
+      content: string
+      file_url: string | null
+      file_name: string | null
+      resolved: boolean
+      parent_comment_id: string | null
+      created_at: string
+      users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
+    }
+    return {
+      id: r.id,
+      approval_id: r.approval_id,
+      approval_item_id: r.approval_item_id,
+      user_id: r.user_id,
+      content: r.content,
+      file_url: r.file_url,
+      file_name: r.file_name,
+      resolved: r.resolved,
+      parent_comment_id: r.parent_comment_id,
+      created_at: r.created_at,
+      users: Array.isArray(r.users) ? r.users[0] : r.users,
+    }
+  })
 
   setComments(mapped)
 }
@@ -637,10 +658,10 @@ await loadApproval()
       <div className="p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
         {/* Top card */}
         <Card>
-  <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 break-words">
+  <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 break-all">
     <div className="flex-1 min-w-0">
       {approval.description && (
-        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-words">
+        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-all">
           {approval.description}
         </p>
       )}
@@ -662,7 +683,7 @@ await loadApproval()
         )}
       </div>
     </div>
-    <div className="flex items-center gap-2 flex-shrink-0">
+    <div className="flex items-center gap-2 shrink-0">
       <Button
         variant="outline"
         size="sm"
@@ -683,18 +704,18 @@ await loadApproval()
 
             return (
               <Card key={item.id}>
-                <CardHeader className="flex flex-row items-center justify-between gap-3 break-words">
+                <CardHeader className="flex flex-row items-center justify-between gap-3 break-all">
   <div className="flex-1 min-w-0">
-    <h3 className="text-sm font-semibold text-gray-900 break-words">
+    <h3 className="text-sm font-semibold text-gray-900 break-all">
       {item.title || 'Untitled asset'}
     </h3>
     {item.initial_comment && (
-      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">
+      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all">
         {item.initial_comment}
       </p>
     )}
   </div>
-  <div className="flex items-center gap-2 flex-shrink-0">
+  <div className="flex items-center gap-2 Shrink-0">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         isApproved
@@ -812,6 +833,7 @@ await loadApproval()
                             >
                               <div className="mt-0.5">
                                 {c.users?.profile_picture_url ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
                                   <img
                                     src={c.users.profile_picture_url}
                                     alt={c.users.name || ''}
@@ -876,16 +898,16 @@ await loadApproval()
         ? parent.content.slice(0, 80) + '...'
         : parent.content
 
-      return (
+            return (
         <div className="mb-1 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
           Replying to <span className="font-semibold">{parentAuthor}</span>:
           {' '}
-          <span className="italic">"{snippet}"</span>
+          <span className="italic">&quot;{snippet}&quot;</span>
         </div>
       )
     })()}
 
-    <p className="mt-0.5 text-gray-700 break-words">
+    <p className="mt-0.5 text-gray-700 break-all">
       {formatComment(c.content)}
     </p>
     {c.file_url && (
@@ -897,6 +919,7 @@ await loadApproval()
       if (isImage) {
         return (
           <div className="space-y-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={c.file_url || ''}
               alt={c.file_name || 'Image'}
@@ -1038,8 +1061,9 @@ await loadApproval()
             setMentionQuery('')
           }}
           className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
-        >
+                >
           {u.profile_picture_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={u.profile_picture_url}
               alt={u.name}
@@ -1116,6 +1140,7 @@ await loadApproval()
     >
       <X className="h-5 w-5" />
     </button>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
     <img
       src={previewImageUrl}
       alt={previewImageName || 'Preview'}

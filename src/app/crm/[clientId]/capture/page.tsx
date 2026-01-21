@@ -13,14 +13,12 @@ import {
   Globe,
   Edit3,
   Trash2,
-  Copy,
   CheckCircle,
   X,
   Search,
   BarChart3,
   List,
   Image as ImageIcon,
-  Type,
   ChevronDown,
 } from 'lucide-react'
 
@@ -71,7 +69,7 @@ interface SubmissionRow {
   email: string | null
   phone: string | null
   notes: string | null
-  data: any
+  data: Record<string, unknown>
   created_at: string
 }
 
@@ -92,33 +90,46 @@ function makeDefaultTheme(): CaptureTheme {
   }
 }
 
-function normalizeTheme(t: any): CaptureTheme {
+function normalizeTheme(t: unknown): CaptureTheme {
   const d = makeDefaultTheme()
   if (!t || typeof t !== 'object') return d
+  const theme = t as Partial<CaptureTheme>
 
   return {
     ...d,
-    ...t,
+    ...theme,
     background: {
       ...d.background,
-      ...(t.background && typeof t.background === 'object' ? t.background : {}),
+      ...(theme.background && typeof theme.background === 'object' ? theme.background : {}),
     },
   }
 }
 
-function normalizeFields(f: any): CaptureField[] {
+interface RawField {
+  id?: unknown;
+  type?: unknown;
+  label?: unknown;
+  required?: unknown;
+  placeholder?: unknown;
+  description?: unknown;
+  options?: unknown;
+  embedUrl?: unknown;
+  embedHeight?: unknown;
+}
+
+function normalizeFields(f: unknown): CaptureField[] {
   const d = makeDefaultFields()
   if (!Array.isArray(f) || f.length === 0) return d
 
   // Ensure required is always boolean and options array is valid when needed
-  return f.map((x: any) => ({
+  return (f as RawField[]).map((x) => ({
     id: String(x.id || `field-${Date.now()}`),
     type: (x.type as FieldType) || 'text',
     label: String(x.label || 'Field'),
     required: !!x.required,
     placeholder: x.placeholder ? String(x.placeholder) : undefined,
     description: x.description ? String(x.description) : undefined,
-    options: Array.isArray(x.options) ? x.options.map(String) : undefined,
+    options: Array.isArray(x.options) ? (x.options as unknown[]).map(String) : undefined,
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
   }))
@@ -126,76 +137,72 @@ function normalizeFields(f: any): CaptureField[] {
 
 export default function CRMCapturePages() {
   const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const clientId = (params?.clientId || params?.clientid) as string
   const supabase = createClient()
 
   const [tab, setTab] = useState<'pages' | 'submissions'>('pages')
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRow | null>(null)
-const [crmRole, setCrmRole] = useState<'admin' | 'manager'>('manager')
-const [roleReady, setRoleReady] = useState(false)
-const [isClientUser, setIsClientUser] = useState(false)
+  const [crmRole, setCrmRole] = useState<'admin' | 'manager'>('manager')
+  const [isClientUser, setIsClientUser] = useState(false)
 
-// ✅ This controls Create/Edit/Delete in Capture Pages
-const canEditCapture = crmRole === 'admin' || isClientUser
+  // ✅ This controls Create/Edit/Delete in Capture Pages
+  const canEditCapture = crmRole === 'admin' || isClientUser
 
-useEffect(() => {
-  let cancelled = false
-  setRoleReady(false)
+  useEffect(() => {
+    let cancelled = false
 
-  ;(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !clientId) return
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || !clientId) return
 
-      const { data: userRow, error: userErr } = await supabase
-        .from('users')
-        .select('role, is_agency_user, client_id')
-        .eq('id', user.id)
-        .single()
+        const { data: userRow, error: userErr } = await supabase
+          .from('users')
+          .select('role, is_agency_user, client_id')
+          .eq('id', user.id)
+          .single()
 
-      if (userErr) {
-        console.error('Capture role load user error:', userErr)
-        return
+        if (userErr) {
+          console.error('Capture role load user error:', userErr)
+          return
+        }
+
+        const isClient = userRow?.role === 'client'
+        if (!cancelled) setIsClientUser(isClient)
+
+        // ✅ Clients are full admins in their own CRM
+        if (isClient) {
+          if (!cancelled) setCrmRole('admin')
+          return
+        }
+
+        // ✅ Agency admins are admins everywhere
+        if (userRow?.role === 'admin' && userRow?.is_agency_user) {
+          if (!cancelled) setCrmRole('admin')
+          return
+        }
+
+        // ✅ Everyone else: membership role
+        const { data: mem, error: memErr } = await supabase
+          .from('client_memberships')
+          .select('role')
+          .eq('client_id', clientId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (memErr) console.error('Capture role load membership error:', memErr)
+
+        if (!cancelled) setCrmRole(mem?.role === 'admin' ? 'admin' : 'manager')
+      } catch (e) {
+        console.error('Capture role load exception:', e)
       }
+    })()
 
-      const isClient = userRow?.role === 'client'
-      if (!cancelled) setIsClientUser(isClient)
-
-      // ✅ Clients are full admins in their own CRM
-      if (isClient) {
-        if (!cancelled) setCrmRole('admin')
-        return
-      }
-
-      // ✅ Agency admins are admins everywhere
-      if (userRow?.role === 'admin' && userRow?.is_agency_user) {
-        if (!cancelled) setCrmRole('admin')
-        return
-      }
-
-      // ✅ Everyone else: membership role
-      const { data: mem, error: memErr } = await supabase
-        .from('client_memberships')
-        .select('role')
-        .eq('client_id', clientId)
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (memErr) console.error('Capture role load membership error:', memErr)
-
-      if (!cancelled) setCrmRole(mem?.role === 'admin' ? 'admin' : 'manager')
-    } catch (e) {
-      console.error('Capture role load exception:', e)
-    } finally {
-      if (!cancelled) setRoleReady(true)
+    return () => {
+      cancelled = true
     }
-  })()
-
-  return () => {
-    cancelled = true
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [clientId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId])
 
   // pages
   const [pages, setPages] = useState<CapturePage[]>([])
@@ -398,15 +405,6 @@ useEffect(() => {
     })
   }
 
-  // ----- Theme helpers -----
-  const setTheme = (patch: Partial<CaptureTheme>) => {
-    setForm((prev) => ({ ...prev, theme: { ...prev.theme, ...patch } }))
-  }
-
-  const setBg = (patch: Partial<CaptureTheme['background']>) => {
-    setForm((prev) => ({ ...prev, theme: { ...prev.theme, background: { ...prev.theme.background, ...patch } } }))
-  }
-
   const handleSave = async () => {
     if (!form.name || !form.slug) return
     if (slugError) return
@@ -595,7 +593,7 @@ useEffect(() => {
     })
   }, [submissions, subSearch])
 
-  function buildFieldLabelMap(fields: any): Record<string, string> {
+  function buildFieldLabelMap(fields: CaptureField[] | null | undefined): Record<string, string> {
   const map: Record<string, string> = {}
   if (!Array.isArray(fields)) return map
   for (const f of fields) {
@@ -706,7 +704,7 @@ const deleteSubmission = async () => {
                     <Card key={page.id} className="bg-[#1E293B] border-[#334155]">
                       <CardContent className="p-5 flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className="p-3 rounded-lg bg-[#0F172A] flex-shrink-0">
+                          <div className="p-3 rounded-lg bg-[#0F172A] shrink-0">
                             <Globe className="h-5 w-5 text-[#2B79F7]" />
                           </div>
 
@@ -751,7 +749,7 @@ const deleteSubmission = async () => {
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <div className="flex flex-col items-end gap-2 shrink-0">
                           <Button variant="outline" size="sm" onClick={() => handleCopyLink(page)}>
                             {copyingId === page.id ? (
                               <>
@@ -1131,7 +1129,7 @@ const deleteSubmission = async () => {
                             <label className="block text-sm font-medium text-gray-200 mb-1">Type</label>
                             <select
                               value={f.type}
-                              onChange={(e) => updateField(f.id, { type: e.target.value as any })}
+                              onChange={(e) => updateField(f.id, { type: e.target.value as FieldType })}
                               className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
                             >
                               <option value="text">Text</option>
@@ -1281,7 +1279,7 @@ const deleteSubmission = async () => {
 
               <div className="px-6 py-4 space-y-3">
                 <p className="text-sm text-gray-300">
-                  Delete <span className="font-semibold text-white">"{pageToDelete.name}"</span>?
+                  Delete <span className="font-semibold text-white">&quot;{pageToDelete.name}&quot;</span>?
                 </p>
                 <p className="text-xs text-gray-500">
                   This removes the configuration. Submissions already collected remain stored.
@@ -1329,8 +1327,8 @@ const deleteSubmission = async () => {
 
     return (
       <div key={k} className="flex gap-3 text-sm">
-        <div className="w-48 text-gray-400 break-words">{label}</div>
-        <div className="flex-1 text-gray-200 break-words">
+        <div className="w-48 text-gray-400 break-all">{label}</div>
+        <div className="flex-1 text-gray-200 break-all">
           {v === null || v === undefined || String(v) === '' ? '—' : String(v)}
         </div>
       </div>
@@ -1342,7 +1340,7 @@ const deleteSubmission = async () => {
 
         <div className="rounded-xl border border-[#334155] bg-[#0F172A] p-4">
           <p className="text-sm font-semibold text-white mb-2">Raw JSON</p>
-          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all">
             {JSON.stringify(selectedSubmission.data || {}, null, 2)}
           </pre>
         </div>

@@ -28,7 +28,7 @@ type BioTemplate = {
 }
 
 export default function BioTemplatesPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [clients, setClients] = useState<ClientRow[]>([])
   const [selectedClientId, setSelectedClientId] = useState('')
@@ -46,11 +46,23 @@ export default function BioTemplatesPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    ;(async () => {
-      const { data } = await supabase.from('clients').select('id,name,business_name,industry,target_audience,social_proof,unique_mechanisms,website_url,content_tier').order('name')
-      setClients((data || []) as any)
-    })()
-  }, [supabase])
+  void (async () => {
+    const { data, error } = await supabase
+      .from('clients')
+      .select(
+        'id,name,business_name,industry,target_audience,social_proof,unique_mechanisms,website_url,content_tier'
+      )
+      .order('name')
+
+    if (error) {
+      console.error('Failed to load clients', error)
+      setClients([])
+      return
+    }
+
+    setClients((data ?? []) as unknown as ClientRow[])
+  })()
+}, [supabase])
 
   useEffect(() => {
     if (!selectedClient) return
@@ -138,7 +150,12 @@ export default function BioTemplatesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
                 <select
                   value={tierOverride}
-                  onChange={(e) => setTierOverride(e.target.value as any)}
+                  onChange={(e) => {
+  const v = e.target.value
+  if (v === 'beginner' || v === 'mid' || v === 'advanced') {
+    setTierOverride(v)
+  }
+}}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="beginner">Beginner</option>

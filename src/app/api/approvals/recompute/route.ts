@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
 
+// Types for Supabase responses
+interface ClientRef {
+  name: string | null
+  business_name: string | null
+}
+
+interface ApprovalItem {
+  status: string
+}
+
+interface AssigneeRow {
+  user_id: string
+}
+
+interface UserRow {
+  id: string
+  email: string | null
+  role: string
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -21,11 +41,16 @@ export async function POST(req: NextRequest) {
       .eq('id', approvalId)
       .single()
 
-  const relClients: any = (approval as any)?.clients
-  const clientDisplayName =
-  (Array.isArray(relClients)
-    ? relClients[0]?.business_name || relClients[0]?.name
-    : relClients?.business_name || relClients?.name) || 'Client'
+    const approvalWithClients = approval as unknown as { clients: ClientRef | ClientRef[] | null }
+    const relClients = approvalWithClients?.clients
+    
+    let clientDisplayName = 'Client'
+    if (Array.isArray(relClients) && relClients.length > 0) {
+      clientDisplayName = relClients[0]?.business_name || relClients[0]?.name || 'Client'
+    } else if (relClients && !Array.isArray(relClients)) {
+      const singleClient = relClients as ClientRef
+      clientDisplayName = singleClient.business_name || singleClient.name || 'Client'
+    }
 
     if (apprErr || !approval) {
       return NextResponse.json({ success: false, error: 'Approval not found' }, { status: 404 })
@@ -40,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to load items' }, { status: 500 })
     }
 
-    const allApproved = (items || []).length > 0 && (items || []).every((i: any) => i.status === 'approved')
+        const allApproved = (items || []).length > 0 && (items || []).every((i: ApprovalItem) => i.status === 'approved')
     const newStatus = allApproved ? 'approved' : 'pending'
     const statusWas = approval.status
 
@@ -61,7 +86,7 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
     .eq('approval_id', approvalId)
 
   const assigneeIds = Array.from(
-    new Set((assigneesRows || []).map((r: any) => r.user_id).filter(Boolean))
+    new Set((assigneesRows || []).map((r: AssigneeRow) => r.user_id).filter(Boolean))
   ).filter((id) => id !== actorId)
 
   // In-app notification (drives popup + sound)
@@ -87,13 +112,13 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
       .in('id', assigneeIds)
 
     const clientEmails = (users || [])
-      .filter((u: any) => u.role === 'client')
-      .map((u: any) => u.email)
+      .filter((u: UserRow) => u.role === 'client')
+      .map((u: UserRow) => u.email)
       .filter(Boolean)
 
     const teamEmails = (users || [])
-      .filter((u: any) => u.role !== 'client')
-      .map((u: any) => u.email)
+      .filter((u: UserRow) => u.role !== 'client')
+      .map((u: UserRow) => u.email)
       .filter(Boolean)
 
     const secret = process.env.APPS_SCRIPT_SECRET
@@ -153,12 +178,19 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
         .select('user_id')
         .eq('approval_id', approvalId)
 
-      const watcherIds = (assigneesRows || []).map((r: any) => r.user_id).filter(Boolean)
+            const watcherIds = (assigneesRows || []).map((r: AssigneeRow) => r.user_id).filter(Boolean)
       const uniqueIds = Array.from(new Set(watcherIds)).filter((id) => id !== actorId)
 
-      const relClients: any = (approval as any).clients
-      const clientName =
-        (Array.isArray(relClients) ? relClients[0]?.business_name || relClients[0]?.name : relClients?.business_name || relClients?.name) || 'Client'
+      const approvalWithClients2 = approval as unknown as { clients: ClientRef | ClientRef[] | null }
+      const relClients2 = approvalWithClients2.clients
+      
+      let clientName = 'Client'
+      if (Array.isArray(relClients2) && relClients2.length > 0) {
+        clientName = relClients2[0]?.business_name || relClients2[0]?.name || 'Client'
+      } else if (relClients2 && !Array.isArray(relClients2)) {
+        const singleClient = relClients2 as ClientRef
+        clientName = singleClient.business_name || singleClient.name || 'Client'
+      }
 
       if (uniqueIds.length > 0) {
         await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
@@ -193,10 +225,11 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
     }
 
     return NextResponse.json({ success: true, status: newStatus })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Recompute approval status error:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Server error'
     return NextResponse.json(
-      { success: false, error: err?.message || 'Server error' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
-import { User, Lock, Bell, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
@@ -22,29 +23,39 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadUserData()
-  }, [])
 
-  const loadUserData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      setEmail(user.email || '')
-      
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      
-      if (userData) {
-        setName(userData.name || '')
-        setProfilePicture(userData.profile_picture_url || '')
-      }
-    }
+
+  const loadUserData = useCallback(async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return
+
+  setEmail(user.email || '')
+
+  const { data: userData, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  if (error) {
+    console.error('Failed to load user data:', error)
+    return
   }
+
+  if (userData) {
+    setName(userData.name || '')
+    setProfilePicture(userData.profile_picture_url || '')
+  }
+}, [supabase])
+
+
+useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void loadUserData()
+}, [loadUserData])
 
   const handleSaveProfile = async () => {
     setIsSaving(true)
@@ -129,12 +140,14 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
               {profilePicture ? (
-                <img 
-                  src={profilePicture} 
-                  alt="Profile"
-                  className="h-20 w-20 rounded-full object-cover"
-                />
-              ) : (
+  <Image
+    src={profilePicture}
+    alt="Profile"
+    width={80}
+    height={80}
+    className="h-20 w-20 rounded-full object-cover"
+  />
+) : (
                 <div className="h-20 w-20 rounded-full bg-brand-gradient flex items-center justify-center text-white text-2xl font-bold">
                   {name.charAt(0)?.toUpperCase() || 'U'}
                 </div>

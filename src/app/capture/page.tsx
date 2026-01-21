@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { CRMLayout } from '@/components/crm/CRMLayout'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader } from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { 
   Plus, 
   Save, 
@@ -12,8 +12,6 @@ import {
   Copy, 
   Trash2, 
   X, 
-  Check, 
-  Palette, 
   Type, 
   Hash, 
   Calendar, 
@@ -22,7 +20,6 @@ import {
   Link as LinkIcon, 
   Video, 
   Settings,
-  ExternalLink,
   Zap,
   FileText,
   ChevronDown,
@@ -96,7 +93,8 @@ const fieldTypes = [
 export default function CaptureForms() {
   const params = useParams()
   const clientId = params.clientId as string
-  const supabase = createClient()
+  // Memoize supabase client to prevent infinite loops in useEffect
+  const supabase = useMemo(() => createClient(), [])
 
   const [forms, setForms] = useState<CaptureForm[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -105,11 +103,7 @@ export default function CaptureForms() {
   const [isSaving, setIsSaving] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
-  useEffect(() => {
-    if (clientId) loadForms()
-  }, [clientId])
-
-  const loadForms = async () => {
+  const loadForms = useCallback(async () => {
     setIsLoading(true)
     try {
       const { data } = await supabase
@@ -125,7 +119,11 @@ export default function CaptureForms() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [clientId, supabase])
+
+  useEffect(() => {
+    if (clientId) loadForms()
+  }, [clientId, loadForms])
 
   const createNewForm = () => {
     const newForm: CaptureForm = {
@@ -409,6 +407,9 @@ export default function CaptureForms() {
   )
 }
 
+// Define helper outside component to avoid purity check issues
+const generateFieldId = () => `field-${Date.now()}`
+
 // Form Builder Modal Component
 function FormBuilderModal({ form, onSave, onClose, isSaving }: { 
   form: CaptureForm; 
@@ -430,7 +431,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
 
   const addField = (type: FormField['type']) => {
     const newField: FormField = {
-      id: `field-${Date.now()}`,
+      id: generateFieldId(),
       type,
       label: type === 'text' ? 'New Field' : 
              type === 'email' ? 'Email Address' :
@@ -456,13 +457,6 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
 
   const removeField = (fieldId: string) => {
     setFormData(prev => ({ ...prev, fields: prev.fields.filter(f => f.id !== fieldId) }))
-  }
-
-  const moveField = (fromIndex: number, toIndex: number) => {
-    const fields = [...formData.fields]
-    const [movedField] = fields.splice(fromIndex, 1)
-    fields.splice(toIndex, 0, movedField)
-    setFormData(prev => ({ ...prev, fields }))
   }
 
   const handleSave = () => {
@@ -526,7 +520,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                 <p className="text-sm text-gray-400 mb-4">Drag and drop to reorder fields</p>
                 
                 <div className="space-y-4">
-                  {formData.fields.map((field, index) => (
+                  {formData.fields.map((field) => (
                     <div key={field.id} className="bg-[#0F172A] border border-[#334155] rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">

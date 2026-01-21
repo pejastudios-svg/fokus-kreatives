@@ -24,7 +24,6 @@ import {
   Settings2,
   Check,
   ExternalLink,
-  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -49,7 +48,7 @@ interface StatusOption {
 
 interface Lead {
   id: string
-  data: Record<string, any>
+  data: Record<string, unknown>
   position: number
   created_at: string
   updated_at?: string
@@ -97,7 +96,7 @@ const defaultFields: Omit<CustomField, 'id'>[] = [
 ]
 
 // Field type config
-const fieldTypeConfig: Record<string, { icon: any; label: string }> = {
+const fieldTypeConfig: Record<string, { icon: React.ElementType; label: string }> = {
   text: { icon: Type, label: 'Text' },
   email: { icon: Mail, label: 'Email' },
   phone: { icon: Phone, label: 'Phone' },
@@ -131,8 +130,8 @@ const getFieldOptions = (field: CustomField): StatusOption[] => {
 }
 
 export default function CRMLeads() {
-const params = useParams()
-  const clientId = ((params as any).clientid || (params as any).clientId) as string
+  const params = useParams()
+  const clientId = (params?.clientId || params?.clientid) as string
   const supabase = createClient()
 
   // Data state
@@ -160,7 +159,7 @@ const params = useParams()
   const [pendingFields, setPendingFields] = useState<Set<string>>(new Set())
   
   // Form state
-  const [newLead, setNewLead] = useState<Record<string, any>>({})
+    const [newLead, setNewLead] = useState<Record<string, string>>({})
   const [newField, setNewField] = useState({ name: '', type: 'text', urlDisplayType: 'link' as 'button' | 'link' | 'hyperlink' })
   
   // Drag state
@@ -170,51 +169,8 @@ const params = useParams()
   // Refs
   const editInputRef = useRef<HTMLInputElement>(null)
 
-  // Load data
-  useEffect(() => {
-    if (clientId) loadData()
-  }, [clientId])
-
-  // Focus edit input
-  useEffect(() => {
-    if (editingCell && editInputRef.current) {
-      editInputRef.current.focus()
-      editInputRef.current.select()
-    }
-  }, [editingCell])
-
-  const loadData = async () => {
-    setIsLoading(true)
-    await Promise.all([loadFields(), loadLeads()])
-    setIsLoading(false)
-  }
-
-  const loadFields = async () => {
-    const { data, error } = await supabase
-      .from('custom_fields')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('position')
-
-    if (error) {
-      console.error('Error loading fields:', error)
-    }
-
-    if (data && data.length > 0) {
-      // Clean up any null options
-      const cleanedFields = data.map(field => ({
-        ...field,
-        options: Array.isArray(field.options) 
-          ? field.options.filter((opt: any) => opt && opt.value && opt.label)
-          : []
-      }))
-      setFields(cleanedFields)
-    } else {
-      await createDefaultFields()
-    }
-  }
-
-  const createDefaultFields = async () => {
+  // Define loading functions with useCallback to fix dependency issues
+  const createDefaultFields = useCallback(async () => {
     const toInsert = defaultFields.map(f => ({ 
       ...f, 
       client_id: clientId,
@@ -234,9 +190,36 @@ const params = useParams()
     if (data) {
       setFields(data)
     }
-  }
+  }, [clientId, supabase])
 
-  const loadLeads = async () => {
+  const loadFields = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('custom_fields')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('position')
+
+    if (error) {
+      console.error('Error loading fields:', error)
+    }
+
+    if (data && data.length > 0) {
+      // Clean up any null options
+      const cleanedFields = data.map(field => ({
+        ...field,
+        options: Array.isArray(field.options) 
+          ? (field.options as unknown[]).filter((opt): opt is StatusOption => 
+              typeof opt === 'object' && opt !== null && 'value' in opt && 'label' in opt
+            )
+          : []
+      }))
+      setFields(cleanedFields)
+    } else {
+      await createDefaultFields()
+    }
+  }, [clientId, supabase, createDefaultFields])
+
+  const loadLeads = useCallback(async () => {
     const { data, error } = await supabase
       .from('leads')
       .select('*')
@@ -248,7 +231,26 @@ const params = useParams()
     }
 
     setLeads(data || [])
-  }
+  }, [clientId, supabase])
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    await Promise.all([loadFields(), loadLeads()])
+    setIsLoading(false)
+  }, [loadFields, loadLeads])
+
+  // Load data
+  useEffect(() => {
+    if (clientId) loadData()
+  }, [clientId, loadData])
+
+  // Focus edit input
+  useEffect(() => {
+    if (editingCell && editInputRef.current) {
+      editInputRef.current.focus()
+      editInputRef.current.select()
+    }
+  }, [editingCell])
 
   // Optimistic add lead
   const handleAddLead = async () => {
@@ -287,8 +289,8 @@ const params = useParams()
 
       setLeads(prev => prev.map(l => l.id === tempId ? data : l))
     } catch (err) {
-      console.error('Failed to add lead:', err)
-      setLeads(prev => prev.filter(l => l.id !== tempId))
+      console.error('Failed to add field:', err instanceof Error ? err.message : err)
+      setFields(prev => prev.filter(f => f.id !== tempId))
     } finally {
       setPendingLeads(prev => {
         const next = new Set(prev)
@@ -299,7 +301,7 @@ const params = useParams()
   }
 
   // Optimistic update lead
-  const handleUpdateLead = useCallback(async (leadId: string, fieldKey: string, value: any) => {
+    const handleUpdateLead = useCallback(async (leadId: string, fieldKey: string, value: string) => {
     const lead = leads.find(l => l.id === leadId)
     if (!lead) return
 
@@ -394,8 +396,8 @@ const params = useParams()
       if (error) throw error
 
       setFields(prev => prev.map(f => f.id === tempId ? data : f))
-    } catch (err: any) {
-      console.error('Failed to add field:', err?.message || err)
+        } catch (err) {
+      console.error('Failed to add field:', err instanceof Error ? err.message : err)
       setFields(prev => prev.filter(f => f.id !== tempId))
     } finally {
       setPendingFields(prev => {
@@ -528,7 +530,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
   }
 
   // Cell handlers
-  const handleCellClick = (e: React.MouseEvent, leadId: string, fieldKey: string, value: any, fieldType: string) => {
+    const handleCellClick = (e: React.MouseEvent, leadId: string, fieldKey: string, value: string, fieldType: string) => {
     e.stopPropagation()
     if (fieldType === 'status' || fieldType === 'select') {
       setStatusDropdown({ leadId, fieldKey })
@@ -724,7 +726,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         <GripVertical className="h-4 w-4 text-gray-600 opacity-0 group-hover:opacity-100 cursor-grab" />
                       </td>
                       {fields.map((field) => {
-                        const value = lead.data?.[field.field_key] || ''
+                        const value = (lead.data?.[field.field_key] as string) || ''
                         const isEditing = editingCell?.leadId === lead.id && editingCell?.fieldKey === field.field_key
 
                         return (
@@ -751,11 +753,11 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 value={value} 
                                 displayType={field.url_display_type || 'link'} 
                                 fieldName={field.field_name}
-                              />
-                            ) : (
-                              <span className="text-white block min-h-[24px] px-2 py-1 rounded hover:bg-[#334155] transition-colors">
-                                {value || <span className="text-gray-500">—</span>}
-                              </span>
+                            />
+                          ) : (
+                            <span className="text-white block min-h-6 px-2 py-1 rounded hover:bg-[#334155] transition-colors">
+                              {(value as string) || <span className="text-gray-500">—</span>}
+                            </span>
                             )}
                           </td>
                         )
@@ -812,7 +814,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 return (
                   <div 
                     key={`${status.value}-${statusIndex}`}
-                    className="flex-shrink-0 w-[300px]"
+                    className="shrink-0 w-[300px]"
                     onDragOver={(e) => handleDragOver(e, status.value)}
                     onDragLeave={() => setDragOverStatus(null)}
                     onDrop={(e) => handleDrop(e, status.value)}
@@ -850,7 +852,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           >
                             <div className="flex items-start justify-between mb-2">
                               <h4 className="font-medium text-white">
-                                {lead.data?.name || 'Unnamed Lead'}
+                                {(lead.data?.name as string) || 'Unnamed Lead'}
                               </h4>
                               <button
                                 onClick={(e) => {
@@ -862,21 +864,21 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            {lead.data?.email && (
+                            {(lead.data?.email as string) && (
                               <p className="text-sm text-gray-400 flex items-center gap-2">
                                 <Mail className="h-3.5 w-3.5" />
-                                {lead.data.email}
+                                {lead.data.email as string}
                               </p>
                             )}
-                            {lead.data?.phone && (
+                            {(lead.data?.phone as string) && (
                               <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
                                 <Phone className="h-3.5 w-3.5" />
-                                {lead.data.phone}
+                                {lead.data.phone as string}
                               </p>
                             )}
-                            {lead.data?.date_added && (
+                            {(lead.data?.date_added as string) && (
                               <p className="text-xs text-gray-600 mt-2">
-                                Added {new Date(lead.data.date_added).toLocaleDateString()}
+                                Added {new Date(lead.data.date_added as string).toLocaleDateString()}
                               </p>
                             )}
                           </div>
@@ -914,7 +916,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 <p className="text-gray-400 text-center py-8">No status data available</p>
               ) : (
                 <div className="space-y-4">
-                  {chartData.map((item, itemIndex) => {
+                  {chartData.map((item) => {
                     const maxCount = Math.max(...chartData.map(d => d.count), 1)
                     const percentage = (item.count / maxCount) * 100
 
@@ -989,13 +991,13 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     {(() => {
                       let accumulated = 0
                       const total = chartData.reduce((sum, d) => sum + d.count, 0) || 1
-                      return chartData.map((item, itemIndex) => {
+                      return chartData.map((item) => {
                         const percentage = (item.count / total) * 100
                         const offset = accumulated
                         accumulated += percentage
                         return (
                           <circle
-                            key={`${item.value}-${itemIndex}`}
+                            key={item.value}
                             cx="50"
                             cy="50"
                             r="40"
@@ -1018,10 +1020,10 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {chartData.map((item, itemIndex) => (
+                  {chartData.map((item) => (
                     <div key={item.value} className="flex items-center gap-2">
                       <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="text-sm text-gray-400">
@@ -1164,7 +1166,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         {statusDropdown && (
           <StatusDropdown
             options={getFieldOptions(fields.find(f => f.field_key === statusDropdown.fieldKey) || fields[0])}
-            currentValue={leads.find(l => l.id === statusDropdown.leadId)?.data?.[statusDropdown.fieldKey] || ''}
+            currentValue={(leads.find(l => l.id === statusDropdown.leadId)?.data?.[statusDropdown.fieldKey] as string) || ''}
             onSelect={(value) => handleUpdateLead(statusDropdown.leadId, statusDropdown.fieldKey, value)}
             onClose={() => setStatusDropdown(null)}
           />
@@ -1433,7 +1435,7 @@ function FieldSettingsModal({
                   <button
                     type="button"
                     onClick={() => setEditingOption(editingOption === opt.value ? null : opt.value)}
-                    className="w-6 h-6 rounded-md flex-shrink-0 border-2 border-transparent hover:border-white/30 transition-all"
+                   className="w-6 h-6 rounded-md shrink-0 border-2 border-transparent hover:border-white/30 transition-all"
                     style={{ backgroundColor: opt.color }}
                   />
                   {editingOption === opt.value ? (
@@ -1560,7 +1562,7 @@ function LeadDetailModal({
   fields: CustomField[]
   isPending: boolean
   onClose: () => void
-  onUpdate: (leadId: string, fieldKey: string, value: any) => void
+    onUpdate: (leadId: string, fieldKey: string, value: string) => void
   onDelete: (leadId: string) => void
   getFieldOptions: (field: CustomField) => StatusOption[]
 }) {
@@ -1575,7 +1577,7 @@ function LeadDetailModal({
       >
         <div className="flex items-center justify-between p-6 border-b border-[#334155] sticky top-0 bg-[#1E293B] z-10">
           <h3 className="text-xl font-semibold text-white">
-            {lead.data?.name || 'Lead Details'}
+            {(lead.data?.name as string) || 'Lead Details'}
           </h3>
           <div className="flex items-center gap-2">
             <button
@@ -1607,7 +1609,7 @@ function LeadDetailModal({
                 </label>
                 {(field.field_type === 'status' || field.field_type === 'select') ? (
                   <select
-                    value={lead.data?.[field.field_key] || ''}
+                    value={(lead.data?.[field.field_key] as string) || ''}
                     onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
                     className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   >
@@ -1619,7 +1621,7 @@ function LeadDetailModal({
                 ) : (
                   <input
                     type={field.field_type === 'email' ? 'email' : field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
-                    value={lead.data?.[field.field_key] || ''}
+                    value={(lead.data?.[field.field_key] as string) || ''}
                     onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
                     className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
@@ -1687,12 +1689,12 @@ function StatusDropdown({
             }`}
           >
             <div 
-              className="w-4 h-4 rounded-full flex-shrink-0"
+              className="w-4 h-4 rounded-full shrink-0"
               style={{ backgroundColor: opt.color }}
             />
             <span className="text-white flex-1 text-left">{opt.label}</span>
             {currentValue === opt.value && (
-              <Check className="h-4 w-4 text-[#2B79F7] flex-shrink-0" />
+              <Check className="h-4 w-4 text-[#2B79F7] shrink-0" />
             )}
           </button>
         ))}
