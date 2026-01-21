@@ -1367,13 +1367,6 @@ function CaptureSkeleton() {
 })()}
           </div>
         </div>
-
-        <div className="rounded-xl border border-[#334155] bg-[#0F172A] p-4">
-          <p className="text-sm font-semibold text-white mb-2">Raw JSON</p>
-          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all">
-            {JSON.stringify(selectedSubmission.data || {}, null, 2)}
-          </pre>
-        </div>
       </div>
     </div>
   </div>
