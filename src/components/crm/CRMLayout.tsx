@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useParams } from 'next/navigation'
@@ -46,7 +46,7 @@ useEffect(() => {
   const router = useRouter()
   const params = useParams()
   const clientId = (params.clientid || params.clientId) as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -60,6 +60,9 @@ useEffect(() => {
 
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // FIX: Track which client ID we have successfully authorized
+  const successClientId = useRef<string | null>(null)
 
   // CRM badge counts (persisted)
   const [countsLoaded, setCountsLoaded] = useState(false)
@@ -252,9 +255,23 @@ if (role !== 'client' && role !== 'admin') {
   }
 }, [clientId, router, supabase, loadClientInfo, params])
 
+// FIX: Keep track of the last successfully loaded client ID
   useEffect(() => {
-    if (clientId) checkAccess()
-  }, [clientId, checkAccess])
+    if (isAuthorized && clientId) {
+      successClientId.current = clientId
+    }
+  }, [isAuthorized, clientId])
+
+ useEffect(() => {
+    if (clientId) {
+      // FIX: If we are already authorized for this client ID, skip the loading check
+      // This prevents the full-screen spinner from showing when navigating between tabs
+      if (isAuthorized && successClientId.current === clientId) {
+        return
+      }
+      checkAccess()
+    }
+  }, [clientId, checkAccess, isAuthorized])
 
   // Realtime for leads/meetings inserts (badge + popup)
   useEffect(() => {
