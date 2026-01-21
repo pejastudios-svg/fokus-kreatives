@@ -1,23 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent } from '@/components/ui/Card'
-import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
+// 1. Separation: Logic moved to this inner component
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState('')
+  
   const searchParams = useSearchParams()
   const nextUrl = searchParams.get('next')
+  
   const router = useRouter()
   const supabase = createClient()
 
@@ -44,37 +46,39 @@ export default function LoginPage() {
     })
 
     if (error) {
-  setError(error.message)
-  setIsLoading(false)
-  return
-}
-if (nextUrl) {
-  router.push(nextUrl)
-  return
-}
-// Determine role and redirect accordingly
-const {
-  data: { user },
-} = await supabase.auth.getUser()
-if (user) {
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('role, client_id')
-    .eq('id', user.id)
-    .single()
-    if (userRow?.role === 'client') {
-    // Client: go to portal approvals
-    router.push('/portal/approvals')
-  } else {
-    // Agency team: go to main dashboard
-    router.push('/dashboard')
-  }
-} else {
-  router.push('/dashboard')
-}
-}
+      setError(error.message)
+      setIsLoading(false)
+      return
+    }
 
+    if (nextUrl) {
+      router.push(nextUrl)
+      return
+    }
+
+    // Determine role and redirect accordingly
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     
+    if (user) {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('role, client_id')
+        .eq('id', user.id)
+        .single()
+        
+      if (userRow?.role === 'client') {
+        // Client: go to portal approvals
+        router.push('/portal/approvals')
+      } else {
+        // Agency team: go to main dashboard
+        router.push('/dashboard')
+      }
+    } else {
+      router.push('/dashboard')
+    }
+  }
 
   if (isChecking) {
     return (
@@ -90,12 +94,12 @@ if (user) {
         <CardContent className="p-8">
           <div className="flex justify-center mb-8">
             <Image
-  src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-  alt="Fokus Kreatives"
-  width={160}
-  height={48}
-  className="object-contain w-auto h-auto"
-/>
+              src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
+              alt="Fokus Kreatives"
+              width={160}
+              height={48}
+              className="object-contain w-auto h-auto"
+            />
           </div>
 
           <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
@@ -140,5 +144,20 @@ if (user) {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// 2. Export: Wrap the form in Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen bg-brand-gradient flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }
