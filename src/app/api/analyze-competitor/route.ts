@@ -1,20 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 
+export const dynamic = 'force-dynamic'
+
+export interface CompetitorAnalysis {
+  summary: string
+  hook: {
+    text: string
+    rating: number
+    why_it_works: string[]
+    weaknesses: string[]
+  }
+  structure: {
+    pillar: string
+    pacing: string
+    beats: { label: string; text: string }[]
+  }
+  cta: {
+    text: string
+    rating: number
+    why_it_works: string[]
+    weaknesses: string[]
+  }
+  voice: {
+    tone: string
+    notable_patterns: string[]
+  }
+  what_works: string[]
+  what_doesnt_work: string[]
+  takeaways_for_client: {
+    hook_formulas: string[]
+    cta_formulas: string[]
+    structural_moves: string[]
+    new_angles: string[]
+  }
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+
+const asStringArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+
+const asString = (v: unknown, fallback = ''): string =>
+  typeof v === 'string' ? v : fallback
+
+const asNumber = (v: unknown, fallback = 0): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback
+
+function normalizeAnalysis(raw: unknown): CompetitorAnalysis {
+  const r = isRecord(raw) ? raw : {}
+  const hook = isRecord(r.hook) ? r.hook : {}
+  const structure = isRecord(r.structure) ? r.structure : {}
+  const cta = isRecord(r.cta) ? r.cta : {}
+  const voice = isRecord(r.voice) ? r.voice : {}
+  const takeaways = isRecord(r.takeaways_for_client) ? r.takeaways_for_client : {}
+  const beats = Array.isArray(structure.beats)
+    ? structure.beats
+        .map((b) =>
+          isRecord(b)
+            ? { label: asString(b.label), text: asString(b.text) }
+            : null,
+        )
+        .filter((b): b is { label: string; text: string } => !!b)
+    : []
+
+  return {
+    summary: asString(r.summary),
+    hook: {
+      text: asString(hook.text),
+      rating: asNumber(hook.rating),
+      why_it_works: asStringArray(hook.why_it_works),
+      weaknesses: asStringArray(hook.weaknesses),
+    },
+    structure: {
+      pillar: asString(structure.pillar),
+      pacing: asString(structure.pacing),
+      beats,
+    },
+    cta: {
+      text: asString(cta.text),
+      rating: asNumber(cta.rating),
+      why_it_works: asStringArray(cta.why_it_works),
+      weaknesses: asStringArray(cta.weaknesses),
+    },
+    voice: {
+      tone: asString(voice.tone),
+      notable_patterns: asStringArray(voice.notable_patterns),
+    },
+    what_works: asStringArray(r.what_works),
+    what_doesnt_work: asStringArray(r.what_doesnt_work),
+    takeaways_for_client: {
+      hook_formulas: asStringArray(takeaways.hook_formulas),
+      cta_formulas: asStringArray(takeaways.cta_formulas),
+      structural_moves: asStringArray(takeaways.structural_moves),
+      new_angles: asStringArray(takeaways.new_angles),
+    },
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'API key not configured' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 
-  const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-  })
-
   try {
-        const {
+    const {
       competitorHandle,
       platform,
       clientNiche,
@@ -22,211 +116,118 @@ export async function POST(request: NextRequest) {
       videoTranscript,
     } = await request.json()
 
-    // Combine transcript / sample content if provided
-    const rawTranscript: string =
-      (videoTranscript || sampleContent || '').toString().trim()
+    const rawTranscript: string = (videoTranscript || sampleContent || '')
+      .toString()
+      .trim()
 
-    let transcriptSection = ''
-    if (rawTranscript) {
-      // Hard cap to avoid huge prompts (roughly ~2000 tokens worth of text)
-      const maxChars = 8000
-      transcriptSection =
-        rawTranscript.length > maxChars
-          ? rawTranscript.slice(0, maxChars)
-          : rawTranscript
+    if (!rawTranscript) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please paste the competitor script or transcript — we break it down line by line.',
+        },
+        { status: 400 },
+      )
     }
 
-    const hasTranscript = transcriptSection.length > 0
+    const maxChars = 12000
+    const transcript =
+      rawTranscript.length > maxChars ? rawTranscript.slice(0, maxChars) : rawTranscript
 
-    const systemPrompt = `You are an elite social media analyst and content strategist with 10+ years of experience breaking down viral content and turning it into repeatable systems.
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-## YOUR ROLE
-You do two things:
-1. **Analyze** high-performing social content: hooks, structure, pillar, CTA, style.
-2. **Generate new ideas** inspired by that style, without copying.
+    const systemPrompt = `You are an elite social media analyst and content strategist. You break down high-performing scripts into a repeatable system the client can steal stylistically without copying.
 
-## LIMITATIONS
-You do NOT have live access to social feeds or APIs. You only see:
-- The platform name
-- The handle
-- The niche
-- (Optionally) pasted sample content or transcripts
+You will receive a full script/transcript. Your job is to return a JSON object that breaks it down into:
+1. What the script actually does (hook, structure, CTA, voice)
+2. What works and what doesn't (honest critique)
+3. Takeaways our client can plug into their own scripts right now — formulas, structural moves, new angles
 
-When sample content/transcripts are provided:
-- Treat THAT text as the ground truth for the analysis.
-- Do NOT copy sentences or phrases word-for-word in your new ideas.
-- Use it as inspiration for structure, pacing, hook style, and CTA style.
+Be specific. No generic advice like "be more engaging". Quote short snippets when useful, but never copy full sentences for the client to reuse. Rate hook and CTA on a 1-10 scale based on real-world stopping power and conversion likelihood.`
 
-## STYLE
-- Be concrete and specific.
-- Avoid vague phrases like "create engaging content".
-- Show hook **formulas + examples**.
-- Show CTA **formulas + examples**.
-- Focus on moves our client can **plug into content creation immediately**.
-`
+    const userPrompt = `## CONTEXT
+Platform: ${platform || 'N/A'}
+Competitor: ${competitorHandle || 'N/A'}
+Client Niche: ${clientNiche || 'N/A'}
 
-    let userPrompt: string
+## SCRIPT / TRANSCRIPT
+"""
+${transcript}
+"""
 
-    if (hasTranscript) {
-      // === TRANSCRIPT MODE ===
-      userPrompt = `## CONTEXT
+Return a JSON object with exactly this shape (no extra keys, no markdown, just JSON):
 
-**Platform:** ${platform}
-**Competitor Handle (if any):** ${competitorHandle || 'N/A'}
-**Client Niche:** ${clientNiche}
+{
+  "summary": "2-3 sentence plain-English summary of what this script is doing and who it's for.",
+  "hook": {
+    "text": "The exact hook line(s) used in the script.",
+    "rating": 1-10,
+    "why_it_works": ["bullet", "bullet"],
+    "weaknesses": ["bullet", "bullet"]
+  },
+  "structure": {
+    "pillar": "Educational | Storytelling | Authority | Series | Double Down | Hybrid (...)",
+    "pacing": "1-2 sentences on how it moves (fast cuts, slow build, etc.)",
+    "beats": [
+      { "label": "Hook", "text": "what happens" },
+      { "label": "Problem", "text": "what happens" },
+      { "label": "Tension", "text": "what happens" },
+      { "label": "Payoff", "text": "what happens" },
+      { "label": "CTA", "text": "what happens" }
+    ]
+  },
+  "cta": {
+    "text": "Exact CTA used (or 'Implicit: ...' if none).",
+    "rating": 1-10,
+    "why_it_works": ["bullet"],
+    "weaknesses": ["bullet"]
+  },
+  "voice": {
+    "tone": "1-line description of tone/voice.",
+    "notable_patterns": ["repeated phrases, stylistic moves"]
+  },
+  "what_works": ["5-8 specific things this script does well"],
+  "what_doesnt_work": ["3-6 specific weaknesses, misses, or risks — be honest"],
+  "takeaways_for_client": {
+    "hook_formulas": ["5-8 new hook formulas inspired by this, NOT copied — written so the client can plug in their own topic"],
+    "cta_formulas": ["5-8 CTA formulas in the same energy"],
+    "structural_moves": ["3-5 structural moves (pacing, order, transitions) worth stealing"],
+    "new_angles": ["3-5 fresh content angles our client could make in this style on their own topic"]
+  }
+}
 
-We have a **high-performing video / piece of content** in this niche. Below is the pasted transcript or sample content (possibly truncated):
-
----
-
-### SAMPLE CONTENT / TRANSCRIPT (TRUNCATED)
-${transcriptSection}
-
----
-
-Based on THIS text, provide the following:
-
-### 1. HOOK ANALYSIS
-- What is the actual hook they used?
-- Where does the hook end and the main content begin?
-- Why does this hook work psychologically (pattern interrupt, pain, curiosity, identity, etc.)?
-- Give 5–10 **new hook formulas** inspired by this style that our client can use (but NOT copying exact wording).
-
-### 2. STRUCTURE & PILLAR
-- Step-by-step, how is this content structured from start to finish?
-- Identify which **content pillar(s)** it fits: Educational, Storytelling, Authority, Series, Double Down (or a mix).
-- Describe the narrative arc (problem → tension → payoff → CTA).
-
-### 3. CTA + LEAD-GEN
-- What is the CTA (explicit or implied) in this piece?
-- How are they likely trying to move people to DM, comment, click, or opt-in?
-- Suggest 5–10 **comment-based CTA formulas** that match this style (e.g. "Comment \\"WORD\\" and I'll send you...").
-
-### 4. STYLE & VOICE NOTES
-- Describe the tone and voice (casual, direct, vulnerable, etc.).
-- Any repeated phrases, patterns, or stylistic moves worth noting?
-- How does the pacing feel (fast cuts, build-up, punchy, etc.)?
-
-### 5. NEW CONTENT IDEAS (INSPIRED, NOT COPIED)
-Propose at least **5 new content concepts** inspired by this piece, with:
-
-For each concept:
-- A proposed **hook line** (1–2 lines)
-- The **pillar** you recommend (Educational, Storytelling, etc.)
-- The best **content type** (Long-form Script, Short-form Script, Carousel, Story Post, Engagement Reel)
-- 1–2 sentence summary of what happens in the piece and how it ends.
-
-Important:
-- Do NOT reuse sentences or copy the original transcript.
-- Keep the same **energy, pacing, and style**, but change the topic/angle enough that it feels fresh.`
-    } else {
-      // === HANDLE/NICHE MODE (NO TRANSCRIPT) ===
-      userPrompt = `## COMPETITOR ANALYSIS REQUEST
-
-**Platform:** ${platform}
-**Competitor Handle:** ${competitorHandle || 'N/A'}
-**Client Niche:** ${clientNiche}
-
-We want to understand how this competitor (and similar top accounts in this niche) probably wins, and how our client can beat them.
-
-Provide a structured analysis with the following sections:
-
----
-
-### 1. ACCOUNT & NICHE OVERVIEW
-- Based on the handle, platform, and niche, what type of content does this competitor likely publish?
-- Who is their likely target audience (demographics, psychographics)?
-
----
-
-### 2. HOOK PATTERNS (Give AT LEAST 10 specific hook formulas)
-For each hook:
-- Give a **formula-style example** that could be used in this niche
-- Briefly explain **why** it works (psychology, pattern interrupt, curiosity, pain, etc.)
-
-Format:
-1. "Hook example" – Why it works: [short reasoning]
-
-Focus on:
-- Scroll-stoppers
-- Pain + desire
-- Identity-based hooks ("If you're a [ROLE]...")
-
----
-
-### 3. CONTENT STRUCTURE & PILLARS
-- What are the likely **content pillars** this competitor uses? (Educational, Storytelling, Authority, Series, Double Down, etc.)
-- For each pillar:
-  - Describe how it probably shows up in their content.
-  - Give 2–3 example content ideas that fit that pillar.
-
----
-
-### 4. CTA & LEAD-GEN STRATEGY
-- What CTAs are likely working in this niche and platform?
-- Give **10+ CTA formulas** that are:
-  - Comment-based ("Comment 'WORD' if you want..."),
-  - DM-based,
-  - Soft, not pushy.
-- Mention how they might be driving people to:
-  - Lead magnets,
-  - Calendly/booking links,
-  - DMs, etc.
-
----
-
-### 5. POSTING & FORMATS
-- Which formats are likely their top performers (shorts/reels, carousels, stories, long-form)?
-- What posting frequency likely works best in this niche?
-- Any observations about:
-  - Length,
-  - Editing style,
-  - Thumbnails/covers,
-  - Use of text on screen?
-
----
-
-### 6. GAPS & OPPORTUNITIES (HIGH VALUE)
-This is the **most important** section.
-
-- What are the **most common mistakes** and missed angles accounts in this niche usually have?
-- Where are the likely **content gaps** this competitor is leaving open?
-- How can our client **differentiate**, for example:
-  - Stronger hooks,
-  - Deeper stories,
-  - More concrete frameworks,
-  - Better, more modern CTAs,
-  - Clearer lead-gen flow?
-
-List at least 5–7 **specific, actionable moves** our client can make to beat this competitor.
-
----
-
-Be extremely specific. Give real example hooks, content ideas, and CTAs that our client can plug into content creation immediately.`
-    }
+Return ONLY the JSON. No preamble, no trailing commentary.`
 
     const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: userPrompt },
       ],
       model: 'llama-3.3-70b-versatile',
-      temperature: hasTranscript ? 0.7 : 0.65,
+      temperature: 0.6,
       max_tokens: 4000,
+      response_format: { type: 'json_object' },
     })
 
-    const analysis = completion.choices[0]?.message?.content || ''
+    const raw = completion.choices[0]?.message?.content || '{}'
 
-    return NextResponse.json({ 
-      success: true, 
-      analysis 
-    })
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch (e) {
+      console.error('analyze-competitor parse error:', e, raw.slice(0, 500))
+      return NextResponse.json(
+        { success: false, error: 'AI returned an unparseable response — try again.' },
+        { status: 500 },
+      )
+    }
 
+    const analysis = normalizeAnalysis(parsed)
+
+    return NextResponse.json({ success: true, analysis })
   } catch (error) {
     console.error('Analysis Error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to analyze competitor' },
-      { status: 500 }
-    )
+    const msg = error instanceof Error ? error.message : 'Failed to analyze competitor'
+    return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }

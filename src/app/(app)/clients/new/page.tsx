@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { FileUpload } from '@/components/ui/FileUpload'
 
 import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
 import { defaultBrandProfile } from '@/components/clients/brandProfile'
@@ -25,7 +25,7 @@ type NewClientFormData = {
   business_name: string
   industry: string
   target_audience: string
-  brand_doc_text: string
+  brand_doc_url: string
   dos_and_donts: string
   topics_library: string
   key_stories: string
@@ -60,7 +60,7 @@ export default function NewClientPage() {
     business_name: '',
     industry: '',
     target_audience: '',
-    brand_doc_text: '',
+    brand_doc_url: '',
     dos_and_donts: '',
     topics_library: '',
     key_stories: '',
@@ -138,7 +138,7 @@ export default function NewClientPage() {
           business_name: formData.business_name,
           industry: formData.industry,
           target_audience: formData.target_audience,
-          brand_doc_text: formData.brand_doc_text,
+          brand_doc_url: formData.brand_doc_url || null,
           dos_and_donts: formData.dos_and_donts,
           topics_library: formData.topics_library,
           key_stories: formData.key_stories,
@@ -312,7 +312,7 @@ export default function NewClientPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Header title="Add New Client" subtitle="Create a new client profile" />
 
       <div className="p-8 max-w-4xl">
@@ -429,17 +429,49 @@ export default function NewClientPage() {
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-              <p className="text-sm text-gray-500 mt-1">Paste the full brand guidelines, voice, tone, and messaging here.</p>
+              <p className="text-sm text-gray-500 mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
             </CardHeader>
-            <CardContent>
-              <textarea
-                name="brand_doc_text"
-                value={formData.brand_doc_text}
-                onChange={handleChange}
-                placeholder="Paste the entire brand document here..."
-                rows={12}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none font-mono text-sm"
-              />
+            <CardContent className="space-y-4">
+              {formData.brand_doc_url ? (
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <a
+                    href={formData.brand_doc_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 text-sm flex-1 truncate hover:underline"
+                  >
+                    {formData.brand_doc_url}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, brand_doc_url: '' }))}
+                    className="text-green-700 text-xs hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <FileUpload
+                    folder="brand-docs"
+                    accept="application/pdf"
+                    label="Upload PDF brand document"
+                    onUpload={(url) => setFormData((prev) => ({ ...prev, brand_doc_url: url }))}
+                  />
+                  <div className="flex items-center gap-3">
+                    <div className="h-px bg-gray-200 flex-1" />
+                    <span className="text-xs text-gray-400">or paste a link</span>
+                    <div className="h-px bg-gray-200 flex-1" />
+                  </div>
+                  <Input
+                    name="brand_doc_url"
+                    value={formData.brand_doc_url}
+                    onChange={handleChange}
+                    placeholder="https://docs.google.com/document/d/..."
+                  />
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -529,6 +561,6 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -16,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 
 import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
 import { defaultBrandProfile } from '@/components/clients/brandProfile'
+import { TopicsBank } from '@/components/clients/TopicsBank'
 
 type BrandProfile = ReturnType<typeof defaultBrandProfile>
 type ContentTier = 'beginner' | 'mid' | 'advanced'
@@ -28,6 +28,7 @@ interface ClientRow {
   profile_picture_url: string | null
   target_audience: string | null
   brand_doc_text: string | null
+  brand_doc_url: string | null
   dos_and_donts: string | null
   topics_library: string | null
   key_stories: string | null
@@ -40,6 +41,8 @@ interface ClientRow {
   content_tier?: ContentTier | null
   brand_profile?: BrandProfile | null
   archived_at?: string | null
+  brand_intake_token?: string | null
+  brand_intake_submitted_at?: string | null
 }
 
 type ClientFormData = {
@@ -49,6 +52,7 @@ type ClientFormData = {
   profile_picture_url: string
   target_audience: string
   brand_doc_text: string
+  brand_doc_url: string
   dos_and_donts: string
   topics_library: string
   key_stories: string
@@ -80,6 +84,8 @@ export default function ClientDetailPage() {
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [portalLink, setPortalLink] = useState<string | null>(null)
+  const [intakeToken, setIntakeToken] = useState<string | null>(null)
+  const [isGeneratingIntake, setIsGeneratingIntake] = useState(false)
 
   const [formData, setFormData] = useState<ClientFormData>({
     name: '',
@@ -88,6 +94,7 @@ export default function ClientDetailPage() {
     profile_picture_url: '',
     target_audience: '',
     brand_doc_text: '',
+    brand_doc_url: '',
     dos_and_donts: '',
     topics_library: '',
     key_stories: '',
@@ -107,6 +114,7 @@ export default function ClientDetailPage() {
       profile_picture_url: row.profile_picture_url ?? '',
       target_audience: row.target_audience ?? '',
       brand_doc_text: row.brand_doc_text ?? '',
+      brand_doc_url: row.brand_doc_url ?? '',
       dos_and_donts: row.dos_and_donts ?? '',
       topics_library: row.topics_library ?? '',
       key_stories: row.key_stories ?? '',
@@ -163,6 +171,7 @@ export default function ClientDetailPage() {
       if (row) {
         setClient(row)
         setFormData(mapClientToForm(row))
+        setIntakeToken(row.brand_intake_token ?? null)
       } else {
         setClient(null)
       }
@@ -243,6 +252,7 @@ export default function ClientDetailPage() {
       profile_picture_url: formData.profile_picture_url ? formData.profile_picture_url : null,
       target_audience: formData.target_audience,
       brand_doc_text: formData.brand_doc_text,
+      brand_doc_url: formData.brand_doc_url ? formData.brand_doc_url : null,
       dos_and_donts: formData.dos_and_donts,
       topics_library: formData.topics_library,
       key_stories: formData.key_stories,
@@ -300,24 +310,58 @@ export default function ClientDetailPage() {
     setTimeout(() => setNotification(null), 2000)
   }
 
+  const intakeLink = intakeToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/intake/${intakeToken}` : null
+
+  const generateIntakeLink = async () => {
+    if (!clientId) return
+    setIsGeneratingIntake(true)
+    try {
+      const res = await fetch('/api/clients/brand-intake/generate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        setNotification({ type: 'error', message: data.error || 'Failed to generate link' })
+      } else {
+        setIntakeToken(data.token)
+        setNotification({ type: 'success', message: 'Intake link generated' })
+      }
+    } catch (e) {
+      console.error('generate intake link error:', e)
+      setNotification({ type: 'error', message: 'Failed to generate link' })
+    } finally {
+      setIsGeneratingIntake(false)
+      setTimeout(() => setNotification(null), 2500)
+    }
+  }
+
+  const copyIntakeLink = async () => {
+    if (!intakeLink) return
+    await navigator.clipboard.writeText(intakeLink)
+    setNotification({ type: 'success', message: 'Intake link copied!' })
+    setTimeout(() => setNotification(null), 2000)
+  }
+
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-8 text-center">Loading...</div>
-      </DashboardLayout>
+      </>
     )
   }
 
   if (!client) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-8 text-center">Client not found</div>
-      </DashboardLayout>
+      </>
     )
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Header title={client.name ?? ''} subtitle={client.business_name ?? ''} />
 
       <div className="p-8 max-w-4xl">
@@ -384,6 +428,38 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="mb-6 border-purple-200 bg-purple-50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-purple-700">Brand Intake Link</p>
+                {intakeLink ? (
+                  <p className="text-sm text-purple-600/70 truncate">{intakeLink}</p>
+                ) : (
+                  <p className="text-sm text-purple-600/70">
+                    Generate a shareable link the client can fill out themselves.
+                  </p>
+                )}
+                {client?.brand_intake_submitted_at && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Client submitted on {new Date(client.brand_intake_submitted_at).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {intakeLink && (
+                  <Button size="sm" variant="outline" onClick={copyIntakeLink}>
+                    Copy
+                  </Button>
+                )}
+                <Button size="sm" onClick={generateIntakeLink} isLoading={isGeneratingIntake}>
+                  {intakeLink ? 'Regenerate' : 'Generate Link'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="space-y-6">
           <Card>
@@ -492,17 +568,49 @@ export default function ClientDetailPage() {
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-              <p className="text-sm text-gray-500 mt-1">Paste the full brand guidelines here. The AI uses this for all content.</p>
+              <p className="text-sm text-gray-500 mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
             </CardHeader>
-            <CardContent>
-              <textarea
-                name="brand_doc_text"
-                value={formData.brand_doc_text}
-                onChange={handleChange}
-                placeholder="Paste brand guidelines, voice, tone, messaging, values, positioning..."
-                rows={10}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none font-mono text-sm"
-              />
+            <CardContent className="space-y-4">
+              {formData.brand_doc_url ? (
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <a
+                    href={formData.brand_doc_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 text-sm flex-1 truncate hover:underline"
+                  >
+                    {formData.brand_doc_url}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, brand_doc_url: '' }))}
+                    className="text-green-700 text-xs hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <FileUpload
+                    folder="brand-docs"
+                    accept="application/pdf"
+                    label="Upload PDF brand document"
+                    onUpload={(url) => setFormData((prev) => ({ ...prev, brand_doc_url: url }))}
+                  />
+                  <div className="flex items-center gap-3">
+                    <div className="h-px bg-gray-200 flex-1" />
+                    <span className="text-xs text-gray-400">or paste a link</span>
+                    <div className="h-px bg-gray-200 flex-1" />
+                  </div>
+                  <Input
+                    name="brand_doc_url"
+                    value={formData.brand_doc_url}
+                    onChange={handleChange}
+                    placeholder="https://docs.google.com/document/d/..."
+                  />
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -575,6 +683,8 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
+          <TopicsBank clientId={clientId} />
+
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-gray-900">Competitor Insights</h3>
@@ -600,6 +710,6 @@ export default function ClientDetailPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

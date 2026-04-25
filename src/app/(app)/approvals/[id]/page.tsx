@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -621,7 +620,7 @@ await loadApproval()
 
   if (isLoading || !approval) {
     return (
-      <DashboardLayout>
+      <>
         <Header title="Approval Detail" />
         <div className="p-8">
           <Card>
@@ -631,7 +630,7 @@ await loadApproval()
             </CardContent>
           </Card>
         </div>
-      </DashboardLayout>
+      </>
     )
   }
 
@@ -650,7 +649,7 @@ await loadApproval()
   })
 
   return (
-    <DashboardLayout>
+    <>
       <Header
         title={approval.title}
         subtitle={`${clientName} · Created ${createdDate}`}
@@ -1149,6 +1148,6 @@ await loadApproval()
   </div>
 )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }
