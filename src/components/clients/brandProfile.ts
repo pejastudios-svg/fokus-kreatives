@@ -36,6 +36,9 @@ export type BrandProfile = {
     signature_phrases: [string, string, string]
     forbidden_words: [string, string, string]
     address_audience_as: string
+    samples: string[]
+    banned_phrases: string[]
+    common_enemy: string
   }
 
   visual: {
@@ -155,6 +158,9 @@ export function defaultBrandProfile(): BrandProfile {
       signature_phrases: ['', '', ''],
       forbidden_words: ['', '', ''],
       address_audience_as: 'You',
+      samples: [],
+      banned_phrases: [],
+      common_enemy: '',
     },
     visual: {
       colors: {
@@ -304,6 +310,9 @@ export function normalizeBrandProfile(input?: Partial<BrandProfile> | null): Bra
       ...v.voice,
       signature_phrases: tuple3(v.voice?.signature_phrases, d.voice.signature_phrases),
       forbidden_words: tuple3(v.voice?.forbidden_words, d.voice.forbidden_words),
+      samples: v.voice?.samples ?? d.voice.samples,
+      banned_phrases: v.voice?.banned_phrases ?? d.voice.banned_phrases,
+      common_enemy: v.voice?.common_enemy ?? d.voice.common_enemy,
     },
 
     visual: {

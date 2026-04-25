@@ -376,6 +376,104 @@ export function BrandProfileForm({
               ))}
             </div>
           </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <Input
+              label="Common enemy (optional)"
+              value={bp.voice.common_enemy}
+              onChange={(e) => set('voice', { ...bp.voice, common_enemy: e.target.value })}
+              placeholder="e.g., gurus selling overnight results, the 9-to-5 grind, cookie-cutter advice"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The shared frustration you and your audience both push back against. Used in hooks and framing.
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Voice samples / brain dump</label>
+              <p className="text-xs text-gray-500 mt-1 mb-2">
+                Paste anything you&apos;ve written or said that sounds like you — captions, voice memos, texts, tweets. The AI uses these as voice few-shots.
+              </p>
+            </div>
+            {bp.voice.samples.map((s, idx) => (
+              <div key={idx} className="relative">
+                <textarea
+                  value={s}
+                  onChange={(e) => {
+                    const copy = [...bp.voice.samples]
+                    copy[idx] = e.target.value
+                    set('voice', { ...bp.voice, samples: copy })
+                  }}
+                  rows={4}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm"
+                  placeholder={`Sample ${idx + 1} — dump a real caption, DM, or transcript chunk`}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const copy = bp.voice.samples.filter((_, i) => i !== idx)
+                    set('voice', { ...bp.voice, samples: copy })
+                  }}
+                  className="absolute top-2 right-2 text-xs text-gray-400 hover:text-red-500"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                set('voice', { ...bp.voice, samples: [...bp.voice.samples, ''] })
+              }
+              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              + Add voice sample
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Banned phrases (flexible list)</label>
+              <p className="text-xs text-gray-500 mt-1 mb-2">
+                Any phrase that sounds AI-generated or off-brand. These are stripped from every output.
+              </p>
+            </div>
+            {bp.voice.banned_phrases.map((p, idx) => (
+              <div key={idx} className="flex gap-2">
+                <input
+                  type="text"
+                  value={p}
+                  onChange={(e) => {
+                    const copy = [...bp.voice.banned_phrases]
+                    copy[idx] = e.target.value
+                    set('voice', { ...bp.voice, banned_phrases: copy })
+                  }}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm"
+                  placeholder="e.g., game changer, dive in, buckle up"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const copy = bp.voice.banned_phrases.filter((_, i) => i !== idx)
+                    set('voice', { ...bp.voice, banned_phrases: copy })
+                  }}
+                  className="px-3 text-sm text-gray-400 hover:text-red-500"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                set('voice', { ...bp.voice, banned_phrases: [...bp.voice.banned_phrases, ''] })
+              }
+              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              + Add banned phrase
+            </button>
+          </div>
         </CardContent>
       </Card>
 

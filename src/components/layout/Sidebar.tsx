@@ -10,7 +10,6 @@ import {
   Users,
   UserCircle,
   Search,
-  MessageSquare,
   Settings,
   LogOut,
   ChevronDown,
@@ -23,7 +22,6 @@ const baseNavigation = [
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Team', href: '/team', icon: UserCircle },
   { name: 'Competitors', href: '/competitors', icon: Search },
-  { name: 'Message Suggestions', href: '/automations', icon: MessageSquare },
   { name: 'Approvals', href: '/approvals', icon: ClipboardList },
 ]
 

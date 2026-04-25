@@ -169,6 +169,17 @@ export function Header({ title, subtitle }: HeaderProps) {
       case 'approval_reminder':
         return `Approval reminder: ${data.title || ''}`
 
+      case 'brand_intake_submitted':
+        return `${data.clientName || 'A client'} submitted their brand intake`
+
+      case 'question_form_submitted': {
+        const count = typeof data.count === 'number' ? data.count : 0
+        const name = data.clientName || 'A client'
+        return count
+          ? `${name} answered ${count} braindump question${count === 1 ? '' : 's'}`
+          : `${name} submitted a braindump`
+      }
+
       default:
         return 'Notification'
     }
@@ -230,6 +241,18 @@ export function Header({ title, subtitle }: HeaderProps) {
                         // Task notifications
                         if (data.taskId) {
                           router.push(`/tasks?taskId=${data.taskId}`)
+                          return
+                        }
+
+                        // Brand intake or question form submitted → go to client profile
+                        if (
+                          n.type === 'brand_intake_submitted' ||
+                          n.type === 'question_form_submitted'
+                        ) {
+                          const clientId = data.clientId
+                          if (clientId) {
+                            router.push(`/clients/${clientId}`)
+                          }
                           return
                         }
 

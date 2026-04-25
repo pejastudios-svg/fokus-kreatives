@@ -1,0 +1,172 @@
+import Groq from 'groq-sdk'
+import { GoogleGenAI } from '@google/genai'
+
+export type ScriptProvider = 'groq' | 'gemini'
+
+export interface GenerateScriptInput {
+  system: string
+  user: string
+  temperature: number
+  maxTokens: number
+  /** Request JSON object output (used by question-form generator). */
+  jsonObject?: boolean
+}
+
+export interface GenerateScriptResult {
+  content: string
+  provider: ScriptProvider
+  model: string
+}
+
+function resolveProvider(): ScriptProvider {
+  const raw = (process.env.SCRIPT_PROVIDER || '').toLowerCase().trim()
+  if (raw === 'groq') return 'groq'
+  return 'gemini'
+}
+
+function resolveModel(provider: ScriptProvider): string {
+  if (provider === 'gemini') {
+    return process.env.GEMINI_MODEL_MAIN || 'gemini-2.5-flash'
+  }
+  return process.env.GROQ_MODEL_MAIN || 'llama-3.3-70b-versatile'
+}
+
+async function generateWithGroq(
+  input: GenerateScriptInput,
+  model: string,
+): Promise<string> {
+  if (!process.env.GROQ_API_KEY) throw new Error('Missing GROQ_API_KEY')
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  const completion = await groq.chat.completions.create({
+    model,
+    temperature: input.temperature,
+    max_tokens: input.maxTokens,
+    ...(input.jsonObject ? { response_format: { type: 'json_object' } } : {}),
+    messages: [
+      { role: 'system', content: input.system },
+      { role: 'user', content: input.user },
+    ],
+  })
+  return completion.choices[0]?.message?.content || ''
+}
+
+function isGeminiDailyQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  // Daily per-model quota from the free tier — string match on the canonical quotaId Google returns.
+  // Distinct from a per-minute 429 (which recovers in seconds and is worth retrying).
+  return /GenerateRequestsPerDayPerProjectPerModel|generate_content_free_tier_requests/i.test(msg)
+}
+
+/**
+ * Gemini's error body sometimes includes a RetryInfo hint like `retryDelay: "58s"` or `"1.5s"`.
+ * When present and short (≤ 90s), this means the quota is expected to replenish soon — Google
+ * occasionally tags per-minute-window exhaustion with the PerDay quotaId, so the retryDelay is
+ * the more reliable signal than the quotaId label.
+ */
+function extractGeminiRetryDelayMs(err: unknown): number | null {
+  const msg = err instanceof Error ? err.message : String(err)
+  const m = msg.match(/retryDelay["'\s:]+["']?(\d+(?:\.\d+)?)s/i)
+  if (!m) return null
+  const seconds = parseFloat(m[1])
+  if (!isFinite(seconds) || seconds <= 0) return null
+  if (seconds > 90) return null
+  return Math.ceil(seconds * 1000)
+}
+
+function isTransientGeminiError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  // If Gemini itself tells us to retry in under 90s, honor that even when the quotaId says "daily".
+  if (extractGeminiRetryDelayMs(err) !== null) return true
+  if (isGeminiDailyQuotaError(err)) return false
+  return /(503|UNAVAILABLE|overloaded|high demand|429|RESOURCE_EXHAUSTED|ECONNRESET|ETIMEDOUT)/i.test(msg)
+}
+
+async function callGeminiOnce(
+  ai: GoogleGenAI,
+  model: string,
+  input: GenerateScriptInput,
+): Promise<string> {
+  // Total wait across all retries ≈ 77s. Gemini transient 503s generally recover within a minute.
+  const delays = [2000, 5000, 10000, 20000, 40000]
+  let lastErr: unknown
+  let dailyHintedAttempts = 0
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      const res = await ai.models.generateContent({
+        model,
+        contents: input.user,
+        config: {
+          systemInstruction: input.system,
+          temperature: input.temperature,
+          maxOutputTokens: input.maxTokens,
+          ...(input.jsonObject ? { responseMimeType: 'application/json' } : {}),
+        },
+      })
+      return res.text || ''
+    } catch (err) {
+      lastErr = err
+      if (!isTransientGeminiError(err) || attempt === delays.length) throw err
+      const hinted = extractGeminiRetryDelayMs(err)
+      // Daily-labeled 429 with a short retryDelay: retry AT MOST once. Two in a row means the
+      // quota is genuinely exhausted and we should bail fast so the caller can fall back or surface
+      // the error, rather than hanging for minutes behind a frontend request.
+      if (hinted !== null && isGeminiDailyQuotaError(err)) {
+        if (dailyHintedAttempts >= 1) throw err
+        dailyHintedAttempts++
+      }
+      const base = hinted ?? delays[attempt]
+      const jitter = Math.floor(Math.random() * 500)
+      await new Promise((r) => setTimeout(r, base + jitter))
+    }
+  }
+  throw lastErr
+}
+
+async function generateWithGemini(
+  input: GenerateScriptInput,
+  model: string,
+): Promise<string> {
+  if (!process.env.GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY')
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+
+  try {
+    return await callGeminiOnce(ai, model, input)
+  } catch (err) {
+    // On a DAILY quota exhaustion only, swap to the lite model (same API key, much larger
+    // free-tier daily cap — ~1000/day for flash-lite vs 20/day for flash). Per-minute 429s
+    // are handled by the retry loop above, not here.
+    const fallbackModel = process.env.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash-lite'
+    if (model === fallbackModel || !isGeminiDailyQuotaError(err)) throw err
+    console.warn(`[provider] gemini model ${model} hit daily quota; switching to ${fallbackModel} for this request.`)
+    return await callGeminiOnce(ai, fallbackModel, input)
+  }
+}
+
+function isTransientProviderError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /(503|UNAVAILABLE|overloaded|high demand|429|RESOURCE_EXHAUSTED|ECONNRESET|ETIMEDOUT)/i.test(msg)
+}
+
+export async function generateScript(
+  input: GenerateScriptInput,
+): Promise<GenerateScriptResult> {
+  const primary = resolveProvider()
+  const primaryModel = resolveModel(primary)
+  try {
+    const content =
+      primary === 'gemini'
+        ? await generateWithGemini(input, primaryModel)
+        : await generateWithGroq(input, primaryModel)
+    return { content, provider: primary, model: primaryModel }
+  } catch (err) {
+    // Only fall back from Groq → Gemini. The reverse (Gemini → Groq) is unsafe:
+    // Groq's free tier caps TPM at 8k, and the longform prompt + 8k output budget
+    // routinely exceeds that, so a Gemini outage falling back to Groq would swap
+    // one error for another. Stick with Gemini and let its extended retries handle it.
+    if (primary !== 'groq' || !isTransientProviderError(err) || !process.env.GEMINI_API_KEY) throw err
+    console.warn(`[provider] groq failed transiently; falling back to gemini. Error: ${err instanceof Error ? err.message : String(err)}`)
+    const fallbackModel = resolveModel('gemini')
+    const content = await generateWithGemini(input, fallbackModel)
+    return { content, provider: 'gemini', model: fallbackModel }
+  }
+}
