@@ -79,9 +79,10 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
     const url = `${appUrl}/approvals/${comment.approval_id}`
 
-    // Snippet for the popup body.
+    // Snippet for the popup body. Field name matches what the comment route
+    // emits (data.contentSnippet) so the popup's subtitle lookup hits.
     const raw = (comment.content || '').toString().trim()
-    const commentSnippet = raw.length > 120 ? raw.slice(0, 120) + '…' : raw
+    const contentSnippet = raw.length > 120 ? raw.slice(0, 120) + '…' : raw
 
     await fetch(`${appUrl}/api/notifications/create`, {
       method: 'POST',
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
           approvalTitle: approval?.title || 'Approval',
           clientName,
           commentId: comment.id,
-          commentSnippet,
+          contentSnippet,
           url,
         },
       }),

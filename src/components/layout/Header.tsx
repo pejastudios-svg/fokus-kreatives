@@ -245,6 +245,7 @@ export function Header({ title, subtitle }: HeaderProps) {
     if (
       n.type === 'approval_created' ||
       n.type === 'approval_approved' ||
+      n.type === 'approval_comment' ||
       n.type === 'approval_mention' ||
       n.type === 'approval_reminder'
     ) {
@@ -406,10 +407,20 @@ function formatNotificationText(n: NotificationRow) {
       return `Approval created for ${data.clientName || 'client'}: ${data.title || ''}`
     case 'approval_approved':
       return `Approval approved for ${data.clientName || 'client'}: ${data.title || ''}`
-    case 'approval_commented':
-      return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
-    case 'approval_mention':
-      return `You were mentioned in an approval: ${data.title || ''}`
+    case 'approval_comment': {
+      // Server emits this type from /api/approvals/comment (used to be a
+      // typo'd `approval_commented` here, which made every comment fall
+      // through to the bare `Notification` label).
+      const who = data.clientName || 'client'
+      const where = data.title ? ` on "${data.title}"` : ''
+      const snippet = typeof data.contentSnippet === 'string' ? `: ${data.contentSnippet}` : ''
+      return `New comment from ${who}${where}${snippet}`
+    }
+    case 'approval_mention': {
+      const where = data.title ? ` on "${data.title}"` : ''
+      const snippet = typeof data.contentSnippet === 'string' ? `: ${data.contentSnippet}` : ''
+      return `You were mentioned${where}${snippet}`
+    }
     case 'approval_reminder':
       return `Approval reminder: ${data.title || ''}`
     case 'brand_intake_submitted':
@@ -431,7 +442,10 @@ function formatNotificationText(n: NotificationRow) {
     }
     case 'approval_comment_resolved': {
       const title = typeof data.approvalTitle === 'string' ? data.approvalTitle : 'an approval'
-      return `A comment on "${title}" was resolved`
+      const snippet = typeof data.contentSnippet === 'string' && data.contentSnippet
+        ? `: ${data.contentSnippet}`
+        : ''
+      return `A comment on "${title}" was resolved${snippet}`
     }
     default:
       return 'Notification'

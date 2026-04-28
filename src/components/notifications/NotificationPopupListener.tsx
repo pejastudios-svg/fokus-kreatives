@@ -90,6 +90,8 @@ export function NotificationPopupListener() {
       ? 'New approval created'
       : popup.type === 'approval_approved'
       ? 'Approval approved'
+      : popup.type === 'approval_comment'
+      ? 'New comment'
       : popup.type === 'approval_mention'
       ? 'You were mentioned'
       : popup.type === 'approval_reminder'
@@ -104,7 +106,10 @@ export function NotificationPopupListener() {
       ? 'Comment resolved'
       : 'New notification'
 
+  // Prefer the comment snippet when there is one - it's the most useful
+  // piece of info on a popup. Fall back to the approval title / client name.
   const subtitle =
+    popup.data?.contentSnippet ||
     popup.data?.title ||
     popup.data?.approvalTitle ||
     popup.data?.clientName ||
