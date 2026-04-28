@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -22,7 +22,9 @@ import { defaultBrandProfile, type BrandProfile } from '../clients/brandProfile'
 import type { Topic } from '@/lib/types/topics'
 import { ClientPicker } from './ClientPicker'
 import { copyToClipboard } from '@/lib/util/clipboard'
+import { ScriptReviewer, type ScriptKind } from '@/components/ui/ScriptReviewer'
 import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 
 interface ClientRow {
   id: string
@@ -42,18 +44,13 @@ interface ClientRow {
   brand_profile: BrandProfile | null
 }
 
-const PILLARS = [
-  { id: 'educational', label: 'Educational' },
-  { id: 'storytelling', label: 'Storytelling' },
-  { id: 'authority', label: 'Authority' },
-  { id: 'series', label: 'Series' },
-  { id: 'doubledown', label: 'Double Down' },
-] as const
-
-type PillarId = (typeof PILLARS)[number]['id']
-
 type CardKind = 'longform' | 'carousel' | 'reel' | 'story'
 type CardStatus = 'pending' | 'loading' | 'ready' | 'error'
+
+function cardKindToScriptKind(kind: CardKind): ScriptKind {
+  if (kind === 'reel') return 'engagement'
+  return kind
+}
 
 interface PackageCard {
   id: string
@@ -104,15 +101,23 @@ export function ScriptPackageEngine() {
 
   const [topics, setTopics] = useState<Topic[]>([])
   const [loadingTopics, setLoadingTopics] = useState(false)
-  const [selectedTopicId, setSelectedTopicId] = useState('')
+  const [selectedTopicId, setSelectedTopicId, clearTopic] = useFormPersistence('package:topic', '')
 
-  const [pillar, setPillar] = useState<PillarId>('educational')
-  const [ctaText, setCtaText] = useState('')
+  const [ctaText, setCtaText, clearCta] = useFormPersistence('package:cta', '')
 
-  const [longform, setLongform] = useState<PackageCard | null>(null)
-  const [carousels, setCarousels] = useState<PackageCard[]>([])
-  const [reels, setReels] = useState<PackageCard[]>([])
-  const [stories, setStories] = useState<PackageCard[]>([])
+  const [longform, setLongform, clearLongform] = useFormPersistence<PackageCard | null>(
+    'package:longform',
+    null,
+  )
+  const [carousels, setCarousels, clearCarousels] = useFormPersistence<PackageCard[]>(
+    'package:carousels',
+    [],
+  )
+  const [reels, setReels, clearReels] = useFormPersistence<PackageCard[]>('package:reels', [])
+  const [stories, setStories, clearStories] = useFormPersistence<PackageCard[]>(
+    'package:stories',
+    [],
+  )
 
   const [error, setError] = useState('')
   const [savingTopic, setSavingTopic] = useState(false)
@@ -153,14 +158,38 @@ export function ScriptPackageEngine() {
     [supabase],
   )
 
+  const didMountRef = useRef(false)
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      // Initial mount: keep any state restored from sessionStorage. Just load topics
+      // and convert any cards left "loading" by a refresh into recoverable errors.
+      if (selectedClientId) fetchTopics(selectedClientId)
+      const fix = (c: PackageCard): PackageCard =>
+        c.status === 'loading' || c.status === 'pending'
+          ? { ...c, status: 'error', error: 'Interrupted - click Redo to retry.' }
+          : c
+      setLongform((p) => (p ? fix(p) : p))
+      setCarousels((prev) => prev.map(fix))
+      setReels((prev) => prev.map(fix))
+      setStories((prev) => prev.map(fix))
+      return
+    }
     setSelectedTopicId('')
+    setCtaText('')
     setLongform(null)
     setCarousels([])
     setReels([])
     setStories([])
+    clearTopic()
+    clearCta()
+    clearLongform()
+    clearCarousels()
+    clearReels()
+    clearStories()
     if (selectedClientId) fetchTopics(selectedClientId)
     else setTopics([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId, fetchTopics])
 
   const generateLongform = async () => {
@@ -181,7 +210,7 @@ export function ScriptPackageEngine() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientProfile,
-          pillar,
+          pillar: selectedTopic.pillar,
           topicAnswer: selectedTopic.answer,
           topicQuestion: selectedTopic.question,
           ctaText: ctaText.trim() || null,
@@ -241,7 +270,7 @@ export function ScriptPackageEngine() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientProfile,
-            pillar,
+            pillar: selectedTopic?.pillar || 'educational',
             longformScript: longform.content,
             index: i + 1,
             total,
@@ -287,7 +316,7 @@ export function ScriptPackageEngine() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientProfile,
-          pillar,
+          pillar: selectedTopic?.pillar || 'educational',
           longformScript: longform.content,
           index: cardIndex + 1,
           total: allCards.length,
@@ -385,25 +414,9 @@ export function ScriptPackageEngine() {
       {selectedClient && selectedTopic && (
         <Card className="card-premium">
           <CardHeader>
-            <h3 className="text-lg font-semibold text-theme-primary">3. Pillar & optional CTA</h3>
+            <h3 className="text-lg font-semibold text-theme-primary">3. Optional CTA</h3>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {PILLARS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setPillar(p.id)}
-                  className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${
-                    pillar === p.id
-                      ? 'border-[#2B79F7] bg-[#E8F1FF] text-[#2B79F7]'
-                      : 'border-theme-primary text-theme-secondary hover:border-[#5A9AFF]'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+          <CardContent>
             <textarea
               value={ctaText}
               onChange={(e) => setCtaText(e.target.value)}
@@ -411,6 +424,10 @@ export function ScriptPackageEngine() {
               placeholder="Optional CTA (verbatim) - e.g. Comment LOOP and I'll DM you the full breakdown."
               className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary resize-none focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
+            <p className="mt-2 text-[11px] text-theme-secondary">
+              Pillar comes from the topic itself ({selectedTopic.pillar}). Pick a different
+              topic if you want a different framing.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -444,6 +461,9 @@ export function ScriptPackageEngine() {
           icon={FileText}
           card={longform}
           onRedo={generateLongform}
+          onContentChange={(next) =>
+            setLongform((prev) => (prev ? { ...prev, content: next } : prev))
+          }
           extraActions={
             longform.status === 'ready' && (
               <>
@@ -462,17 +482,17 @@ export function ScriptPackageEngine() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <LayoutGrid className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Carousel Repurpose (10)</h3>
+                <h3 className="text-lg font-semibold text-theme-primary">Carousel Repurpose (5)</h3>
               </div>
               <Button
                 size="sm"
                 onClick={() =>
-                  runRepurpose('/api/scripts/package/carousel', setCarousels, 'carousel', 10)
+                  runRepurpose('/api/scripts/package/carousel', setCarousels, 'carousel', 5)
                 }
                 disabled={carousels.some((c) => c.status === 'loading')}
               >
                 <Sparkles className="h-4 w-4 mr-1" />
-                {carousels.length ? 'Regenerate all' : 'Generate 10 carousels'}
+                {carousels.length ? 'Regenerate all' : 'Generate 5 carousels'}
               </Button>
             </div>
           </CardHeader>
@@ -488,6 +508,11 @@ export function ScriptPackageEngine() {
                     onRedo={() =>
                       regenerateCard('carousel', idx, '/api/scripts/package/carousel', setCarousels, carousels)
                     }
+                    onContentChange={(next) =>
+                      setCarousels((prev) =>
+                        prev.map((p, i) => (i === idx ? { ...p, content: next } : p)),
+                      )
+                    }
                   />
                 ))}
               </div>
@@ -502,15 +527,15 @@ export function ScriptPackageEngine() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Engagement Reels (10)</h3>
+                <h3 className="text-lg font-semibold text-theme-primary">Engagement Reels (5)</h3>
               </div>
               <Button
                 size="sm"
-                onClick={() => runRepurpose('/api/scripts/package/reel', setReels, 'reel', 10)}
+                onClick={() => runRepurpose('/api/scripts/package/reel', setReels, 'reel', 5)}
                 disabled={reels.some((c) => c.status === 'loading')}
               >
                 <Sparkles className="h-4 w-4 mr-1" />
-                {reels.length ? 'Regenerate all' : 'Generate 10 reels'}
+                {reels.length ? 'Regenerate all' : 'Generate 5 reels'}
               </Button>
             </div>
           </CardHeader>
@@ -526,6 +551,11 @@ export function ScriptPackageEngine() {
                     onRedo={() =>
                       regenerateCard('reel', idx, '/api/scripts/package/reel', setReels, reels)
                     }
+                    onContentChange={(next) =>
+                      setReels((prev) =>
+                        prev.map((p, i) => (i === idx ? { ...p, content: next } : p)),
+                      )
+                    }
                   />
                 ))}
               </div>
@@ -540,15 +570,15 @@ export function ScriptPackageEngine() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Stories (10)</h3>
+                <h3 className="text-lg font-semibold text-theme-primary">Stories (5)</h3>
               </div>
               <Button
                 size="sm"
-                onClick={() => runRepurpose('/api/scripts/package/story', setStories, 'story', 10)}
+                onClick={() => runRepurpose('/api/scripts/package/story', setStories, 'story', 5)}
                 disabled={stories.some((c) => c.status === 'loading')}
               >
                 <Sparkles className="h-4 w-4 mr-1" />
-                {stories.length ? 'Regenerate all' : 'Generate 10 stories'}
+                {stories.length ? 'Regenerate all' : 'Generate 5 stories'}
               </Button>
             </div>
           </CardHeader>
@@ -563,6 +593,11 @@ export function ScriptPackageEngine() {
                     compact
                     onRedo={() =>
                       regenerateCard('story', idx, '/api/scripts/package/story', setStories, stories)
+                    }
+                    onContentChange={(next) =>
+                      setStories((prev) =>
+                        prev.map((p, i) => (i === idx ? { ...p, content: next } : p)),
+                      )
                     }
                   />
                 ))}
@@ -580,6 +615,7 @@ function ResultCard({
   icon: Icon,
   card,
   onRedo,
+  onContentChange,
   compact = false,
   extraActions,
 }: {
@@ -587,6 +623,7 @@ function ResultCard({
   icon?: React.ComponentType<{ className?: string }>
   card: PackageCard
   onRedo: () => void
+  onContentChange?: (next: string) => void
   compact?: boolean
   extraActions?: React.ReactNode
 }) {
@@ -643,9 +680,19 @@ function ResultCard({
             <p className="text-sm text-red-600">{card.error || 'Failed'}</p>
           )}
           {card.status === 'ready' && (
-            <pre className="whitespace-pre-wrap bg-theme-tertiary/40 p-4 rounded-lg text-sm text-theme-primary font-sans leading-relaxed max-h-[480px] overflow-auto">
-              {card.content}
-            </pre>
+            onContentChange ? (
+              <ScriptReviewer
+                value={card.content}
+                onChange={onContentChange}
+                kind={cardKindToScriptKind(card.kind)}
+                minHeight={compact ? 280 : 460}
+                hideCopy
+              />
+            ) : (
+              <pre className="whitespace-pre-wrap bg-theme-tertiary/40 p-4 rounded-lg text-sm text-theme-primary font-sans leading-relaxed max-h-[480px] overflow-auto">
+                {card.content}
+              </pre>
+            )
           )}
         </CardContent>
       )}

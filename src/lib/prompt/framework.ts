@@ -167,7 +167,7 @@ FORMATTING, SPACING, PADDING (mandatory - the script is copy-pasted into a doc a
 - [DESCRIPTION] uses plain "•" bullets for the key-takeaway section, one per line, each ending with a period.`
 
 export const CAROUSEL_FROM_LONGFORM = `CAROUSEL REPURPOSE (from a long-form script):
-You are given the full long-form script and a CAROUSEL INDEX (1–10 - your position in the repurposing package). Pick ONE specific teaching beat from the long-form (one BODY point, one sub-mechanic, one named step inside a framework) and TEACH that beat as a standalone lesson. The carousel is not a trailer for the video and not a transcript of the video's intro - it stands alone as a mini-lesson that delivers the beat's value without the viewer ever having to watch the long-form.
+You are given the full long-form script and a CAROUSEL INDEX (1–5 - your position in the repurposing package). Pick ONE specific teaching beat from the long-form (one BODY point, one sub-mechanic, one named step inside a framework) and TEACH that beat as a standalone lesson. The carousel is not a trailer for the video and not a transcript of the video's intro - it stands alone as a mini-lesson that delivers the beat's value without the viewer ever having to watch the long-form.
 
 HARD RULES:
 - EXACTLY 10 slides. Not 6. Not 8. Ten. If the beat feels thin, expand it with concrete examples and edge cases pulled from the long-form - never pad with filler.
@@ -187,7 +187,7 @@ SLIDE ARC (10 slides, teaching structure):
 - Caption: 90–160 words, 3 bullets, ends with a question. The caption TEACHES the takeaway - it does not describe the carousel.
 
 OUTPUT FORMAT:
-[CAROUSEL N of 10]
+[CAROUSEL N of M]
 [ANGLE]  - one line: which specific long-form BODY beat this carousel teaches (name the mechanic, not the video topic)
 Slide 1: ...
 Slide 2: ...
@@ -203,37 +203,42 @@ Slide 10: ...
 [HASHTAGS]  - 12–18 tags, all unique`
 
 export const REEL_FROM_LONGFORM = `ENGAGEMENT REEL REPURPOSE (from a long-form script):
-You are given the full long-form script and a REEL INDEX (1–10 - your position in the repurposing package). Pick ONE specific teaching beat from the long-form (one BODY point, one sub-mechanic, one named step inside a framework) and turn JUST that beat into a short engagement reel that TEACHES the beat. The reel stands alone as a mini-lesson - the viewer should get the beat's payoff without ever watching the long-form.
+You are given the full long-form script and a REEL INDEX (1–5 - your position in the repurposing package). Pick ONE specific teaching beat from the long-form (one BODY point, one sub-mechanic, one named step inside a framework) and turn JUST that beat into a short engagement reel that TEACHES the beat. The reel stands alone as a mini-lesson - the viewer should get the beat's payoff without ever watching the long-form.
+
+THIS IS A SILENT, TEXT-ONLY FORMAT.
+- NO voiceover. NO narration. NO spoken script.
+- NEVER include lines like "Voiceover:", "Narration:", "Say this:", or any (spoken) annotation. Every word in the output is on-screen overlay text the viewer READS while watching the visual.
+- The format is fixed: Text-on-screen only. Do not output a [FORMAT] field or list alternatives.
 
 HARD RULES:
 - 1–4 scenes based on what the beat needs. Most reels are 2–3 scenes. Every scene must move the idea forward - no scene restates the previous one.
 - DO NOT transcribe the long-form's INTRO beats (Context / Common Belief / Contrarian / Proof / Plan) as the reel's scenes. That is the video's opening sequence, not a reel's teaching arc. Teach one BODY beat, not the video's own hook structure.
 - DO NOT lift sentences verbatim from the long-form. Reframe, tighten, and adapt every line for the reel format.
 - Every line traces back to the long-form - no new ideas, no invented examples, numbers, or frameworks.
+- Each on-screen overlay is short and screen-readable: 5–14 words per line. No paragraphs. No voiceover-length sentences.
 - Final scene closes a loop, poses a question, or leaves a one-line fortune cookie (use supplied CTA verbatim if given).
 - Pacing: specify slow-build | fast-cut | reflective | punchy based on the beat's emotional shape.
 
 SCENE ARC guidance (adapt to the beat):
-- Scene 1 (hook): a sharp opener that names the problem or payoff of the specific beat. Not the video's general topic - THIS beat.
-- Middle scene(s): the teaching core. Show the mechanic, a concrete micro-example, or a direct application. For a 2-scene reel, fold hook and teach together; for 3–4 scenes, separate them.
-- Final scene: the takeaway, an open question, or a soft CTA.
+- Scene 1 (hook): a sharp on-screen line that names the problem or payoff of the specific beat. Not the video's general topic - THIS beat.
+- Middle scene(s): the teaching core, expressed as overlay text. Show the mechanic, a concrete micro-example, or a direct application. For a 2-scene reel, fold hook and teach together; for 3–4 scenes, separate them.
+- Final scene: the takeaway, an open question, or a soft CTA, all as overlay text.
 
 OUTPUT FORMAT:
-[REEL N of 10]
+[REEL N of M]
 [ANGLE]  - one line: which specific long-form BODY beat this reel teaches (name the mechanic, not the video topic)
 [WHY THIS WORKS]  - 1–2 sentences on the psychology
-[FORMAT]  - Video (visual only) | Voiceover | Text-on-screen only
 [LENGTH]  - approx seconds
 [PACING]  - slow-build | fast-cut | reflective | punchy
 [SCENES]  - 1–4 scenes
-  Scene 1 (0–X sec): on-screen text + (optional) secondary text beneath
+  Scene 1 (0–X sec): On-screen text only. Write only the overlay line(s) — no voiceover, no narration.
   Scene 2 (X–Y sec): ...
   ...
 [CAPTION]  - 60–120 words, TEACHES the takeaway (does not describe the reel), ends with a question
 [HASHTAGS]  - 8–14 tags`
 
 export const STORY_FROM_LONGFORM = `STORY REPURPOSE (from a long-form script):
-You are given the full long-form script and a STORY INDEX (1–10 - your position in the repurposing package). Pick ONE small teaching moment from the long-form (a sub-mechanic, a tip, a micro-insight, a question that opens a loop) and turn it into a 1–4 slide IG story sequence that TEACHES or INVITES reflection on that one moment. The story stands alone - no context from the video required.
+You are given the full long-form script and a STORY INDEX (1–5 - your position in the repurposing package). Pick ONE small teaching moment from the long-form (a sub-mechanic, a tip, a micro-insight, a question that opens a loop) and turn it into a 1–4 slide IG story sequence that TEACHES or INVITES reflection on that one moment. The story stands alone - no context from the video required.
 
 HARD RULES:
 - 1–4 slides. Most stories are 2–3 slides. Short overlay text only, one idea per slide.
@@ -244,7 +249,7 @@ HARD RULES:
 - No captions, stories don't have them. Include sticker text if a poll/question.
 
 OUTPUT FORMAT:
-[STORY N of 10]
+[STORY N of M]
 [ANGLE]  - one line: which specific long-form BODY moment this story repurposes (name it precisely)
 [SLIDES]  - 1–4 slides
   Slide 1 (HOOK): overlay text

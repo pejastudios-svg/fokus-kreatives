@@ -69,7 +69,8 @@ const SHARED_GUARDRAILS = `GUARDRAILS:
 - CTA appears a maximum of THREE times total across the entire script: once inside the relevant body point, once inside the outro fortune cookie, and once in the [CTA] section. Do not parrot it in multiple outro sentences.
 - OUTRO must include the fortune-cookie tool/tip beat, not a vanilla recap. Outro is 3 beats maximum, no filler.
 - LENGTH IS EARNED: target the per-section word counts by going DEEPER on braindump beats (more concrete examples, more specific language). Never pad by restating the same idea in different words.
-- FORMATTING / SPACING: every bracket section sits on its own line with blank lines before and after. Every POINT N: header sits on its own line. Every CONTEXT:/APPLICATION:/FRAMING:/RE-HOOK: label sits on its own line with a blank line before it. Copy-paste of the output must read cleanly in a Google Doc with no manual reformatting.
+- FORMATTING / SPACING: every bracket section sits on its own line with blank lines before and after. Every POINT N: header sits on its own line. Every CONTEXT:/APPLICATION:/FRAMING:/RE-HOOK: label sits on its own line with a blank line before it. Slide N: / Frame N: headers also sit on their own line — the slide content goes on the NEXT line, never glued to the header. Copy-paste of the output must read cleanly in a Google Doc with no manual reformatting.
+- TAG-AS-HEADER (non-negotiable): bracket tags are headers, not punctuation. NEVER append a tag to the end of a paragraph (e.g. "...understood. [CTA]"). Each tag appears EXACTLY ONCE in the script — no writing [CTA] inside [PAYOFF] and again at the bottom.
 - For long-form (YouTube), use [DESCRIPTION] not [CAPTION], and NO hashtags in the output.
 - For carousel/reel/story (Instagram), keep [CAPTION] + [HASHTAGS].
 

@@ -121,6 +121,25 @@ function isTransientGeminiError(err: unknown): boolean {
   return /(503|UNAVAILABLE|overloaded|high demand|429|RESOURCE_EXHAUSTED|ECONNRESET|ETIMEDOUT)/i.test(msg)
 }
 
+/**
+ * Gemini 2.5 models include "thinking" tokens that count against
+ * maxOutputTokens. Pro defaults to using a generous chunk of the budget on
+ * reasoning, which truncates creative-writing outputs mid-script. Cap it.
+ *
+ * Pro:        cap thinking at 1024 (still gets some structured planning).
+ * Flash:      disable thinking (creative writing doesn't benefit much).
+ * Flash-Lite: disable thinking.
+ *
+ * Reference: https://ai.google.dev/gemini-api/docs/thinking
+ */
+function thinkingConfigFor(model: string): { thinkingBudget: number } | undefined {
+  const m = model.toLowerCase()
+  if (m.includes('flash-lite')) return { thinkingBudget: 0 }
+  if (m.includes('flash')) return { thinkingBudget: 0 }
+  if (m.includes('pro')) return { thinkingBudget: 1024 }
+  return undefined
+}
+
 async function callGeminiOnce(
   ai: GoogleGenAI,
   model: string,
@@ -130,6 +149,7 @@ async function callGeminiOnce(
   const delays = [2000, 5000, 10000, 20000, 40000]
   let lastErr: unknown
   let dailyHintedAttempts = 0
+  const thinkingConfig = thinkingConfigFor(model)
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       const res = await ai.models.generateContent({
@@ -139,6 +159,7 @@ async function callGeminiOnce(
           systemInstruction: input.system,
           temperature: input.temperature,
           maxOutputTokens: input.maxTokens,
+          ...(thinkingConfig ? { thinkingConfig } : {}),
           ...(input.jsonObject ? { responseMimeType: 'application/json' } : {}),
         },
       })

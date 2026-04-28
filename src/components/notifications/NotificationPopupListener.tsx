@@ -98,6 +98,8 @@ export function NotificationPopupListener() {
       ? 'Brand intake submitted'
       : popup.type === 'question_form_submitted'
       ? 'New form responses'
+      : popup.type === 'series_form_submitted'
+      ? 'Series form submitted'
       : 'New notification'
 
   const subtitle =

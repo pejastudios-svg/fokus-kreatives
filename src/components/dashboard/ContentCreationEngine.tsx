@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -27,7 +27,13 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { BrandProfile, defaultBrandProfile } from '../clients/brandProfile'
 import { Skeleton } from '@/components/ui/Loading'
+import { ScriptReviewer, type ScriptKind } from '@/components/ui/ScriptReviewer'
 import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
+import {
+  buildExternalPrompt,
+  type ExternalFormat,
+} from '@/lib/prompt/external'
 
 interface Client {
   id: string
@@ -75,11 +81,45 @@ const contentTypes = [
   { id: 'Engagement Reel', name: 'Engagement', icon: Zap, description: 'Viral reels' },
 ]
 
+function typeIdToScriptKind(id: string): ScriptKind {
+  switch (id) {
+    case 'Long-form Script':
+      return 'longform'
+    case 'Short-form Script':
+      return 'short'
+    case 'Carousel':
+      return 'carousel'
+    case 'Story Post':
+      return 'story'
+    case 'Engagement Reel':
+      return 'engagement'
+    default:
+      return 'short'
+  }
+}
+
+function typeIdToExternalFormat(id: string): ExternalFormat {
+  switch (id) {
+    case 'Long-form Script':
+      return 'longform'
+    case 'Short-form Script':
+      return 'short'
+    case 'Carousel':
+      return 'carousel'
+    case 'Story Post':
+      return 'story'
+    case 'Engagement Reel':
+      return 'engagement'
+    default:
+      return 'short'
+  }
+}
+
+
 const contentPillars = [
   { id: 'educational', name: 'Educational', description: 'Tips, tutorials, mistakes' },
   { id: 'storytelling', name: 'Storytelling', description: 'Journey, challenges, wins' },
   { id: 'authority', name: 'Authority', description: 'Case studies, transformations' },
-  { id: 'series', name: 'Series', description: 'Multi-part content' },
   { id: 'doubledown', name: 'Double Down', description: 'Expand proven content' },
 ]
 
@@ -150,32 +190,32 @@ export function ContentCreationEngine() {
     [clients, selectedClientId],
   )
 
-  const [selectedType, setSelectedType] = useState('Short-form Script')
-  const [selectedPillar, setSelectedPillar] = useState('educational')
+  const [selectedType, setSelectedType] = useFormPersistence('content:type', 'Short-form Script')
+  const [selectedPillar, setSelectedPillar] = useFormPersistence('content:pillar', 'educational')
   const [recommendedPillars, setRecommendedPillars] = useState<string[]>([])
 
-  const [ideaInput, setIdeaInput] = useState('')
+  const [ideaInput, setIdeaInput] = useFormPersistence('content:idea', '')
 
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedContent, setGeneratedContent] = useState('')
+  const [generatedContent, setGeneratedContent] = useFormPersistence('content:generated', '')
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
 
   // Title state
-  const [recommendedTitle, setRecommendedTitle] = useState('')
-  const [customTitle, setCustomTitle] = useState('')
-  const [useCustomTitle, setUseCustomTitle] = useState(false)
+  const [recommendedTitle, setRecommendedTitle] = useFormPersistence('content:recTitle', '')
+  const [customTitle, setCustomTitle] = useFormPersistence('content:customTitle', '')
+  const [useCustomTitle, setUseCustomTitle] = useFormPersistence('content:useCustomTitle', false)
   const [isSaving, setIsSaving] = useState(false)
   const [savedOnce, setSavedOnce] = useState(false)
 
   // CTA library
   const [ctas, setCtas] = useState<ClientCTA[]>([])
-  const [includeCta, setIncludeCta] = useState(true)
-  const [selectedCtaId, setSelectedCtaId] = useState<string>('')
+  const [includeCta, setIncludeCta] = useFormPersistence('content:includeCta', true)
+  const [selectedCtaId, setSelectedCtaId] = useFormPersistence('content:ctaId', '')
 
   // Custom CTA
-  const [customKeyword, setCustomKeyword] = useState('')
-  const [customCtaText, setCustomCtaText] = useState('')
+  const [customKeyword, setCustomKeyword] = useFormPersistence('content:customKw', '')
+  const [customCtaText, setCustomCtaText] = useFormPersistence('content:customCtaText', '')
 
   // Modal States
   const [showCtaModal, setShowCtaModal] = useState(false)
@@ -187,21 +227,68 @@ export function ContentCreationEngine() {
 
   // Reference Script State
   const [showRefModal, setShowRefModal] = useState(false)
-  const [referenceScript, setReferenceScript] = useState<SavedScript | null>(null)
+  const [referenceScript, setReferenceScript] = useFormPersistence<SavedScript | null>(
+    'content:ref',
+    null,
+  )
   const [savedScripts, setSavedScripts] = useState<SavedScript[]>([])
   const [bankSearch, setBankSearch] = useState('')
   const [deletingScriptId, setDeletingScriptId] = useState<string | null>(null)
   const [pendingScriptDeleteId, setPendingScriptDeleteId] = useState<string | null>(null)
   const [pendingCtaDeleteId, setPendingCtaDeleteId] = useState<string | null>(null)
 
-  const [includeMeta, setIncludeMeta] = useState(true)
+  const [includeMeta, setIncludeMeta] = useFormPersistence('content:includeMeta', true)
 
-  const needsReference = selectedPillar === 'series' || selectedPillar === 'doubledown'
+  // Double-Down external-prompt flow (Series moved to its own dashboard tab)
+  const [externalPrompt, setExternalPrompt, clearExternalPrompt] = useFormPersistence(
+    'content:externalPrompt',
+    '',
+  )
+  const [externalCopied, setExternalCopied] = useState(false)
 
+  // 'series' is intentionally absent here - it has its own dashboard tab
+  // (Series Form) that runs the per-entry intake flow. Double Down stays.
+  const isExternalPillar = selectedPillar === 'doubledown'
+  const needsReference = selectedPillar === 'doubledown'
+
+  // Old sessions may have 'series' stashed as the selected pillar - reset once
+  // on mount so the user doesn't land on a pillar with no matching button.
+  const didCheckLegacyPillarRef = useRef(false)
   useEffect(() => {
+    if (didCheckLegacyPillarRef.current) return
+    didCheckLegacyPillarRef.current = true
+    if (selectedPillar === 'series') setSelectedPillar('educational')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-derive includeMeta from selectedType, but skip on initial mount so a
+  // restored value isn't immediately overwritten.
+  const didMountTypeRef = useRef(false)
+  useEffect(() => {
+    if (!didMountTypeRef.current) {
+      didMountTypeRef.current = true
+      return
+    }
     if (selectedType === 'Story Post') setIncludeMeta(false)
     else setIncludeMeta(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType])
+
+  // Drop the external prompt when the user switches off series/doubledown so we
+  // don't leave a stale prompt visible. Skip on initial mount so a restored
+  // prompt isn't wiped just because the pillar was already non-external.
+  const didMountPillarRef = useRef(false)
+  useEffect(() => {
+    if (!didMountPillarRef.current) {
+      didMountPillarRef.current = true
+      return
+    }
+    if (selectedPillar !== 'series' && selectedPillar !== 'doubledown') {
+      setExternalPrompt('')
+      clearExternalPrompt()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPillar])
 
   const fetchClients = useCallback(async () => {
     try {
@@ -243,13 +330,29 @@ export function ContentCreationEngine() {
     [supabase],
   )
 
+  const didInitClientRef = useRef(false)
   useEffect(() => {
+    const isFirstRun = !didInitClientRef.current
+    didInitClientRef.current = true
+
     if (!selectedClient) {
       setCtas([])
-      setSelectedCtaId('')
+      // Only clear CTA selection on real client transitions, not on the very first
+      // render where clients are still loading and we'd wipe a restored selection.
+      if (!isFirstRun) {
+        setSelectedCtaId('')
+        setExternalPrompt('')
+        clearExternalPrompt()
+      }
       setRecommendedPillars([])
       setSavedScripts([])
       return
+    }
+
+    // Real client change: drop any prompt baked with the previous client's info.
+    if (!isFirstRun) {
+      setExternalPrompt('')
+      clearExternalPrompt()
     }
 
     const baseProfile = defaultBrandProfile()
@@ -292,6 +395,7 @@ export function ContentCreationEngine() {
 
     loadClientCtas(selectedClient.id)
     loadSavedScripts(selectedClient.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId, selectedClient, loadClientCtas, loadSavedScripts])
 
   const selectedCta = ctas.find((c) => c.id === selectedCtaId) || null
@@ -349,6 +453,41 @@ export function ContentCreationEngine() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleBuildPrompt = () => {
+    if (!selectedClient || !selectedClientProfile) {
+      setError('Please select a client first')
+      return
+    }
+    if (!referenceScript) {
+      setError('Please pick a reference script to mimic.')
+      return
+    }
+    if (!isExternalPillar) return
+
+    setError('')
+
+    const prompt = buildExternalPrompt({
+      clientProfile: selectedClientProfile,
+      clientName: selectedClient.name,
+      businessName: selectedClient.business_name,
+      industry: selectedClient.industry,
+      format: typeIdToExternalFormat(selectedType),
+      pillar: 'doubledown',
+      ctaText: finalCtaText || null,
+      ideaInput: ideaInput || null,
+      referenceScript: referenceScript.script,
+    })
+
+    setExternalPrompt(prompt)
+  }
+
+  const handleCopyExternalPrompt = async () => {
+    if (!externalPrompt) return
+    await navigator.clipboard.writeText(externalPrompt)
+    setExternalCopied(true)
+    setTimeout(() => setExternalCopied(false), 2000)
   }
 
   const handleSaveScript = async () => {
@@ -581,9 +720,7 @@ export function ContentCreationEngine() {
           {needsReference && (
             <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl animate-in fade-in-up">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <span className="text-sm font-medium text-gray-700">
-                  {selectedPillar === 'series' ? 'Select previous part' : 'Select script to mimic'}
-                </span>
+                <span className="text-sm font-medium text-gray-700">Select script to mimic</span>
                 <Button size="sm" variant="outline" onClick={() => setShowRefModal(true)}>
                   <History className="h-4 w-4 mr-2" />
                   Browse Content Bank
@@ -606,6 +743,7 @@ export function ContentCreationEngine() {
               )}
             </div>
           )}
+
         </CardContent>
       </Card>
 
@@ -706,16 +844,28 @@ export function ContentCreationEngine() {
 
       {/* Generate Button */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 pt-2 sticky bottom-4 z-10">
-        <Button
-          size="lg"
-          onClick={handleGenerate}
-          isLoading={isGenerating}
-          disabled={!selectedClientId || !selectedType || !selectedPillar}
-          className="px-12 w-full sm:w-auto"
-        >
-          <Sparkles className={`h-5 w-5 mr-2 ${isGenerating ? 'animate-pulse' : ''}`} />
-          {isGenerating ? 'Generating...' : 'Generate Content'}
-        </Button>
+        {isExternalPillar ? (
+          <Button
+            size="lg"
+            onClick={handleBuildPrompt}
+            disabled={!selectedClientId || !selectedType || !selectedPillar}
+            className="px-12 w-full sm:w-auto"
+          >
+            <Sparkles className="h-5 w-5 mr-2" />
+            {externalPrompt ? 'Rebuild Prompt' : 'Build Prompt'}
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            onClick={handleGenerate}
+            isLoading={isGenerating}
+            disabled={!selectedClientId || !selectedType || !selectedPillar}
+            className="px-12 w-full sm:w-auto"
+          >
+            <Sparkles className={`h-5 w-5 mr-2 ${isGenerating ? 'animate-pulse' : ''}`} />
+            {isGenerating ? 'Generating...' : 'Generate Content'}
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -726,8 +876,52 @@ export function ContentCreationEngine() {
         </Card>
       )}
 
+      {/* External Prompt result (series + doubledown) */}
+      {isExternalPillar && externalPrompt && (
+        <Card className="animate-in fade-in-up">
+          <CardHeader>
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">External Prompt</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Paste this whole block into ChatGPT, Claude, or Gemini. The full client profile, voice rules, format structure, and reference script are baked in - one copy, one paste.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleBuildPrompt}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Rebuild
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCopyExternalPrompt}>
+                  {externalCopied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" /> Copy prompt
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={externalPrompt}
+              readOnly
+              rows={20}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 font-mono text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            />
+            <p className="mt-2 text-[11px] text-gray-400">
+              The reference script is embedded in full. The external AI will mirror its structure and rhythm on a fresh angle.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Generated Content + Save Panel */}
-      {generatedContent && (
+      {generatedContent && !isExternalPillar && (
         <Card className="animate-in fade-in-up">
           <CardHeader>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -796,9 +990,11 @@ export function ContentCreationEngine() {
               </div>
             </div>
 
-            <pre className="whitespace-pre-wrap bg-gray-50 p-4 sm:p-6 rounded-lg text-sm text-gray-800 overflow-auto max-h-[600px] font-sans leading-relaxed">
-              {generatedContent}
-            </pre>
+            <ScriptReviewer
+              value={generatedContent}
+              onChange={setGeneratedContent}
+              kind={typeIdToScriptKind(selectedType)}
+            />
           </CardContent>
         </Card>
       )}

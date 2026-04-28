@@ -205,11 +205,11 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
 
   // Declarative sentence accidentally ending with a question mark — model
   // tic where it ends statements like "...without the burnout?" or
-  // "...cuts through the noise?". If the sentence doesn't START with a
-  // question word (how/what/why/when/where/who/which/can/do/does/did/is/
-  // are/will/should/would/could) and ends in '?', it's almost always a
-  // declarative; convert to a period.
-  { re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so)\b)([A-Z][^?.!]{8,200}?)\?/gi, replace: '$1$2.' },
+  // "...cuts through the noise?". The allowlist below covers anything that
+  // could legitimately start a question, including imperative-style verbs
+  // ("want", "need", "got", "ready", "tell", "let", "try", "think", "ever",
+  // "feel"). If the sentence opens with one of those, leave the '?' alone.
+  { re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so|want|need|got|ready|tell|let|try|think|ever|feel|been|fancy|wanna|gonna|sure|guess|wonder|see|know|remember|notice|imagine)\b)([A-Z][^?.!]{8,200}?)\?/gi, replace: '$1$2.' },
 
   // Common paired-adjective AI stacks — strip the redundant adjective.
   // Conservative: only the highest-frequency offenders so we don't eat
@@ -460,10 +460,19 @@ Beat order - HOOK → REHOOK → CONNECT → COMMON ENEMY (shown, not labeled) �
 - RELOOP: last line sends them back to the hook or prompts immediate action.
 - No "Step 1/2/3". Use "first… then… last" inline.`
     case 'engagement':
-      return `ENGAGEMENT REEL (15–25s, 60–110 words):
-Beat order - TRIGGER → CONTEXT (1 sentence) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT → CTA.
-- Take a clear, slightly polarizing stance grounded in the client context.
-- Bait must be answerable in the comments in under 5 words.`
+      return `ENGAGEMENT REEL (15–25s total runtime, 30–70 words across all frames):
+This is a SILENT video format. NO voiceover, NO narration, NO spoken script. Every line you write is overlay text the viewer READS on the screen. The visual is the creator on camera (or B-roll) with text overlays appearing/disappearing in sync with their movement.
+- Every beat is a TEXT OVERLAY, not a spoken line. Write punchy, screen-readable lines, not sentences a creator would speak aloud. Think Instagram caption length, not voiceover script.
+- No "voiceover:" labels, no "(narration)" notes, no "say this:" prefixes. The output IS the text overlays, period.
+Beat order — TRIGGER → CONTEXT (1 short overlay) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT (the answer/teaser they'll see if they engage) → CTA.
+- TRIGGER: 5–10 words, pattern interrupt that makes them stop scrolling.
+- CONTEXT: 1 short overlay, 8–14 words. Sets up the bait.
+- BAIT: a question answerable in the comments in under 5 words. Take a clear, slightly polarizing stance grounded in the client context.
+- ON-SCREEN TEXT: the framework name, payoff line, or hidden answer that ties it all together. 3–8 words.
+- CTA: the comment-bait or follow line. 4–10 words.
+- COHERENCE RULE: TRIGGER, CONTEXT, and BAIT must all be about the SAME specific thing. The trigger introduces the angle, the context narrows it, and the bait asks a question that resolves the same tension. Never pivot from one topic in TRIGGER to a different question in BAIT — readers feel the disconnect immediately.
+- Bad: TRIGGER = "I used to make content the dumbest way" → BAIT = "Do you give your best tip first or second?" The trigger is about content failure, the bait is about tip ordering. Disconnected.
+- Good: TRIGGER = "Best tip first kills your retention" → CONTEXT = "Order matters more than the tips themselves" → BAIT = "Best tip first or second?" Same thread the whole way through.`
     case 'carousel':
       return `CAROUSEL (6–10 slides, ~15 words/slide):
 Slide 1 = hook (5–10 words). Slide 2 = promise/rehook. Slides 3 to N-2 = one specific idea per slide with a concrete micro-example.
@@ -641,7 +650,37 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
 3) Creates tension the viewer needs to resolve.
 4) Flows in one breath when read aloud.
 5) Sounds like a real person - not a brand voice.`,
-    `RULES: no em dash. no "it's not X, it's Y". no "that's not X, that's Y". no "and you know what?". no "and the result?". no "and the best part?" / "but the best part?" (do not use these transitional questions at all). no "here's what I've learned" / "yeah, you read that right". no "what if I told you". no "here's the thing". no "let me show you". no "in this video". no choppy fragment stacking ("Hours back. Energy saved. Freedom unlocked."). write natural flowing sentences with varied lengths. Do NOT reuse the same transitional phrase twice in one script.`,
+    `SECTION TAGS:
+- Every [SECTION_TAG] starts on its own line with a blank line before and after.
+- NEVER place a [SECTION_TAG] inline at the end of a paragraph (e.g. "...understood. [CTA]"). Tags are headers, not punctuation.
+- Each tag appears EXACTLY ONCE per script. Do not write [CTA] inside [PAYOFF] and again at the bottom.`,
+    `VOICE RULES (non-negotiable):
+- No em-dashes (—) or en-dashes (–). Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple) ARE allowed.
+- ABSOLUTELY no "<subject> isn't X, it's Y" / "you're not just X, you're Y" / "it's not about X, but Y" pivots. State the positive claim directly. Single biggest AI tell.
+- No rhetorical fragment-questions used as transitions: "The result?", "The kicker?", "The catch?", "The truth?", "Plot twist?", "Spoiler:", "Here's the thing,", "Honestly?", "Look,". Just say the next sentence.
+- No "here's the truth" / "here's the wild truth" / "here's the secret" / "here's what actually works" family.
+- No "and the result?", "and the best part?", "what if I told you", "you read that right", "in this video".
+- Speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, kill it.
+- Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because.
+- Vary length violently — a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
+- No paired or tripled adjectives. "consistent, engaging content" → "consistent content". Pick ONE.
+- Don't justify every claim. Make the point and move on; don't add "and that's why this matters".
+- Don't bridge paragraphs with "Now," / "So," / "Moving on," / "Let's break it down,". Just start the next idea.
+- No choppy fragment stacking ("Hours back. Energy saved. Freedom unlocked."). One fragment is fine; three in a row reads as AI.
+- Don't reuse the same transitional phrase twice in one script.`,
+    `HUMAN-VOICE EXAMPLE — match this rhythm. Never the polished-blog tone of typical AI output:
+
+"""
+Most people overthink this. They sit down, stare at the doc, and try to sound smart. That's the trap. Smart sounds like school. School doesn't sell.
+
+Just talk. Say what you'd say to a friend who asked you the question. If you wouldn't use the word out loud, cut it. If a sentence sounds like a LinkedIn post, kill it.
+
+The pattern I use is three things. Topic. Idea. Outline. That's it. I don't sit there 'getting in the right headspace'. I open a doc and I write what I'd say.
+
+And yeah, the first draft is rough. Doesn't matter. You can fix rough. You can't fix a blank page.
+"""
+
+Notice: contractions everywhere, sentence fragments ("That's the trap.", "Three things."), short next to longer, no paired adjectives, no rhetorical fragment-questions. Match THAT rhythm.`,
     ctaBlock(cta, profile),
     outputFormat(contentType),
   ].filter(Boolean)
@@ -665,16 +704,41 @@ ${topic}
 """`,
       )
     } else {
-      userParts.push(`TOPIC: ${topic}`)
+      // Short topic = topic-expansion mode. Without this explicit framing,
+      // the model sometimes treats the topic as a prompt to clarify ("tell
+      // me more about X") instead of expanding it into a full script.
+      userParts.push(
+        `TOPIC: ${topic}
+
+TOPIC EXPANSION MODE: The topic above is the seed for the entire script. Treat it as the angle, not as a question to answer. Build the full piece around it: hook into the audience's pain (from CLIENT CONTEXT and AMMO), teach using the framework and pillar above, weave in concrete examples, land on the CTA. Don't ask for more input. Don't pad. Generate the full output exactly per OUTPUT FORMAT below.`,
+      )
     }
   } else {
-    userParts.push('NO TOPIC GIVEN. Pick a strong one from the evergreen topics or myths in the client context.')
+    userParts.push(
+      'NO TOPIC GIVEN. Pick a strong one from the evergreen topics or myths in the client context, then expand it into the full output. Do not ask the user to pick one.',
+    )
   }
 
   const user = userParts.join('\n\n')
 
   const temperature = contentType === 'text' ? 0.7 : 0.55
-  const maxTokens = contentType === 'long' ? 3800 : contentType === 'text' ? 400 : 1600
+  // Headroom over the actual content size so the script can finish even when
+  // Pro's thinking config consumes ~1024 tokens of budget. Earlier values
+  // (1600 for everything except long) were getting truncated mid-script.
+  const maxTokens =
+    contentType === 'long'
+      ? 8000
+      : contentType === 'carousel'
+        ? 4000
+        : contentType === 'short'
+          ? 4000
+          : contentType === 'engagement'
+            ? 2500
+            : contentType === 'story'
+              ? 2500
+              : contentType === 'text'
+                ? 800
+                : 4000
 
   return { system, user, maxTokens, temperature }
 }
@@ -812,23 +876,43 @@ export function ensureTitle(output: string, fallback = 'untitled'): string {
 export function ensureCtaVerbatim(output: string, cta?: string): string {
   if (!cta || !cta.trim()) return output
   const c = cta.trim()
-  if (output.includes(c)) return output
-
-  const lines = output.split('\n')
-  const idx = lines.findIndex((l) => /^\s*\[CTA\]\s*$/i.test(l))
-  if (idx >= 0) {
-    let end = lines.length
-    for (let i = idx + 1; i < lines.length; i++) {
-      if (/^\s*\[[A-Z][A-Z +]*\]\s*$/.test(lines[i])) { end = i; break }
+  let result = output
+  if (!result.includes(c)) {
+    const lines = result.split('\n')
+    const idx = lines.findIndex((l) => /^\s*\[CTA\]\s*$/i.test(l))
+    if (idx >= 0) {
+      let end = lines.length
+      for (let i = idx + 1; i < lines.length; i++) {
+        if (/^\s*\[[A-Z][A-Z +]*\]\s*$/.test(lines[i])) { end = i; break }
+      }
+      const before = lines.slice(0, idx + 1)
+      const after = lines.slice(end)
+      result = [...before, '', c, '', ...after].join('\n')
+    } else {
+      const packRe = /\n\s*\[PUBLISHING PACK\]/i
+      if (packRe.test(result)) {
+        result = result.replace(packRe, `\n\n[CTA]\n${c}\n\n[PUBLISHING PACK]`)
+      } else {
+        result = `${result.trim()}\n\n[CTA]\n${c}\n`
+      }
     }
-    const before = lines.slice(0, idx + 1)
-    const after = lines.slice(end)
-    return [...before, '', c, '', ...after].join('\n')
   }
+  return dedupeCtaSection(result)
+}
 
-  const packRe = /\n\s*\[PUBLISHING PACK\]/i
-  if (packRe.test(output)) {
-    return output.replace(packRe, `\n\n[CTA]\n${c}\n\n[PUBLISHING PACK]`)
-  }
-  return `${output.trim()}\n\n[CTA]\n${c}\n`
+/**
+ * Collapse repeated `[CTA]\n<text>\n` blocks down to a single occurrence.
+ * Pro sometimes writes the [CTA] section twice — once inline at the end of
+ * the body and once as a standalone label — and we don't want both in the
+ * final output.
+ */
+function dedupeCtaSection(text: string): string {
+  const re = /(\[CTA\]\s*\n[\s\S]*?)(?=\n\s*\[[A-Z][A-Z +]*\]|\n*$)/gi
+  const seen = new Set<string>()
+  return text.replace(re, (match) => {
+    const normalized = match.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(normalized)) return ''
+    seen.add(normalized)
+    return match
+  })
 }

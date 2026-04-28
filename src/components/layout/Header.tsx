@@ -228,7 +228,8 @@ export function Header({ title, subtitle }: HeaderProps) {
 
     if (
       n.type === 'brand_intake_submitted' ||
-      n.type === 'question_form_submitted'
+      n.type === 'question_form_submitted' ||
+      n.type === 'series_form_submitted'
     ) {
       const clientId = data.clientId
       if (clientId) router.push(`/clients/${clientId}`)
@@ -413,6 +414,14 @@ function formatNotificationText(n: NotificationRow) {
       return count
         ? `${name} answered ${count} braindump question${count === 1 ? '' : 's'}`
         : `${name} submitted a braindump`
+    }
+    case 'series_form_submitted': {
+      const count = typeof data.count === 'number' ? data.count : 0
+      const name = data.clientName || 'A client'
+      const seriesTitle = typeof data.seriesTitle === 'string' ? data.seriesTitle : 'a series'
+      return count
+        ? `${name} filled out ${count} answer${count === 1 ? '' : 's'} for "${seriesTitle}"`
+        : `${name} submitted "${seriesTitle}"`
     }
     default:
       return 'Notification'
