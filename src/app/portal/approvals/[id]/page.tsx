@@ -619,12 +619,13 @@ await loadApproval()
   }
 
   const toggleResolveComment = async (comment: Comment) => {
+    const nextResolved = !comment.resolved
     setResolvingCommentId(comment.id)
     try {
       const { error } = await supabase
         .from('approval_comments')
         .update({
-          resolved: !comment.resolved,
+          resolved: nextResolved,
           updated_at: new Date().toISOString(),
         })
         .eq('id', comment.id)
@@ -634,6 +635,14 @@ await loadApproval()
         alert('Failed to update')
       } else {
         await loadComments()
+        if (nextResolved) {
+          // Fire-and-forget popup notification.
+          void fetch('/api/approvals/notify-comment-resolved', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ commentId: comment.id, actorId: currentUserId }),
+          }).catch((e) => console.error('resolve notify failed:', e))
+        }
       }
     } catch (err) {
       console.error('Resolve comment exception', err)

@@ -100,6 +100,8 @@ export function NotificationPopupListener() {
       ? 'New form responses'
       : popup.type === 'series_form_submitted'
       ? 'Series form submitted'
+      : popup.type === 'approval_comment_resolved'
+      ? 'Comment resolved'
       : 'New notification'
 
   const subtitle =

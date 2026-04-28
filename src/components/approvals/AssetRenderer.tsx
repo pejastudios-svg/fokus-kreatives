@@ -10,6 +10,9 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { CloudinaryAsset } from '@/lib/cloudinary'
 import { cldThumb, cldUrl } from '@/lib/cloudinary'
+import type { CommentRegion } from '@/lib/types/annotations'
+import { RegionOverlay } from './RegionOverlay'
+import { DrawCanvas } from './DrawCanvas'
 
 interface AssetRendererProps {
   attachments: CloudinaryAsset[]
@@ -34,12 +37,20 @@ export interface AssetRendererHandle {
   seekTo: (seconds: number) => void
   /**
    * Convenience for the comment-click flow: jump to slide N, scrub to T,
-   * scroll the player into view. All optional - pass what you have.
+   * scroll the player into view, and optionally flash a saved region.
    */
   focusAnnotation: (opts: {
     attachmentIndex?: number | null
     timestampSeconds?: number | null
+    region?: CommentRegion | null
   }) => void
+  /**
+   * Open the draw overlay on the active slide. Resolves with the region the
+   * user drew, or null if they cancelled.
+   */
+  enterDrawMode: (shape?: 'circle' | 'freeform') => Promise<CommentRegion | null>
+  /** Pulse a saved region for ~2.5s on the active slide. */
+  flashRegion: (region: CommentRegion) => void
 }
 
 const SWIPE_THRESHOLD_PX = 50
@@ -67,10 +78,26 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
     const swipeDeltaRef = useRef(0)
     const containerRef = useRef<HTMLDivElement | null>(null)
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
+    // Per-slide rendered asset elements (img | video), tracked in state so that
+    // overlays can read them during render (callback refs alone wouldn't
+    // trigger a re-render after mount).
+    const [assetEls, setAssetEls] = useState<Record<number, HTMLElement | null>>({})
+    const setAssetElAt = (i: number) => (el: HTMLElement | null) => {
+      setAssetEls((prev) => (prev[i] === el ? prev : { ...prev, [i]: el }))
+    }
     // Tracks the most recent video the user has interacted with (played /
     // scrubbed / loaded metadata for). Lets `getCurrentTime()` return the
     // right one even in grid mode where there's no single "active" slide.
     const lastInteractedVideoIndexRef = useRef<number | null>(null)
+
+    // Annotation overlays. flashedRegion runs a pulse on the active slide for
+    // ~2.5s when a comment timestamp/region pill is clicked. drawingMode opens
+    // the interactive draw canvas; the parent awaits a region.
+    const [flashedRegion, setFlashedRegion] = useState<CommentRegion | null>(null)
+    const [drawingMode, setDrawingMode] = useState<{
+      shape: 'circle' | 'freeform'
+      resolve: (r: CommentRegion | null) => void
+    } | null>(null)
 
     // When the active slide changes, pause every other video so audio doesn't
     // bleed across slides. (Carousel-only - in grid mode each video is its own
@@ -123,7 +150,12 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         const focusAnnotation = ({
           attachmentIndex,
           timestampSeconds,
-        }: { attachmentIndex?: number | null; timestampSeconds?: number | null }) => {
+          region,
+        }: {
+          attachmentIndex?: number | null
+          timestampSeconds?: number | null
+          region?: CommentRegion | null
+        }) => {
           if (typeof attachmentIndex === 'number' && attachmentIndex >= 0) {
             goToSlide(attachmentIndex)
           }
@@ -133,17 +165,71 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
             // video element we want to scrub actually exists in the DOM.
             setTimeout(() => seekTo(timestampSeconds), 60)
           }
+          if (region) {
+            setTimeout(() => setFlashedRegion(region), 80)
+          }
         }
-        return { getCurrentTime, getActiveIndex: getActiveIdx, goToSlide, seekTo, focusAnnotation }
+        const enterDrawMode: AssetRendererHandle['enterDrawMode'] = (shape = 'circle') =>
+          new Promise<CommentRegion | null>((resolve) => {
+            setDrawingMode({ shape, resolve })
+          })
+        const flashRegion: AssetRendererHandle['flashRegion'] = (region) => {
+          setFlashedRegion(region)
+        }
+        return {
+          getCurrentTime,
+          getActiveIndex: getActiveIdx,
+          goToSlide,
+          seekTo,
+          focusAnnotation,
+          enterDrawMode,
+          flashRegion,
+        }
       },
       [active, attachments, isCarousel],
     )
+
+    const drawCanvasNode = drawingMode ? (
+      <DrawCanvas
+        assetRef={assetEls[(() => {
+          if (attachments.length <= 1) return 0
+          if (isCarousel) return Math.max(0, Math.min(active, attachments.length - 1))
+          return 0
+        })()] || null}
+        initialShape={drawingMode.shape}
+        onComplete={(region) => {
+          drawingMode.resolve(region)
+          setDrawingMode(null)
+        }}
+        onCancel={() => {
+          drawingMode.resolve(null)
+          setDrawingMode(null)
+        }}
+      />
+    ) : null
+
+    const flashOverlayFor = (slideIdx: number) => {
+      if (!flashedRegion) return null
+      // Only flash on the slide that's currently active.
+      const activeIdx = isCarousel
+        ? Math.max(0, Math.min(active, attachments.length - 1))
+        : 0
+      if (slideIdx !== activeIdx) return null
+      return (
+        <RegionOverlay
+          region={flashedRegion}
+          assetRef={assetEls[slideIdx] || null}
+          flashing
+          onFlashDone={() => setFlashedRegion(null)}
+        />
+      )
+    }
 
     if (!attachments?.length) return null
 
     if (attachments.length === 1) {
       return (
-        <div ref={containerRef}>
+        <div ref={containerRef} className="relative">
           <AssetView
             asset={attachments[0]}
             onImageClick={onImageClick}
@@ -151,10 +237,13 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
             videoRef={(el) => {
               videoRefs.current[0] = el
             }}
+            assetElRef={setAssetElAt(0)}
             onVideoInteract={() => {
               lastInteractedVideoIndexRef.current = 0
             }}
           />
+          {flashOverlayFor(0)}
+          {drawCanvasNode}
         </div>
       )
     }
@@ -206,7 +295,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
             {attachments.map((a, i) => (
               <div
                 key={`${a.public_id}-${i}`}
-                className="w-full flex-shrink-0"
+                className="w-full flex-shrink-0 relative"
                 aria-hidden={i !== safeIndex}
               >
                 <AssetView
@@ -216,10 +305,13 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                   videoRef={(el) => {
                     videoRefs.current[i] = el
                   }}
+                  assetElRef={setAssetElAt(i)}
                   onVideoInteract={() => {
                     lastInteractedVideoIndexRef.current = i
                   }}
                 />
+                {flashOverlayFor(i)}
+                {i === safeIndex && drawCanvasNode}
               </div>
             ))}
           </div>
@@ -296,6 +388,9 @@ interface AssetViewProps {
    *  on their poster frame with no network activity. */
   isActive?: boolean
   videoRef?: (el: HTMLVideoElement | null) => void
+  /** Generic ref to whichever element is rendering the asset (img | video).
+   *  Region overlays use this to size themselves to the visible asset box. */
+  assetElRef?: (el: HTMLElement | null) => void
   /** Fires whenever the video plays / scrubs / emits timeupdate. The parent
    *  uses this to remember which video the user has been interacting with
    *  so getCurrentTime() returns the right one. */
@@ -308,13 +403,17 @@ function AssetView({
   fill,
   isActive,
   videoRef,
+  assetElRef,
   onVideoInteract,
 }: AssetViewProps) {
   if (asset.resource_type === 'video') {
     const poster = cldThumb(asset, fill ? { w: 600, h: 600, crop: 'fill' } : { w: 1200 })
     return (
       <video
-        ref={videoRef}
+        ref={(el) => {
+          videoRef?.(el)
+          assetElRef?.(el)
+        }}
         src={cldUrl(asset, { w: 1200 })}
         poster={poster}
         controls
@@ -337,6 +436,7 @@ function AssetView({
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
+      ref={assetElRef}
       src={src}
       alt={asset.name || 'Asset'}
       className={

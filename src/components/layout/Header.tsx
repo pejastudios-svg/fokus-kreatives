@@ -236,6 +236,12 @@ export function Header({ title, subtitle }: HeaderProps) {
       return
     }
 
+    if (n.type === 'approval_comment_resolved') {
+      const approvalId = data.approvalId
+      if (approvalId) router.push(`/approvals/${approvalId}`)
+      return
+    }
+
     if (
       n.type === 'approval_created' ||
       n.type === 'approval_approved' ||
@@ -422,6 +428,10 @@ function formatNotificationText(n: NotificationRow) {
       return count
         ? `${name} filled out ${count} answer${count === 1 ? '' : 's'} for "${seriesTitle}"`
         : `${name} submitted "${seriesTitle}"`
+    }
+    case 'approval_comment_resolved': {
+      const title = typeof data.approvalTitle === 'string' ? data.approvalTitle : 'an approval'
+      return `A comment on "${title}" was resolved`
     }
     default:
       return 'Notification'

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
 import { uploadWithProgress } from '@/lib/uploadWithProgress'
 import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
-import { formatTimestamp } from '@/lib/types/annotations'
+import { formatTimestamp, type CommentRegion } from '@/lib/types/annotations'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Trash2 as TrashIcon,
   Clock as ClockIcon,
+  Pen as PenIcon,
 } from 'lucide-react'
 import { cldThumb, destroyCloudinaryAssets } from '@/lib/cloudinary'
 
@@ -214,8 +215,17 @@ export default function ApprovalDetailPage() {
   const assetRendererRefs = useRef<Record<string, AssetRendererHandle | null>>({})
 
   // Annotations attached to the next comment, per composer (general + per-item).
+  // Either field can be set independently - timestamp without region, region
+  // without timestamp, or both.
   const [pendingAnnotation, setPendingAnnotation] = useState<
-    Record<string, { timestampSeconds: number; attachmentIndex: number | null }>
+    Record<
+      string,
+      {
+        timestampSeconds?: number | null
+        region?: CommentRegion | null
+        attachmentIndex: number | null
+      }
+    >
   >({})
 
   const handleGrabTime = (itemId: string) => {
@@ -229,7 +239,23 @@ export default function ApprovalDetailPage() {
     setPendingAnnotation((prev) => ({
       ...prev,
       [itemId]: {
+        ...(prev[itemId] ?? { attachmentIndex: null }),
         timestampSeconds: time,
+        attachmentIndex: handle.getActiveIndex(),
+      },
+    }))
+  }
+
+  const handleAnnotate = async (itemId: string, shape: 'circle' | 'freeform') => {
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    const region = await handle.enterDrawMode(shape)
+    if (!region) return
+    setPendingAnnotation((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...(prev[itemId] ?? {}),
+        region,
         attachmentIndex: handle.getActiveIndex(),
       },
     }))
@@ -243,15 +269,31 @@ export default function ApprovalDetailPage() {
     })
   }
 
+  const handleClearPendingField = (key: string, field: 'timestampSeconds' | 'region') => {
+    setPendingAnnotation((prev) => {
+      const cur = prev[key]
+      if (!cur) return prev
+      const next = { ...cur, [field]: null }
+      // If both fields are now empty, drop the whole entry.
+      if (!next.timestampSeconds && !next.region) {
+        const out = { ...prev }
+        delete out[key]
+        return out
+      }
+      return { ...prev, [key]: next }
+    })
+  }
+
   const handleFocusComment = (
     itemId: string | null,
     timestampSeconds: number | null,
     attachmentIndex: number | null,
+    region: CommentRegion | null = null,
   ) => {
     if (!itemId) return
     const handle = assetRendererRefs.current[itemId]
     if (!handle) return
-    handle.focusAnnotation({ attachmentIndex, timestampSeconds })
+    handle.focusAnnotation({ attachmentIndex, timestampSeconds, region })
   }
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -944,7 +986,7 @@ export default function ApprovalDetailPage() {
       parent_comment_id: replyToCommentId,
       created_at: new Date().toISOString(),
       timestamp_seconds: annotation?.timestampSeconds ?? null,
-      region: null,
+      region: annotation?.region ?? null,
       attachment_index: annotation?.attachmentIndex ?? null,
       users: currentUserProfile
         ? { ...currentUserProfile }
@@ -999,6 +1041,7 @@ export default function ApprovalDetailPage() {
             fileName,
             parentCommentId: replyToCommentId,
             timestampSeconds: annotation?.timestampSeconds ?? null,
+            region: annotation?.region ?? null,
             attachmentIndex: annotation?.attachmentIndex ?? null,
           }),
         })
@@ -1091,6 +1134,14 @@ export default function ApprovalDetailPage() {
         console.error('Resolve comment error:', error)
         setComments(snapshot)
         alert('Failed to update')
+      } else if (nextResolved) {
+        // Fire-and-forget popup notification to the comment's author + the
+        // approval's assignees (excluding the resolver). Failures are non-fatal.
+        void fetch('/api/approvals/notify-comment-resolved', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commentId: comment.id, actorId: currentUserId }),
+        }).catch((e) => console.error('resolve notify failed:', e))
       }
     } catch (err) {
       console.error('Resolve comment exception', err)
@@ -1740,18 +1791,45 @@ export default function ApprovalDetailPage() {
       )
     })()}
 
-    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
-      <button
-        type="button"
-        onClick={() =>
-          handleFocusComment(c.approval_item_id, c.timestamp_seconds, c.attachment_index)
-        }
-        title="Jump to this moment"
-        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
-      >
-        <ClockIcon className="h-3 w-3" />
-        {formatTimestamp(c.timestamp_seconds)}
-      </button>
+    {(c.timestamp_seconds != null || c.region) && (
+      <div className="mt-0.5 flex flex-wrap gap-1">
+        {c.timestamp_seconds != null && (
+          <button
+            type="button"
+            onClick={() =>
+              handleFocusComment(
+                c.approval_item_id,
+                c.timestamp_seconds,
+                c.attachment_index,
+                c.region,
+              )
+            }
+            title="Jump to this moment"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+          >
+            <ClockIcon className="h-3 w-3" />
+            {formatTimestamp(c.timestamp_seconds)}
+          </button>
+        )}
+        {c.region && (
+          <button
+            type="button"
+            onClick={() =>
+              handleFocusComment(
+                c.approval_item_id,
+                c.timestamp_seconds,
+                c.attachment_index,
+                c.region,
+              )
+            }
+            title="Show the highlighted region"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+          >
+            <PenIcon className="h-3 w-3" />
+            View highlight
+          </button>
+        )}
+      </div>
     )}
     <p className="mt-0.5 text-gray-700 break-all">
       {formatComment(c.content)}
@@ -2027,19 +2105,33 @@ export default function ApprovalDetailPage() {
       </button>
     </p>
   )}
-  {pendingAnnotation[item.id] && (
-    <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-      <span>Tagged at:</span>
-      <button
-        type="button"
-        onClick={() => handleClearPending(item.id)}
-        title="Remove timestamp"
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
-      >
-        <ClockIcon className="h-3 w-3" />
-        {formatTimestamp(pendingAnnotation[item.id].timestampSeconds)}
-        <X className="h-3 w-3" />
-      </button>
+  {pendingAnnotation[item.id] && (pendingAnnotation[item.id].timestampSeconds || pendingAnnotation[item.id].region) && (
+    <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+      <span>Tagged:</span>
+      {pendingAnnotation[item.id].timestampSeconds != null && (
+        <button
+          type="button"
+          onClick={() => handleClearPendingField(item.id, 'timestampSeconds')}
+          title="Remove timestamp"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+        >
+          <ClockIcon className="h-3 w-3" />
+          {formatTimestamp(pendingAnnotation[item.id].timestampSeconds!)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {pendingAnnotation[item.id].region && (
+        <button
+          type="button"
+          onClick={() => handleClearPendingField(item.id, 'region')}
+          title="Remove highlight"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+        >
+          <PenIcon className="h-3 w-3" />
+          {pendingAnnotation[item.id].region!.shape === 'circle' ? 'Circle' : 'Highlight'}
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   )}
   <div className="flex items-center justify-between gap-2">
@@ -2057,15 +2149,26 @@ export default function ApprovalDetailPage() {
         />
       </label>
       {item.attachments && item.attachments.length > 0 && (
-        <button
-          type="button"
-          onClick={() => handleGrabTime(item.id)}
-          title="Grab the current playback time"
-          className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
-        >
-          <ClockIcon className="h-3 w-3" />
-          <span>Grab time</span>
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => handleGrabTime(item.id)}
+            title="Grab the current playback time"
+            className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+          >
+            <ClockIcon className="h-3 w-3" />
+            <span>Grab time</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAnnotate(item.id, 'circle')}
+            title="Draw a region on the asset"
+            className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+          >
+            <PenIcon className="h-3 w-3" />
+            <span>Annotate</span>
+          </button>
+        </>
       )}
     </div>
     <button
