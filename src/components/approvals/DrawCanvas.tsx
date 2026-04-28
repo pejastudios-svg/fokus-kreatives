@@ -130,7 +130,29 @@ export function DrawCanvas({
     setDraft(null)
   }
 
-  if (!box) return null
+  // Render a fallback toolbar even if the asset measurement hasn't settled
+  // yet. Without this, an asset that hasn't loaded its dimensions would leave
+  // the user staring at a UI that "did nothing" when they clicked Annotate.
+  if (!box) {
+    return (
+      <div
+        ref={containerRef}
+        className="absolute inset-0 z-30 pointer-events-none flex items-start justify-start"
+      >
+        <div className="m-2 pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white shadow-lg border border-gray-200 text-xs text-gray-600">
+          <span className="inline-block h-2 w-2 rounded-full bg-[#2B79F7] animate-pulse" />
+          <span>Annotate mode (waiting on asset)…</span>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-1 px-1.5 py-0.5 rounded hover:bg-gray-100 text-gray-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Render the current draft as SVG so the user sees what they're drawing.
   let preview: React.ReactElement | null = null

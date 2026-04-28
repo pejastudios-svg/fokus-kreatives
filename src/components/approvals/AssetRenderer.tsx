@@ -114,11 +114,14 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
 
     // Annotation overlays. flashedRegion runs a pulse on the active slide for
     // ~2.5s when a comment timestamp/region pill is clicked. drawingMode opens
-    // the interactive draw canvas; the parent awaits a region.
+    // the interactive draw canvas; the parent awaits a region. targetSlide is
+    // captured at draw-start time so the canvas renders against the right
+    // asset even in grid mode where there's no single "active" slide.
     const [flashedRegion, setFlashedRegion] = useState<CommentRegion | null>(null)
     const [drawingMode, setDrawingMode] = useState<{
       shape: 'circle' | 'freeform'
       resolve: (r: CommentRegion | null) => void
+      targetSlide: number
     } | null>(null)
 
     // When the active slide changes, pause every other video so audio doesn't
@@ -193,7 +196,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         }
         const enterDrawMode: AssetRendererHandle['enterDrawMode'] = (shape = 'circle') =>
           new Promise<CommentRegion | null>((resolve) => {
-            setDrawingMode({ shape, resolve })
+            setDrawingMode({ shape, resolve, targetSlide: getActiveIdx() })
           })
         const flashRegion: AssetRendererHandle['flashRegion'] = (region) => {
           setFlashedRegion(region)
@@ -213,11 +216,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
 
     const drawCanvasNode = drawingMode ? (
       <DrawCanvas
-        assetRef={assetEls[(() => {
-          if (attachments.length <= 1) return 0
-          if (isCarousel) return Math.max(0, Math.min(active, attachments.length - 1))
-          return 0
-        })()] || null}
+        assetRef={assetEls[drawingMode.targetSlide] || null}
         initialShape={drawingMode.shape}
         onComplete={(region) => {
           drawingMode.resolve(region)
@@ -329,7 +328,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                   }}
                 />
                 {flashOverlayFor(i)}
-                {i === safeIndex && drawCanvasNode}
+                {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
               </div>
             ))}
           </div>
@@ -376,7 +375,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         {attachments.map((a, i) => (
           <div
             key={`${a.public_id}-${i}`}
-            className="aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
+            className="aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50 relative"
           >
             <AssetView
               asset={a}
@@ -384,10 +383,13 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
               fill
               isActive
               videoRef={setVideoRefByIndex[i]}
+              assetElRef={setAssetElByIndex[i]}
               onVideoInteract={() => {
                 lastInteractedVideoIndexRef.current = i
               }}
             />
+            {flashOverlayFor(i)}
+            {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
           </div>
         ))}
       </div>

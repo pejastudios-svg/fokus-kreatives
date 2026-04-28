@@ -1,7 +1,7 @@
 // src/app/approvals/[id]/page.tsx
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
 import { uploadWithProgress } from '@/lib/uploadWithProgress'
 import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
@@ -213,6 +213,16 @@ export default function ApprovalDetailPage() {
   // when the user clicks "Grab time" and `focusAnnotation` when they click a
   // saved timestamp pill on an existing comment. Keyed by item id.
   const assetRendererRefs = useRef<Record<string, AssetRendererHandle | null>>({})
+
+  // Stable registration callback handed to each AssetRendererSlot. Empty deps
+  // mean every slot gets the same function across renders, which keeps each
+  // slot's own ref callback identity stable too.
+  const registerAssetRenderer = useCallback(
+    (id: string, handle: AssetRendererHandle | null) => {
+      assetRendererRefs.current[id] = handle
+    },
+    [],
+  )
 
   // Annotations attached to the next comment, per composer (general + per-item).
   // Either field can be set independently - timestamp without region, region
@@ -1662,10 +1672,9 @@ export default function ApprovalDetailPage() {
                       </div>
                     ) : item.attachments && item.attachments.length > 0 ? (
                       <div className="p-3">
-                        <AssetRenderer
-                          ref={(handle) => {
-                            assetRendererRefs.current[item.id] = handle
-                          }}
+                        <AssetRendererSlot
+                          itemId={item.id}
+                          onRegister={registerAssetRenderer}
                           attachments={item.attachments}
                           isCarousel={!!item.is_carousel}
                           onImageClick={(url, name) => {
@@ -2211,5 +2220,46 @@ export default function ApprovalDetailPage() {
 )}
       </div>
     </>
+  )
+}
+
+/**
+ * Tiny wrapper around AssetRenderer that owns a stable callback ref. Without
+ * this, the ref callback declared inline in items.map() would have a fresh
+ * identity every parent render, which means React detaches + reattaches the
+ * imperative handle on every render - leaving brief windows where
+ * assetRendererRefs.current[item.id] is null and click handlers see no handle.
+ *
+ * The useCallback below keys on itemId, which is stable per row, so the
+ * function identity stays stable across parent re-renders.
+ */
+interface AssetRendererSlotProps {
+  itemId: string
+  onRegister: (id: string, handle: AssetRendererHandle | null) => void
+  attachments: CloudinaryAttachment[]
+  isCarousel: boolean
+  onImageClick?: (url: string, name: string) => void
+}
+
+function AssetRendererSlot({
+  itemId,
+  onRegister,
+  attachments,
+  isCarousel,
+  onImageClick,
+}: AssetRendererSlotProps) {
+  const setRef = useCallback(
+    (handle: AssetRendererHandle | null) => {
+      onRegister(itemId, handle)
+    },
+    [itemId, onRegister],
+  )
+  return (
+    <AssetRenderer
+      ref={setRef}
+      attachments={attachments}
+      isCarousel={isCarousel}
+      onImageClick={onImageClick}
+    />
   )
 }
