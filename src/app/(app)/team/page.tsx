@@ -48,6 +48,7 @@ export default function TeamPage() {
   const [pendingNewRole, setPendingNewRole] = useState<AgencyRole>('employee')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!openMenuId) return
@@ -271,20 +272,29 @@ export default function TeamPage() {
   }
 
   const handleResendInvite = async (member: TeamMember) => {
+    if (resendingId) return
     setNotification(null)
-    const origin = window.location.origin
-    const res = await fetch('/api/team/resend-invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: member.id, origin }),
-    })
-    const data = await res.json()
-    if (!data.success) {
-      setNotification({ type: 'error', message: data.error || 'Failed to resend invite' })
-      return
+    setResendingId(member.id)
+    try {
+      const origin = window.location.origin
+      const res = await fetch('/api/team/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: member.id, origin }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        setNotification({ type: 'error', message: data.error || 'Failed to resend invite' })
+        return
+      }
+      setNotification({ type: 'success', message: 'Invite refreshed and emailed', link: data.inviteLink })
+      await fetchTeam()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to resend invite'
+      setNotification({ type: 'error', message: msg })
+    } finally {
+      setResendingId(null)
     }
-    setNotification({ type: 'success', message: 'Invite refreshed and emailed', link: data.inviteLink })
-    await fetchTeam()
   }
 
   const handleChangeRole = async (member: TeamMember, role: AgencyRole, password: string) => {
@@ -464,10 +474,13 @@ function TeamSkeleton() {
                         {canInvite && !member.invitation_accepted && (
                           <button
                             onClick={() => handleResendInvite(member)}
-                            className="p-1.5 hover:bg-[#E8F1FF] rounded-lg text-gray-400 hover:text-[#2B79F7] transition-colors"
-                            title="Resend invite"
+                            disabled={resendingId === member.id}
+                            className="p-1.5 hover:bg-[#E8F1FF] rounded-lg text-gray-400 hover:text-[#2B79F7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            title={resendingId === member.id ? 'Resending invite…' : 'Resend invite'}
                           >
-                            <RefreshCw className="h-4 w-4" />
+                            <RefreshCw
+                              className={`h-4 w-4 ${resendingId === member.id ? 'animate-spin' : ''}`}
+                            />
                           </button>
                         )}
                         {canRemove && (
@@ -633,10 +646,13 @@ function TeamSkeleton() {
                                     handleResendInvite(member)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-[#E8F1FF] hover:text-[#2B79F7]"
+                                  disabled={resendingId === member.id}
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-[#E8F1FF] hover:text-[#2B79F7] disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                  <RefreshCw className="h-4 w-4" />
-                                  Resend invite
+                                  <RefreshCw
+                                    className={`h-4 w-4 ${resendingId === member.id ? 'animate-spin' : ''}`}
+                                  />
+                                  {resendingId === member.id ? 'Resending…' : 'Resend invite'}
                                 </button>
                               )}
                               {canRemove && (
