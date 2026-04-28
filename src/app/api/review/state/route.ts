@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     const [itemsRes, commentsRes, assigneesRes] = await Promise.all([
       reviewAdmin
         .from('approval_items')
-        .select('id, title, url, initial_comment, status, position')
+        .select('id, title, url, initial_comment, status, position, attachments, is_carousel, kind')
         .eq('approval_id', approval.id)
         .order('position', { ascending: true }),
       reviewAdmin

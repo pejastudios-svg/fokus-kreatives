@@ -26,6 +26,9 @@ import {
   Copy,
   FileText,
   Check,
+  Upload as UploadIcon,
+  Image as ImageIcon,
+  Video as VideoIcon,
 } from 'lucide-react'
 
 interface Client {
@@ -62,6 +65,10 @@ interface ApprovalItemDraft {
   title: string
   url: string
   initialComment: string
+  attachments: import('@/lib/cloudinary').CloudinaryAsset[]
+  isCarousel: boolean
+  // Per-file upload progress (transient - not sent to server).
+  uploads: { id: string; name: string; pct: number; error?: string }[]
 }
 
 const AUTO_APPROVE_PRESETS = [
@@ -96,7 +103,7 @@ export default function ApprovalsPage() {
   const [isFetchingClickup, setIsFetchingClickup] = useState(false)
   const [autoApproveMinutes, setAutoApproveMinutes] = useState<number | null>(7 * 24 * 60)
   const [items, setItems] = useState<ApprovalItemDraft[]>([
-    { title: '', url: '', initialComment: '' },
+    { title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] },
   ])
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([])
   const [assigneeSearchOpen, setAssigneeSearchOpen] = useState(false)
@@ -479,16 +486,127 @@ const searchResults = assigneeSearchOpen
   })
 
   const handleAddItem = () => {
-    setItems((prev) => [...prev, { title: '', url: '', initialComment: '' }])
+    setItems((prev) => [...prev, { title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] }])
   }
 
   const handleRemoveItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleItemChange = (index: number, field: keyof ApprovalItemDraft, value: string) => {
+  const handleItemChange = (index: number, field: 'title' | 'url' | 'initialComment', value: string) => {
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const handleItemFlag = (index: number, field: 'isCarousel', value: boolean) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const handleRemoveAttachment = (itemIndex: number, attachmentIndex: number) => {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== itemIndex) return item
+        const next = item.attachments.filter((_, j) => j !== attachmentIndex)
+        return {
+          ...item,
+          attachments: next,
+          // Carousel only makes sense with 2+ assets.
+          isCarousel: next.length > 1 ? item.isCarousel : false,
+        }
+      }),
+    )
+  }
+
+  const handleUploadFiles = async (itemIndex: number, files: FileList | File[]) => {
+    const list = Array.from(files)
+    if (!list.length) return
+
+    const { uploadToCloudinary, fileKind } = await import('@/lib/cloudinary')
+
+    // Seed upload tracking entries so each file gets its own progress bar.
+    const tracking = list.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`,
+      name: f.name,
+      pct: 0,
+    }))
+
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === itemIndex ? { ...item, uploads: [...item.uploads, ...tracking] } : item,
+      ),
+    )
+
+    // Kick off uploads in parallel; each updates its own tracking entry.
+    await Promise.all(
+      list.map(async (file, j) => {
+        const trackingId = tracking[j].id
+        const kind = fileKind(file)
+        if (kind === 'other') {
+          setItems((prev) =>
+            prev.map((item, i) =>
+              i === itemIndex
+                ? {
+                    ...item,
+                    uploads: item.uploads.map((u) =>
+                      u.id === trackingId ? { ...u, error: 'Unsupported type' } : u,
+                    ),
+                  }
+                : item,
+            ),
+          )
+          return
+        }
+
+        try {
+          const asset = await uploadToCloudinary(file, {
+            folder: `approvals/drafts/${formClientId || 'unscoped'}`,
+            onProgress: (pct) => {
+              setItems((prev) =>
+                prev.map((item, i) =>
+                  i === itemIndex
+                    ? {
+                        ...item,
+                        uploads: item.uploads.map((u) =>
+                          u.id === trackingId ? { ...u, pct } : u,
+                        ),
+                      }
+                    : item,
+                ),
+              )
+            },
+          })
+
+          setItems((prev) =>
+            prev.map((item, i) =>
+              i === itemIndex
+                ? {
+                    ...item,
+                    attachments: [...item.attachments, asset],
+                    uploads: item.uploads.filter((u) => u.id !== trackingId),
+                  }
+                : item,
+            ),
+          )
+        } catch (err) {
+          console.error('Upload failed:', err)
+          const msg = err instanceof Error ? err.message : 'Upload failed'
+          setItems((prev) =>
+            prev.map((item, i) =>
+              i === itemIndex
+                ? {
+                    ...item,
+                    uploads: item.uploads.map((u) =>
+                      u.id === trackingId ? { ...u, error: msg } : u,
+                    ),
+                  }
+                : item,
+            ),
+          )
+        }
+      }),
     )
   }
 
@@ -502,12 +620,20 @@ const searchResults = assigneeSearchOpen
     () =>
       items
         .map((i) => ({
-          ...i,
-          url: i.url.trim(),
           title: i.title.trim(),
+          url: i.url.trim(),
           initialComment: i.initialComment.trim(),
+          attachments: i.attachments,
+          isCarousel: i.isCarousel,
         }))
-        .filter((i) => i.url),
+        // Valid = has at least a URL OR one finished upload. Pending uploads
+        // shouldn't gate submission - the user can still add a URL alongside.
+        .filter((i) => i.url || i.attachments.length > 0),
+    [items],
+  )
+
+  const anyUploadInFlight = useMemo(
+    () => items.some((i) => i.uploads.length > 0 && i.uploads.every((u) => !u.error)),
     [items],
   )
 
@@ -516,7 +642,8 @@ const searchResults = assigneeSearchOpen
     Boolean(formClientId) &&
     formTitle.trim().length > 0 &&
     validItems.length > 0 &&
-    !isFetchingClickup
+    !isFetchingClickup &&
+    !anyUploadInFlight
 
   const { run: handleCreateApproval, isRunning: isCreating } = useAsyncAction(async () => {
     if (!canSubmitNewApproval || !currentUserId) return
@@ -601,7 +728,7 @@ const searchResults = assigneeSearchOpen
       setClickupTaskName(null)
       setClickupLookupError(null)
       setAutoApproveMinutes(7 * 24 * 60)
-      setItems([{ title: '', url: '', initialComment: '' }])
+      setItems([{ title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] }])
       setSelectedAssigneeIds([])
 
       // Make the new approval visible immediately by switching the list filter
@@ -1172,13 +1299,126 @@ function ApprovalsBoardSkeleton() {
                           placeholder="e.g. Longform #1, Hooks batch, Stories..."
                         />
                         <Input
-                          label="URL"
+                          label="URL (optional if uploading)"
                           value={item.url}
                           onChange={(e) =>
                             handleItemChange(index, 'url', e.target.value)
                           }
                           placeholder="https://drive.google.com/..."
                         />
+
+                        {/* Upload area */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Or upload images / videos
+                          </label>
+                          <label
+                            htmlFor={`asset-upload-${index}`}
+                            className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
+                          >
+                            <UploadIcon className="h-4 w-4" />
+                            <span>Click to pick files (multi-select supported)</span>
+                          </label>
+                          <input
+                            id={`asset-upload-${index}`}
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files.length) {
+                                handleUploadFiles(index, e.target.files)
+                              }
+                              // Reset so picking the same file twice still fires.
+                              e.target.value = ''
+                            }}
+                          />
+                        </div>
+
+                        {/* Live upload progress */}
+                        {item.uploads.length > 0 && (
+                          <div className="space-y-1.5">
+                            {item.uploads.map((u) => (
+                              <div key={u.id} className="text-[11px]">
+                                <div className="flex items-center justify-between text-gray-600">
+                                  <span className="truncate pr-2">{u.name}</span>
+                                  <span>
+                                    {u.error ? (
+                                      <span className="text-red-500">{u.error}</span>
+                                    ) : (
+                                      `${u.pct}%`
+                                    )}
+                                  </span>
+                                </div>
+                                {!u.error && (
+                                  <div className="h-1 bg-gray-200 rounded overflow-hidden mt-0.5">
+                                    <div
+                                      className="h-full bg-[#2B79F7] transition-all duration-150"
+                                      style={{ width: `${u.pct}%` }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Uploaded thumbnails */}
+                        {item.attachments.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2">
+                              {item.attachments.map((a, j) => (
+                                <div
+                                  key={`${a.public_id}-${j}`}
+                                  className="relative group aspect-square rounded-lg border border-gray-200 bg-gray-50 overflow-hidden"
+                                >
+                                  {a.resource_type === 'video' ? (
+                                    <div className="h-full w-full flex items-center justify-center bg-gray-900 text-white">
+                                      <VideoIcon className="h-6 w-6" />
+                                    </div>
+                                  ) : (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img
+                                      src={a.secure_url}
+                                      alt={a.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAttachment(index, j)}
+                                    className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label="Remove attachment"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                  <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px]">
+                                    {a.resource_type === 'video' ? (
+                                      <VideoIcon className="h-2.5 w-2.5" />
+                                    ) : (
+                                      <ImageIcon className="h-2.5 w-2.5" />
+                                    )}
+                                    {a.format}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {item.attachments.length > 1 && (
+                              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isCarousel}
+                                  onChange={(e) =>
+                                    handleItemFlag(index, 'isCarousel', e.target.checked)
+                                  }
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
+                                />
+                                View as a carousel
+                              </label>
+                            )}
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Comment (optional)

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
 import { uploadWithProgress } from '@/lib/uploadWithProgress'
+import { AssetRenderer } from '@/components/approvals/AssetRenderer'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
@@ -43,6 +44,18 @@ interface ApprovalDetail {
   }
 }
 
+interface CloudinaryAttachment {
+  public_id: string
+  secure_url: string
+  resource_type: 'image' | 'video'
+  format: string
+  width: number
+  height: number
+  duration?: number
+  bytes: number
+  name: string
+}
+
 interface ApprovalItem {
   id: string
   approval_id: string
@@ -52,6 +65,9 @@ interface ApprovalItem {
   status: string
   position: number
   created_at: string
+  attachments?: CloudinaryAttachment[]
+  is_carousel?: boolean
+  kind?: 'url' | 'image' | 'video' | 'mixed'
 }
 
 interface Assignee {
@@ -1168,6 +1184,17 @@ export default function ApprovalDetailPage() {
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
+                      </div>
+                    ) : item.attachments && item.attachments.length > 0 ? (
+                      <div className="p-3">
+                        <AssetRenderer
+                          attachments={item.attachments}
+                          isCarousel={!!item.is_carousel}
+                          onImageClick={(url, name) => {
+                            setPreviewImageUrl(url)
+                            setPreviewImageName(name)
+                          }}
+                        />
                       </div>
                     ) : (
                       <iframe

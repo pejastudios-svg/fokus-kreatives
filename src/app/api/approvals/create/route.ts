@@ -23,6 +23,18 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+interface AttachmentInput {
+  public_id: string
+  secure_url: string
+  resource_type: 'image' | 'video'
+  format: string
+  width: number
+  height: number
+  duration?: number
+  bytes: number
+  name: string
+}
+
 type CreateApprovalBody = {
   creatorId: string
   clientId: string
@@ -33,8 +45,11 @@ type CreateApprovalBody = {
   assigneeIds?: string[]
   items: {
     title: string
-    url: string
+    url?: string
     initialComment?: string
+    attachments?: AttachmentInput[]
+    isCarousel?: boolean
+    kind?: 'url' | 'image' | 'video' | 'mixed'
   }[]
 }
 
@@ -118,15 +133,39 @@ export async function POST(req: NextRequest) {
 
     const approvalId = approvalRow.id as string
 
-    // 2) Insert items
-    const itemsToInsert = items.map((item, index) => ({
-      approval_id: approvalId,
-      title: item.title || `Asset ${index + 1}`,
-      url: item.url,
-      initial_comment: item.initialComment || null,
-      status: 'pending',
-      position: index,
-    }))
+    // 2) Insert items. Each item can be EITHER a legacy URL link, OR one or
+    // more uploaded Cloudinary attachments. When attachments are present we
+    // store the first asset's secure_url in `url` (so anything that still
+    // reads `url` keeps working) and put the full list in `attachments`.
+    const itemsToInsert = items.map((item, index) => {
+      const attachments = Array.isArray(item.attachments) ? item.attachments : []
+      const firstAttachmentUrl = attachments[0]?.secure_url || null
+      const url = (item.url && item.url.trim()) || firstAttachmentUrl || ''
+
+      // Auto-derive `kind` if the client didn't send one.
+      let kind: 'url' | 'image' | 'video' | 'mixed' = item.kind || 'url'
+      if (!item.kind && attachments.length) {
+        const types = new Set(attachments.map((a) => a.resource_type))
+        kind =
+          types.size > 1
+            ? 'mixed'
+            : types.has('video')
+              ? 'video'
+              : 'image'
+      }
+
+      return {
+        approval_id: approvalId,
+        title: item.title || `Asset ${index + 1}`,
+        url,
+        initial_comment: item.initialComment || null,
+        status: 'pending',
+        position: index,
+        attachments,
+        is_carousel: !!item.isCarousel && attachments.length > 1,
+        kind,
+      }
+    })
 
     const { error: itemsError } = await supabase
       .from('approval_items')

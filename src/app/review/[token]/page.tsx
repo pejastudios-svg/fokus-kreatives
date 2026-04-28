@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
+import { AssetRenderer } from '@/components/approvals/AssetRenderer'
 import {
   CheckCircle,
   Loader2,
@@ -27,6 +28,18 @@ interface ApprovalSummary {
   clientPicture: string | null
 }
 
+interface CloudinaryItemAttachment {
+  public_id: string
+  secure_url: string
+  resource_type: 'image' | 'video'
+  format: string
+  width: number
+  height: number
+  duration?: number
+  bytes: number
+  name: string
+}
+
 interface ApprovalItem {
   id: string
   title: string | null
@@ -34,6 +47,9 @@ interface ApprovalItem {
   initial_comment: string | null
   status: 'pending' | 'approved'
   position: number
+  attachments?: CloudinaryItemAttachment[]
+  is_carousel?: boolean
+  kind?: 'url' | 'image' | 'video' | 'mixed'
 }
 
 interface CommentAttachment {
@@ -830,7 +846,16 @@ function ReviewItemCard({
           {item.title || 'Untitled asset'}
         </h2>
 
-        <AssetEmbed url={item.url} title={item.title || 'Asset'} />
+        {item.attachments && item.attachments.length > 0 ? (
+          <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+            <AssetRenderer
+              attachments={item.attachments}
+              isCarousel={!!item.is_carousel}
+            />
+          </div>
+        ) : (
+          <AssetEmbed url={item.url} title={item.title || 'Asset'} />
+        )}
 
         {item.initial_comment && (
           <CollapsibleText text={item.initial_comment} previewChars={220} />

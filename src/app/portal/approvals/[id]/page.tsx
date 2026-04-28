@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { AssetRenderer } from '@/components/approvals/AssetRenderer'
 import {
   Loader2,
   X,
@@ -36,6 +37,18 @@ interface ApprovalDetail {
   }
 }
 
+interface CloudinaryAttachment {
+  public_id: string
+  secure_url: string
+  resource_type: 'image' | 'video'
+  format: string
+  width: number
+  height: number
+  duration?: number
+  bytes: number
+  name: string
+}
+
 interface ApprovalItem {
   id: string
   approval_id: string
@@ -45,6 +58,9 @@ interface ApprovalItem {
   status: string
   position: number
   created_at: string
+  attachments?: CloudinaryAttachment[]
+  is_carousel?: boolean
+  kind?: 'url' | 'image' | 'video' | 'mixed'
 }
 
 interface Assignee {
@@ -783,6 +799,17 @@ await loadApproval()
                              Save Changes
                            </Button>
                         </div>
+                      </div>
+                    ) : item.attachments && item.attachments.length > 0 ? (
+                      <div className="p-3">
+                        <AssetRenderer
+                          attachments={item.attachments}
+                          isCarousel={!!item.is_carousel}
+                          onImageClick={(url, name) => {
+                            setPreviewImageUrl(url)
+                            setPreviewImageName(name)
+                          }}
+                        />
                       </div>
                     ) : (
                       <iframe
