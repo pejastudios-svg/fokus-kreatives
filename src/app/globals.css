@@ -22,6 +22,16 @@ input, textarea, select {
   box-sizing: border-box;
 }
 
+/* iOS Safari (and Chrome on iOS) auto-zooms the viewport when an input has a
+   font-size below 16px. Pin every form control to 16px on small screens to
+   stop the zoom-in-on-tap behavior. We leave desktop alone so we can keep the
+   smaller component sizes. */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
 input[type="date"], input[type="time"] {
   width: 100%;
   max-width: 100%;

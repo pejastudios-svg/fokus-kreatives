@@ -5,9 +5,10 @@ import { Header } from '@/components/layout/Header'
 import { ContentCreationEngine } from '@/components/dashboard/ContentCreationEngine'
 import { ScriptPackageEngine } from '@/components/dashboard/ScriptPackageEngine'
 import { QuestionsFormEngine } from '@/components/dashboard/QuestionsFormEngine'
-import { ClipboardList, Package, Sparkles, ArrowRight } from 'lucide-react'
+import { SeriesFormEngine } from '@/components/dashboard/SeriesFormEngine'
+import { ClipboardList, Package, Sparkles, ArrowRight, Layers } from 'lucide-react'
 
-type Mode = 'package' | 'individual' | 'questions'
+type Mode = 'package' | 'individual' | 'questions' | 'series'
 
 export default function DashboardPage() {
   const [mode, setMode] = useState<Mode>('package')
@@ -15,7 +16,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const saved = localStorage.getItem('dashboardMode')
-    if (saved === 'package' || saved === 'individual' || saved === 'questions') setMode(saved)
+    if (
+      saved === 'package' ||
+      saved === 'individual' ||
+      saved === 'questions' ||
+      saved === 'series'
+    )
+      setMode(saved)
   }, [])
 
   const setModeAndPersist = (m: Mode) => {
@@ -36,6 +43,7 @@ export default function DashboardPage() {
           {mode === 'package' && <ScriptPackageEngine />}
           {mode === 'individual' && <ContentCreationEngine />}
           {mode === 'questions' && <QuestionsFormEngine />}
+          {mode === 'series' && <SeriesFormEngine />}
         </div>
       </div>
     </>
@@ -50,9 +58,15 @@ const MODES: { id: Mode; label: string; description: string; icon: React.Compone
     icon: ClipboardList,
   },
   {
+    id: 'series',
+    label: 'Series Form',
+    description: 'Per-entry intake for a multi-day series. One prompt from real answers.',
+    icon: Layers,
+  },
+  {
     id: 'package',
     label: 'Script Package',
-    description: 'One long-form script + 10 carousels, 10 reels, 10 stories.',
+    description: 'One long-form script + 5 carousels, 5 reels, 5 stories.',
     icon: Package,
   },
   {
@@ -65,7 +79,7 @@ const MODES: { id: Mode; label: string; description: string; icon: React.Compone
 
 function ModeSwitcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
       {MODES.map((m) => {
         const selected = mode === m.id
         return (

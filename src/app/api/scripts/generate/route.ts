@@ -171,7 +171,15 @@ export async function POST(request: NextRequest) {
     )
 
     const runOnce = async (userPrompt: string): Promise<string> => {
-      return sanitize(await callLLM(prompt.system, userPrompt, prompt.maxTokens, prompt.temperature))
+      // Individual generation writes from scratch (no longform source to
+      // inherit voice from), so use the high tier (Pro) regardless of
+      // content type. Cost difference vs Flash is small in absolute terms
+      // (~$0.006 extra per short-form, ~$0.10 extra per longform), and the
+      // quality lift on voice/AI-tells matters most when there's no
+      // reference script anchoring the model.
+      return sanitize(
+        await callLLM(prompt.system, userPrompt, prompt.maxTokens, prompt.temperature, 'high'),
+      )
     }
 
     // ===== 1. First-pass generation =====
