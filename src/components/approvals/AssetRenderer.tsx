@@ -37,9 +37,11 @@ export interface AssetRendererHandle {
   goToSlide: (index: number) => void
   /** Scrub the active slide's video to `seconds` (no-op if not a video). */
   seekTo: (seconds: number) => void
+  /** Smooth-scroll the asset into the viewport (used on phone-sized screens). */
+  scrollIntoView: () => void
   /**
    * Convenience for the comment-click flow: jump to slide N, scrub to T,
-   * scroll the player into view, and optionally flash a saved region.
+   * scroll the player into view, and optionally show a saved region.
    */
   focusAnnotation: (opts: {
     attachmentIndex?: number | null
@@ -48,11 +50,17 @@ export interface AssetRendererHandle {
   }) => void
   /**
    * Open the draw overlay on the active slide. Resolves with the region the
-   * user drew, or null if they cancelled.
+   * user drew (and the video's timestamp at confirm time, if applicable),
+   * or null if they cancelled.
    */
-  enterDrawMode: (shape?: 'circle' | 'freeform') => Promise<CommentRegion | null>
-  /** Pulse a saved region for ~2.5s on the active slide. */
+  enterDrawMode: (shape?: 'circle' | 'freeform') => Promise<{
+    region: CommentRegion
+    timestampSeconds: number | null
+  } | null>
+  /** Display a saved region on the active slide until cleared. */
   flashRegion: (region: CommentRegion) => void
+  /** Hide any currently-displayed saved region. */
+  clearFlash: () => void
 }
 
 const SWIPE_THRESHOLD_PX = 50
@@ -120,9 +128,17 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
     const [flashedRegion, setFlashedRegion] = useState<CommentRegion | null>(null)
     const [drawingMode, setDrawingMode] = useState<{
       shape: 'circle' | 'freeform'
-      resolve: (r: CommentRegion | null) => void
+      resolve: (
+        r: { region: CommentRegion; timestampSeconds: number | null } | null,
+      ) => void
       targetSlide: number
     } | null>(null)
+
+    // Clears any persistent highlight when the user starts playing the video
+    // - the highlight has done its job once the video is rolling.
+    const onAnyVideoPlay = useCallback(() => {
+      setFlashedRegion((prev) => (prev ? null : prev))
+    }, [])
 
     // When the active slide changes, pause every other video so audio doesn't
     // bleed across slides. (Carousel-only - in grid mode each video is its own
@@ -195,20 +211,30 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           }
         }
         const enterDrawMode: AssetRendererHandle['enterDrawMode'] = (shape = 'circle') =>
-          new Promise<CommentRegion | null>((resolve) => {
-            setDrawingMode({ shape, resolve, targetSlide: getActiveIdx() })
-          })
+          new Promise<{ region: CommentRegion; timestampSeconds: number | null } | null>(
+            (resolve) => {
+              setDrawingMode({ shape, resolve, targetSlide: getActiveIdx() })
+            },
+          )
         const flashRegion: AssetRendererHandle['flashRegion'] = (region) => {
           setFlashedRegion(region)
+        }
+        const clearFlash: AssetRendererHandle['clearFlash'] = () => {
+          setFlashedRegion(null)
+        }
+        const scrollIntoView: AssetRendererHandle['scrollIntoView'] = () => {
+          containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
         return {
           getCurrentTime,
           getActiveIndex: getActiveIdx,
           goToSlide,
           seekTo,
+          scrollIntoView,
           focusAnnotation,
           enterDrawMode,
           flashRegion,
+          clearFlash,
         }
       },
       [active, attachments, isCarousel],
@@ -219,7 +245,14 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         assetRef={assetEls[drawingMode.targetSlide] || null}
         initialShape={drawingMode.shape}
         onComplete={(region) => {
-          drawingMode.resolve(region)
+          // Auto-grab the playback time at the moment of confirmation if the
+          // target asset is a video - the highlight IS that moment, so the
+          // timestamp travels with it.
+          const slideIdx = drawingMode.targetSlide
+          const v = videoRefs.current[slideIdx]
+          const isVideo = attachments[slideIdx]?.resource_type === 'video'
+          const timestampSeconds = isVideo && v ? v.currentTime : null
+          drawingMode.resolve({ region, timestampSeconds })
           setDrawingMode(null)
         }}
         onCancel={() => {
@@ -231,7 +264,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
 
     const flashOverlayFor = (slideIdx: number) => {
       if (!flashedRegion) return null
-      // Only flash on the slide that's currently active.
+      // Only show the highlight on the slide that's currently active.
       const activeIdx = isCarousel
         ? Math.max(0, Math.min(active, attachments.length - 1))
         : 0
@@ -241,7 +274,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           region={flashedRegion}
           assetRef={assetEls[slideIdx] || null}
           flashing
-          onFlashDone={() => setFlashedRegion(null)}
+          onClose={() => setFlashedRegion(null)}
         />
       )
     }
@@ -260,6 +293,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
             onVideoInteract={() => {
               lastInteractedVideoIndexRef.current = 0
             }}
+            onVideoPlay={onAnyVideoPlay}
           />
           {flashOverlayFor(0)}
           {drawCanvasNode}
@@ -326,6 +360,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                   onVideoInteract={() => {
                     lastInteractedVideoIndexRef.current = i
                   }}
+                  onVideoPlay={onAnyVideoPlay}
                 />
                 {flashOverlayFor(i)}
                 {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
@@ -387,6 +422,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
               onVideoInteract={() => {
                 lastInteractedVideoIndexRef.current = i
               }}
+              onVideoPlay={onAnyVideoPlay}
             />
             {flashOverlayFor(i)}
             {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
@@ -413,6 +449,9 @@ interface AssetViewProps {
    *  uses this to remember which video the user has been interacting with
    *  so getCurrentTime() returns the right one. */
   onVideoInteract?: () => void
+  /** Fires only on `play` events. Used to clear a saved-region highlight
+   *  once the user starts watching - the highlight has done its job. */
+  onVideoPlay?: () => void
 }
 
 function AssetView({
@@ -423,6 +462,7 @@ function AssetView({
   videoRef,
   assetElRef,
   onVideoInteract,
+  onVideoPlay,
 }: AssetViewProps) {
   // Stable merged callback ref - if it weren't memoised, React would treat it
   // as a new ref each render and fire it (null) -> (el), retriggering the
@@ -445,7 +485,10 @@ function AssetView({
         controls
         playsInline
         preload={isActive ? 'metadata' : 'none'}
-        onPlay={onVideoInteract}
+        onPlay={() => {
+          onVideoInteract?.()
+          onVideoPlay?.()
+        }}
         onSeeked={onVideoInteract}
         onTimeUpdate={onVideoInteract}
         onLoadedMetadata={onVideoInteract}

@@ -224,6 +224,43 @@ export default function ApprovalDetailPage() {
     [],
   )
 
+  // Per-item refs to the composer textarea + scrollable comments list. Used
+  // for the phone-first scroll behaviours (Annotate -> asset, Use -> textbox,
+  // Send -> latest message) and the new-comment preview bubble.
+  const composerTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
+  const commentsListRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // Per-item: was the user near the bottom of the comments list at last check?
+  // Drives whether an arriving comment becomes a preview bubble or just slots
+  // into view normally.
+  const [commentsAtBottom, setCommentsAtBottom] = useState<Record<string, boolean>>({})
+
+  // Latest comment that arrived while the user was scrolled away, per item.
+  const [unreadPreview, setUnreadPreview] = useState<
+    Record<string, { id: string; name: string; preview: string; avatar: string | null } | null>
+  >({})
+
+  // tempId of the just-sent optimistic comment, used to scroll its bubble
+  // into view once it renders.
+  const [pendingScrollToCommentId, setPendingScrollToCommentId] = useState<string | null>(null)
+
+  const handleCommentsScroll = (itemId: string) => () => {
+    const el = commentsListRefs.current[itemId]
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+    const atBottom = distanceFromBottom < 40
+    setCommentsAtBottom((prev) => (prev[itemId] === atBottom ? prev : { ...prev, [itemId]: atBottom }))
+    if (atBottom && unreadPreview[itemId]) {
+      setUnreadPreview((prev) => ({ ...prev, [itemId]: null }))
+    }
+  }
+
+  const scrollCommentsToBottom = (itemId: string) => {
+    const el = commentsListRefs.current[itemId]
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
+
   // Annotations attached to the next comment, per composer (general + per-item).
   // Either field can be set independently - timestamp without region, region
   // without timestamp, or both.
@@ -243,9 +280,11 @@ export default function ApprovalDetailPage() {
     if (!handle) return
     const time = handle.getCurrentTime()
     if (time === null) {
+      handle.scrollIntoView()
       alert('Play or seek the video first, then click Grab time.')
       return
     }
+    handle.scrollIntoView()
     setPendingAnnotation((prev) => ({
       ...prev,
       [itemId]: {
@@ -259,16 +298,27 @@ export default function ApprovalDetailPage() {
   const handleAnnotate = async (itemId: string, shape: 'circle' | 'freeform') => {
     const handle = assetRendererRefs.current[itemId]
     if (!handle) return
-    const region = await handle.enterDrawMode(shape)
-    if (!region) return
+    handle.scrollIntoView()
+    const result = await handle.enterDrawMode(shape)
+    if (!result) return
     setPendingAnnotation((prev) => ({
       ...prev,
       [itemId]: {
-        ...(prev[itemId] ?? {}),
-        region,
+        // Drawing on a video implicitly tags the playback time as well -
+        // the highlight IS that moment, so the timestamp travels with it.
+        // Existing timestamp wins if the user already grabbed one manually.
+        timestampSeconds:
+          prev[itemId]?.timestampSeconds ?? result.timestampSeconds ?? null,
+        region: result.region,
         attachmentIndex: handle.getActiveIndex(),
       },
     }))
+    // Send the user back to the textbox once they've confirmed the region.
+    const ta = composerTextareaRefs.current[itemId]
+    if (ta) {
+      ta.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      ta.focus({ preventScroll: true })
+    }
   }
 
   const handleClearPending = (key: string) => {
@@ -391,6 +441,55 @@ export default function ApprovalDetailPage() {
       comments,
     })
   }, [approvalId, isLoading, approval, items, assignees, comments])
+
+  // Detect new comments arriving (realtime / loadComments) so we can show a
+  // preview bubble when the user is scrolled away from the bottom of the
+  // relevant item's comment list.
+  const seenCommentIdsRef = useRef<Set<string>>(new Set())
+  const seenInitialisedRef = useRef(false)
+  useEffect(() => {
+    if (!seenInitialisedRef.current) {
+      // Treat the first batch as "already read" - we don't want to alert the
+      // user about every comment that existed when they opened the page.
+      for (const c of comments) {
+        if (!c.id.startsWith('temp-')) seenCommentIdsRef.current.add(c.id)
+      }
+      seenInitialisedRef.current = true
+      return
+    }
+    for (const c of comments) {
+      if (c.id.startsWith('temp-')) continue
+      if (seenCommentIdsRef.current.has(c.id)) continue
+      seenCommentIdsRef.current.add(c.id)
+      if (c.user_id === currentUserId) continue
+      const itemKey = c.approval_item_id || 'general'
+      // If the user is near the bottom (or hasn't scrolled this list at all
+      // yet, in which case it auto-shows the latest), no preview needed.
+      const atBottom = commentsAtBottom[itemKey] !== false
+      if (atBottom) continue
+      setUnreadPreview((prev) => ({
+        ...prev,
+        [itemKey]: {
+          id: c.id,
+          name: c.users?.name || c.users?.email || c.reviewer_email || 'Someone',
+          preview: (c.content || '').slice(0, 60),
+          avatar: c.users?.profile_picture_url || null,
+        },
+      }))
+    }
+  }, [comments, currentUserId, commentsAtBottom])
+
+  // After we add an optimistic comment, scroll its container to the bottom
+  // so the user sees their just-sent bubble.
+  useEffect(() => {
+    if (!pendingScrollToCommentId) return
+    const target = comments.find((c) => c.id === pendingScrollToCommentId)
+    if (!target) return
+    const itemKey = target.approval_item_id || 'general'
+    // Run after commit so the new bubble is in the DOM.
+    requestAnimationFrame(() => scrollCommentsToBottom(itemKey))
+    setPendingScrollToCommentId(null)
+  }, [pendingScrollToCommentId, comments])
 
   const init = async () => {
   // Bail if we don't have a route id yet, or another init() is already in flight.
@@ -1003,6 +1102,8 @@ export default function ApprovalDetailPage() {
         : { name: 'You', email: '', profile_picture_url: null },
     }
     setComments((prev) => [...prev, optimistic])
+    // Scroll the comments container so the user sees their just-sent bubble.
+    setPendingScrollToCommentId(tempId)
 
     // Background send so the UI never waits.
     ;(async () => {
@@ -1145,6 +1246,11 @@ export default function ApprovalDetailPage() {
         setComments(snapshot)
         alert('Failed to update')
       } else if (nextResolved) {
+        // Hide any persistent highlight on the asset that was tied to this
+        // comment - the conversation is closed.
+        if (comment.approval_item_id) {
+          assetRendererRefs.current[comment.approval_item_id]?.clearFlash()
+        }
         // Fire-and-forget popup notification to the comment's author + the
         // approval's assignees (excluding the resolver). Failures are non-fatal.
         void fetch('/api/approvals/notify-comment-resolved', {
@@ -1701,7 +1807,13 @@ export default function ApprovalDetailPage() {
                       </span>
                     </div>
 
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div
+                      ref={(el) => {
+                        commentsListRefs.current[item.id] = el
+                      }}
+                      onScroll={handleCommentsScroll(item.id)}
+                      className="relative space-y-3 max-h-64 overflow-y-auto"
+                    >
                       {itemComments.length === 0 ? (
                         <p className="text-xs text-gray-400">
                           No comments yet.
@@ -2001,6 +2113,41 @@ export default function ApprovalDetailPage() {
                       )}
                     </div>
 
+                    {/* New-comment preview bubble — appears when a comment from
+                        someone else arrives while the user is scrolled away.
+                        Animates in (avatar pops, preview slides out as a pill),
+                        click jumps the comments list to the bottom. */}
+                    {unreadPreview[item.id] && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          scrollCommentsToBottom(item.id)
+                          setUnreadPreview((prev) => ({ ...prev, [item.id]: null }))
+                        }}
+                        aria-label={`Jump to new comment from ${unreadPreview[item.id]!.name}`}
+                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+                      >
+                        {unreadPreview[item.id]!.avatar ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={unreadPreview[item.id]!.avatar!}
+                            alt=""
+                            className="h-6 w-6 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="h-6 w-6 rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+                            {(unreadPreview[item.id]!.name || 'U').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="font-semibold truncate max-w-[80px]">
+                          {unreadPreview[item.id]!.name.split(' ')[0]}
+                        </span>
+                        <span className="text-gray-500 truncate max-w-[180px]">
+                          {unreadPreview[item.id]!.preview || 'sent an attachment'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* New comment input */}
                     <div className="border border-gray-200 rounded-lg p-2 space-y-2">
   {replyTarget && replyTarget.itemId === item.id && (
@@ -2017,6 +2164,9 @@ export default function ApprovalDetailPage() {
     </p>
   )}
   <textarea
+    ref={(el) => {
+      composerTextareaRefs.current[item.id] = el
+    }}
     value={newCommentText[item.id] || ''}
     onChange={(e) =>
       handleNewCommentChange(item.id, e.target.value)

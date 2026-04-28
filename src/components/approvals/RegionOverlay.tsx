@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { CommentRegion } from '@/lib/types/annotations'
 
 /**
@@ -9,27 +10,29 @@ import type { CommentRegion } from '@/lib/types/annotations'
  * 0-1 relative to the asset's rendered bounding box; we measure the box on
  * mount + on resize and project them into pixel space.
  *
- * If `flashing` is true, the stroke pulses for ~2.5s then `onFlashDone`
- * fires - the parent uses this to clear the flash state.
+ * The overlay stays visible until the parent unmounts it or the user taps the
+ * close badge. `flashing` controls whether the stroke pulses (used for the
+ * first second after a comment pill is clicked, to draw the eye).
  */
 interface RegionOverlayProps {
   region: CommentRegion
   /** The element the region was drawn relative to (image / video). */
   assetRef: HTMLElement | null
   flashing?: boolean
-  onFlashDone?: () => void
-  /** Visual style. `flash` pulses; `static` is a thin dashed outline. */
-  variant?: 'flash' | 'static'
+  onClose?: () => void
 }
 
 export function RegionOverlay({
   region,
   assetRef,
   flashing = false,
-  onFlashDone,
-  variant = 'flash',
+  onClose,
 }: RegionOverlayProps) {
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  // Pulse only for the first second after the overlay appears. After that,
+  // the stroke stays solid so the user can study the highlight without a
+  // distracting animation.
+  const [pulse, setPulse] = useState(flashing)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Track the asset's bounding rect inside the nearest positioned ancestor.
@@ -52,18 +55,21 @@ export function RegionOverlay({
   }, [assetRef])
 
   useEffect(() => {
-    if (!flashing || !onFlashDone) return
-    const t = setTimeout(onFlashDone, 2500)
+    // The state is already seeded with `flashing`, so we only need to schedule
+    // the calm-down. setState inside an effect (without a synchronous prefix)
+    // satisfies the strict React rule.
+    if (!flashing) return
+    const t = setTimeout(() => setPulse(false), 1000)
     return () => clearTimeout(t)
-  }, [flashing, onFlashDone])
+  }, [flashing])
 
   if (!box) return <div ref={containerRef} className="absolute inset-0 pointer-events-none" />
 
   // Build SVG content for circle vs freeform.
   const longest = Math.max(box.w, box.h)
-  const stroke = flashing ? '#FF5757' : '#1E54B7'
-  const strokeWidth = flashing ? 4 : 2
-  const dash = variant === 'static' ? '6 4' : undefined
+  const stroke = '#FF5757'
+  const strokeWidth = 4
+  const dash: string | undefined = undefined
 
   let shape: React.ReactElement | null = null
   if (region.shape === 'circle') {
@@ -96,18 +102,29 @@ export function RegionOverlay({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 pointer-events-none"
-      aria-hidden
-    >
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none">
       <svg
-        className={flashing ? 'absolute animate-pulse' : 'absolute'}
+        className={pulse ? 'absolute animate-pulse' : 'absolute'}
         style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
         viewBox={`0 0 ${box.w} ${box.h}`}
+        aria-hidden
       >
         {shape}
       </svg>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Hide highlight"
+          className="absolute pointer-events-auto inline-flex items-center justify-center h-7 w-7 rounded-full bg-black/70 text-white shadow-lg hover:bg-black"
+          style={{
+            left: box.x + box.w - 32,
+            top: box.y + 4,
+          }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   )
 }
