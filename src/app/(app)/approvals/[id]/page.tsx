@@ -25,7 +25,13 @@ import {
   CheckCircle,
   AlertCircle,
   Send as SendIcon,
+  Upload as UploadIcon,
+  Video as VideoIcon,
+  Image as ImageIcon,
+  RefreshCw,
+  Trash2 as TrashIcon,
 } from 'lucide-react'
+import { cldThumb } from '@/lib/cloudinary'
 
 interface ApprovalDetail {
   id: string
@@ -171,6 +177,14 @@ export default function ApprovalDetailPage() {
   const [editItemTitle, setEditItemTitle] = useState('')
   const [editItemUrl, setEditItemUrl] = useState('')
   const [editItemComment, setEditItemComment] = useState('')
+  const [editItemAttachments, setEditItemAttachments] = useState<CloudinaryAttachment[]>([])
+  const [editItemIsCarousel, setEditItemIsCarousel] = useState(false)
+  // Per-file upload progress while editing. `replaceIndex` is set when a file
+  // is uploading to replace an existing attachment at that position, so we can
+  // splice it in once the upload finishes.
+  const [editItemUploads, setEditItemUploads] = useState<
+    { id: string; name: string; pct: number; error?: string; replaceIndex?: number }[]
+  >([])
 
   // Comments
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({})
@@ -576,6 +590,9 @@ export default function ApprovalDetailPage() {
     setEditItemTitle(item.title || '')
     setEditItemUrl(item.url || '')
     setEditItemComment(item.initial_comment || '')
+    setEditItemAttachments(item.attachments ?? [])
+    setEditItemIsCarousel(!!item.is_carousel)
+    setEditItemUploads([])
   }
 
   const cancelEditItem = () => {
@@ -583,19 +600,129 @@ export default function ApprovalDetailPage() {
     setEditItemTitle('')
     setEditItemUrl('')
     setEditItemComment('')
+    setEditItemAttachments([])
+    setEditItemIsCarousel(false)
+    setEditItemUploads([])
   }
+
+  const handleEditAttachmentDelete = (index: number) => {
+    setEditItemAttachments((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      // Carousel only makes sense with 2+; turn it off if we drop below.
+      if (next.length < 2) setEditItemIsCarousel(false)
+      return next
+    })
+  }
+
+  /**
+   * Upload one or more files. If `replaceIndex` is provided, the first file
+   * uploaded swaps in at that position; the rest append. Otherwise everything
+   * appends to the end.
+   */
+  const handleEditAttachmentUpload = async (
+    files: FileList | File[],
+    replaceIndex?: number,
+  ) => {
+    const list = Array.from(files)
+    if (!list.length) return
+
+    const { uploadToCloudinary, fileKind } = await import('@/lib/cloudinary')
+
+    const tracking = list.map((f, i) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`,
+      name: f.name,
+      pct: 0,
+      // Only the first file in a replace operation actually replaces; later
+      // files just append.
+      replaceIndex: i === 0 ? replaceIndex : undefined,
+    }))
+
+    setEditItemUploads((prev) => [...prev, ...tracking])
+
+    await Promise.all(
+      list.map(async (file, j) => {
+        const tid = tracking[j].id
+        const ri = tracking[j].replaceIndex
+        const kind = fileKind(file)
+        if (kind === 'other') {
+          setEditItemUploads((prev) =>
+            prev.map((u) => (u.id === tid ? { ...u, error: 'Unsupported type' } : u)),
+          )
+          return
+        }
+        try {
+          const asset = await uploadToCloudinary(file, {
+            folder: `approvals/${approvalId || 'misc'}/items`,
+            onProgress: (pct) =>
+              setEditItemUploads((prev) =>
+                prev.map((u) => (u.id === tid ? { ...u, pct } : u)),
+              ),
+          })
+
+          if (typeof ri === 'number') {
+            // Replace at position; preserve the rest.
+            setEditItemAttachments((prev) =>
+              prev.map((a, idx) => (idx === ri ? asset : a)),
+            )
+          } else {
+            setEditItemAttachments((prev) => [...prev, asset])
+          }
+
+          setEditItemUploads((prev) => prev.filter((u) => u.id !== tid))
+        } catch (err) {
+          console.error('Edit upload failed:', err)
+          const msg = err instanceof Error ? err.message : 'Upload failed'
+          setEditItemUploads((prev) =>
+            prev.map((u) => (u.id === tid ? { ...u, error: msg } : u)),
+          )
+        }
+      }),
+    )
+  }
+
+  /** Wipes the existing attachment list and uploads the new selection in its place. */
+  const handleEditAttachmentReplaceAll = async (files: FileList | File[]) => {
+    setEditItemAttachments([])
+    setEditItemIsCarousel(false)
+    await handleEditAttachmentUpload(files)
+  }
+
+  const editUploadInFlight =
+    editItemUploads.length > 0 && editItemUploads.every((u) => !u.error)
 
   const saveEditItem = async (itemId: string) => {
     if (!canEditItems) return
-
-    const title = editItemTitle.trim()
-    const url = editItemUrl.trim()
-    const comment = editItemComment.trim()
-
-    if (!url) {
-      alert('URL is required')
+    if (editUploadInFlight) {
+      alert('Wait for uploads to finish before saving.')
       return
     }
+
+    const title = editItemTitle.trim()
+    const urlInput = editItemUrl.trim()
+    const comment = editItemComment.trim()
+
+    // Either a URL or at least one attachment is required - the create flow
+    // already enforces this; mirror it here so editors don't accidentally save
+    // an empty asset.
+    if (!urlInput && editItemAttachments.length === 0) {
+      alert('Add a URL or at least one attachment.')
+      return
+    }
+
+    // Mirror the create-route normalisation: when attachments are present,
+    // the canonical `url` falls back to the first asset's secure_url so any
+    // legacy reader still gets something.
+    const firstAttachmentUrl = editItemAttachments[0]?.secure_url || null
+    const url = urlInput || firstAttachmentUrl || ''
+
+    // Re-derive `kind` from attachment types.
+    let kind: 'url' | 'image' | 'video' | 'mixed' = 'url'
+    if (editItemAttachments.length) {
+      const types = new Set(editItemAttachments.map((a) => a.resource_type))
+      kind =
+        types.size > 1 ? 'mixed' : types.has('video') ? 'video' : 'image'
+    }
+    const isCarousel = editItemIsCarousel && editItemAttachments.length > 1
 
     // Optimistic patch + rollback on failure.
     const snapshot = items
@@ -607,6 +734,9 @@ export default function ApprovalDetailPage() {
               title: title || '',
               url,
               initial_comment: comment || null,
+              attachments: editItemAttachments,
+              is_carousel: isCarousel,
+              kind,
               updated_at: new Date().toISOString(),
             }
           : i,
@@ -621,6 +751,9 @@ export default function ApprovalDetailPage() {
           title: title || null,
           url,
           initial_comment: comment || null,
+          attachments: editItemAttachments,
+          is_carousel: isCarousel,
+          kind,
           updated_at: new Date().toISOString(),
         })
         .eq('id', itemId)
@@ -1115,9 +1248,10 @@ export default function ApprovalDetailPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => saveEditItem(item.id)}
+                              disabled={editUploadInFlight}
                             >
                               <Save className="h-4 w-4 mr-1" />
-                              Save
+                              {editUploadInFlight ? 'Uploading…' : 'Save'}
                             </Button>
                             <Button
                               size="sm"
@@ -1166,7 +1300,7 @@ export default function ApprovalDetailPage() {
                           placeholder="Asset title"
                         />
                         <Input
-                          label="URL"
+                          label="URL (optional if uploading)"
                           value={editItemUrl}
                           onChange={(e) => setEditItemUrl(e.target.value)}
                           placeholder="https://drive.google.com/..."
@@ -1184,6 +1318,172 @@ export default function ApprovalDetailPage() {
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
+
+                        {/* Existing attachments — each is removable and replaceable. */}
+                        {editItemAttachments.length > 0 && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Attachments ({editItemAttachments.length})
+                              </label>
+                              <label
+                                htmlFor={`edit-replaceall-${item.id}`}
+                                className="text-[11px] text-red-600 hover:underline cursor-pointer"
+                              >
+                                Replace all
+                              </label>
+                              <input
+                                id={`edit-replaceall-${item.id}`}
+                                type="file"
+                                accept="image/*,video/*"
+                                multiple
+                                className="sr-only"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length) {
+                                    handleEditAttachmentReplaceAll(e.target.files)
+                                  }
+                                  e.target.value = ''
+                                }}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {editItemAttachments.map((a, j) => {
+                                const thumb = cldThumb(a, { w: 600, h: 600, crop: 'fill' })
+                                const replaceInputId = `edit-replace-${item.id}-${j}`
+                                return (
+                                  <div
+                                    key={`${a.public_id}-${j}`}
+                                    className="relative group aspect-square rounded-lg border border-gray-200 bg-gray-50 overflow-hidden"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={thumb}
+                                      alt={a.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                    {a.resource_type === 'video' && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="h-9 w-9 rounded-full bg-black/55 flex items-center justify-center backdrop-blur-sm">
+                                          <VideoIcon className="h-4 w-4 text-white" />
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Per-thumbnail action overlay */}
+                                    <div className="absolute inset-0 flex items-end justify-center gap-1 p-1.5 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <label
+                                        htmlFor={replaceInputId}
+                                        title="Replace this asset"
+                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-white text-gray-700 cursor-pointer"
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditAttachmentDelete(j)}
+                                        title="Delete this asset"
+                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-red-50 text-red-600"
+                                      >
+                                        <TrashIcon className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    <input
+                                      id={replaceInputId}
+                                      type="file"
+                                      accept="image/*,video/*"
+                                      className="sr-only"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          handleEditAttachmentUpload([e.target.files[0]], j)
+                                        }
+                                        e.target.value = ''
+                                      }}
+                                    />
+                                    <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px]">
+                                      {a.resource_type === 'video' ? (
+                                        <VideoIcon className="h-2.5 w-2.5" />
+                                      ) : (
+                                        <ImageIcon className="h-2.5 w-2.5" />
+                                      )}
+                                      {a.format}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {editItemAttachments.length > 1 && (
+                              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none mt-2">
+                                <input
+                                  type="checkbox"
+                                  checked={editItemIsCarousel}
+                                  onChange={(e) => setEditItemIsCarousel(e.target.checked)}
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
+                                />
+                                View as a carousel
+                              </label>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Add new files (appends to existing) */}
+                        <div>
+                          <label
+                            htmlFor={`edit-add-${item.id}`}
+                            className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
+                          >
+                            <UploadIcon className="h-4 w-4" />
+                            <span>
+                              {editItemAttachments.length === 0
+                                ? 'Click to upload images / videos'
+                                : 'Add more files'}
+                            </span>
+                          </label>
+                          <input
+                            id={`edit-add-${item.id}`}
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files.length) {
+                                handleEditAttachmentUpload(e.target.files)
+                              }
+                              e.target.value = ''
+                            }}
+                          />
+                        </div>
+
+                        {/* Live upload progress (replace + add both flow through here) */}
+                        {editItemUploads.length > 0 && (
+                          <div className="space-y-1.5">
+                            {editItemUploads.map((u) => (
+                              <div key={u.id} className="text-[11px]">
+                                <div className="flex items-center justify-between text-gray-600">
+                                  <span className="truncate pr-2">
+                                    {typeof u.replaceIndex === 'number'
+                                      ? `Replacing #${u.replaceIndex + 1}: `
+                                      : ''}
+                                    {u.name}
+                                  </span>
+                                  <span>
+                                    {u.error ? (
+                                      <span className="text-red-500">{u.error}</span>
+                                    ) : (
+                                      `${u.pct}%`
+                                    )}
+                                  </span>
+                                </div>
+                                {!u.error && (
+                                  <div className="h-1 bg-gray-200 rounded overflow-hidden mt-0.5">
+                                    <div
+                                      className="h-full bg-[#2B79F7] transition-all duration-150"
+                                      style={{ width: `${u.pct}%` }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ) : item.attachments && item.attachments.length > 0 ? (
                       <div className="p-3">

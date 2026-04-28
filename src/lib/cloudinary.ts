@@ -210,3 +210,26 @@ export function cldUrl(
 
   return `https://res.cloudinary.com/${cloudName}/${asset.resource_type}/upload/${tx}/${asset.public_id}.${asset.format}`
 }
+
+/**
+ * Poster-frame thumbnail for an asset. For images this is just `cldUrl`; for
+ * videos Cloudinary will extract a representative frame and serve it as a
+ * JPEG when the URL extension is `.jpg`. Useful for upload UIs and grid
+ * previews where we don't want to load the whole video just to see what it is.
+ */
+export function cldThumb(
+  asset: CloudinaryAsset,
+  opts: { w?: number; h?: number; crop?: 'fill' | 'limit' | 'fit' } = {},
+): string {
+  if (asset.resource_type !== 'video') return cldUrl(asset, opts)
+  if (!asset?.public_id || !asset?.secure_url) return asset?.secure_url || ''
+  const cloudName = asset.secure_url.split('/res.cloudinary.com/')[1]?.split('/')[0]
+  if (!cloudName) return asset.secure_url
+
+  const t: string[] = ['f_auto', 'q_auto', 'so_auto']
+  if (opts.w) t.push(`w_${opts.w}`)
+  if (opts.h) t.push(`h_${opts.h}`)
+  if (opts.crop) t.push(`c_${opts.crop}`)
+
+  return `https://res.cloudinary.com/${cloudName}/video/upload/${t.join(',')}/${asset.public_id}.jpg`
+}

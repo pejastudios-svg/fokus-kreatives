@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
 import { ClientPicker } from '@/components/dashboard/ClientPicker'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
+import { cldThumb } from '@/lib/cloudinary'
 import {
   Plus,
   Search,
@@ -1367,22 +1368,27 @@ function ApprovalsBoardSkeleton() {
                         {item.attachments.length > 0 && (
                           <div className="space-y-2">
                             <div className="grid grid-cols-3 gap-2">
-                              {item.attachments.map((a, j) => (
+                              {item.attachments.map((a, j) => {
+                                // Use Cloudinary's frame-extraction so videos
+                                // render an actual poster image, not just an icon.
+                                const thumbUrl = cldThumb(a, { w: 600, h: 600, crop: 'fill' })
+                                return (
                                 <div
                                   key={`${a.public_id}-${j}`}
                                   className="relative group aspect-square rounded-lg border border-gray-200 bg-gray-50 overflow-hidden"
                                 >
-                                  {a.resource_type === 'video' ? (
-                                    <div className="h-full w-full flex items-center justify-center bg-gray-900 text-white">
-                                      <VideoIcon className="h-6 w-6" />
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={thumbUrl}
+                                    alt={a.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                  {a.resource_type === 'video' && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <div className="h-9 w-9 rounded-full bg-black/55 flex items-center justify-center backdrop-blur-sm">
+                                        <VideoIcon className="h-4 w-4 text-white" />
+                                      </div>
                                     </div>
-                                  ) : (
-                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                    <img
-                                      src={a.secure_url}
-                                      alt={a.name}
-                                      className="h-full w-full object-cover"
-                                    />
                                   )}
                                   <button
                                     type="button"
@@ -1401,7 +1407,8 @@ function ApprovalsBoardSkeleton() {
                                     {a.format}
                                   </span>
                                 </div>
-                              ))}
+                                )
+                              })}
                             </div>
                             {item.attachments.length > 1 && (
                               <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
