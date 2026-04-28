@@ -2,7 +2,7 @@
 // src/app/approvals/[id]/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PortalLayout } from '@/components/portal/PortalLayout'
 import { Header } from '@/components/layout/Header'
@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
-import { AssetRenderer } from '@/components/approvals/AssetRenderer'
+import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
+import { formatTimestamp } from '@/lib/types/annotations'
 import {
   Loader2,
   X,
@@ -19,6 +20,7 @@ import {
   Paperclip,
   Copy,
   Pencil,
+  Clock as ClockIcon,
 } from 'lucide-react'
 
 interface ApprovalDetail {
@@ -131,6 +133,46 @@ export default function PortalApprovalDetailPage() {
   const [commentFile, setCommentFile] = useState<File | null>(null)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
+
+  // AssetRenderer handles + pending annotation, same flow as the agency page.
+  const assetRendererRefs = useRef<Record<string, AssetRendererHandle | null>>({})
+  const [pendingAnnotation, setPendingAnnotation] = useState<
+    Record<string, { timestampSeconds: number; attachmentIndex: number | null }>
+  >({})
+
+  const handleGrabTime = (itemId: string) => {
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    const time = handle.getCurrentTime()
+    if (time === null) {
+      alert('Play or seek the video first, then click Grab time.')
+      return
+    }
+    setPendingAnnotation((prev) => ({
+      ...prev,
+      [itemId]: {
+        timestampSeconds: time,
+        attachmentIndex: handle.getActiveIndex(),
+      },
+    }))
+  }
+  const handleClearPending = (key: string) => {
+    setPendingAnnotation((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+  const handleFocusComment = (
+    itemId: string | null,
+    timestampSeconds: number | null,
+    attachmentIndex: number | null,
+  ) => {
+    if (!itemId) return
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    handle.focusAnnotation({ attachmentIndex, timestampSeconds })
+  }
   const [sendingCommentForItem, setSendingCommentForItem] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingCommentText, setEditingCommentText] = useState<string>('')
@@ -497,6 +539,8 @@ await loadApproval()
     }
   }
 
+  const annotation = pendingAnnotation[key] || null
+
   try {
     const res = await fetch('/api/approvals/comment', {
       method: 'POST',
@@ -512,6 +556,8 @@ await loadApproval()
           replyTarget && replyTarget.itemId === itemId
             ? replyTarget.commentId
             : null,
+        timestampSeconds: annotation?.timestampSeconds ?? null,
+        attachmentIndex: annotation?.attachmentIndex ?? null,
       }),
     })
 
@@ -525,6 +571,7 @@ await loadApproval()
       setReplyTarget((prev) =>
         prev && prev.itemId === itemId ? null : prev
       )
+      handleClearPending(key)
       // Realtime should refresh comments, but we can also reload
       await loadComments()
     }
@@ -812,6 +859,9 @@ await loadApproval()
                     ) : item.attachments && item.attachments.length > 0 ? (
                       <div className="p-3">
                         <AssetRenderer
+                          ref={(handle) => {
+                            assetRendererRefs.current[item.id] = handle
+                          }}
                           attachments={item.attachments}
                           isCarousel={!!item.is_carousel}
                           onImageClick={(url, name) => {
@@ -927,6 +977,23 @@ await loadApproval()
                                       )
                                     })()}
 
+                                    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleFocusComment(
+                                            c.approval_item_id,
+                                            c.timestamp_seconds,
+                                            c.attachment_index,
+                                          )
+                                        }
+                                        title="Jump to this moment"
+                                        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                                      >
+                                        <ClockIcon className="h-3 w-3" />
+                                        {formatTimestamp(c.timestamp_seconds)}
+                                      </button>
+                                    )}
                                     <p className="mt-0.5 text-gray-700 break-all">
                                       {formatComment(c.content)}
                                     </p>
@@ -1116,19 +1183,47 @@ await loadApproval()
                           </button>
                         </p>
                       )}
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
-                          <Paperclip className="h-3 w-3" />
-                          <span>Attach file</span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null
-                              setCommentFile(file)
-                            }}
-                          />
-                        </label>
+                      {pendingAnnotation[item.id] && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                          <span>Tagged at:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleClearPending(item.id)}
+                            title="Remove timestamp"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+                          >
+                            <ClockIcon className="h-3 w-3" />
+                            {formatTimestamp(pendingAnnotation[item.id].timestampSeconds)}
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+                            <Paperclip className="h-3 w-3" />
+                            <span>Attach file</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null
+                                setCommentFile(file)
+                              }}
+                            />
+                          </label>
+                          {item.attachments && item.attachments.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleGrabTime(item.id)}
+                              title="Grab the current playback time"
+                              className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                            >
+                              <ClockIcon className="h-3 w-3" />
+                              <span>Grab time</span>
+                            </button>
+                          )}
+                        </div>
                         <Button
                           size="sm"
                           variant="outline"

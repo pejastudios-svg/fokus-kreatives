@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
-import { AssetRenderer } from '@/components/approvals/AssetRenderer'
+import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
+import { formatTimestamp } from '@/lib/types/annotations'
 import {
   CheckCircle,
   Loader2,
@@ -17,6 +18,7 @@ import {
   Image as ImageIcon,
   Film,
   Download,
+  Clock as ClockIcon,
 } from 'lucide-react'
 
 interface ApprovalSummary {
@@ -632,7 +634,33 @@ function ReviewItemCard({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const assetRendererRef = useRef<AssetRendererHandle | null>(null)
+  const [pendingAnnotation, setPendingAnnotation] = useState<{
+    timestampSeconds: number
+    attachmentIndex: number | null
+  } | null>(null)
   const isApproved = item.status === 'approved'
+
+  const handleGrabTime = () => {
+    const handle = assetRendererRef.current
+    if (!handle) return
+    const time = handle.getCurrentTime()
+    if (time === null) {
+      onError('Play or seek the video first, then click Grab time.')
+      return
+    }
+    setPendingAnnotation({
+      timestampSeconds: time,
+      attachmentIndex: handle.getActiveIndex(),
+    })
+  }
+
+  const handleFocusComment = (
+    timestampSeconds: number | null,
+    attachmentIndex: number | null,
+  ) => {
+    assetRendererRef.current?.focusAnnotation({ attachmentIndex, timestampSeconds })
+  }
 
   const onDraftChange = (value: string) => {
     setDraft(value)
@@ -799,6 +827,8 @@ function ReviewItemCard({
           itemId: item.id,
           body: text,
           attachments: uploaded,
+          timestampSeconds: pendingAnnotation?.timestampSeconds ?? null,
+          attachmentIndex: pendingAnnotation?.attachmentIndex ?? null,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -813,6 +843,7 @@ function ReviewItemCard({
       })
       setDraft('')
       setPendingFiles([])
+      setPendingAnnotation(null)
     } finally {
       setIsPosting(false)
     }
@@ -852,6 +883,7 @@ function ReviewItemCard({
         {item.attachments && item.attachments.length > 0 ? (
           <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
             <AssetRenderer
+              ref={assetRendererRef}
               attachments={item.attachments}
               isCarousel={!!item.is_carousel}
             />
@@ -898,6 +930,17 @@ function ReviewItemCard({
                         })}
                       </span>
                     </div>
+                    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
+                      <button
+                        type="button"
+                        onClick={() => handleFocusComment(c.timestamp_seconds, c.attachment_index)}
+                        title="Jump to this moment"
+                        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                      >
+                        <ClockIcon className="h-3 w-3" />
+                        {formatTimestamp(c.timestamp_seconds)}
+                      </button>
+                    )}
                     {body && (
                       <p className="text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
                         {formatCommentBody(body)}
@@ -962,6 +1005,37 @@ function ReviewItemCard({
               ))}
             </ul>
           )}
+
+          <div className="flex items-center justify-between gap-2">
+            {pendingAnnotation ? (
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                <span>Tagged at:</span>
+                <button
+                  type="button"
+                  onClick={() => setPendingAnnotation(null)}
+                  title="Remove timestamp"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+                >
+                  <ClockIcon className="h-3 w-3" />
+                  {formatTimestamp(pendingAnnotation.timestampSeconds)}
+                  <XIcon className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <span />
+            )}
+            {item.attachments && item.attachments.length > 0 && (
+              <button
+                type="button"
+                onClick={handleGrabTime}
+                title="Grab the current playback time"
+                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+              >
+                <ClockIcon className="h-3 w-3" />
+                <span>Grab time</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex items-end gap-2 relative">
             <input

@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
 import { uploadWithProgress } from '@/lib/uploadWithProgress'
-import { AssetRenderer } from '@/components/approvals/AssetRenderer'
+import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
+import { formatTimestamp } from '@/lib/types/annotations'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
@@ -30,6 +31,7 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Trash2 as TrashIcon,
+  Clock as ClockIcon,
 } from 'lucide-react'
 import { cldThumb, destroyCloudinaryAssets } from '@/lib/cloudinary'
 
@@ -205,6 +207,52 @@ export default function ApprovalDetailPage() {
   // Per-comment upload progress, keyed by the optimistic comment's tempId so a
   // user uploading on one item composer doesn't see progress on another.
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
+
+  // Imperative handles into each item's AssetRenderer, so we can `getCurrentTime`
+  // when the user clicks "Grab time" and `focusAnnotation` when they click a
+  // saved timestamp pill on an existing comment. Keyed by item id.
+  const assetRendererRefs = useRef<Record<string, AssetRendererHandle | null>>({})
+
+  // Annotations attached to the next comment, per composer (general + per-item).
+  const [pendingAnnotation, setPendingAnnotation] = useState<
+    Record<string, { timestampSeconds: number; attachmentIndex: number | null }>
+  >({})
+
+  const handleGrabTime = (itemId: string) => {
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    const time = handle.getCurrentTime()
+    if (time === null) {
+      alert('Play or seek the video first, then click Grab time.')
+      return
+    }
+    setPendingAnnotation((prev) => ({
+      ...prev,
+      [itemId]: {
+        timestampSeconds: time,
+        attachmentIndex: handle.getActiveIndex(),
+      },
+    }))
+  }
+
+  const handleClearPending = (key: string) => {
+    setPendingAnnotation((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const handleFocusComment = (
+    itemId: string | null,
+    timestampSeconds: number | null,
+    attachmentIndex: number | null,
+  ) => {
+    if (!itemId) return
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    handle.focusAnnotation({ attachmentIndex, timestampSeconds })
+  }
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingCommentText, setEditingCommentText] = useState<string>('')
@@ -870,9 +918,11 @@ export default function ApprovalDetailPage() {
     const fileToUpload = commentFile
     const replyToCommentId =
       replyTarget && replyTarget.itemId === itemId ? replyTarget.commentId : null
+    const annotation = pendingAnnotation[key] || null
     setNewCommentText((prev) => ({ ...prev, [key]: '' }))
     setCommentFile(null)
     setReplyTarget((prev) => (prev && prev.itemId === itemId ? null : prev))
+    handleClearPending(key)
 
     // Optimistic comment — gets replaced once realtime/loadComments brings in
     // the real one (it'll have a real uuid and our temp- one drops out).
@@ -893,9 +943,9 @@ export default function ApprovalDetailPage() {
       resolved: false,
       parent_comment_id: replyToCommentId,
       created_at: new Date().toISOString(),
-      timestamp_seconds: null,
+      timestamp_seconds: annotation?.timestampSeconds ?? null,
       region: null,
-      attachment_index: null,
+      attachment_index: annotation?.attachmentIndex ?? null,
       users: currentUserProfile
         ? { ...currentUserProfile }
         : { name: 'You', email: '', profile_picture_url: null },
@@ -948,6 +998,8 @@ export default function ApprovalDetailPage() {
             fileUrl,
             fileName,
             parentCommentId: replyToCommentId,
+            timestampSeconds: annotation?.timestampSeconds ?? null,
+            attachmentIndex: annotation?.attachmentIndex ?? null,
           }),
         })
 
@@ -1560,6 +1612,9 @@ export default function ApprovalDetailPage() {
                     ) : item.attachments && item.attachments.length > 0 ? (
                       <div className="p-3">
                         <AssetRenderer
+                          ref={(handle) => {
+                            assetRendererRefs.current[item.id] = handle
+                          }}
                           attachments={item.attachments}
                           isCarousel={!!item.is_carousel}
                           onImageClick={(url, name) => {
@@ -1685,6 +1740,19 @@ export default function ApprovalDetailPage() {
       )
     })()}
 
+    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
+      <button
+        type="button"
+        onClick={() =>
+          handleFocusComment(c.approval_item_id, c.timestamp_seconds, c.attachment_index)
+        }
+        title="Jump to this moment"
+        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+      >
+        <ClockIcon className="h-3 w-3" />
+        {formatTimestamp(c.timestamp_seconds)}
+      </button>
+    )}
     <p className="mt-0.5 text-gray-700 break-all">
       {formatComment(c.content)}
     </p>
@@ -1959,19 +2027,47 @@ export default function ApprovalDetailPage() {
       </button>
     </p>
   )}
-  <div className="flex items-center justify-between">
-    <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
-      <Paperclip className="h-3 w-3" />
-      <span>Attach file</span>
-      <input
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0] || null
-          setCommentFile(file)
-        }}
-      />
-    </label>
+  {pendingAnnotation[item.id] && (
+    <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
+      <span>Tagged at:</span>
+      <button
+        type="button"
+        onClick={() => handleClearPending(item.id)}
+        title="Remove timestamp"
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+      >
+        <ClockIcon className="h-3 w-3" />
+        {formatTimestamp(pendingAnnotation[item.id].timestampSeconds)}
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )}
+  <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+        <Paperclip className="h-3 w-3" />
+        <span>Attach file</span>
+        <input
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0] || null
+            setCommentFile(file)
+          }}
+        />
+      </label>
+      {item.attachments && item.attachments.length > 0 && (
+        <button
+          type="button"
+          onClick={() => handleGrabTime(item.id)}
+          title="Grab the current playback time"
+          className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+        >
+          <ClockIcon className="h-3 w-3" />
+          <span>Grab time</span>
+        </button>
+      )}
+    </div>
     <button
       type="button"
       onClick={() => sendComment(item.id)}
