@@ -2,8 +2,10 @@
 
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -82,9 +84,29 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
     // overlays can read them during render (callback refs alone wouldn't
     // trigger a re-render after mount).
     const [assetEls, setAssetEls] = useState<Record<number, HTMLElement | null>>({})
-    const setAssetElAt = (i: number) => (el: HTMLElement | null) => {
-      setAssetEls((prev) => (prev[i] === el ? prev : { ...prev, [i]: el }))
-    }
+
+    // Stable per-index callback refs. If they were declared inline they'd have
+    // a fresh identity each render, which would make React detach + reattach
+    // every callback ref every render - calling each one with (null) then (el)
+    // and re-firing setState in the asset element setters, looping forever.
+    // useMemo keyed on the slide count returns the same arrays as long as the
+    // attachment count is stable, so the callbacks themselves are stable too.
+    const slotCount = attachments.length
+    const setAssetElByIndex = useMemo(
+      () =>
+        Array.from({ length: slotCount }, (_, i) => (el: HTMLElement | null) => {
+          setAssetEls((prev) => (prev[i] === el ? prev : { ...prev, [i]: el }))
+        }),
+      [slotCount],
+    )
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+    const setVideoRefByIndex = useMemo(
+      () =>
+        Array.from({ length: slotCount }, (_, i) => (el: HTMLVideoElement | null) => {
+          videoRefs.current[i] = el
+        }),
+      [slotCount],
+    )
     // Tracks the most recent video the user has interacted with (played /
     // scrubbed / loaded metadata for). Lets `getCurrentTime()` return the
     // right one even in grid mode where there's no single "active" slide.
@@ -234,10 +256,8 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
             asset={attachments[0]}
             onImageClick={onImageClick}
             isActive
-            videoRef={(el) => {
-              videoRefs.current[0] = el
-            }}
-            assetElRef={setAssetElAt(0)}
+            videoRef={setVideoRefByIndex[0]}
+            assetElRef={setAssetElByIndex[0]}
             onVideoInteract={() => {
               lastInteractedVideoIndexRef.current = 0
             }}
@@ -302,10 +322,8 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                   asset={a}
                   onImageClick={onImageClick}
                   isActive={i === safeIndex}
-                  videoRef={(el) => {
-                    videoRefs.current[i] = el
-                  }}
-                  assetElRef={setAssetElAt(i)}
+                  videoRef={setVideoRefByIndex[i]}
+                  assetElRef={setAssetElByIndex[i]}
                   onVideoInteract={() => {
                     lastInteractedVideoIndexRef.current = i
                   }}
@@ -365,9 +383,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
               onImageClick={onImageClick}
               fill
               isActive
-              videoRef={(el) => {
-                videoRefs.current[i] = el
-              }}
+              videoRef={setVideoRefByIndex[i]}
               onVideoInteract={() => {
                 lastInteractedVideoIndexRef.current = i
               }}
@@ -406,14 +422,22 @@ function AssetView({
   assetElRef,
   onVideoInteract,
 }: AssetViewProps) {
+  // Stable merged callback ref - if it weren't memoised, React would treat it
+  // as a new ref each render and fire it (null) -> (el), retriggering the
+  // setState inside assetElRef, which loops.
+  const setVideoRefs = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoRef?.(el)
+      assetElRef?.(el)
+    },
+    [videoRef, assetElRef],
+  )
+
   if (asset.resource_type === 'video') {
     const poster = cldThumb(asset, fill ? { w: 600, h: 600, crop: 'fill' } : { w: 1200 })
     return (
       <video
-        ref={(el) => {
-          videoRef?.(el)
-          assetElRef?.(el)
-        }}
+        ref={setVideoRefs}
         src={cldUrl(asset, { w: 1200 })}
         poster={poster}
         controls
