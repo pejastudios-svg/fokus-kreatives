@@ -85,6 +85,9 @@ interface Comment {
   resolved: boolean
   parent_comment_id: string | null
   created_at: string
+  timestamp_seconds: number | null
+  region: import('@/lib/types/annotations').CommentRegion | null
+  attachment_index: number | null
   users?: {
     name: string
     email: string
@@ -296,7 +299,7 @@ export default function PortalApprovalDetailPage() {
     const { data, error } = await supabase
       .from('approval_comments')
       .select(
-        'id, approval_id, approval_item_id, user_id, content, file_url, file_name, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
+        'id, approval_id, approval_item_id, user_id, content, file_url, file_name, resolved, parent_comment_id, created_at, timestamp_seconds, region, attachment_index, users(name, email, profile_picture_url)'
       )
       .eq('approval_id', approvalId)
       .order('created_at', { ascending: true })
@@ -317,6 +320,9 @@ export default function PortalApprovalDetailPage() {
       resolved: boolean
       parent_comment_id: string | null
       created_at: string
+      timestamp_seconds: number | null
+      region: import('@/lib/types/annotations').CommentRegion | null
+      attachment_index: number | null
       users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
     }
 
@@ -331,6 +337,9 @@ export default function PortalApprovalDetailPage() {
       resolved: row.resolved,
       parent_comment_id: row.parent_comment_id,
       created_at: row.created_at,
+      timestamp_seconds: row.timestamp_seconds,
+      region: row.region,
+      attachment_index: row.attachment_index,
       users: Array.isArray(row.users) ? row.users[0] : row.users,
     }))
 

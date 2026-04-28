@@ -1,6 +1,7 @@
 // src/app/api/approvals/comment/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sanitizeRegion } from '@/lib/types/annotations'
 
 // Types for Supabase responses
 interface ClientRef {
@@ -92,6 +93,22 @@ export async function POST(req: NextRequest) {
     const fileName = (body.fileName as string | null) || null
     const parentCommentId = (body.parentCommentId as string | null) || null
 
+    // Annotations: timestamp on a video, region on an image/video, plus the
+    // carousel slide index it applies to. All three are optional.
+    const rawTimestamp = body.timestampSeconds
+    const timestampSeconds =
+      typeof rawTimestamp === 'number' && Number.isFinite(rawTimestamp) && rawTimestamp >= 0
+        ? rawTimestamp
+        : null
+    const region = sanitizeRegion(body.region)
+    const rawAttachmentIndex = body.attachmentIndex
+    const attachmentIndex =
+      typeof rawAttachmentIndex === 'number' &&
+      Number.isFinite(rawAttachmentIndex) &&
+      rawAttachmentIndex >= 0
+        ? Math.floor(rawAttachmentIndex)
+        : null
+
     const content = contentRaw.trim()
 
     if (!approvalId || !userId || (!content && !fileUrl)) {
@@ -112,6 +129,9 @@ export async function POST(req: NextRequest) {
         file_url: fileUrl,
         file_name: fileName,
         parent_comment_id: parentCommentId,
+        timestamp_seconds: timestampSeconds,
+        region,
+        attachment_index: attachmentIndex,
       })
       .select()
       .single()

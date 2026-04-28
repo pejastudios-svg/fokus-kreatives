@@ -68,6 +68,9 @@ interface CommentRow {
   attachments: CommentAttachment[] | null
   file_url: string | null
   file_name: string | null
+  timestamp_seconds: number | null
+  region: import('@/lib/types/annotations').CommentRegion | null
+  attachment_index: number | null
   users: { name: string | null; email: string; profile_picture_url: string | null } | null
 }
 

@@ -106,6 +106,10 @@ interface Comment {
   resolved: boolean
   parent_comment_id: string | null
   created_at: string
+  // Annotations (3a foundation; UI lands in 3b/3c).
+  timestamp_seconds: number | null
+  region: import('@/lib/types/annotations').CommentRegion | null
+  attachment_index: number | null
   users?: {
     name: string
     email: string
@@ -463,7 +467,7 @@ export default function ApprovalDetailPage() {
   const { data, error } = await supabase
     .from('approval_comments')
     .select(
-      'id, approval_id, approval_item_id, user_id, content, file_url, file_name, reviewer_email, attachments, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
+      'id, approval_id, approval_item_id, user_id, content, file_url, file_name, reviewer_email, attachments, resolved, parent_comment_id, created_at, timestamp_seconds, region, attachment_index, users(name, email, profile_picture_url)'
     )
     .eq('approval_id', approvalId)
     .order('created_at', { ascending: true })
@@ -493,6 +497,9 @@ export default function ApprovalDetailPage() {
       resolved: boolean
       parent_comment_id: string | null
       created_at: string
+      timestamp_seconds: number | null
+      region: import('@/lib/types/annotations').CommentRegion | null
+      attachment_index: number | null
       users: { name: string; email: string; profile_picture_url: string | null } | { name: string; email: string; profile_picture_url: string | null }[] | null
     }
     return {
@@ -508,6 +515,9 @@ export default function ApprovalDetailPage() {
       resolved: r.resolved,
       parent_comment_id: r.parent_comment_id,
       created_at: r.created_at,
+      timestamp_seconds: r.timestamp_seconds,
+      region: r.region,
+      attachment_index: r.attachment_index,
       users: Array.isArray(r.users) ? r.users[0] : r.users,
     }
   })
@@ -883,6 +893,9 @@ export default function ApprovalDetailPage() {
       resolved: false,
       parent_comment_id: replyToCommentId,
       created_at: new Date().toISOString(),
+      timestamp_seconds: null,
+      region: null,
+      attachment_index: null,
       users: currentUserProfile
         ? { ...currentUserProfile }
         : { name: 'You', email: '', profile_picture_url: null },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeRegion } from '@/lib/types/annotations'
 import {
   reviewAdmin,
   loadApprovalByShareToken,
@@ -246,6 +247,9 @@ export async function POST(req: NextRequest) {
       itemId?: string | null
       body?: string
       attachments?: AttachmentInput[]
+      timestampSeconds?: number | null
+      region?: unknown
+      attachmentIndex?: number | null
     }
     const token = (body.token || '').trim()
     const text = (body.body || '').trim()
@@ -304,6 +308,21 @@ export async function POST(req: NextRequest) {
       }))
       .filter((a) => a.url && (a.size == null || a.size <= MAX_BYTES))
 
+    // Annotations are optional. Same shape + sanitisation as the agency route.
+    const rawTimestamp = body.timestampSeconds
+    const timestampSeconds =
+      typeof rawTimestamp === 'number' && Number.isFinite(rawTimestamp) && rawTimestamp >= 0
+        ? rawTimestamp
+        : null
+    const region = sanitizeRegion(body.region)
+    const rawAttachmentIndex = body.attachmentIndex
+    const attachmentIndex =
+      typeof rawAttachmentIndex === 'number' &&
+      Number.isFinite(rawAttachmentIndex) &&
+      rawAttachmentIndex >= 0
+        ? Math.floor(rawAttachmentIndex)
+        : null
+
     const { data: created, error } = await reviewAdmin
       .from('approval_comments')
       .insert({
@@ -313,8 +332,13 @@ export async function POST(req: NextRequest) {
         reviewer_email: session.email,
         content: text || '',
         attachments: attachments.length ? attachments : null,
+        timestamp_seconds: timestampSeconds,
+        region,
+        attachment_index: attachmentIndex,
       })
-      .select('id, content, created_at, approval_item_id, reviewer_email, attachments')
+      .select(
+        'id, content, created_at, approval_item_id, reviewer_email, attachments, timestamp_seconds, region, attachment_index',
+      )
       .single()
 
     if (error || !created) {
