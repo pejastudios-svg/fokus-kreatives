@@ -3,6 +3,21 @@ import { GoogleGenAI } from '@google/genai'
 
 export type ScriptProvider = 'groq' | 'gemini'
 
+/**
+ * Quality tier for a generation. Maps to a different Gemini model so we don't
+ * pay Pro prices on cheap utility calls (carousels, reels, question forms).
+ *
+ *   high     → longform scripts (the main quality-sensitive output)
+ *   standard → repurposed shortform (carousel/reel/story) and ad-hoc scripts
+ *   cheap    → utility (question-form generation, anything mechanical)
+ *
+ * Pricing reference (Gemini 2.5):
+ *   pro:        $1.25 / $10.00 per 1M tokens (input / output) - 4x flash
+ *   flash:      $0.30 / $2.50 per 1M tokens
+ *   flash-lite: $0.10 / $0.40 per 1M tokens
+ */
+export type Quality = 'high' | 'standard' | 'cheap'
+
 export interface GenerateScriptInput {
   system: string
   user: string
@@ -10,6 +25,11 @@ export interface GenerateScriptInput {
   maxTokens: number
   /** Request JSON object output (used by question-form generator). */
   jsonObject?: boolean
+  /**
+   * Quality tier. Default 'standard'. Set 'high' for longform (uses Pro),
+   * 'cheap' for utility calls (uses Flash-Lite).
+   */
+  quality?: Quality
 }
 
 export interface GenerateScriptResult {
@@ -24,10 +44,30 @@ function resolveProvider(): ScriptProvider {
   return 'gemini'
 }
 
-function resolveModel(provider: ScriptProvider): string {
-  if (provider === 'gemini') {
-    return process.env.GEMINI_MODEL_MAIN || 'gemini-2.5-flash'
+function resolveGeminiModel(quality: Quality): string {
+  if (quality === 'high') {
+    // Longform — quality matters. Pro by default, but allow override and a
+    // safe fall-back to whatever GEMINI_MODEL_MAIN is set to (so a user who
+    // only configured one model still works).
+    return (
+      process.env.GEMINI_MODEL_HIGH ||
+      process.env.GEMINI_MODEL_MAIN ||
+      'gemini-2.5-pro'
+    )
   }
+  if (quality === 'cheap') {
+    return (
+      process.env.GEMINI_MODEL_CHEAP ||
+      process.env.GEMINI_MODEL_FALLBACK ||
+      'gemini-2.5-flash-lite'
+    )
+  }
+  // standard
+  return process.env.GEMINI_MODEL_STANDARD || 'gemini-2.5-flash'
+}
+
+function resolveModel(provider: ScriptProvider, quality: Quality): string {
+  if (provider === 'gemini') return resolveGeminiModel(quality)
   return process.env.GROQ_MODEL_MAIN || 'llama-3.3-70b-versatile'
 }
 
@@ -52,14 +92,14 @@ async function generateWithGroq(
 
 function isGeminiDailyQuotaError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
-  // Daily per-model quota from the free tier — string match on the canonical quotaId Google returns.
+  // Daily per-model quota from the free tier - string match on the canonical quotaId Google returns.
   // Distinct from a per-minute 429 (which recovers in seconds and is worth retrying).
   return /GenerateRequestsPerDayPerProjectPerModel|generate_content_free_tier_requests/i.test(msg)
 }
 
 /**
  * Gemini's error body sometimes includes a RetryInfo hint like `retryDelay: "58s"` or `"1.5s"`.
- * When present and short (≤ 90s), this means the quota is expected to replenish soon — Google
+ * When present and short (≤ 90s), this means the quota is expected to replenish soon - Google
  * occasionally tags per-minute-window exhaustion with the PerDay quotaId, so the retryDelay is
  * the more reliable signal than the quotaId label.
  */
@@ -133,7 +173,7 @@ async function generateWithGemini(
     return await callGeminiOnce(ai, model, input)
   } catch (err) {
     // On a DAILY quota exhaustion only, swap to the lite model (same API key, much larger
-    // free-tier daily cap — ~1000/day for flash-lite vs 20/day for flash). Per-minute 429s
+    // free-tier daily cap - ~1000/day for flash-lite vs 20/day for flash). Per-minute 429s
     // are handled by the retry loop above, not here.
     const fallbackModel = process.env.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash-lite'
     if (model === fallbackModel || !isGeminiDailyQuotaError(err)) throw err
@@ -150,8 +190,9 @@ function isTransientProviderError(err: unknown): boolean {
 export async function generateScript(
   input: GenerateScriptInput,
 ): Promise<GenerateScriptResult> {
+  const quality: Quality = input.quality || 'standard'
   const primary = resolveProvider()
-  const primaryModel = resolveModel(primary)
+  const primaryModel = resolveModel(primary, quality)
   try {
     const content =
       primary === 'gemini'
@@ -165,7 +206,7 @@ export async function generateScript(
     // one error for another. Stick with Gemini and let its extended retries handle it.
     if (primary !== 'groq' || !isTransientProviderError(err) || !process.env.GEMINI_API_KEY) throw err
     console.warn(`[provider] groq failed transiently; falling back to gemini. Error: ${err instanceof Error ? err.message : String(err)}`)
-    const fallbackModel = resolveModel('gemini')
+    const fallbackModel = resolveModel('gemini', quality)
     const content = await generateWithGemini(input, fallbackModel)
     return { content, provider: 'gemini', model: fallbackModel }
   }

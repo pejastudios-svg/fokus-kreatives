@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
-import { ChevronDown, Search, Check } from 'lucide-react'
+import { ChevronDown, Search, Check, UserCircle } from 'lucide-react'
 
 interface ClientLite {
   id: string
@@ -89,7 +89,9 @@ export function ClientPicker({ clients, value, onChange, loading, placeholder = 
             {selected.name.charAt(0).toUpperCase()}
           </div>
         ) : (
-          <div className="h-7 w-7 rounded-full bg-theme-tertiary" />
+          <div className="h-7 w-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+            <UserCircle className="h-5 w-5" />
+          </div>
         )}
         <div className="flex-1 min-w-0">
           {selected ? (

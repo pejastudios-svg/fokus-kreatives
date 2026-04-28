@@ -82,6 +82,8 @@ export function NotificationPopupListener() {
   if (!popup) return null
 
   const approvalId = popup.data?.approvalId as string | undefined
+  const clientId = popup.data?.clientId as string | undefined
+  const popupUrl = popup.data?.url as string | undefined
 
   const title =
     popup.type === 'approval_created'
@@ -92,6 +94,10 @@ export function NotificationPopupListener() {
       ? 'You were mentioned'
       : popup.type === 'approval_reminder'
       ? 'Approval reminder'
+      : popup.type === 'brand_intake_submitted'
+      ? 'Brand intake submitted'
+      : popup.type === 'question_form_submitted'
+      ? 'New form responses'
       : 'New notification'
 
   const subtitle =
@@ -100,10 +106,17 @@ export function NotificationPopupListener() {
     popup.data?.clientName ||
     ''
 
+  const target = approvalId
+    ? userRole === 'client'
+      ? `/portal/approvals/${approvalId}`
+      : `/approvals/${approvalId}`
+    : clientId
+    ? `/clients/${clientId}`
+    : popupUrl || null
+
   const go = () => {
-    if (!approvalId) return
-    const isClient = userRole === 'client'
-    router.push(isClient ? `/portal/approvals/${approvalId}` : `/approvals/${approvalId}`)
+    if (!target) return
+    router.push(target)
   }
 
   return (
@@ -119,7 +132,7 @@ export function NotificationPopupListener() {
             {subtitle && (
               <p className="text-xs text-gray-500 mt-1 truncate">{subtitle}</p>
             )}
-            {approvalId && (
+            {target && (
               <p className="text-[11px] text-[#2B79F7] mt-2">Click to open</p>
             )}
           </button>

@@ -26,7 +26,7 @@ export function UrlField({ value, displayType, hyperlinkText, onChange, readonly
           className="text-theme-tertiary cursor-text"
           onClick={() => !readonly && setIsEditing(true)}
         >
-          —
+          -
         </span>
       )
     }

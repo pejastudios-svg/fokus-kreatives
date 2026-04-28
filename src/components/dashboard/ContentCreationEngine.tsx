@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Toggle } from '@/components/ui/Toggle'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
   Sparkles,
   FileText,
@@ -26,6 +27,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { BrandProfile, defaultBrandProfile } from '../clients/brandProfile'
 import { Skeleton } from '@/components/ui/Loading'
+import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 
 interface Client {
   id: string
@@ -139,7 +141,8 @@ export function ContentCreationEngine() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
-  const [selectedClientId, setSelectedClientId] = useState('')
+  const [selectedClientId, setSelectedClientId] = useState(readStashedClientId)
+  useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
   const [selectedClientProfile, setSelectedClientProfile] = useState<BrandProfile | null>(null)
 
   const selectedClient = useMemo(
@@ -188,6 +191,8 @@ export function ContentCreationEngine() {
   const [savedScripts, setSavedScripts] = useState<SavedScript[]>([])
   const [bankSearch, setBankSearch] = useState('')
   const [deletingScriptId, setDeletingScriptId] = useState<string | null>(null)
+  const [pendingScriptDeleteId, setPendingScriptDeleteId] = useState<string | null>(null)
+  const [pendingCtaDeleteId, setPendingCtaDeleteId] = useState<string | null>(null)
 
   const [includeMeta, setIncludeMeta] = useState(true)
 
@@ -384,7 +389,6 @@ export function ContentCreationEngine() {
 
   const handleDeleteScript = async (id: string) => {
     if (!selectedClient) return
-    if (!confirm('Delete this script from the content bank?')) return
     setDeletingScriptId(id)
     try {
       const { error } = await supabase.from('content').delete().eq('id', id)
@@ -447,7 +451,6 @@ export function ContentCreationEngine() {
 
   const deleteCta = async (id: string) => {
     if (!selectedClient) return
-    if (!confirm('Delete this CTA from the library?')) return
     setCtaDeletingId(id)
     try {
       await supabase.from('client_ctas').delete().eq('id', id)
@@ -489,7 +492,7 @@ export function ContentCreationEngine() {
             <option value="">Choose a client...</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
-                {client.name} — {client.business_name}
+                {client.name} - {client.business_name}
               </option>
             ))}
           </select>
@@ -610,7 +613,7 @@ export function ContentCreationEngine() {
       <Card className="animate-in fade-in-up">
         <CardHeader>
           <h3 className="text-lg font-semibold text-gray-900">Topic / Idea</h3>
-          <p className="text-xs text-gray-500 mt-1">Optional — type an angle or paste a draft to polish.</p>
+          <p className="text-xs text-gray-500 mt-1">Optional - type an angle or paste a draft to polish.</p>
         </CardHeader>
         <CardContent>
           <textarea
@@ -643,7 +646,7 @@ export function ContentCreationEngine() {
                 <option value="">No saved CTA</option>
                 {ctas.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name || c.keyword} — {normalizeKeyword(c.keyword)}
+                    {c.name || c.keyword} - {normalizeKeyword(c.keyword)}
                   </option>
                 ))}
               </select>
@@ -660,7 +663,7 @@ export function ContentCreationEngine() {
                     variant="outline"
                     size="sm"
                     className="mt-2"
-                    onClick={() => deleteCta(selectedCta.id)}
+                    onClick={() => setPendingCtaDeleteId(selectedCta.id)}
                     isLoading={ctaDeletingId === selectedCta.id}
                   >
                     <Trash2 className="h-4 w-4 mr-1" /> Delete
@@ -754,7 +757,7 @@ export function ContentCreationEngine() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Save to content bank</p>
-                  <p className="text-xs text-gray-500">Pick a title — use our recommendation or write your own.</p>
+                  <p className="text-xs text-gray-500">Pick a title - use our recommendation or write your own.</p>
                 </div>
                 <Toggle
                   checked={useCustomTitle}
@@ -878,7 +881,7 @@ export function ContentCreationEngine() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteScript(s.id)}
+                        onClick={() => setPendingScriptDeleteId(s.id)}
                         isLoading={deletingScriptId === s.id}
                         className="text-red-500 hover:bg-red-50"
                       >
@@ -989,6 +992,33 @@ export function ContentCreationEngine() {
           </Card>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!pendingScriptDeleteId}
+        title="Delete this script?"
+        message="The script will be removed from this client's content bank."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          if (!pendingScriptDeleteId) return
+          await handleDeleteScript(pendingScriptDeleteId)
+          setPendingScriptDeleteId(null)
+        }}
+        onClose={() => setPendingScriptDeleteId(null)}
+      />
+      <ConfirmModal
+        open={!!pendingCtaDeleteId}
+        title="Delete this CTA?"
+        message="The CTA will be removed from the library."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          if (!pendingCtaDeleteId) return
+          await deleteCta(pendingCtaDeleteId)
+          setPendingCtaDeleteId(null)
+        }}
+        onClose={() => setPendingCtaDeleteId(null)}
+      />
     </div>
   )
 }

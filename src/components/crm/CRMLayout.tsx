@@ -22,6 +22,7 @@ import { Loading } from '@/components/ui/Loading'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { PageTransition } from '@/components/ui/PageTransition'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
+import { useIdleTimeout } from '@/hooks/useIdleTimeout'
 
 interface CRMLayoutProps {
   children: React.ReactNode
@@ -50,6 +51,8 @@ useEffect(() => {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
+
+  useIdleTimeout(isAuthorized)
 
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null)
 

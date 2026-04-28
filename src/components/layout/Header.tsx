@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import Image from 'next/image'
-import { UserCircle, Bell } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Bell, Trash2, X, CheckCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -11,63 +10,51 @@ interface HeaderProps {
   subtitle?: string
 }
 
+interface NotificationRow {
+  id: string
+  type: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>
+  read_at: string | null
+  created_at: string
+}
+
 export function Header({ title, subtitle }: HeaderProps) {
-  const [profilePicture, setProfilePicture] = useState<string | null>(null)
-  const [userName, setUserName] = useState<string>('')
-  const [userRole, setUserRole] = useState<string | null>(null)
-  
-  // Memoize supabase to prevent recreation on every render
   const supabase = useMemo(() => createClient(), [])
-  
   const router = useRouter()
 
-  interface NotificationRow {
-    id: string
-    type: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: Record<string, any>
-    read_at: string | null
-    created_at: string
-  }
-
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<NotificationRow[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotif, setShowNotif] = useState(false)
+  // Decoupled mount + open so we can run an exit animation before unmounting.
+  const [notifMounted, setNotifMounted] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
 
-  // 1. Load User Profile (Runs once on mount)
   useEffect(() => {
-    const loadUserProfile = async () => {
+    void (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase
-          .from('users')
-          .select('name, profile_picture_url, role')
-          .eq('id', user.id)
-          .single()
-
-        if (data) {
-          setUserName(data.name || '')
-          // FIX: Fallback to Google/Auth picture if DB is empty
-          setProfilePicture(data.profile_picture_url || user.user_metadata?.avatar_url || null)
-          setUserRole(data.role || null)
-        }
-      }
-    }
-    loadUserProfile()
+      if (!user) return
+      const { data } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      setUserRole((data?.role as string) ?? null)
+    })()
   }, [supabase])
 
-  // 2. Load Notifications & Setup Realtime (Runs once user is known)
   useEffect(() => {
     let isMounted = true
 
-    const setupNotifications = async () => {
-      // Get user ID first
-      const { data: { user } } = await supabase.auth.getUser()
+    const setup = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
 
-      // Define fetch function inside the effect to avoid dependency cycles
       const fetchNotifications = async () => {
         const { data, error } = await supabase
           .from('notifications')
@@ -75,12 +62,10 @@ export function Header({ title, subtitle }: HeaderProps) {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(20)
-
         if (error) {
           console.error('Load notifications error:', error)
           return
         }
-
         if (isMounted) {
           const rows = (data || []) as NotificationRow[]
           setNotifications(rows)
@@ -88,10 +73,8 @@ export function Header({ title, subtitle }: HeaderProps) {
         }
       }
 
-      // Initial fetch
       await fetchNotifications()
 
-      // Setup Realtime Subscription
       const channel = supabase
         .channel(`notifications-${user.id}`)
         .on(
@@ -103,10 +86,8 @@ export function Header({ title, subtitle }: HeaderProps) {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            console.log('Realtime: notification change')
-            // Reuse the local fetch function
             fetchNotifications()
-          }
+          },
         )
         .subscribe()
 
@@ -115,207 +96,325 @@ export function Header({ title, subtitle }: HeaderProps) {
       }
     }
 
-    const cleanupPromise = setupNotifications()
-
+    const cleanupPromise = setup()
     return () => {
       isMounted = false
       cleanupPromise.then((cleanup) => cleanup && cleanup())
     }
   }, [supabase])
 
-  const markAsRead = async (id: string) => {
-    // Optimistic update
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
-    )
-    setUnreadCount((prev) => Math.max(0, prev - 1))
+  // Drive open/close transitions: mount immediately on open, delay unmount on close.
+  useEffect(() => {
+    if (showNotif) {
+      setNotifMounted(true)
+      return
+    }
+    if (!notifMounted) return
+    const t = setTimeout(() => setNotifMounted(false), 200)
+    return () => clearTimeout(t)
+  }, [showNotif, notifMounted])
 
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('id', id)
+  // Click-outside + ESC to close.
+  useEffect(() => {
+    if (!showNotif) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setShowNotif(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowNotif(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showNotif])
 
-    if (error) {
-      console.error('Mark notification read error:', error)
+  // All notification mutations go through `/api/notifications/mutate`. The
+  // direct supabase.client.delete() approach was silently rejected by RLS for
+  // some users — rows came back on reload because the DELETE never happened.
+  // The server route uses the service-role key + auth.uid() gate so writes
+  // always succeed for the caller's own rows.
+  const callMutate = async (body: Record<string, unknown>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/notifications/mutate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({ success: false }))
+      if (!data.success) {
+        console.error('Notification mutate failed:', { ...data, sent: body })
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error('Notification mutate exception:', err)
+      return false
     }
   }
 
-  const formatNotificationText = (n: NotificationRow) => {
+  const markAsRead = async (id: string) => {
+    const target = notifications.find((n) => n.id === id)
+    if (!target) return
+    const wasUnread = !target.read_at
+    // Optimistic
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)),
+    )
+    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1))
+    const ok = await callMutate({ action: 'mark_read', id })
+    if (!ok) {
+      // Roll back
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read_at: target.read_at } : n)),
+      )
+      if (wasUnread) setUnreadCount((prev) => prev + 1)
+    }
+  }
+
+  const markAllAsRead = async () => {
+    const previous = notifications
+    const previousUnread = unreadCount
+    if (previousUnread === 0) return
+    const now = new Date().toISOString()
+    setNotifications((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })))
+    setUnreadCount(0)
+    const ok = await callMutate({ action: 'mark_all_read' })
+    if (!ok) {
+      setNotifications(previous)
+      setUnreadCount(previousUnread)
+    }
+  }
+
+  const deleteOne = async (id: string) => {
+    const target = notifications.find((n) => n.id === id)
+    if (!target) return
+    const wasUnread = !target.read_at
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1))
+    const ok = await callMutate({ action: 'delete_one', id })
+    if (!ok) {
+      // Roll back
+      setNotifications((prev) => [target, ...prev])
+      if (wasUnread) setUnreadCount((prev) => prev + 1)
+    }
+  }
+
+  const clearAll = async () => {
+    if (notifications.length === 0) return
+    const previous = notifications
+    const previousUnread = unreadCount
+    setNotifications([])
+    setUnreadCount(0)
+    const ok = await callMutate({ action: 'clear_all' })
+    if (!ok) {
+      setNotifications(previous)
+      setUnreadCount(previousUnread)
+    }
+  }
+
+  const handleNotificationClick = (n: NotificationRow) => {
+    void markAsRead(n.id)
+    setShowNotif(false)
+
     const data = n.data || {}
-    switch (n.type) {
-      case 'task_created':
-        return `Task created: ${data.title || ''}`
-      case 'task_status_changed':
-        return `Task "${data.title || ''}" moved to ${data.status || ''}`
-      case 'task_mentioned':
-        return `You were mentioned in a task`
 
-      case 'approval_created':
-        return `Approval created for ${data.clientName || 'client'}: ${
-          data.title || ''
-        }`
+    if (data.taskId) {
+      router.push(`/tasks?taskId=${data.taskId}`)
+      return
+    }
 
-      case 'approval_approved':
-        return `Approval approved for ${data.clientName || 'client'}: ${
-          data.title || ''
-        }`
+    if (
+      n.type === 'brand_intake_submitted' ||
+      n.type === 'question_form_submitted'
+    ) {
+      const clientId = data.clientId
+      if (clientId) router.push(`/clients/${clientId}`)
+      return
+    }
 
-      case 'approval_commented':
-        return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
-
-      case 'approval_mention':
-        return `You were mentioned in an approval: ${data.title || ''}`
-
-      case 'approval_reminder':
-        return `Approval reminder: ${data.title || ''}`
-
-      case 'brand_intake_submitted':
-        return `${data.clientName || 'A client'} submitted their brand intake`
-
-      case 'question_form_submitted': {
-        const count = typeof data.count === 'number' ? data.count : 0
-        const name = data.clientName || 'A client'
-        return count
-          ? `${name} answered ${count} braindump question${count === 1 ? '' : 's'}`
-          : `${name} submitted a braindump`
+    if (
+      n.type === 'approval_created' ||
+      n.type === 'approval_approved' ||
+      n.type === 'approval_mention' ||
+      n.type === 'approval_reminder'
+    ) {
+      const approvalId = data.approvalId
+      if (userRole === 'client') {
+        router.push(approvalId ? `/portal/approvals/${approvalId}` : `/portal/approvals`)
+      } else {
+        router.push(approvalId ? `/approvals/${approvalId}` : `/approvals`)
       }
-
-      default:
-        return 'Notification'
+      return
     }
   }
 
   return (
-    <header className="flex items-center justify-between h-20 px-8 bg-white border-b border-gray-200">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+    <header className="flex items-center justify-between h-16 md:h-20 px-4 md:px-8 bg-white border-b border-gray-200 gap-3">
+      <div className="min-w-0 flex-1">
+        <h1 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{title}</h1>
+        {subtitle && <p className="text-xs md:text-sm text-gray-500 mt-1 truncate">{subtitle}</p>}
       </div>
-      
-      <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowNotif((prev) => !prev)}
-            className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors"
-          >
-            <Bell className="h-5 w-5 text-gray-500" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
 
-          {showNotif && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
-              <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-800">
-                  Notifications
-                </span>
+      <div ref={wrapRef} className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowNotif((prev) => !prev)}
+          className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          aria-label="Notifications"
+          aria-expanded={showNotif}
+        >
+          <Bell className="h-5 w-5 text-gray-500" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {notifMounted && (
+          <div
+            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 z-50 origin-top-right transition-all duration-200 ease-out ${
+              showNotif ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
+            }`}
+          >
+            <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-gray-800">Notifications</span>
+              <div className="flex items-center gap-1">
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void markAllAsRead()}
+                    className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] px-2 py-1 rounded-md hover:bg-gray-50 transition-colors"
+                    title="Mark all as read"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark all read
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void clearAll()}
+                    className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-red-600 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors"
+                    title="Clear all"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear all
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="text-xs text-gray-400 hover:text-gray-600"
                   onClick={() => setShowNotif(false)}
+                  className="p-1 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-50"
+                  aria-label="Close"
                 >
-                  Close
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="max-h-80 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <p className="px-4 py-4 text-xs text-gray-400">
-                    No notifications yet.
-                  </p>
-                ) : (
-                  notifications.map((n) => (
-                    <button
-                      key={n.id}
-                      type="button"
-                      onClick={() => {
-                        markAsRead(n.id)
-                        setShowNotif(false)
-
-                        const data = n.data || {}
-
-                        // Task notifications
-                        if (data.taskId) {
-                          router.push(`/tasks?taskId=${data.taskId}`)
-                          return
-                        }
-
-                        // Brand intake or question form submitted → go to client profile
-                        if (
-                          n.type === 'brand_intake_submitted' ||
-                          n.type === 'question_form_submitted'
-                        ) {
-                          const clientId = data.clientId
-                          if (clientId) {
-                            router.push(`/clients/${clientId}`)
-                          }
-                          return
-                        }
-
-                        // Approval notifications
-                        if (
-                          n.type === 'approval_created' ||
-                          n.type === 'approval_approved' ||
-                          n.type === 'approval_mention' ||
-                          n.type === 'approval_reminder'
-                        ) {
-                          const approvalId = data.approvalId
-                          if (userRole === 'client') {
-                            router.push(approvalId ? `/portal/approvals/${approvalId}` : `/portal/approvals`)
-                          } else {
-                            router.push(approvalId ? `/approvals/${approvalId}` : `/approvals`)
-                          }
-                          return
-                        }
-                      }}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
-                        !n.read_at ? 'bg-blue-50/60' : ''
-                      }`}
-                    >
-                      <p className="text-xs text-gray-800">
-                        {formatNotificationText(n)}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        {new Date(n.created_at).toLocaleString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </button>
-                  ))
-                )}
-              </div>
             </div>
-          )}
-        </div>
 
-        {/* User */}
-        <div className="flex items-center gap-3">
-          {profilePicture ? (
-            <Image
-              src={profilePicture}
-              alt={userName}
-              width={40}
-              height={40}
-              unoptimized
-              className="rounded-full object-cover ring-2 ring-gray-200"
-            />
-          ) : (
-            <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center">
-              <UserCircle className="h-6 w-6 text-white" />
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="px-4 py-6 text-xs text-gray-400 text-center">No notifications yet.</p>
+              ) : (
+                notifications.map((n) => (
+                  <NotificationRowItem
+                    key={n.id}
+                    notification={n}
+                    text={formatNotificationText(n)}
+                    onOpen={() => handleNotificationClick(n)}
+                    onDelete={() => void deleteOne(n.id)}
+                  />
+                ))
+              )}
             </div>
-          )}
-          {userName && (
-            <span className="text-sm font-medium text-gray-900">{userName}</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </header>
   )
+}
+
+function NotificationRowItem({
+  notification: n,
+  text,
+  onOpen,
+  onDelete,
+}: {
+  notification: NotificationRow
+  text: string
+  onOpen: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div
+      className={`group relative flex items-start gap-2 border-b border-gray-100 hover:bg-gray-50 ${
+        !n.read_at ? 'bg-blue-50/60' : ''
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex-1 min-w-0 text-left px-4 py-3"
+      >
+        <p className="text-xs text-gray-800 break-words">{text}</p>
+        <p className="text-[10px] text-gray-400 mt-1">
+          {new Date(n.created_at).toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete()
+        }}
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 mt-1 mr-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50"
+        aria-label="Delete notification"
+        title="Delete"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+function formatNotificationText(n: NotificationRow) {
+  const data = n.data || {}
+  switch (n.type) {
+    case 'task_created':
+      return `Task created: ${data.title || ''}`
+    case 'task_status_changed':
+      return `Task "${data.title || ''}" moved to ${data.status || ''}`
+    case 'task_mentioned':
+      return `You were mentioned in a task`
+    case 'approval_created':
+      return `Approval created for ${data.clientName || 'client'}: ${data.title || ''}`
+    case 'approval_approved':
+      return `Approval approved for ${data.clientName || 'client'}: ${data.title || ''}`
+    case 'approval_commented':
+      return `New comment on ${data.clientName || 'client'} approval: ${data.title || ''}`
+    case 'approval_mention':
+      return `You were mentioned in an approval: ${data.title || ''}`
+    case 'approval_reminder':
+      return `Approval reminder: ${data.title || ''}`
+    case 'brand_intake_submitted':
+      return `${data.clientName || 'A client'} submitted their brand intake`
+    case 'question_form_submitted': {
+      const count = typeof data.count === 'number' ? data.count : 0
+      const name = data.clientName || 'A client'
+      return count
+        ? `${name} answered ${count} braindump question${count === 1 ? '' : 's'}`
+        : `${name} submitted a braindump`
+    }
+    default:
+      return 'Notification'
+  }
 }

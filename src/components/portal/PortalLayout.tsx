@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useIdleTimeout } from '@/hooks/useIdleTimeout'
 
 interface PortalLayoutProps {
   children: React.ReactNode
@@ -17,6 +18,8 @@ export function PortalLayout({ children }: PortalLayoutProps) {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
+
+  useIdleTimeout(isAuthorized)
 
   useEffect(() => {
     // Fix: Define function inside useEffect to avoid hoisting and dependency issues

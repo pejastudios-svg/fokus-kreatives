@@ -393,7 +393,7 @@ export function BrandProfileForm({
             <div>
               <label className="block text-sm font-medium text-gray-700">Voice samples / brain dump</label>
               <p className="text-xs text-gray-500 mt-1 mb-2">
-                Paste anything you&apos;ve written or said that sounds like you — captions, voice memos, texts, tweets. The AI uses these as voice few-shots.
+                Paste anything you&apos;ve written or said that sounds like you - captions, voice memos, texts, tweets. The AI uses these as voice few-shots.
               </p>
             </div>
             {bp.voice.samples.map((s, idx) => (
@@ -407,7 +407,7 @@ export function BrandProfileForm({
                   }}
                   rows={4}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm"
-                  placeholder={`Sample ${idx + 1} — dump a real caption, DM, or transcript chunk`}
+                  placeholder={`Sample ${idx + 1} - dump a real caption, DM, or transcript chunk`}
                 />
                 <button
                   type="button"

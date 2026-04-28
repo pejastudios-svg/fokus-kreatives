@@ -46,9 +46,15 @@ function clientLine(profile: BrandProfile | null): string {
 }
 
 const SHARED_GUARDRAILS = `GUARDRAILS:
-- No em dashes (—) anywhere. Use commas or periods instead.
-- ABSOLUTELY no "<subject> isn't X, it's Y" construction in any form. Applies to ANY subject, not just "this/that/it" — "your intro isn't just a greeting, it's a...", "the end isn't a goodbye, it's...", "this isn't just X, it's Y" are ALL banned. Any variant (comma, semicolon, period between the clauses; with or without "just", "simply", "merely"). State the positive claim directly. This is the single most common AI tell and is banned outright.
+- No em dashes (—) or en dashes (–) anywhere. Use commas or periods instead. Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple, RE-HOOK, 2-1-3-4) ARE allowed and required — never replace them with commas.
+- ABSOLUTELY no "<subject> isn't X, it's Y" construction in any form. Applies to ANY subject, not just "this/that/it" - "your intro isn't just a greeting, it's a...", "the end isn't a goodbye, it's...", "this isn't just X, it's Y" are ALL banned. Any variant (comma, semicolon, period between the clauses; with or without "just", "simply", "merely"). State the positive claim directly. This is the single most common AI tell and is banned outright.
 - No "here's the truth" / "here's the wild truth" / "here's the hard truth" / "here's the real truth" / "the wild truth" in any form. Just state the claim.
+- No rhetorical fragment-questions used as transitions: "The result?", "The kicker?", "The catch?", "The truth?", "The secret?", "Plot twist?", "Spoiler:", "Here's the thing,". Banned outright. They read as fake-conversational because every AI uses them. Just state the next sentence.
+- No "Honestly?" or "Look," as standalone transitions. ("I was honestly surprised" inside a sentence is fine; "Honestly?" as a sentence opener is not.)
+- Voice rule: speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, a textbook, or a polished blog intro, rewrite it. Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because. Vary length violently — a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
+- No paired or tripled adjectives. "Consistent, engaging content" → "consistent content". "Clear, actionable, relevant advice" → "clear advice". Pick ONE adjective. Stacked adjectives are an AI tell.
+- Don't justify every claim. Real people make a point and move on; they don't add "and that's why this matters" after every sentence.
+- Don't bridge paragraphs with "Now," / "So," / "Moving on," / "Let's break it down,". Just start the next idea.
 - No "and the best part", no "in this video", no "welcome back", no "let me know what you think", no "I'm excited to see", no "I'm sure you want to know", no "click the link in the description" outside of a single CTA placement.
 - No meta-writing jargon inside the spoken script: never say "click-confirm", "directly echo and confirm", "pattern interrupt", "hook stack", "scroll-stop", "curiosity loop", "re-hook" as literal words in the script. These are behind-the-scenes instructions to the writer, not lines the audience should hear. Named creator-framework terms the braindump actually teaches (e.g. "2-1-3-4 method", "fortune cookie outro", "value loop", "5-part intro") ARE allowed because they are the taught concepts.
 - BODY POINT COUNT: 3 or 4 points only. NEVER 5. The 2-1-3-4 method only works cleanly at 4. If the braindump has more than 4 steps, GROUP them so you end with 3 or 4 top-level points; walk through sub-steps inside APPLICATION.
@@ -67,9 +73,9 @@ const SHARED_GUARDRAILS = `GUARDRAILS:
 - For long-form (YouTube), use [DESCRIPTION] not [CAPTION], and NO hashtags in the output.
 - For carousel/reel/story (Instagram), keep [CAPTION] + [HASHTAGS].
 
-GOOD vs BAD — concrete rewrites. Study these. Produce lines like RIGHT, NEVER like WRONG.
+GOOD vs BAD - concrete rewrites. Study these. Produce lines like RIGHT, NEVER like WRONG.
 
-#1 AI tell — negation-then-pivot. Banned in every form: "isn't X, it's Y", "don't just X, you Y", "not about X, but Y", with any subject, any connector (comma, semicolon, period, "but"), with or without "just/simply/merely/only".
+#1 AI tell - negation-then-pivot. Banned in every form: "isn't X, it's Y", "don't just X, you Y", "not about X, but Y", with any subject, any connector (comma, semicolon, period, "but"), with or without "just/simply/merely/only".
   WRONG: "Your intro isn't just a polite greeting, it's a five-part powerhouse."
   RIGHT: "Your intro is a five-part sequence that hooks the viewer in under ten seconds."
   WRONG: "You don't just share information; you craft an experience."
@@ -79,22 +85,22 @@ GOOD vs BAD — concrete rewrites. Study these. Produce lines like RIGHT, NEVER 
   WRONG: "Consistent content isn't about brute force; it's about a repeatable pattern."
   RIGHT: "Consistent content comes from a repeatable pattern, not brute force."
 
-#2 AI tell — "here's the [adj] truth" family. Banned in every form (truth, wild truth, hard truth, real truth, ugly truth, honest truth, contrarian truth, simple truth, uncomfortable truth).
+#2 AI tell - "here's the [adj] truth" family. Banned in every form (truth, wild truth, hard truth, real truth, ugly truth, honest truth, contrarian truth, simple truth, uncomfortable truth).
   WRONG: "Here's the contrarian truth: it doesn't have to be."
   RIGHT: "It doesn't have to be."
   WRONG: "Here's the wild truth about consistent content."
   RIGHT: "Consistent content is simpler than most people make it."
 
-#3 AI tell — meta-writing jargon bleeding into spoken lines. These words are instructions to YOU, not words the audience should hear: "click-confirm", "echoes and confirms", "echoing what the video is about", "pattern interrupt", "hook stack", "scroll-stop", "curiosity loop", "re-hook" (the label is fine; the spoken word is not).
-  WRONG: "First, you start with Context — immediately echoing what the video is about."
+#3 AI tell - meta-writing jargon bleeding into spoken lines. These words are instructions to YOU, not words the audience should hear: "click-confirm", "echoes and confirms", "echoing what the video is about", "pattern interrupt", "hook stack", "scroll-stop", "curiosity loop", "re-hook" (the label is fine; the spoken word is not).
+  WRONG: "First, you start with Context - immediately echoing what the video is about."
   RIGHT: "First, you start with Context: restate the promise of the title in your opening two lines, so the viewer knows they're in the right place."
   WRONG: "This directly echoes and confirms the video's topic."
   RIGHT: "This restates what the title promised."
   WRONG: "The hook stack opens curiosity loops that keep them watching."
   RIGHT: "The five-part intro opens questions the viewer wants answered."
 
-STRUCTURAL MUSTS — non-negotiable. A missing label or skipped section is a failure, not a style choice.
-- Every BODY point emits CONTEXT:, APPLICATION:, FRAMING: labels in that exact order, each on its own line, separated by blank lines. FRAMING is never skipped and never merged into APPLICATION — even a two-sentence FRAMING is required.
+STRUCTURAL MUSTS - non-negotiable. A missing label or skipped section is a failure, not a style choice.
+- Every BODY point emits CONTEXT:, APPLICATION:, FRAMING: labels in that exact order, each on its own line, separated by blank lines. FRAMING is never skipped and never merged into APPLICATION - even a two-sentence FRAMING is required.
 - RE-HOOK: appears on every body point except the final one.
 - OUTLINE bullet count EQUALS BODY point count (3 or 4). Never 5+.
 - BODY labels go 1, 2, 3, 4 in reading order. The 2-1-3-4 rule reorders points INTERNALLY; output numbering is always sequential.
@@ -115,6 +121,19 @@ export function buildLongformPackagePrompt(input: LongformPromptInput) {
 
   const systemParts = [
     `You are a ghostwriter. Real human voice. Short sentences. Specific words. No AI filler. You expand the client's braindump into a full script; you do not replace it with generic advice.`,
+    `HUMAN-VOICE EXAMPLE — match this rhythm and tone, never the polished-blog tone of typical AI output:
+
+"""
+Most people overthink content. They sit down, stare at the doc, and try to write something smart. That's the trap. Smart sounds like school. School doesn't sell.
+
+Just talk. Say what you'd say to a friend who asked you the question at dinner. If you wouldn't use a word out loud, cut it. If a sentence sounds like a LinkedIn post, kill it.
+
+The pattern I use? Three things. Topic. Idea. Outline. That's it. I don't sit there for an hour 'getting in the right headspace'. I open a doc and I write what I'd say.
+
+And yeah, sometimes the first draft is rough. Doesn't matter. You can fix rough. You can't fix a blank page.
+"""
+
+Notice: contractions everywhere, sentence fragments ("That's the trap.", "Three things."), short sentences next to longer ones, no paired adjectives, no rhetorical fragment-questions like "The result?", no "isn't X, it's Y", no "here's the thing". Match THAT rhythm.`,
     voiceLine(profile),
     clientLine(profile),
     FRAMEWORK_CORE,
@@ -123,7 +142,7 @@ export function buildLongformPackagePrompt(input: LongformPromptInput) {
     SHARED_GUARDRAILS,
     ctaText
       ? `CTA INSTRUCTIONS: The following CTA was supplied. You MUST (1) weave it verbatim into the single body point it most naturally solves, AND (2) reference it again softly in the fortune-cookie outro, AND (3) echo the exact text in the [CTA] section. Do not rewrite the CTA:\n${ctaText}`
-      : `CTA: No CTA was supplied. Close softly via the fortune-cookie outro. In the [CTA] section, write "(none — native close in outro)".`,
+      : `CTA: No CTA was supplied. Close softly via the fortune-cookie outro. In the [CTA] section, write "(none - native close in outro)".`,
     pillar === 'series' && seriesDay ? `SERIES DAY: ${seriesDay}` : '',
   ].filter(Boolean)
 
@@ -132,7 +151,7 @@ export function buildLongformPackagePrompt(input: LongformPromptInput) {
   const userParts: string[] = []
   if (topicQuestion) userParts.push(`SOURCE QUESTION (the question the client was answering):\n${topicQuestion}`)
   userParts.push(
-    `CLIENT BRAINDUMP — THIS IS THE SOURCE OF TRUTH.\n` +
+    `CLIENT BRAINDUMP - THIS IS THE SOURCE OF TRUTH.\n` +
       `Before you write a single line, extract the concrete beats from this braindump. Every OUTLINE point, every BODY example, every framework named, every step described in the script must come from here. Preserve the client's vocabulary, their specific sequence, their specific examples. If they named a framework (e.g. "2-1-3-4", "fortune cookie", a numbered order of steps), the script TEACHES that exact framework with that exact name. If the braindump is thin on a point, keep the script tighter rather than inventing filler.\n\n"""\n${topicAnswer}\n"""\n\n` +
       `Now build the script strictly around what's inside those triple-quotes.`,
   )
@@ -184,11 +203,11 @@ function repurposeBase(kind: 'carousel' | 'reel' | 'story', input: RepurposeProm
   const system = systemParts.join('\n\n')
 
   const avoid = previousAngles.length
-    ? `ANGLES ALREADY USED (do NOT repeat — pick a different beat from the long-form):\n- ${previousAngles.join('\n- ')}`
+    ? `ANGLES ALREADY USED (do NOT repeat - pick a different beat from the long-form):\n- ${previousAngles.join('\n- ')}`
     : ''
 
   const user = [
-    `LONG-FORM SOURCE SCRIPT (this is your only source of truth — do not invent new points, examples, numbers, or claims):\n"""\n${longformScript}\n"""`,
+    `LONG-FORM SOURCE SCRIPT (this is your only source of truth - do not invent new points, examples, numbers, or claims):\n"""\n${longformScript}\n"""`,
     avoid,
     `INDEX: ${index} of ${total}. Pick ONE specific beat from the long-form that hasn't been used yet. Name it precisely in [ANGLE]. Return ONLY the formatted output for this single ${kind}.`,
   ].filter(Boolean).join('\n\n')

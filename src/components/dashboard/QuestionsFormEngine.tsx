@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
   Sparkles,
   Copy,
@@ -19,6 +20,7 @@ import { defaultBrandProfile, type BrandProfile } from '../clients/brandProfile'
 import type { FormQuestion, QuestionForm } from '@/lib/types/questionForm'
 import type { TopicPillar } from '@/lib/types/topics'
 import { ClientPicker } from './ClientPicker'
+import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 
 interface ClientRow {
   id: string
@@ -65,7 +67,8 @@ export function QuestionsFormEngine() {
   const supabase = useMemo(() => createClient(), [])
   const [clients, setClients] = useState<ClientRow[]>([])
   const [loadingClients, setLoadingClients] = useState(true)
-  const [selectedClientId, setSelectedClientId] = useState('')
+  const [selectedClientId, setSelectedClientId] = useState(readStashedClientId)
+  useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
 
   const [pillars, setPillars] = useState<TopicPillar[]>(DEFAULT_PILLARS)
   const [count, setCount] = useState(12)
@@ -222,8 +225,9 @@ export function QuestionsFormEngine() {
     setTimeout(() => setCopiedUrl(''), 2000)
   }
 
+  const [pendingDeleteFormId, setPendingDeleteFormId] = useState<string | null>(null)
+
   const deleteForm = async (id: string) => {
-    if (!confirm('Delete this form? The share link will stop working.')) return
     setPastForms((prev) => prev.filter((f) => f.id !== id))
     await supabase.from('question_forms').delete().eq('id', id)
   }
@@ -478,7 +482,7 @@ export function QuestionsFormEngine() {
                           variant="ghost"
                           size="sm"
                           className="text-red-500 hover:bg-red-50"
-                          onClick={() => deleteForm(f.id)}
+                          onClick={() => setPendingDeleteFormId(f.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -491,6 +495,20 @@ export function QuestionsFormEngine() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmModal
+        open={!!pendingDeleteFormId}
+        title="Delete this form?"
+        message="The share link will stop working immediately."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          if (!pendingDeleteFormId) return
+          await deleteForm(pendingDeleteFormId)
+          setPendingDeleteFormId(null)
+        }}
+        onClose={() => setPendingDeleteFormId(null)}
+      />
     </div>
   )
 }

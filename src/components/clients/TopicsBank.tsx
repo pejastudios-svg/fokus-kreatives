@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Plus, Trash2, RotateCcw, Check, Lightbulb } from 'lucide-react'
 import type { Topic, TopicPillar } from '@/lib/types/topics'
 
@@ -30,6 +31,7 @@ export function TopicsBank({ clientId }: Props) {
   const [newQuestion, setNewQuestion] = useState('')
   const [newAnswer, setNewAnswer] = useState('')
   const [newPillar, setNewPillar] = useState<TopicPillar>('unassigned')
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -69,7 +71,6 @@ export function TopicsBank({ clientId }: Props) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this topic?')) return
     setTopics((prev) => prev.filter((t) => t.id !== id))
     await supabase.from('topics').delete().eq('id', id)
   }
@@ -117,7 +118,7 @@ export function TopicsBank({ clientId }: Props) {
           </label>
         </div>
         <p className="text-xs text-theme-secondary mt-1">
-          Client braindumps. Each answer is a topic. Used topics turn grey — the AI will skip them unless you manually pick one again.
+          Client braindumps. Each answer is a topic. Used topics turn grey - the AI will skip them unless you manually pick one again.
         </p>
       </CardHeader>
 
@@ -128,7 +129,7 @@ export function TopicsBank({ clientId }: Props) {
           <input
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
-            placeholder="Question (optional — e.g. 'What's a hard lesson you learned about pricing?')"
+            placeholder="Question (optional - e.g. 'What's a hard lesson you learned about pricing?')"
             className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
           <textarea
@@ -216,7 +217,7 @@ export function TopicsBank({ clientId }: Props) {
                       variant="ghost"
                       size="sm"
                       className="text-red-500 hover:bg-red-50"
-                      onClick={() => handleDelete(t.id)}
+                      onClick={() => setPendingDeleteId(t.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -227,6 +228,20 @@ export function TopicsBank({ clientId }: Props) {
           </ul>
         )}
       </CardContent>
+
+      <ConfirmModal
+        open={!!pendingDeleteId}
+        title="Delete this topic?"
+        message="The topic will be removed from this client's bank."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          if (!pendingDeleteId) return
+          await handleDelete(pendingDeleteId)
+          setPendingDeleteId(null)
+        }}
+        onClose={() => setPendingDeleteId(null)}
+      />
     </Card>
   )
 }

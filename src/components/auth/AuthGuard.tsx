@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
+import { useIdleTimeout } from '@/hooks/useIdleTimeout'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -13,6 +14,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
+
+  useIdleTimeout(isAuthenticated)
   
 
   useEffect(() => {

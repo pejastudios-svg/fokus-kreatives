@@ -176,7 +176,7 @@ function detectMetaPointOne(bodyText: string): StructuralIssue | null {
     const otherTitles = titles.slice(1).map((t) => `"${t}"`).join(', ')
     return {
       code: 'meta_point_one',
-      detail: `CRITICAL STRUCTURAL FAILURE: POINT 1 ("${titles[0]}") is a META-POINT — an umbrella/pattern/framework that POINTS 2+ are sub-mechanics of. Its APPLICATION references ${touched.length} of the other ${titles.length - 1} POINT titles: ${touchedList}. This is the #1 failure mode in this system and it is UNACCEPTABLE.\n\nTO FIX: (1) DELETE POINT 1 entirely — its title, its CONTEXT, its APPLICATION, its FRAMING, its RE-HOOK. Do NOT rename it. Do NOT rewrite it. DELETE IT. (2) RENUMBER: old POINT 2 becomes new POINT 1, old POINT 3 becomes POINT 2, old POINT 4 becomes POINT 3. Your current POINTs are ${otherTitles}. (3) ADD A NEW FINAL POINT covering a distinct, specific mechanic NOT already covered by the existing points and NOT an umbrella over them. Its title MUST NOT contain the words: pattern, system, framework, method, blueprint, process, sequence, approach, strategy, formula, map, roadmap, playbook, recipe, engine, machine. (4) Update [OUTLINE] and [DESCRIPTION] to match the new point list. (5) Update the intro's Plan beat to preview the new point titles.`,
+      detail: `CRITICAL STRUCTURAL FAILURE: POINT 1 ("${titles[0]}") is a META-POINT - an umbrella/pattern/framework that POINTS 2+ are sub-mechanics of. Its APPLICATION references ${touched.length} of the other ${titles.length - 1} POINT titles: ${touchedList}. This is the #1 failure mode in this system and it is UNACCEPTABLE.\n\nTO FIX: (1) DELETE POINT 1 entirely - its title, its CONTEXT, its APPLICATION, its FRAMING, its RE-HOOK. Do NOT rename it. Do NOT rewrite it. DELETE IT. (2) RENUMBER: old POINT 2 becomes new POINT 1, old POINT 3 becomes POINT 2, old POINT 4 becomes POINT 3. Your current POINTs are ${otherTitles}. (3) ADD A NEW FINAL POINT covering a distinct, specific mechanic NOT already covered by the existing points and NOT an umbrella over them. Its title MUST NOT contain the words: pattern, system, framework, method, blueprint, process, sequence, approach, strategy, formula, map, roadmap, playbook, recipe, engine, machine. (4) Update [OUTLINE] and [DESCRIPTION] to match the new point list. (5) Update the intro's Plan beat to preview the new point titles.`,
     }
   }
   return null
@@ -202,7 +202,7 @@ export function validateCarouselStructure(text: string): StructuralIssue[] {
   }
   const slides = (t.match(/^\s*Slide\s+\d+\s*:/gim) || []).length
   if (slides !== 10) {
-    issues.push({ code: 'slide_count', detail: `Found ${slides} slides. The spec is EXACTLY 10 slides — not fewer, not more. Expand the teaching beat with concrete examples or breakdowns from the long-form until there are exactly 10 slides. Do NOT pad by restating the same point.` })
+    issues.push({ code: 'slide_count', detail: `Found ${slides} slides. The spec is EXACTLY 10 slides - not fewer, not more. Expand the teaching beat with concrete examples or breakdowns from the long-form until there are exactly 10 slides. Do NOT pad by restating the same point.` })
   }
   const slideLabels = t.match(/^\s*Slide\s+(\d+)\s*:/gim) || []
   slideLabels.forEach((h, i) => {
@@ -242,7 +242,7 @@ export function validateReelStructure(text: string): StructuralIssue[] {
   const scenesBlock = extractSectionFrom(t, '[SCENES]', '[CAPTION]')
   const scenes = (scenesBlock.match(/^\s*Scene\s+\d+\b/gim) || []).length
   if (scenes < 1 || scenes > 4) {
-    issues.push({ code: 'scene_count', detail: `Found ${scenes} scenes in [SCENES]. The spec is 1–4 scenes — most reels are 2–3.` })
+    issues.push({ code: 'scene_count', detail: `Found ${scenes} scenes in [SCENES]. The spec is 1–4 scenes - most reels are 2–3.` })
   }
   const sceneLabels = scenesBlock.match(/^\s*Scene\s+(\d+)\b/gim) || []
   sceneLabels.forEach((h, i) => {
@@ -282,7 +282,7 @@ export function validateStoryStructure(text: string): StructuralIssue[] {
   const slidesBlock = extractSectionFrom(t, '[SLIDES]', '[OPTIONAL STICKER]')
   const slides = (slidesBlock.match(/^\s*Slide\s+\d+\b/gim) || []).length
   if (slides < 1 || slides > 4) {
-    issues.push({ code: 'slide_count', detail: `Found ${slides} slides in [SLIDES]. The spec is 1–4 — most stories are 2–3.` })
+    issues.push({ code: 'slide_count', detail: `Found ${slides} slides in [SLIDES]. The spec is 1–4 - most stories are 2–3.` })
   }
   return issues
 }

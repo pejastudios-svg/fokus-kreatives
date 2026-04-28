@@ -25,13 +25,37 @@ export interface BuiltPrompt {
 }
 
 const HARD_BANS = [
+  // Em-dash and en-dash — convert to commas via the repair regex; if any
+  // survive the repair pass we want them surgically stripped. NOTE: this
+  // entry MUST NOT be a plain hyphen ("-"), or surgicalBanRemoval will
+  // delete every sentence that uses a compound modifier ("5-part intro",
+  // "lead-generating machine", etc.).
   '—',
+  '–',
+  // Rhetorical-fragment-question transitions. These read as conversational
+  // but every AI uses them now — they're the new "Here's the thing".
   'and the result?',
+  'the result?',
+  'the kicker?',
+  'and the kicker?',
+  'the catch?',
+  'and the catch?',
+  'the truth?',
+  'the secret?',
+  'the trick?',
+  'plot twist?',
+  'spoiler?',
   'and you know what?',
   'and the best part?',
   'but the best part?',
   'and here\'s the best part',
   "here's the best part",
+  // Standalone "honestly?" / "honestly," as a vocal-tic transition (the word
+  // inside a real sentence — "I was honestly surprised" — is fine).
+  'honestly?',
+  'honestly,',
+  'look,',
+  // Common longer AI tells.
   'what if i told you',
   "here's what i've learned",
   "yeah, you read that right",
@@ -72,12 +96,17 @@ const HARD_BANS = [
   'here is what actually works',
   "here's what really works",
   'here is what really works',
+  // "Here's the thing" — the OG of this whole family.
+  "here's the thing",
+  'here is the thing',
 ]
 
 const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
-  // Em dash (spaced or unspaced) becomes a comma break. Avoids the stray-hyphen
-  // artifact from a naive "—" → "-" replacement.
-  { re: /\s*—\s*/g, replace: ', ' },
+  // Em dash / en dash (spaced or unspaced) becomes a comma break. The regex
+  // MUST NOT match plain hyphens — earlier versions did and corrupted every
+  // compound modifier in the output ("5-part" → "5, part", "lead-generating"
+  // → "lead, generating", "RE-HOOK" → "RE, HOOK", etc.).
+  { re: /\s*[—–]\s*/g, replace: ', ' },
   // "X is not Y. It's Z." / "X isn't Y. It's Z." → drop the negation clause, keep the positive claim
   { re: /\b(\w[\w\s]{0,30})\s+is\s+not\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
   { re: /\b(\w[\w\s]{0,30})\s+isn['’]t\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
@@ -87,7 +116,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:\*{0,2})?(?:is\s+not|isn['’]t|are\s+not|aren['’]t)(?:\*{0,2})?(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:\*{0,2})?(?:it['’]s|that['’]s|they['’]re|this\s+is|these\s+are)(?:\*{0,2})?\s+/gi, replace: '$1 is ' },
   // Non-negation cousin: "<subject> is (about) more than just X; it's Y" → "<subject> is Y"
   { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:is|are)(?:\s+about)?\s+more\s+than\s+(?:just\s+)?[^.,;!?]{1,80}[,;.]\s*(?:it['’]s|that['’]s|they['’]re|this\s+is|these\s+are)\s+/gi, replace: '$1 is ' },
-  // Subject-agnostic "X isn't (just) about Y; it's (just) about Z" — catches cases where the subject
+  // Subject-agnostic "X isn't (just) about Y; it's (just) about Z" - catches cases where the subject
   // has no determiner (e.g. "consistent, engaging content isn't about endless effort; it's about ...").
   // The "about" keyword on both sides makes this idiom distinctive enough to rewrite without a determiner anchor.
   // Also handles contracted forms "it's not" / "they're not" via ['’]s\s+not and ['’]re\s+not.
@@ -101,7 +130,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   // Catches "This intro doesn't just tell them what's coming; it makes them feel understood."
   // Pivot clause accepts bare pronoun + verb (not only "it's" / "that's").
   { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:it|that|they|this|these|those)\s+/gi, replace: '$1 ' },
-  // Broadest subject-agnostic pivot: "<anything> isn't (just) Y; it's Z" — catches adjective-led
+  // Broadest subject-agnostic pivot: "<anything> isn't (just) Y; it's Z" - catches adjective-led
   // subjects like "consistent, engaging content isn't magic; it's a pattern" that slip past the
   // determiner-anchored rule. Runs AFTER the specific rules so those take priority.
   // Only triggers on comma/semicolon pivots (NOT period), to avoid eating legitimate cross-sentence
@@ -114,13 +143,13 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   // "Here's the [wild|hard|real|ugly|plain|honest|contrarian|simple|uncomfortable] truth" → strip entirely
   { re: /\bhere['’]s\s+(?:the\s+(?:wild\s+|ugly\s+|hard\s+|real\s+|plain\s+|honest\s+|contrarian\s+|simple\s+|uncomfortable\s+)?truth)\s*[:,.]?\s*/gi, replace: '' },
   { re: /\bhere is\s+(?:the\s+(?:wild\s+|ugly\s+|hard\s+|real\s+|plain\s+|honest\s+|contrarian\s+|simple\s+|uncomfortable\s+)?truth)\s*[:,.]?\s*/gi, replace: '' },
-  // "Here's the [real|hidden|simple|contrarian] secret" family — same AI-transition tell as "truth"
+  // "Here's the [real|hidden|simple|contrarian] secret" family - same AI-transition tell as "truth"
   { re: /\bhere['’]s\s+(?:the\s+(?:real\s+|hidden\s+|simple\s+|contrarian\s+|wild\s+)?secret)\s*[:,.]?\s*/gi, replace: '' },
   { re: /\bhere is\s+(?:the\s+(?:real\s+|hidden\s+|simple\s+|contrarian\s+|wild\s+)?secret)\s*[:,.]?\s*/gi, replace: '' },
   // "Here's the real deal" variants
   { re: /\bhere['’]s\s+the\s+real\s+deal\s*[:,.]?\s*/gi, replace: '' },
   { re: /\bhere is\s+the\s+real\s+deal\s*[:,.]?\s*/gi, replace: '' },
-  // "Here's what actually works" / "Here's what really works" — same transition-tell family
+  // "Here's what actually works" / "Here's what really works" - same transition-tell family
   { re: /\b(?:but\s+)?here['’]s\s+what\s+(?:actually|really)\s+works\s*[:,.]?\s*/gi, replace: '' },
   { re: /\b(?:but\s+)?here is\s+what\s+(?:actually|really)\s+works\s*[:,.]?\s*/gi, replace: '' },
   // Meta-writing jargon leaking into the script voice (soft-rewrite, keeps sentence flow)
@@ -150,7 +179,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\ba\s+curiosity\s+loop\b/gi, replace: 'an open question' },
   { re: /\ban\s+curiosity\s+loop\b/gi, replace: 'an open question' },
   { re: /\bcuriosity\s+loop\b/gi, replace: 'open question' },
-  // Filler starters — strip, keep rest of sentence
+  // Filler starters - strip, keep rest of sentence
   { re: /\band the result\??/gi, replace: "here's what happened." },
   { re: /^\s*the result\??$/gim, replace: "here's what happened." },
   { re: /\band you know what\??\s*/gi, replace: '' },
@@ -164,6 +193,43 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\bin this (video|post)\b[:,]?\s*/gi, replace: '' },
   { re: /\b(stare|staring)\s+at\s+(a\s+)?blank\s+(page|screen)\b/gi, replace: 'stuck on the first line' },
   { re: /\b(blank)\s+(page|screen)\b/gi, replace: 'empty draft' },
+
+  // "you're not (just) X; you're Y" / "I'm not X, I'm Y" — contracted-be
+  // negation pivot. Not covered by the do/does/don't catcher above.
+  { re: /\b(I|we|you|they|he|she|it)['’]?(?:m|re|s)?\s+not(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:I|we|you|they|he|she|it)['’]?(?:m|re|s)?\s+/gi, replace: '$1 ' },
+
+  // Empty quoted phrase left behind when the sanitizer strips a banned word
+  // from inside quotes ("This is your "" moment" → "This is your moment").
+  { re: /\s*[""]\s*[""]\s*/g, replace: ' ' },
+  { re: /\s*"\s*"\s*/g, replace: ' ' },
+
+  // Declarative sentence accidentally ending with a question mark — model
+  // tic where it ends statements like "...without the burnout?" or
+  // "...cuts through the noise?". If the sentence doesn't START with a
+  // question word (how/what/why/when/where/who/which/can/do/does/did/is/
+  // are/will/should/would/could) and ends in '?', it's almost always a
+  // declarative; convert to a period.
+  { re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so)\b)([A-Z][^?.!]{8,200}?)\?/gi, replace: '$1$2.' },
+
+  // Common paired-adjective AI stacks — strip the redundant adjective.
+  // Conservative: only the highest-frequency offenders so we don't eat
+  // legitimate phrasing.
+  { re: /\bconsistent,\s+engaging\b/gi, replace: 'consistent' },
+  { re: /\bclear,\s+valuable,?\s+and\s+actionable\b/gi, replace: 'actionable' },
+  { re: /\bclear,\s+concise\b/gi, replace: 'clear' },
+  { re: /\bsimple,\s+repeatable\b/gi, replace: 'repeatable' },
+  { re: /\bspecific,\s+actionable\b/gi, replace: 'actionable' },
+  { re: /\bcompelling,\s+engaging\b/gi, replace: 'engaging' },
+
+  // AI clichés that survived earlier passes.
+  { re: /\bgot\s+the\s+receipts?\b/gi, replace: 'have proof' },
+  { re: /\breinvent(?:ing)?\s+the\s+wheel\b/gi, replace: 'starting from scratch' },
+  { re: /\bmagic\s+well\s+of\s+(?:endless\s+)?ideas?\b/gi, replace: 'an endless supply of ideas' },
+  { re: /\bevery\s+single\s+(day|week|time|month)\b/gi, replace: 'every $1' },
+  { re: /\byou\s+just\s+watched\s+how\s+to\s+/gi, replace: 'use this to ' },
+
+  // Tag-question filler at end of sentence: "...impossible task, right?"
+  { re: /,\s*right\?/g, replace: '.' },
 ]
 
 const PREAMBLE_STRIPPERS: RegExp[] = [
@@ -261,7 +327,7 @@ function voiceSamples(profile: BrandProfile | null): string {
   const samples = (profile?.voice.samples || []).map((s) => s.trim()).filter(Boolean).slice(0, 3)
   if (!samples.length) return ''
   return [
-    'VOICE SAMPLES (mirror the rhythm, word choice, sentence length — do NOT quote):',
+    'VOICE SAMPLES (mirror the rhythm, word choice, sentence length - do NOT quote):',
     ...samples.map((s, i) => `<sample ${i + 1}>\n${s}\n</sample>`),
   ].join('\n')
 }
@@ -274,7 +340,7 @@ function commonEnemyLine(profile: BrandProfile | null, tier: Tier): string {
       ? `Frame as "me and you, figuring this out together" vs ${enemy}.`
       : tier === 'mid'
         ? `Frame as "me, a few steps ahead, pulling you past ${enemy}".`
-        : `Frame as "I've seen what keeps people stuck in ${enemy} — here's the way through".`
+        : `Frame as "I've seen what keeps people stuck in ${enemy} - here's the way through".`
   return `COMMON ENEMY: ${stance} Never say "the enemy is". Show the trap; don't label it.`
 }
 
@@ -309,7 +375,7 @@ function tierVoiceBlock(tier: Tier): string {
   }
   if (tier === 'mid') {
     return `TIER: MID (peer who's a few steps ahead).
-- You can use "you" more confidently. Frame common errors as "a common mistake I see" — not "your mistake".
+- You can use "you" more confidently. Frame common errors as "a common mistake I see" - not "your mistake".
 - Mix "I learned…" with "here's what works…". Client examples allowed only if supplied in context.`
   }
   return `TIER: ADVANCED (coach with proof).
@@ -321,14 +387,14 @@ function pillarBlock(pillar: Pillar, tier: Tier, seriesDay?: number): string {
   switch (pillar) {
     case 'educational':
       if (tier === 'beginner') {
-        return `PILLAR: EDUCATIONAL (beginner variant — teach through your own learning).
+        return `PILLAR: EDUCATIONAL (beginner variant - teach through your own learning).
 - Frame every teaching beat as "what I figured out" not "what you should do".
 - One clear idea. Mistake I made → cost → what I changed → one concrete example.
-- Lots of "you" is fine — but "you" is a friend, not a student being lectured.`
+- Lots of "you" is fine - but "you" is a friend, not a student being lectured.`
       }
       return `PILLAR: EDUCATIONAL.
 - Friendly advice, peer-to-peer. Lots of "you". Never condescending.
-- Teach ONE specific concept. Name the actual framework/technique — no vague "system" or "something".
+- Teach ONE specific concept. Name the actual framework/technique - no vague "system" or "something".
 - Show the mistake, the cost, the fix, and one concrete example line the viewer can copy.`
     case 'storytelling':
       return `PILLAR: STORYTELLING (cozy-friend-vlog voice).
@@ -336,14 +402,14 @@ function pillarBlock(pillar: Pillar, tier: Tier, seriesDay?: number): string {
 - Only use personal stories the user supplied in the topic. Never invent dates, numbers, names, or outcomes.
 - If the topic is thin, tell a situational story (a moment, not a timeline).`
     case 'authority':
-      return `PILLAR: AUTHORITY (advanced tier only — coach tone).
+      return `PILLAR: AUTHORITY (advanced tier only - coach tone).
 - You've walked the path. Pull the viewer forward. Confident, not arrogant.
 - "If I were running your X…" / "Here's the move I'd make…" is the register.
 - Never invent metrics, clients, or outcomes. Use only what's in the client context.`
     case 'series': {
       const dayLabel = seriesDay ? `Day ${seriesDay}` : 'Day N'
       return `PILLAR: SERIES (${dayLabel} continuation).
-- Hook MUST start with "${dayLabel}." — no recap, no "welcome back", no "as we discussed".
+- Hook MUST start with "${dayLabel}." - no recap, no "welcome back", no "as we discussed".
 - Pattern: current status → today's struggle → the small win → what I'm trying tomorrow.`
     }
     case 'doubledown':
@@ -367,7 +433,7 @@ HOOK STACK (first 30 seconds is everything):
 - 8–15s PREVIEW: tease 3 points and open 2–3 loops you will close later.
 - 15–30s PROOF: quick credibility + one concrete detail from the client context (if available).
 
-BODY — pick ONE structure:
+BODY - pick ONE structure:
 A) Transformation framework (current state → bridge method → steps → signs it's working)
 B) Myth-busting (3 myths with truth + proof for each → your real method)
 C) Story-teaching hybrid (story beats every ~2 min, each delivering one lesson)
@@ -385,7 +451,7 @@ SOFT LEAD CAPTURE (natural, not pitchy):
 - 90% teaching, 10% offer connection. Never make the script about the offer.`
     case 'short':
       return `SHORT-FORM (30–45s, 120–170 words):
-Beat order — HOOK → REHOOK → CONNECT → COMMON ENEMY (shown, not labeled) → REHOOK → RELATE → CLOSE → CTA → RELOOP.
+Beat order - HOOK → REHOOK → CONNECT → COMMON ENEMY (shown, not labeled) → REHOOK → RELATE → CLOSE → CTA → RELOOP.
 - HOOK: pattern interrupt in ≤8 words. Specific.
 - REHOOK: a promise or tease that justifies staying.
 - CONNECT: one line that makes the viewer say "that's me".
@@ -395,7 +461,7 @@ Beat order — HOOK → REHOOK → CONNECT → COMMON ENEMY (shown, not labeled)
 - No "Step 1/2/3". Use "first… then… last" inline.`
     case 'engagement':
       return `ENGAGEMENT REEL (15–25s, 60–110 words):
-Beat order — TRIGGER → CONTEXT (1 sentence) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT → CTA.
+Beat order - TRIGGER → CONTEXT (1 sentence) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT → CTA.
 - Take a clear, slightly polarizing stance grounded in the client context.
 - Bait must be answerable in the comments in under 5 words.`
     case 'carousel':
@@ -419,14 +485,14 @@ Frame 1 HOOK → Frame 2 VALUE (the ONE insight) → Frame 3 MINI-TEACH (one thi
 function outputFormat(type: ContentType): string {
   switch (type) {
     case 'long':
-      return `OUTPUT FORMAT (aim 1200–1600 words total — depth over length, no filler):
+      return `OUTPUT FORMAT (aim 1200–1600 words total - depth over length, no filler):
 [TITLE]  (1 punchy headline)
 [HOOK]  (60–120 words)
-[SETUP]  (100–150 words — stakes + preview; open 2 loops)
-[ANTICIPATION]  (80–120 words — tease the best tip; one proof point)
-[TEACH]  (600–800 words — 3 teaching beats. Each beat = NAME the specific framework/technique, 1 concrete example line, 1 practical action. Close both loops in order. Do NOT repeat ideas. Do NOT invent client stories.)
-[REHOOK]  (60–100 words — the best tip of the whole script)
-[PAYOFF]  (80–120 words — the "if you only take one thing" moment)
+[SETUP]  (100–150 words - stakes + preview; open 2 loops)
+[ANTICIPATION]  (80–120 words - tease the best tip; one proof point)
+[TEACH]  (600–800 words - 3 teaching beats. Each beat = NAME the specific framework/technique, 1 concrete example line, 1 practical action. Close both loops in order. Do NOT repeat ideas. Do NOT invent client stories.)
+[REHOOK]  (60–100 words - the best tip of the whole script)
+[PAYOFF]  (80–120 words - the "if you only take one thing" moment)
 [CTA]  (20–50 words)
 [PUBLISHING PACK]
 HEADER: (6–14 words)
@@ -544,7 +610,7 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
   const { profile, tier, pillar, contentType, topic, cta, referenceScript, seriesDay, competitorPatterns } = input
 
   const blocks = [
-    `You are a ghostwriter. You write like a real human creator. Short sentences. Specific words. No AI filler. You can write from multiple angles — "I used to…", "Here's how I do X now…", "When I first tried X…", "If I were starting today…" — not just "you're a ___ who…".`,
+    `You are a ghostwriter. You write like a real human creator. Short sentences. Specific words. No AI filler. You can write from multiple angles - "I used to…", "Here's how I do X now…", "When I first tried X…", "If I were starting today…" - not just "you're a ___ who…".`,
     voiceFingerprint(profile) && `VOICE: ${voiceFingerprint(profile)}`,
     voiceSamples(profile),
     tierVoiceBlock(tier),
@@ -562,7 +628,7 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
     `FABRICATION PREVENTION:
 - Never invent social proof: "you keep asking", "my most requested", "everyone's been DMing me". Only claims from the client context or the topic are allowed.
 - Never invent numbers, percentages, dollars, follower counts, timeframes, or outcomes.
-- Never invent a client story ("I was working with a client who…", "one of my clients…") unless a real client example is in the inputs. If you need an example, use a hypothetical framed as "imagine a [role] who…" — don't pretend it happened.
+- Never invent a client story ("I was working with a client who…", "one of my clients…") unless a real client example is in the inputs. If you need an example, use a hypothetical framed as "imagine a [role] who…" - don't pretend it happened.
 - Never re-use the user's own story as a client's story. Your "I" and a client's "they" are different people.
 - Never name specific competitors. Describe patterns instead.`,
     `TEACHING DEPTH:
@@ -574,7 +640,7 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
 2) One concrete detail from the inputs.
 3) Creates tension the viewer needs to resolve.
 4) Flows in one breath when read aloud.
-5) Sounds like a real person — not a brand voice.`,
+5) Sounds like a real person - not a brand voice.`,
     `RULES: no em dash. no "it's not X, it's Y". no "that's not X, that's Y". no "and you know what?". no "and the result?". no "and the best part?" / "but the best part?" (do not use these transitional questions at all). no "here's what I've learned" / "yeah, you read that right". no "what if I told you". no "here's the thing". no "let me show you". no "in this video". no choppy fragment stacking ("Hours back. Energy saved. Freedom unlocked."). write natural flowing sentences with varied lengths. Do NOT reuse the same transitional phrase twice in one script.`,
     ctaBlock(cta, profile),
     outputFormat(contentType),
@@ -624,7 +690,7 @@ export function sanitize(text: string): string {
   // Repairs above can land a lowercase "it's"/"that's" at a sentence boundary.
   // Restore capitalization after `.`, `:`, or at start of string / line.
   // `!` and `?` are excluded because quoted interjections like "Click me!" And "aha!" Moment
-  // are mid-sentence — treating them as terminators wrongly capitalizes the next word.
+  // are mid-sentence - treating them as terminators wrongly capitalizes the next word.
   // Also handle closing quote/paren between terminator and space: `.' it's` / `.) it's`.
   t = t.replace(/(^|[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
 
@@ -652,7 +718,7 @@ export function sanitize(text: string): string {
   // Outline bullets on their own line (models run them together on one line)
   t = t.replace(/\s*[*•\-]\s+POINT:\s*/g, '\n*   POINT: ')
 
-  // Dedupe multiple [PUBLISHING PACK] sections (keep the last — usually most complete)
+  // Dedupe multiple [PUBLISHING PACK] sections (keep the last - usually most complete)
   t = dedupeSection(t, '[PUBLISHING PACK]')
 
   // Hashtag hard cap (fixes runaway loops like "#tipstipstips…")

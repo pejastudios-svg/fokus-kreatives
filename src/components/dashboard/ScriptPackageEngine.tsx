@@ -22,6 +22,7 @@ import { defaultBrandProfile, type BrandProfile } from '../clients/brandProfile'
 import type { Topic } from '@/lib/types/topics'
 import { ClientPicker } from './ClientPicker'
 import { copyToClipboard } from '@/lib/util/clipboard'
+import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 
 interface ClientRow {
   id: string
@@ -90,7 +91,7 @@ function buildProfileForClient(c: ClientRow): BrandProfile {
 }
 
 function extractAngle(content: string): string {
-  const m = content.match(/\[ANGLE\]\s*[—-]?\s*(.+)/i)
+  const m = content.match(/\[ANGLE\]\s*[--]?\s*(.+)/i)
   return m?.[1]?.trim().slice(0, 140) || ''
 }
 
@@ -98,7 +99,8 @@ export function ScriptPackageEngine() {
   const supabase = useMemo(() => createClient(), [])
   const [clients, setClients] = useState<ClientRow[]>([])
   const [loadingClients, setLoadingClients] = useState(true)
-  const [selectedClientId, setSelectedClientId] = useState('')
+  const [selectedClientId, setSelectedClientId] = useState(readStashedClientId)
+  useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
 
   const [topics, setTopics] = useState<Topic[]>([])
   const [loadingTopics, setLoadingTopics] = useState(false)
@@ -333,7 +335,7 @@ export function ScriptPackageEngine() {
               <h3 className="text-lg font-semibold text-theme-primary">2. Pick a topic from their bank</h3>
             </div>
             <p className="text-xs text-theme-secondary mt-1">
-              Unused topics appear first. Used ones are greyed — you can still pick them manually.
+              Unused topics appear first. Used ones are greyed - you can still pick them manually.
             </p>
           </CardHeader>
           <CardContent>
@@ -406,7 +408,7 @@ export function ScriptPackageEngine() {
               value={ctaText}
               onChange={(e) => setCtaText(e.target.value)}
               rows={2}
-              placeholder="Optional CTA (verbatim) — e.g. Comment LOOP and I'll DM you the full breakdown."
+              placeholder="Optional CTA (verbatim) - e.g. Comment LOOP and I'll DM you the full breakdown."
               className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary resize-none focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </CardContent>
