@@ -1,7 +1,9 @@
 // src/app/approvals/[id]/page.tsx
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
+import { uploadWithProgress } from '@/lib/uploadWithProgress'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
@@ -21,6 +23,7 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
+  Send as SendIcon,
 } from 'lucide-react'
 
 interface ApprovalDetail {
@@ -100,16 +103,40 @@ function getEmbedUrl(url: string): string {
   return url
 }
 
+interface ApprovalCachedSnapshot {
+  approval: ApprovalDetail | null
+  items: ApprovalItem[]
+  assignees: Assignee[]
+  comments: Comment[]
+}
+
 export default function ApprovalDetailPage() {
   const params = useParams()
-  const approvalId = params.id as string
-  const supabase = createClient()
+  const approvalId = params.id as string | undefined
+  // Single Supabase client per page instance. Without useMemo it gets re-created
+  // on every render, which churns the realtime subscription and was a likely
+  // cause of the loading-state flicker.
+  const supabase = useMemo(() => createClient(), [])
+  // Prevents init() from running twice in dev StrictMode (or being re-entered
+  // before the first run finishes), which produces a true→false→true flicker.
+  const initInFlightRef = useRef(false)
 
-  const [approval, setApproval] = useState<ApprovalDetail | null>(null)
-  const [items, setItems] = useState<ApprovalItem[]>([])
-  const [assignees, setAssignees] = useState<Assignee[]>([])
-  const [comments, setComments] = useState<Comment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // Hydrate from sessionStorage so navigating in/out of the page doesn't
+  // re-render an empty skeleton. If we have cached data, the first paint
+  // shows the page immediately and we silently revalidate in the background.
+  const cachedInitial = useMemo<ApprovalCachedSnapshot | null>(() => {
+    if (!approvalId) return null
+    return readApprovalCache<ApprovalCachedSnapshot>(approvalId)
+  }, [approvalId])
+
+  const [approval, setApproval] = useState<ApprovalDetail | null>(
+    cachedInitial?.approval ?? null,
+  )
+  const [items, setItems] = useState<ApprovalItem[]>(cachedInitial?.items ?? [])
+  const [assignees, setAssignees] = useState<Assignee[]>(cachedInitial?.assignees ?? [])
+  const [comments, setComments] = useState<Comment[]>(cachedInitial?.comments ?? [])
+  // Skip the skeleton entirely on a cache hit - the page is already populated.
+  const [isLoading, setIsLoading] = useState(!cachedInitial)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [currentUserProfile, setCurrentUserProfile] = useState<{
@@ -133,6 +160,9 @@ export default function ApprovalDetailPage() {
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({})
   const [commentFile, setCommentFile] = useState<File | null>(null)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
+  // Per-comment upload progress, keyed by the optimistic comment's tempId so a
+  // user uploading on one item composer doesn't see progress on another.
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingCommentText, setEditingCommentText] = useState<string>('')
@@ -147,10 +177,18 @@ export default function ApprovalDetailPage() {
 } | null>(null)
 
    useEffect(() => {
+  // Wait for the route param to actually resolve before doing anything.
+  // Without this guard the effect can fire once with approvalId=undefined
+  // (each load function bails, isLoading flips to false), then again when
+  // the real id arrives (isLoading flips back true) - which is the flicker.
+  if (!approvalId) return
+
   let channel: RealtimeChannel | null = null
+  let cancelled = false
 
   const run = async () => {
     await init()
+    if (cancelled) return
 
     channel = supabase
       .channel(`portal-approval-live-${approvalId}`)
@@ -193,13 +231,36 @@ export default function ApprovalDetailPage() {
   run()
 
   return () => {
+    cancelled = true
     if (channel) supabase.removeChannel(channel)
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [approvalId])
 
+  // Persist the latest snapshot to sessionStorage so a return visit hydrates
+  // instantly. Skip while still loading (avoids caching half-populated state)
+  // and skip when there's no approval row yet (avoids caching the empty shell).
+  useEffect(() => {
+    if (!approvalId || isLoading || !approval) return
+    writeApprovalCache<ApprovalCachedSnapshot>(approvalId, {
+      approval,
+      items,
+      assignees,
+      comments,
+    })
+  }, [approvalId, isLoading, approval, items, assignees, comments])
+
   const init = async () => {
-  setIsLoading(true)
+  // Bail if we don't have a route id yet, or another init() is already in flight.
+  // Both guards together kill the spurious second pass that produced the
+  // skeleton flicker.
+  if (!approvalId) return
+  if (initInFlightRef.current) return
+  initInFlightRef.current = true
+  // Only show the skeleton when we have nothing to show. If the cache
+  // already populated state at mount, this is a background revalidation and
+  // the user should keep seeing the page they had.
+  if (!cachedInitial) setIsLoading(true)
   try {
     // load user, role, approval, items, assignees, comments
     const {
@@ -228,6 +289,7 @@ export default function ApprovalDetailPage() {
     await Promise.all([loadApproval(), loadItems(), loadAssignees(), loadComments()])
   } finally {
     setIsLoading(false)
+    initInFlightRef.current = false
   }
 }
 
@@ -519,6 +581,23 @@ export default function ApprovalDetailPage() {
       return
     }
 
+    // Optimistic patch + rollback on failure.
+    const snapshot = items
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              title: title || '',
+              url,
+              initial_comment: comment || null,
+              updated_at: new Date().toISOString(),
+            }
+          : i,
+      ),
+    )
+    cancelEditItem()
+
     try {
       const { error } = await supabase
         .from('approval_items')
@@ -532,13 +611,15 @@ export default function ApprovalDetailPage() {
 
       if (error) {
         console.error('Save edit item error:', error)
+        setItems(snapshot)
         alert('Failed to save changes')
       } else {
+        // Server may normalize fields - quietly reconcile from db.
         await loadItems()
-        cancelEditItem()
       }
     } catch (err) {
       console.error('Save edit item exception', err)
+      setItems(snapshot)
       alert('Failed to save changes')
     }
   }
@@ -548,7 +629,9 @@ export default function ApprovalDetailPage() {
 
   const parts = value.split(/\s/)
   const last = parts[parts.length - 1]
-  if (last.startsWith('@') && last.length > 1) {
+  // Open the dropdown the moment "@" is typed (length === 1, empty query
+  // shows top results) and keep it open while the user types more letters.
+  if (last.startsWith('@')) {
     setMentionTargetItemId(itemId)
     setMentionQuery(last.slice(1).toLowerCase())
   } else if (mentionTargetItemId === itemId) {
@@ -559,6 +642,7 @@ export default function ApprovalDetailPage() {
 
   const sendComment = async (itemId: string | null) => {
     if (!currentUserId) return
+    if (!approvalId) return
 
     const key = itemId || 'general'
     const text = (newCommentText[key] || '').trim()
@@ -606,18 +690,28 @@ export default function ApprovalDetailPage() {
         const formData = new FormData()
         formData.append('file', fileToUpload)
         formData.append('folder', `approvals/${approvalId}/comments`)
+        // Seed progress at 0 so the bar appears instantly.
+        setUploadProgress((prev) => ({ ...prev, [tempId]: 0 }))
         try {
-          const res = await fetch('/api/upload', {
-            method: 'POST',
+          const res = await uploadWithProgress({
+            url: '/api/upload',
             body: formData,
+            onProgress: (pct) =>
+              setUploadProgress((prev) => ({ ...prev, [tempId]: pct })),
           })
-          const uploadData = await res.json()
-          if (uploadData.success) {
+          const uploadData = res.json()
+          if (uploadData?.success) {
             fileUrl = uploadData.url
             fileName = fileToUpload.name
           }
         } catch (err) {
           console.error('Comment file upload error:', err)
+        } finally {
+          setUploadProgress((prev) => {
+            const next = { ...prev }
+            delete next[tempId]
+            return next
+          })
         }
       }
 
@@ -673,47 +767,61 @@ export default function ApprovalDetailPage() {
   const saveEditComment = async () => {
     if (!editingCommentId || !editingCommentText.trim()) return
 
+    // Optimistic edit + rollback on failure.
+    const id = editingCommentId
+    const nextContent = editingCommentText.trim()
+    const snapshot = comments
+    setComments((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, content: nextContent } : c)),
+    )
+    cancelEditComment()
+
     try {
       const { error } = await supabase
         .from('approval_comments')
         .update({
-          content: editingCommentText.trim(),
+          content: nextContent,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', editingCommentId)
+        .eq('id', id)
 
       if (error) {
         console.error('Edit comment error:', error)
+        setComments(snapshot)
         alert('Failed to save comment')
-      } else {
-        await loadComments()
-        cancelEditComment()
       }
     } catch (err) {
       console.error('Edit comment exception', err)
+      setComments(snapshot)
       alert('Failed to save comment')
     }
   }
 
   const toggleResolveComment = async (comment: Comment) => {
+    // Optimistic flip + rollback on failure.
+    const nextResolved = !comment.resolved
+    const snapshot = comments
     setResolvingCommentId(comment.id)
+    setComments((prev) =>
+      prev.map((c) => (c.id === comment.id ? { ...c, resolved: nextResolved } : c)),
+    )
     try {
       const { error } = await supabase
         .from('approval_comments')
         .update({
-          resolved: !comment.resolved,
+          resolved: nextResolved,
           updated_at: new Date().toISOString(),
         })
         .eq('id', comment.id)
 
       if (error) {
         console.error('Resolve comment error:', error)
+        setComments(snapshot)
         alert('Failed to update')
-      } else {
-        await loadComments()
       }
     } catch (err) {
       console.error('Resolve comment exception', err)
+      setComments(snapshot)
       alert('Failed to update')
     } finally {
       setResolvingCommentId(null)
@@ -721,7 +829,11 @@ export default function ApprovalDetailPage() {
   }
 
   const deleteComment = async (comment: Comment) => {
+    // Optimistic remove + rollback on failure. The user sees instant feedback;
+    // the network call settles in the background.
+    const snapshot = comments
     setDeletingCommentId(comment.id)
+    setComments((prev) => prev.filter((c) => c.id !== comment.id))
     try {
       const { error } = await supabase
         .from('approval_comments')
@@ -730,12 +842,12 @@ export default function ApprovalDetailPage() {
 
       if (error) {
         console.error('Delete comment error:', error)
+        setComments(snapshot)
         alert('Failed to delete')
-      } else {
-        await loadComments()
       }
     } catch (err) {
       console.error('Delete comment exception', err)
+      setComments(snapshot)
       alert('Failed to delete')
     } finally {
       setDeletingCommentId(null)
@@ -1225,6 +1337,20 @@ export default function ApprovalDetailPage() {
     })()}
   </div>
 )}
+    {uploadProgress[c.id] !== undefined && (
+      <div className="mt-1.5">
+        <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
+          <span>Uploading…</span>
+          <span>{uploadProgress[c.id]}%</span>
+        </div>
+        <div className="h-1 bg-gray-200 rounded overflow-hidden">
+          <div
+            className="h-full bg-[#2B79F7] transition-all duration-150"
+            style={{ width: `${uploadProgress[c.id]}%` }}
+          />
+        </div>
+      </div>
+    )}
     {c.attachments && c.attachments.length > 0 && (
       <div className="mt-1 grid grid-cols-2 gap-1.5">
         {c.attachments.map((att, i) => {
@@ -1374,55 +1500,54 @@ export default function ApprovalDetailPage() {
       </div>
     )
   })()}
-  {mentionTargetItemId === item.id && mentionQuery && (
-  <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
-    {mentionUsers
-      .filter((u) =>
-        u.name.toLowerCase().includes(mentionQuery)
-      )
-      .slice(0, 5)
-      .map((u) => (
-        <button
-          key={u.id}
-          type="button"
-          onClick={() => {
-            const current = newCommentText[item.id] || ''
-            const parts = current.split(/\s/)
-            parts[parts.length - 1] = '@' + u.name.split(' ')[0]
-            const next = parts.join(' ') + ' '
-            setNewCommentText((prev) => ({
-              ...prev,
-              [item.id]: next,
-            }))
-            setMentionTargetItemId(null)
-            setMentionQuery('')
-          }}
-          className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
-                >
-          {u.profile_picture_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={u.profile_picture_url}
-              alt={u.name}
-              className="h-4 w-4 rounded-full object-cover"
-            />
-          ) : (
-            <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
-              {u.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="truncate">{u.name}</span>
-        </button>
-      ))}
-    {mentionUsers.filter((u) =>
-      u.name.toLowerCase().includes(mentionQuery)
-    ).length === 0 && (
-      <p className="px-2 py-1 text-gray-400">
-        No matches
-      </p>
-    )}
-  </div>
-)}
+  {mentionTargetItemId === item.id && (() => {
+    // When the query is empty (user just typed "@"), show top 3 users by
+    // default. With a query, filter against the full list and show top 5.
+    const filtered = mentionQuery
+      ? mentionUsers.filter((u) => u.name.toLowerCase().includes(mentionQuery))
+      : mentionUsers
+    const visible = filtered.slice(0, mentionQuery ? 5 : 3)
+    return (
+      <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+        {visible.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            onClick={() => {
+              const current = newCommentText[item.id] || ''
+              const parts = current.split(/\s/)
+              parts[parts.length - 1] = '@' + u.name.split(' ')[0]
+              const next = parts.join(' ') + ' '
+              setNewCommentText((prev) => ({
+                ...prev,
+                [item.id]: next,
+              }))
+              setMentionTargetItemId(null)
+              setMentionQuery('')
+            }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
+          >
+            {u.profile_picture_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={u.profile_picture_url}
+                alt={u.name}
+                className="h-4 w-4 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
+                {u.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="truncate">{u.name}</span>
+          </button>
+        ))}
+        {visible.length === 0 && (
+          <p className="px-2 py-1 text-gray-400">No matches</p>
+        )}
+      </div>
+    )
+  })()}
   {commentFile && (
     <p className="text-[10px] text-gray-500">
       Attached: {commentFile.name}{' '}
@@ -1448,17 +1573,19 @@ export default function ApprovalDetailPage() {
         }}
       />
     </label>
-    <Button
-      size="sm"
-      variant="outline"
+    <button
+      type="button"
       onClick={() => sendComment(item.id)}
       disabled={
         !commentFile &&
         !(newCommentText[item.id] || '').trim()
       }
+      title="Send comment"
+      aria-label="Send comment"
+      className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#2B79F7] text-white hover:bg-[#1E54B7] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
     >
-      Send
-    </Button>
+      <SendIcon className="h-4 w-4" />
+    </button>
   </div>
 </div>
                   </div>

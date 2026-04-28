@@ -48,10 +48,18 @@ export async function loadApprovalByShareToken(token: string) {
 }
 
 /**
- * Anyone added to the approval's client (via clients.email or as a client-role
- * user with users.client_id) is allowed to start a review session for that
- * approval. We check both because the client identity can come from either
- * place depending on how the client was set up.
+ * Anyone who could plausibly have received the approval's review link is
+ * allowed to start a session. That covers:
+ *   - clients.email (the client's primary contact)
+ *   - any users.client_id = X user (client portal users + CRM team for that
+ *     client - regardless of role, because admin/manager users on a CRM team
+ *     receive the same emails)
+ *   - the approval's creator and assignees (approval_assignees -> users.email)
+ *   - workspace owners (users.client_id IS NULL with role admin or manager)
+ *     since they receive every approval email and need to be able to open the
+ *     share link to verify what the client sees
+ *
+ * The check stays case- and whitespace-insensitive on both sides.
  */
 export async function isEmailAllowedForApproval(
   approvalId: string,
@@ -59,32 +67,65 @@ export async function isEmailAllowedForApproval(
 ): Promise<boolean> {
   const normalised = email.trim().toLowerCase()
   if (!normalised) return false
+  const matches = (raw: string | null | undefined) =>
+    !!raw && raw.trim().toLowerCase() === normalised
 
-  // Read approval → client.
+  // Read approval → client + creator.
   const { data: approval } = await reviewAdmin
     .from('approvals')
-    .select('client_id')
+    .select('client_id, created_by')
     .eq('id', approvalId)
     .maybeSingle()
   if (!approval) return false
 
-  // Direct match on `clients.email`.
+  // 1) Direct match on `clients.email`.
   const { data: client } = await reviewAdmin
     .from('clients')
     .select('email')
     .eq('id', approval.client_id)
     .maybeSingle()
-  if (client?.email && client.email.trim().toLowerCase() === normalised) return true
+  if (matches(client?.email)) return true
 
-  // Match on `users` rows that are client-role users for this client.
+  // 2) Any user attached to this client (portal client user OR CRM team
+  //    member) - they all receive the approval email.
   const { data: clientUsers } = await reviewAdmin
     .from('users')
     .select('email')
     .eq('client_id', approval.client_id)
-    .eq('role', 'client')
   for (const u of clientUsers || []) {
-    if ((u.email || '').trim().toLowerCase() === normalised) return true
+    if (matches(u.email)) return true
   }
+
+  // 3) Approval creator + assignees (creator, assignees, internal watchers).
+  const { data: assigneeRows } = await reviewAdmin
+    .from('approval_assignees')
+    .select('user_id')
+    .eq('approval_id', approvalId)
+  const assigneeIds = (assigneeRows || []).map((r) => r.user_id).filter(Boolean) as string[]
+  const watcherIds = Array.from(
+    new Set([approval.created_by, ...assigneeIds].filter(Boolean) as string[]),
+  )
+  if (watcherIds.length) {
+    const { data: watchers } = await reviewAdmin
+      .from('users')
+      .select('email')
+      .in('id', watcherIds)
+    for (const u of watchers || []) {
+      if (matches(u.email)) return true
+    }
+  }
+
+  // 4) Workspace owners (admin/manager with no client scope) - they receive
+  //    every approval email and need to verify share links.
+  const { data: workspaceOwners } = await reviewAdmin
+    .from('users')
+    .select('email')
+    .is('client_id', null)
+    .in('role', ['admin', 'manager'])
+  for (const u of workspaceOwners || []) {
+    if (matches(u.email)) return true
+  }
+
   return false
 }
 
