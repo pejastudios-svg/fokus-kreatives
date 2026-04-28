@@ -2,7 +2,7 @@
 // src/app/approvals/[id]/page.tsx
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { PortalLayout } from '@/components/portal/PortalLayout'
 import { Header } from '@/components/layout/Header'
@@ -21,6 +21,7 @@ import {
   Copy,
   Pencil,
   Clock as ClockIcon,
+  Pen as PenIcon,
 } from 'lucide-react'
 
 interface ApprovalDetail {
@@ -134,27 +135,95 @@ export default function PortalApprovalDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
 
-  // AssetRenderer handles + pending annotation, same flow as the agency page.
+  // AssetRenderer handles + pending annotation, mirroring the agency page so
+  // a client commenting from the portal gets the same time-grab + region
+  // highlight tooling agency reviewers have.
   const assetRendererRefs = useRef<Record<string, AssetRendererHandle | null>>({})
+  const registerAssetRenderer = useCallback(
+    (id: string, handle: AssetRendererHandle | null) => {
+      assetRendererRefs.current[id] = handle
+    },
+    [],
+  )
   const [pendingAnnotation, setPendingAnnotation] = useState<
-    Record<string, { timestampSeconds: number; attachmentIndex: number | null }>
+    Record<
+      string,
+      {
+        timestampSeconds?: number | null
+        region?: import('@/lib/types/annotations').CommentRegion | null
+        attachmentIndex: number | null
+      }
+    >
   >({})
+
+  // Per-item refs to the composer textarea + scrollable comments list, used
+  // for the phone-first scroll behaviours (Annotate -> asset, Use -> textbox,
+  // Send -> latest message) and the new-comment preview bubble.
+  const composerTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
+  const commentsListRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [commentsAtBottom, setCommentsAtBottom] = useState<Record<string, boolean>>({})
+  const [unreadPreview, setUnreadPreview] = useState<
+    Record<string, { id: string; name: string; preview: string; avatar: string | null } | null>
+  >({})
+  const [pendingScrollToCommentId, setPendingScrollToCommentId] = useState<string | null>(null)
+
+  const handleCommentsScroll = (itemId: string) => () => {
+    const el = commentsListRefs.current[itemId]
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+    const atBottom = distanceFromBottom < 40
+    setCommentsAtBottom((prev) =>
+      prev[itemId] === atBottom ? prev : { ...prev, [itemId]: atBottom },
+    )
+    if (atBottom && unreadPreview[itemId]) {
+      setUnreadPreview((prev) => ({ ...prev, [itemId]: null }))
+    }
+  }
+  const scrollCommentsToBottom = (itemId: string) => {
+    const el = commentsListRefs.current[itemId]
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
 
   const handleGrabTime = (itemId: string) => {
     const handle = assetRendererRefs.current[itemId]
     if (!handle) return
     const time = handle.getCurrentTime()
     if (time === null) {
+      handle.scrollIntoView()
       alert('Play or seek the video first, then click Grab time.')
       return
     }
+    handle.scrollIntoView()
     setPendingAnnotation((prev) => ({
       ...prev,
       [itemId]: {
+        ...(prev[itemId] ?? { attachmentIndex: null }),
         timestampSeconds: time,
         attachmentIndex: handle.getActiveIndex(),
       },
     }))
+  }
+  const handleAnnotate = async (itemId: string, shape: 'circle' | 'freeform') => {
+    const handle = assetRendererRefs.current[itemId]
+    if (!handle) return
+    handle.scrollIntoView()
+    const result = await handle.enterDrawMode(shape)
+    if (!result) return
+    setPendingAnnotation((prev) => ({
+      ...prev,
+      [itemId]: {
+        timestampSeconds:
+          prev[itemId]?.timestampSeconds ?? result.timestampSeconds ?? null,
+        region: result.region,
+        attachmentIndex: handle.getActiveIndex(),
+      },
+    }))
+    const ta = composerTextareaRefs.current[itemId]
+    if (ta) {
+      ta.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      ta.focus({ preventScroll: true })
+    }
   }
   const handleClearPending = (key: string) => {
     setPendingAnnotation((prev) => {
@@ -163,15 +232,32 @@ export default function PortalApprovalDetailPage() {
       return next
     })
   }
+  const handleClearPendingField = (
+    key: string,
+    field: 'timestampSeconds' | 'region',
+  ) => {
+    setPendingAnnotation((prev) => {
+      const cur = prev[key]
+      if (!cur) return prev
+      const next = { ...cur, [field]: null }
+      if (!next.timestampSeconds && !next.region) {
+        const out = { ...prev }
+        delete out[key]
+        return out
+      }
+      return { ...prev, [key]: next }
+    })
+  }
   const handleFocusComment = (
     itemId: string | null,
     timestampSeconds: number | null,
     attachmentIndex: number | null,
+    region: import('@/lib/types/annotations').CommentRegion | null = null,
   ) => {
     if (!itemId) return
     const handle = assetRendererRefs.current[itemId]
     if (!handle) return
-    handle.focusAnnotation({ attachmentIndex, timestampSeconds })
+    handle.focusAnnotation({ attachmentIndex, timestampSeconds, region })
   }
   const [sendingCommentForItem, setSendingCommentForItem] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -185,6 +271,47 @@ export default function PortalApprovalDetailPage() {
   commentId: string
   userName: string
 } | null>(null)
+
+  // Mark which comments we've already shown so a new arrival via realtime
+  // can be flagged as a preview bubble.
+  const seenCommentIdsRef = useRef<Set<string>>(new Set())
+  const seenInitialisedRef = useRef(false)
+  useEffect(() => {
+    if (!seenInitialisedRef.current) {
+      for (const c of comments) {
+        if (!c.id.startsWith('temp-')) seenCommentIdsRef.current.add(c.id)
+      }
+      seenInitialisedRef.current = true
+      return
+    }
+    for (const c of comments) {
+      if (c.id.startsWith('temp-')) continue
+      if (seenCommentIdsRef.current.has(c.id)) continue
+      seenCommentIdsRef.current.add(c.id)
+      if (c.user_id === currentUserId) continue
+      const itemKey = c.approval_item_id || 'general'
+      const atBottom = commentsAtBottom[itemKey] !== false
+      if (atBottom) continue
+      setUnreadPreview((prev) => ({
+        ...prev,
+        [itemKey]: {
+          id: c.id,
+          name: c.users?.name || c.users?.email || 'Someone',
+          preview: (c.content || '').slice(0, 60),
+          avatar: c.users?.profile_picture_url || null,
+        },
+      }))
+    }
+  }, [comments, currentUserId, commentsAtBottom])
+
+  useEffect(() => {
+    if (!pendingScrollToCommentId) return
+    const target = comments.find((c) => c.id === pendingScrollToCommentId)
+    if (!target) return
+    const itemKey = target.approval_item_id || 'general'
+    requestAnimationFrame(() => scrollCommentsToBottom(itemKey))
+    setPendingScrollToCommentId(null)
+  }, [pendingScrollToCommentId, comments])
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null
@@ -557,6 +684,7 @@ await loadApproval()
             ? replyTarget.commentId
             : null,
         timestampSeconds: annotation?.timestampSeconds ?? null,
+        region: annotation?.region ?? null,
         attachmentIndex: annotation?.attachmentIndex ?? null,
       }),
     })
@@ -574,6 +702,9 @@ await loadApproval()
       handleClearPending(key)
       // Realtime should refresh comments, but we can also reload
       await loadComments()
+      // Scroll the per-item comments list to its bottom so the user
+      // sees their just-sent bubble.
+      requestAnimationFrame(() => scrollCommentsToBottom(key))
     }
   } catch (err) {
     console.error('Send comment exception', err)
@@ -636,6 +767,9 @@ await loadApproval()
       } else {
         await loadComments()
         if (nextResolved) {
+          if (comment.approval_item_id) {
+            assetRendererRefs.current[comment.approval_item_id]?.clearFlash()
+          }
           // Fire-and-forget popup notification.
           void fetch('/api/approvals/notify-comment-resolved', {
             method: 'POST',
@@ -867,10 +1001,9 @@ await loadApproval()
                       </div>
                     ) : item.attachments && item.attachments.length > 0 ? (
                       <div className="p-3">
-                        <AssetRenderer
-                          ref={(handle) => {
-                            assetRendererRefs.current[item.id] = handle
-                          }}
+                        <AssetRendererSlot
+                          itemId={item.id}
+                          onRegister={registerAssetRenderer}
                           attachments={item.attachments}
                           isCarousel={!!item.is_carousel}
                           onImageClick={(url, name) => {
@@ -897,7 +1030,13 @@ await loadApproval()
                       </span>
                     </div>
 
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div
+                      ref={(el) => {
+                        commentsListRefs.current[item.id] = el
+                      }}
+                      onScroll={handleCommentsScroll(item.id)}
+                      className="relative space-y-3 max-h-64 overflow-y-auto"
+                    >
                       {itemComments.length === 0 ? (
                         <p className="text-xs text-gray-400">
                           No comments yet.
@@ -986,22 +1125,45 @@ await loadApproval()
                                       )
                                     })()}
 
-                                    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleFocusComment(
-                                            c.approval_item_id,
-                                            c.timestamp_seconds,
-                                            c.attachment_index,
-                                          )
-                                        }
-                                        title="Jump to this moment"
-                                        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
-                                      >
-                                        <ClockIcon className="h-3 w-3" />
-                                        {formatTimestamp(c.timestamp_seconds)}
-                                      </button>
+                                    {(c.timestamp_seconds != null || c.region) && (
+                                      <div className="mt-0.5 flex flex-wrap gap-1">
+                                        {c.timestamp_seconds != null && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleFocusComment(
+                                                c.approval_item_id,
+                                                c.timestamp_seconds,
+                                                c.attachment_index,
+                                                c.region,
+                                              )
+                                            }
+                                            title="Jump to this moment"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                                          >
+                                            <ClockIcon className="h-3 w-3" />
+                                            {formatTimestamp(c.timestamp_seconds)}
+                                          </button>
+                                        )}
+                                        {c.region && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleFocusComment(
+                                                c.approval_item_id,
+                                                c.timestamp_seconds,
+                                                c.attachment_index,
+                                                c.region,
+                                              )
+                                            }
+                                            title="Show the highlighted region"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                                          >
+                                            <PenIcon className="h-3 w-3" />
+                                            View highlight
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                     <p className="mt-0.5 text-gray-700 break-all">
                                       {formatComment(c.content)}
@@ -1108,6 +1270,37 @@ await loadApproval()
                       )}
                     </div>
 
+                    {/* New-comment preview bubble - same as agency. */}
+                    {unreadPreview[item.id] && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          scrollCommentsToBottom(item.id)
+                          setUnreadPreview((prev) => ({ ...prev, [item.id]: null }))
+                        }}
+                        aria-label={`Jump to new comment from ${unreadPreview[item.id]!.name}`}
+                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+                      >
+                        {unreadPreview[item.id]!.avatar ? (
+                          <img
+                            src={unreadPreview[item.id]!.avatar!}
+                            alt=""
+                            className="h-6 w-6 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="h-6 w-6 rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+                            {(unreadPreview[item.id]!.name || 'U').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="font-semibold truncate max-w-[80px]">
+                          {unreadPreview[item.id]!.name.split(' ')[0]}
+                        </span>
+                        <span className="text-gray-500 truncate max-w-[180px]">
+                          {unreadPreview[item.id]!.preview || 'sent an attachment'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* New comment input */}
                     <div className="border border-gray-200 rounded-lg p-2 space-y-2">
                       {replyTarget && replyTarget.itemId === item.id && (
@@ -1123,63 +1316,68 @@ await loadApproval()
                           </button>
                         </p>
                       )}
-                      <textarea
-                        value={newCommentText[item.id] || ''}
-                        onChange={(e) =>
-                          handleNewCommentChange(item.id, e.target.value)
-                        }
-                        rows={2}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
-                        placeholder="Leave a comment... use @name to tag someone."
-                      />
-                      {mentionTargetItemId === item.id && mentionQuery && (
-                        <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
-                          {mentionUsers
-                            .filter((u) =>
+                      <div className="relative">
+                        <textarea
+                          ref={(el) => {
+                            composerTextareaRefs.current[item.id] = el
+                          }}
+                          value={newCommentText[item.id] || ''}
+                          onChange={(e) =>
+                            handleNewCommentChange(item.id, e.target.value)
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                          placeholder="Leave a comment... use @name to tag someone."
+                        />
+                        {mentionTargetItemId === item.id && mentionQuery && (
+                          <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+                            {mentionUsers
+                              .filter((u) =>
+                                u.name.toLowerCase().includes(mentionQuery)
+                              )
+                              .slice(0, 5)
+                              .map((u) => (
+                                <button
+                                  key={u.id}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = newCommentText[item.id] || ''
+                                    const parts = current.split(/\s/)
+                                    parts[parts.length - 1] = '@' + u.name.split(' ')[0]
+                                    const next = parts.join(' ') + ' '
+                                    setNewCommentText((prev) => ({
+                                      ...prev,
+                                      [item.id]: next,
+                                    }))
+                                    setMentionTargetItemId(null)
+                                    setMentionQuery('')
+                                  }}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
+                                >
+                                  {u.profile_picture_url ? (
+                                    <img
+                                      src={u.profile_picture_url}
+                                      alt={u.name}
+                                      className="h-4 w-4 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
+                                      {u.name.charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <span className="truncate">{u.name}</span>
+                                </button>
+                              ))}
+                            {mentionUsers.filter((u) =>
                               u.name.toLowerCase().includes(mentionQuery)
-                            )
-                            .slice(0, 5)
-                            .map((u) => (
-                              <button
-                                key={u.id}
-                                type="button"
-                                onClick={() => {
-                                  const current = newCommentText[item.id] || ''
-                                  const parts = current.split(/\s/)
-                                  parts[parts.length - 1] = '@' + u.name.split(' ')[0]
-                                  const next = parts.join(' ') + ' '
-                                  setNewCommentText((prev) => ({
-                                    ...prev,
-                                    [item.id]: next,
-                                  }))
-                                  setMentionTargetItemId(null)
-                                  setMentionQuery('')
-                                }}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
-                              >
-                                {u.profile_picture_url ? (
-                                  <img
-                                    src={u.profile_picture_url}
-                                    alt={u.name}
-                                    className="h-4 w-4 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
-                                    {u.name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <span className="truncate">{u.name}</span>
-                              </button>
-                            ))}
-                          {mentionUsers.filter((u) =>
-                            u.name.toLowerCase().includes(mentionQuery)
-                          ).length === 0 && (
-                            <p className="px-2 py-1 text-gray-400">
-                              No matches
-                            </p>
-                          )}
-                        </div>
-                      )}
+                            ).length === 0 && (
+                              <p className="px-2 py-1 text-gray-400">
+                                No matches
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       {commentFile && (
                         <p className="text-[10px] text-gray-500">
                           Attached: {commentFile.name}{' '}
@@ -1192,19 +1390,33 @@ await loadApproval()
                           </button>
                         </p>
                       )}
-                      {pendingAnnotation[item.id] && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                          <span>Tagged at:</span>
-                          <button
-                            type="button"
-                            onClick={() => handleClearPending(item.id)}
-                            title="Remove timestamp"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
-                          >
-                            <ClockIcon className="h-3 w-3" />
-                            {formatTimestamp(pendingAnnotation[item.id].timestampSeconds)}
-                            <X className="h-3 w-3" />
-                          </button>
+                      {pendingAnnotation[item.id] && (pendingAnnotation[item.id].timestampSeconds || pendingAnnotation[item.id].region) && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+                          <span>Tagged:</span>
+                          {pendingAnnotation[item.id].timestampSeconds != null && (
+                            <button
+                              type="button"
+                              onClick={() => handleClearPendingField(item.id, 'timestampSeconds')}
+                              title="Remove timestamp"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+                            >
+                              <ClockIcon className="h-3 w-3" />
+                              {formatTimestamp(pendingAnnotation[item.id].timestampSeconds!)}
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                          {pendingAnnotation[item.id].region && (
+                            <button
+                              type="button"
+                              onClick={() => handleClearPendingField(item.id, 'region')}
+                              title="Remove highlight"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+                            >
+                              <PenIcon className="h-3 w-3" />
+                              {pendingAnnotation[item.id].region!.shape === 'circle' ? 'Circle' : 'Highlight'}
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       )}
                       <div className="flex items-center justify-between gap-2">
@@ -1222,15 +1434,26 @@ await loadApproval()
                             />
                           </label>
                           {item.attachments && item.attachments.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleGrabTime(item.id)}
-                              title="Grab the current playback time"
-                              className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
-                            >
-                              <ClockIcon className="h-3 w-3" />
-                              <span>Grab time</span>
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleGrabTime(item.id)}
+                                title="Grab the current playback time"
+                                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                              >
+                                <ClockIcon className="h-3 w-3" />
+                                <span>Grab time</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAnnotate(item.id, 'circle')}
+                                title="Draw a region on the asset"
+                                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                              >
+                                <PenIcon className="h-3 w-3" />
+                                <span>Annotate</span>
+                              </button>
+                            </>
                           )}
                         </div>
                         <Button
@@ -1271,5 +1494,41 @@ await loadApproval()
 )}
       </div>
     </PortalLayout>
+  )
+}
+
+/**
+ * Stable wrapper around AssetRenderer - keeps the imperative-handle callback
+ * ref identity-stable per item, so React doesn't churn the registration on
+ * every parent render. Mirrors the agency page's slot.
+ */
+interface AssetRendererSlotProps {
+  itemId: string
+  onRegister: (id: string, handle: AssetRendererHandle | null) => void
+  attachments: CloudinaryAttachment[]
+  isCarousel: boolean
+  onImageClick?: (url: string, name: string) => void
+}
+
+function AssetRendererSlot({
+  itemId,
+  onRegister,
+  attachments,
+  isCarousel,
+  onImageClick,
+}: AssetRendererSlotProps) {
+  const setRef = useCallback(
+    (handle: AssetRendererHandle | null) => {
+      onRegister(itemId, handle)
+    },
+    [itemId, onRegister],
+  )
+  return (
+    <AssetRenderer
+      ref={setRef}
+      attachments={attachments}
+      isCarousel={isCarousel}
+      onImageClick={onImageClick}
+    />
   )
 }

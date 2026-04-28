@@ -2163,56 +2163,29 @@ export default function ApprovalDetailPage() {
       </button>
     </p>
   )}
-  <textarea
-    ref={(el) => {
-      composerTextareaRefs.current[item.id] = el
-    }}
-    value={newCommentText[item.id] || ''}
-    onChange={(e) =>
-      handleNewCommentChange(item.id, e.target.value)
-    }
-    rows={2}
-    className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
-    placeholder="Leave a comment... use @name to tag someone."
-  />
-  {(() => {
-    const draft = resolveDraftMentions(newCommentText[item.id] || '')
-    if (draft.length === 0) return null
-    return (
-      <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500">
-        <span>Tagging:</span>
-        {draft.map((u) => (
-          <span
-            key={u.id}
-            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium"
-          >
-            {u.profile_picture_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={u.profile_picture_url}
-                alt={u.name}
-                className="h-3.5 w-3.5 rounded-full object-cover"
-              />
-            ) : (
-              <span className="h-3.5 w-3.5 rounded-full bg-[#2B79F7] text-white flex items-center justify-center text-[8px] font-semibold">
-                {u.name.charAt(0).toUpperCase()}
-              </span>
-            )}
-            <span className="text-[10px]">@{u.name}</span>
-          </span>
-        ))}
-      </div>
-    )
-  })()}
-  {mentionTargetItemId === item.id && (() => {
-    // When the query is empty (user just typed "@"), show top 3 users by
-    // default. With a query, filter against the full list and show top 5.
-    const filtered = mentionQuery
-      ? mentionUsers.filter((u) => u.name.toLowerCase().includes(mentionQuery))
-      : mentionUsers
-    const visible = filtered.slice(0, mentionQuery ? 5 : 3)
-    return (
-      <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+  <div className="relative">
+    <textarea
+      ref={(el) => {
+        composerTextareaRefs.current[item.id] = el
+      }}
+      value={newCommentText[item.id] || ''}
+      onChange={(e) =>
+        handleNewCommentChange(item.id, e.target.value)
+      }
+      rows={2}
+      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+      placeholder="Leave a comment... use @name to tag someone."
+    />
+    {mentionTargetItemId === item.id && (() => {
+      // Show top 3 by default ("@" alone), top 5 once filtered. Dropdown
+      // pops UPWARD via bottom-full so the user's eye stays near the
+      // textarea + the keyboard doesn't fight the suggestions on phones.
+      const filtered = mentionQuery
+        ? mentionUsers.filter((u) => u.name.toLowerCase().includes(mentionQuery))
+        : mentionUsers
+      const visible = filtered.slice(0, mentionQuery ? 5 : 3)
+      return (
+        <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
         {visible.map((u) => (
           <button
             key={u.id}
@@ -2249,6 +2222,39 @@ export default function ApprovalDetailPage() {
         {visible.length === 0 && (
           <p className="px-2 py-1 text-gray-400">No matches</p>
         )}
+      </div>
+    )
+  })()}
+  </div>
+  {(() => {
+    // "Tagging:" preview pills, displayed under the textarea while the
+    // user has @-mentions in their draft. Stays out of the dropdown's
+    // popup-above wrapper so it doesn't get covered by the suggestions.
+    const draft = resolveDraftMentions(newCommentText[item.id] || '')
+    if (draft.length === 0) return null
+    return (
+      <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500">
+        <span>Tagging:</span>
+        {draft.map((u) => (
+          <span
+            key={u.id}
+            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium"
+          >
+            {u.profile_picture_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={u.profile_picture_url}
+                alt={u.name}
+                className="h-3.5 w-3.5 rounded-full object-cover"
+              />
+            ) : (
+              <span className="h-3.5 w-3.5 rounded-full bg-[#2B79F7] text-white flex items-center justify-center text-[8px] font-semibold">
+                {u.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="text-[10px]">@{u.name}</span>
+          </span>
+        ))}
       </div>
     )
   })()}
