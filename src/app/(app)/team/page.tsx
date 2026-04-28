@@ -105,7 +105,12 @@ export default function TeamPage() {
         const role = (me?.role as AgencyRole) || 'employee'
         setCurrentUserRole(role)
         setCurrentUserName(me?.name || user.email || '')
-        setCurrentUserAvatar(me?.profile_picture_url || null)
+        // Fall back to the OAuth-provided avatar (Google) when the public users
+        // row has no custom pic set - matches what the sidebar does so the
+        // invite email matches what the inviter sees in-app.
+        setCurrentUserAvatar(
+          me?.profile_picture_url || user.user_metadata?.avatar_url || null,
+        )
 
         await fetchTeam()
       } finally {

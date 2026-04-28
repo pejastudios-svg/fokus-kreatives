@@ -18,10 +18,18 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 })
 
-    const { data: me } = await supabase.from('users').select('role, name').eq('id', user.id).single()
+    const { data: me } = await supabase
+      .from('users')
+      .select('role, name, profile_picture_url')
+      .eq('id', user.id)
+      .single()
     if (me?.role !== 'admin' && me?.role !== 'manager') {
       return NextResponse.json({ success: false, error: 'Admins or managers only' }, { status: 403 })
     }
+    const inviterAvatarUrl =
+      me?.profile_picture_url ||
+      (user.user_metadata as { avatar_url?: string } | null)?.avatar_url ||
+      ''
 
     const body = (await req.json()) as { userId?: string; origin?: string }
     const userId = body.userId?.trim()
@@ -64,6 +72,7 @@ export async function POST(req: NextRequest) {
             to: target.email,
             inviteeName: target.name || target.email,
             inviterName: me?.name || 'Someone',
+            inviterAvatarUrl,
             role: target.role,
             workspaceName: 'Fokus Kreatives workspace',
             acceptUrl: inviteLink,

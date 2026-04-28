@@ -72,7 +72,11 @@ export default function CRMTeamPage() {
         setCurrentAppRole(appRole)
 
         setCurrentUserName(userRow?.name || user.email || '')
-        setCurrentUserAvatar(userRow?.profile_picture_url || null)
+        // Fall back to OAuth (Google) avatar when no custom pic was saved -
+        // matches sidebar so the invite email reflects what the inviter sees.
+        setCurrentUserAvatar(
+          userRow?.profile_picture_url || user.user_metadata?.avatar_url || null,
+        )
 
         // client display name
         const { data: client } = await supabase
