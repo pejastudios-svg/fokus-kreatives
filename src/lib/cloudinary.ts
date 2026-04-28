@@ -212,6 +212,34 @@ export function cldUrl(
 }
 
 /**
+ * Fire-and-forget cleanup for orphaned Cloudinary assets.
+ *
+ * Pass any number of `{ public_id, resource_type }` pairs and we'll ask
+ * the server (`/api/cloudinary/destroy`) to delete them from Cloudinary.
+ * Failures are logged but never thrown, since cleanup running in the
+ * background should never block the user-facing flow.
+ */
+export async function destroyCloudinaryAssets(
+  assets: { public_id: string; resource_type: 'image' | 'video' }[],
+): Promise<void> {
+  if (!assets?.length) return
+  try {
+    await fetch('/api/cloudinary/destroy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assets: assets.map((a) => ({
+          publicId: a.public_id,
+          resourceType: a.resource_type,
+        })),
+      }),
+    })
+  } catch (err) {
+    console.error('destroyCloudinaryAssets failed (orphans left behind):', err)
+  }
+}
+
+/**
  * Poster-frame thumbnail for an asset. For images this is just `cldUrl`; for
  * videos Cloudinary will extract a representative frame and serve it as a
  * JPEG when the URL extension is `.jpg`. Useful for upload UIs and grid

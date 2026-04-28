@@ -31,7 +31,7 @@ import {
   RefreshCw,
   Trash2 as TrashIcon,
 } from 'lucide-react'
-import { cldThumb } from '@/lib/cloudinary'
+import { cldThumb, destroyCloudinaryAssets } from '@/lib/cloudinary'
 
 interface ApprovalDetail {
   id: string
@@ -142,6 +142,14 @@ export default function ApprovalDetailPage() {
   // Prevents init() from running twice in dev StrictMode (or being re-entered
   // before the first run finishes), which produces a true→false→true flicker.
   const initInFlightRef = useRef(false)
+
+  // Edit-session attachment snapshots used to clean up orphaned Cloudinary
+  // assets at Save/Cancel time. `original` is the item's attachments at the
+  // moment Edit was opened; `fresh` collects every successful upload during
+  // the session. On Save we destroy (original \ current); on Cancel we
+  // destroy `fresh` (anything uploaded but never persisted).
+  const editOriginalAttachmentsRef = useRef<CloudinaryAttachment[]>([])
+  const editFreshUploadsRef = useRef<CloudinaryAttachment[]>([])
 
   // Hydrate from sessionStorage so navigating in/out of the page doesn't
   // re-render an empty skeleton. If we have cached data, the first paint
@@ -593,9 +601,26 @@ export default function ApprovalDetailPage() {
     setEditItemAttachments(item.attachments ?? [])
     setEditItemIsCarousel(!!item.is_carousel)
     setEditItemUploads([])
+    // Snapshot the originals so we can diff at Save and clean up the
+    // assets the user removed/replaced. Reset the fresh-uploads tally too.
+    editOriginalAttachmentsRef.current = item.attachments ?? []
+    editFreshUploadsRef.current = []
   }
 
   const cancelEditItem = () => {
+    // Anything uploaded during this session was never saved, so it's now
+    // orphaned. Clean it up from Cloudinary in the background.
+    if (editFreshUploadsRef.current.length) {
+      destroyCloudinaryAssets(
+        editFreshUploadsRef.current.map((a) => ({
+          public_id: a.public_id,
+          resource_type: a.resource_type,
+        })),
+      )
+    }
+    editOriginalAttachmentsRef.current = []
+    editFreshUploadsRef.current = []
+
     setEditingItemId(null)
     setEditItemTitle('')
     setEditItemUrl('')
@@ -667,6 +692,8 @@ export default function ApprovalDetailPage() {
           } else {
             setEditItemAttachments((prev) => [...prev, asset])
           }
+          // Track the new asset so Cancel/Save can clean it up if needed.
+          editFreshUploadsRef.current = [...editFreshUploadsRef.current, asset]
 
           setEditItemUploads((prev) => prev.filter((u) => u.id !== tid))
         } catch (err) {
@@ -724,6 +751,27 @@ export default function ApprovalDetailPage() {
     }
     const isCarousel = editItemIsCarousel && editItemAttachments.length > 1
 
+    // Compute the orphan list BEFORE we tear down the edit state. Anything
+    // that was on the item originally but isn't in the saved list is now
+    // unreferenced; same for any fresh upload that was added then removed
+    // before saving.
+    const currentIds = new Set(editItemAttachments.map((a) => a.public_id))
+    const original = editOriginalAttachmentsRef.current
+    const fresh = editFreshUploadsRef.current
+    const toDestroy = [...original, ...fresh].filter((a) => !currentIds.has(a.public_id))
+    // De-dupe by public_id so we never double-destroy.
+    const seen = new Set<string>()
+    const orphanList = toDestroy.filter((a) => {
+      if (seen.has(a.public_id)) return false
+      seen.add(a.public_id)
+      return true
+    })
+
+    // Reset the snapshots so cancelEditItem (called below) doesn't also
+    // destroy the fresh uploads that just got persisted.
+    editOriginalAttachmentsRef.current = []
+    editFreshUploadsRef.current = []
+
     // Optimistic patch + rollback on failure.
     const snapshot = items
     setItems((prev) =>
@@ -762,9 +810,20 @@ export default function ApprovalDetailPage() {
         console.error('Save edit item error:', error)
         setItems(snapshot)
         alert('Failed to save changes')
+        // DB write failed - DON'T destroy anything, since the original
+        // attachments are still referenced by the un-modified row.
       } else {
         // Server may normalize fields - quietly reconcile from db.
         await loadItems()
+        // DB write succeeded; safe to clean up Cloudinary orphans now.
+        if (orphanList.length) {
+          destroyCloudinaryAssets(
+            orphanList.map((a) => ({
+              public_id: a.public_id,
+              resource_type: a.resource_type,
+            })),
+          )
+        }
       }
     } catch (err) {
       console.error('Save edit item exception', err)
