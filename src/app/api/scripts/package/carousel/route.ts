@@ -51,6 +51,9 @@ export async function POST(req: NextRequest) {
         user: userPrompt,
         temperature: prompt.temperature,
         maxTokens: prompt.maxTokens,
+        // Repurpose inherits voice from the longform source — Flash handles
+        // it cleanly at ~4x lower cost than Pro.
+        quality: 'standard',
       })
       let sanitized = sanitize(content)
       for (let i = 0; i < 2; i++) {

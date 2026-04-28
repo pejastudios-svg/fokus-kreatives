@@ -38,6 +38,44 @@ function extractMentions(text: string): string[] {
   return Array.from(new Set(out))
 }
 
+// 10-minute email cooldown per approval — keeps a burst of comments from
+// turning into a flood of inbox pings while still letting in-app notifs fire
+// every time. Mentions bypass this (a direct @ is high-signal).
+const EMAIL_COOLDOWN_MS = 10 * 60 * 1000
+
+async function tryClaimEmailSlot(approvalId: string): Promise<boolean> {
+  const cutoffIso = new Date(Date.now() - EMAIL_COOLDOWN_MS).toISOString()
+  const nowIso = new Date().toISOString()
+
+  const nullPath = await supabase
+    .from('approvals')
+    .update({ last_comment_email_at: nowIso })
+    .eq('id', approvalId)
+    .is('last_comment_email_at', null)
+    .select('id')
+
+  if (!nullPath.error && (nullPath.data?.length || 0) > 0) return true
+
+  const stalePath = await supabase
+    .from('approvals')
+    .update({ last_comment_email_at: nowIso })
+    .eq('id', approvalId)
+    .lt('last_comment_email_at', cutoffIso)
+    .select('id')
+
+  if (!stalePath.error && (stalePath.data?.length || 0) > 0) return true
+
+  if (
+    nullPath.error &&
+    ((nullPath.error as { code?: string }).code === '42703' ||
+      (nullPath.error as { code?: string }).code === 'PGRST204')
+  ) {
+    return true
+  }
+
+  return false
+}
+
 function normalizeKey(s: string) {
   return (s || '').toLowerCase().replace(/[^a-z0-9_]/g, '')
 }
@@ -86,31 +124,33 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2) Load approval + client name
+    // 2) Load approval + client name + share token
     const { data: approval } = await supabase
       .from('approvals')
-      .select('id, title, client_id, clients(name, business_name)')
+      .select('id, title, client_id, share_token, clients(name, business_name, email)')
       .eq('id', approvalId)
       .single()
 
-    const approvalWithClients = approval as unknown as { clients: ClientRef | ClientRef[] | null }
+    const approvalWithClients = approval as unknown as {
+      clients: (ClientRef & { email?: string | null }) | (ClientRef & { email?: string | null })[] | null
+      share_token?: string | null
+    }
     const relClients = approvalWithClients?.clients
-    
+    const shareToken = approvalWithClients?.share_token || null
+
     let clientDisplayName = 'Client'
+    let clientEmail: string | null = null
     if (Array.isArray(relClients) && relClients.length > 0) {
-      clientDisplayName = relClients[0]?.business_name || relClients[0]?.name || 'Client'
+      const c = relClients[0]
+      clientDisplayName = c?.business_name || c?.name || 'Client'
+      clientEmail = c?.email || null
     } else if (relClients && !Array.isArray(relClients)) {
-      const singleClient = relClients as ClientRef
-      clientDisplayName = singleClient.business_name || singleClient.name || 'Client'
+      const c = relClients as ClientRef & { email?: string | null }
+      clientDisplayName = c.business_name || c.name || 'Client'
+      clientEmail = c.email || null
     }
 
-    // Mentions-only notifications (if no @mentions, notify nobody)
-    const mentionTokens = extractMentions(content)
-    if (mentionTokens.length === 0) {
-      return NextResponse.json({ success: true, comment: commentRow })
-    }
-
-    // 3) Load approval assignees (to resolve mentions to user IDs)
+    // 3) Resolve assignees + the @-mention map.
     const { data: assigneesRows } = await supabase
       .from('approval_assignees')
       .select('user_id, users(name, email)')
@@ -134,6 +174,9 @@ export async function POST(req: NextRequest) {
       if (emailLocal) tokenToUserId.set(emailLocal, uid)
     }
 
+    // Mentions take precedence: if anyone is @-tagged we notify ONLY them.
+    // Otherwise we broadcast to every assignee + the client (minus the author).
+    const mentionTokens = extractMentions(content)
     const mentionTargetIds = Array.from(
       new Set(
         mentionTokens
@@ -142,33 +185,49 @@ export async function POST(req: NextRequest) {
       )
     ).filter((id) => id !== userId)
 
-    if (mentionTargetIds.length === 0) {
-      return NextResponse.json({ success: true, comment: commentRow })
+    const isMentionMode = mentionTokens.length > 0 && mentionTargetIds.length > 0
+    const notifyType = isMentionMode ? 'approval_mention' : 'approval_comment'
+
+    let inAppTargetIds: string[] = []
+    if (isMentionMode) {
+      inAppTargetIds = mentionTargetIds
+    } else {
+      inAppTargetIds = Array.from(
+        new Set(
+          (assigneesRows || [])
+            .map((r) => (r as unknown as AssigneeRow).user_id)
+            .filter(Boolean)
+        )
+      ).filter((id) => id !== userId)
     }
 
-    // 4) In-app notifications (drives popup + sound)
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds: mentionTargetIds,
-          type: 'approval_mention',
-          data: {
-            approvalId,
-            title: approval?.title || '',
-            clientName: clientDisplayName,
-            commentId: commentRow.id,
-            itemId: approvalItemId,
-            contentSnippet: content.length > 120 ? content.slice(0, 120) + '...' : content,
-          },
-        }),
-      })
-    } catch (notifyErr) {
-      console.error('Approval mention in-app notification error:', notifyErr)
+    const snippet = content.length > 120 ? content.slice(0, 120) + '...' : content
+
+    // 4) In-app notifications.
+    if (inAppTargetIds.length > 0) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userIds: inAppTargetIds,
+            type: notifyType,
+            data: {
+              approvalId,
+              title: approval?.title || '',
+              clientName: clientDisplayName,
+              commentId: commentRow.id,
+              itemId: approvalItemId,
+              contentSnippet: snippet,
+            },
+          }),
+        })
+      } catch (notifyErr) {
+        console.error('Approval in-app notification error:', notifyErr)
+      }
     }
 
-    // 5) Email notifications (mentions only; split client/team URLs)
+    // 5) Email notifications.
     try {
       const secret = process.env.APPS_SCRIPT_SECRET
       if (!secret) {
@@ -176,63 +235,140 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, comment: commentRow })
       }
 
-      const { data: mentionUsers } = await supabase
-        .from('users')
-        .select('id, email, role')
-        .in('id', mentionTargetIds)
-
-      const clientEmails = (mentionUsers || [])
-        .filter((u: UserRow) => u.role === 'client')
-        .map((u: UserRow) => u.email)
-        .filter(Boolean)
-
-      const teamEmails = (mentionUsers || [])
-        .filter((u: UserRow) => u.role !== 'client')
-        .map((u: UserRow) => u.email)
-        .filter(Boolean)
-
       const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
       const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
+      const reviewUrl = shareToken
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/review/${shareToken}`
+        : portalUrl
 
-      if (clientEmails.length > 0) {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'approval_mention',
-            payload: {
-              secret,
-              to: clientEmails,
-              clientName: clientDisplayName,
-              approvalTitle: approval?.title || '',
-              approvalId,
-              commentSnippet: content.length > 200 ? content.slice(0, 200) + '...' : content,
-              url: portalUrl,
-            },
-          }),
-        })
-      }
+      const emailSnippet =
+        content.length > 200 ? content.slice(0, 200) + '...' : content
 
-      if (teamEmails.length > 0) {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'approval_mention',
-            payload: {
-              secret,
-              to: teamEmails,
-              clientName: clientDisplayName,
-              approvalTitle: approval?.title || '',
-              approvalId,
-              commentSnippet: content.length > 200 ? content.slice(0, 200) + '...' : content,
-              url: agencyUrl,
-            },
-          }),
-        })
+      if (isMentionMode) {
+        // Only the @-tagged folks get email.
+        const { data: mentionUsers } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .in('id', mentionTargetIds)
+
+        const clientUserEmails = (mentionUsers || [])
+          .filter((u: UserRow) => u.role === 'client')
+          .map((u: UserRow) => u.email)
+          .filter(Boolean)
+        const teamEmails = (mentionUsers || [])
+          .filter((u: UserRow) => u.role !== 'client')
+          .map((u: UserRow) => u.email)
+          .filter(Boolean)
+
+        if (clientUserEmails.length > 0) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_mention',
+              payload: {
+                secret,
+                to: clientUserEmails,
+                clientName: clientDisplayName,
+                approvalTitle: approval?.title || '',
+                approvalId,
+                commentSnippet: emailSnippet,
+                url: reviewUrl,
+              },
+            }),
+          })
+        }
+
+        if (teamEmails.length > 0) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_mention',
+              payload: {
+                secret,
+                to: teamEmails,
+                clientName: clientDisplayName,
+                approvalTitle: approval?.title || '',
+                approvalId,
+                commentSnippet: emailSnippet,
+                url: agencyUrl,
+              },
+            }),
+          })
+        }
+      } else {
+        // Broadcast emails are throttled (mentions don't go through this branch).
+        const canEmail = await tryClaimEmailSlot(approvalId)
+        if (!canEmail) {
+          console.log('Skipping approval_comment broadcast email (cooldown)', {
+            approvalId,
+          })
+          return NextResponse.json({ success: true, comment: commentRow })
+        }
+
+        // Broadcast: every assignee + the client.
+        const { data: assigneeUsers } = inAppTargetIds.length
+          ? await supabase
+              .from('users')
+              .select('id, email, role')
+              .in('id', inAppTargetIds)
+          : { data: [] as UserRow[] }
+
+        const teamEmails = (assigneeUsers || [])
+          .filter((u: UserRow) => u.role !== 'client')
+          .map((u: UserRow) => u.email)
+          .filter(Boolean)
+        const clientUserEmails = (assigneeUsers || [])
+          .filter((u: UserRow) => u.role === 'client')
+          .map((u: UserRow) => u.email)
+          .filter(Boolean)
+
+        if (teamEmails.length > 0) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_comment',
+              payload: {
+                secret,
+                to: teamEmails,
+                clientName: clientDisplayName,
+                approvalTitle: approval?.title || '',
+                approvalId,
+                commentSnippet: emailSnippet,
+                url: agencyUrl,
+              },
+            }),
+          })
+        }
+
+        const clientToList = Array.from(
+          new Set(
+            [...clientUserEmails, clientEmail].filter(Boolean) as string[],
+          ),
+        )
+        if (clientToList.length > 0) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'approval_comment',
+              payload: {
+                secret,
+                to: clientToList,
+                clientName: clientDisplayName,
+                approvalTitle: approval?.title || '',
+                approvalId,
+                commentSnippet: emailSnippet,
+                url: reviewUrl,
+              },
+            }),
+          })
+        }
       }
     } catch (emailErr) {
-      console.error('Approval mention email notification error:', emailErr)
+      console.error('Approval comment email notification error:', emailErr)
     }
 
     return NextResponse.json({ success: true, comment: commentRow })

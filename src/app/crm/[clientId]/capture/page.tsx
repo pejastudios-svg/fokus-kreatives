@@ -840,7 +840,7 @@ function CaptureSkeleton() {
                       <option value="">All pages</option>
                       {pages.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} — /capture/{p.slug}
+                          {p.name} - /capture/{p.slug}
                         </option>
                       ))}
                     </select>
@@ -919,9 +919,9 @@ function CaptureSkeleton() {
                               <td className="px-4 py-3 text-sm text-gray-300">
                                 {new Date(s.created_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.name || '—'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.email || '—'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.phone || '—'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-300">{s.name || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-300">{s.email || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-300">{s.phone || '-'}</td>
                               <td className="px-4 py-3 text-sm">
                                 {hasMeeting ? (
                                   <span className="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400">
@@ -1359,7 +1359,7 @@ function CaptureSkeleton() {
       <div key={k} className="flex gap-3 text-sm">
         <div className="w-48 text-gray-400 break-all">{label}</div>
         <div className="flex-1 text-gray-200 break-all">
-          {v === null || v === undefined || String(v) === '' ? '—' : String(v)}
+          {v === null || v === undefined || String(v) === '' ? '-' : String(v)}
         </div>
       </div>
     )

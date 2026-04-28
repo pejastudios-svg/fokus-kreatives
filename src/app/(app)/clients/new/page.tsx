@@ -16,6 +16,7 @@ import { FileUpload } from '@/components/ui/FileUpload'
 import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
 import { defaultBrandProfile } from '@/components/clients/brandProfile'
 import type { BrandProfile } from '@/components/clients/brandProfile'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 
 type ClientTier = 'beginner' | 'mid' | 'advanced'
 
@@ -54,22 +55,25 @@ export default function NewClientPage() {
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  const [formData, setFormData] = useState<NewClientFormData>({
-    name: '',
-    email: '',
-    business_name: '',
-    industry: '',
-    target_audience: '',
-    brand_doc_url: '',
-    dos_and_donts: '',
-    topics_library: '',
-    key_stories: '',
-    unique_mechanisms: '',
-    social_proof: '',
-    website_url: '',
-    content_tier: 'beginner',
-    brand_profile: defaultBrandProfile(),
-  })
+  const [formData, setFormData, clearFormData] = useFormPersistence<NewClientFormData>(
+    'clients:new',
+    {
+      name: '',
+      email: '',
+      business_name: '',
+      industry: '',
+      target_audience: '',
+      brand_doc_url: '',
+      dos_and_donts: '',
+      topics_library: '',
+      key_stories: '',
+      unique_mechanisms: '',
+      social_proof: '',
+      website_url: '',
+      content_tier: 'beginner',
+      brand_profile: defaultBrandProfile(),
+    },
+  )
 
   // Only admins can create clients (per your current rule)
   const canCreateClient = userRole === 'admin'
@@ -302,6 +306,7 @@ export default function NewClientPage() {
         setNotification({ type: 'success', message: 'Client created successfully!' })
       }
 
+      clearFormData()
       setTimeout(() => router.push('/clients'), 1500)
     } catch (err: unknown) {
       console.error('Unexpected error:', err)
@@ -315,7 +320,7 @@ export default function NewClientPage() {
     <>
       <Header title="Add New Client" subtitle="Create a new client profile" />
 
-      <div className="p-8 max-w-4xl">
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
         <Link href="/clients" className="inline-flex items-center text-[#2B79F7] hover:underline mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Clients
@@ -342,7 +347,7 @@ export default function NewClientPage() {
               <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Client Name" name="name" value={formData.name} onChange={handleChange} placeholder="John Smith" required />
                 <Input
                   label="Business Name"
@@ -354,7 +359,7 @@ export default function NewClientPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Client Email (for portal access)"
                   name="email"

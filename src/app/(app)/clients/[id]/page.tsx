@@ -1,23 +1,40 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-
+import {
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+  MoreVertical,
+  Sparkles,
+  Pencil,
+  Archive as ArchiveIcon,
+  Trash2,
+  RefreshCw,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  Globe,
+  Briefcase,
+  Crown,
+  Users as UsersIcon,
+  Target,
+  Megaphone,
+  Building2,
+  Check,
+  X as XIcon,
+} from 'lucide-react'
 import { Header } from '@/components/layout/Header'
-import { Card, CardContent, CardHeader } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { FileUpload } from '@/components/ui/FileUpload'
-
-import { ArrowLeft, Save, Trash2, Sparkles, CheckCircle, AlertCircle } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Loading'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { ClientAssignees } from '@/components/clients/ClientAssignees'
 import { createClient } from '@/lib/supabase/client'
+import { normalizeBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
 
-import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
-import { defaultBrandProfile } from '@/components/clients/brandProfile'
-import { TopicsBank } from '@/components/clients/TopicsBank'
-
-type BrandProfile = ReturnType<typeof defaultBrandProfile>
 type ContentTier = 'beginner' | 'mid' | 'advanced'
 
 interface ClientRow {
@@ -27,292 +44,127 @@ interface ClientRow {
   industry: string | null
   profile_picture_url: string | null
   target_audience: string | null
-  brand_doc_text: string | null
   brand_doc_url: string | null
+  brand_doc_text: string | null
   dos_and_donts: string | null
   topics_library: string | null
   key_stories: string | null
   unique_mechanisms: string | null
   social_proof: string | null
+  competitor_insights: string | null
+  website_url: string | null
+  content_tier: ContentTier | null
+  brand_profile: BrandProfile | null
+  archived_at: string | null
+  brand_intake_token: string | null
+  brand_intake_submitted_at: string | null
   created_at: string
-
-  competitor_insights?: string | null
-  website_url?: string | null
-  content_tier?: ContentTier | null
-  brand_profile?: BrandProfile | null
-  archived_at?: string | null
-  brand_intake_token?: string | null
-  brand_intake_submitted_at?: string | null
 }
 
-type ClientFormData = {
-  name: string
-  business_name: string
-  industry: string
-  profile_picture_url: string
-  target_audience: string
-  brand_doc_text: string
-  brand_doc_url: string
-  dos_and_donts: string
-  topics_library: string
-  key_stories: string
-  unique_mechanisms: string
-  social_proof: string
-  competitor_insights: string
-  website_url: string
-  content_tier: ContentTier
-  brand_profile: BrandProfile
-}
+type TabKey = 'overview' | 'audience' | 'guidelines' | 'competitors' | 'team'
 
-export default function ClientDetailPage() {
+const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'overview', label: 'Overview', icon: Briefcase },
+  { key: 'audience', label: 'Audience', icon: Target },
+  { key: 'guidelines', label: 'Brand guidelines', icon: FileText },
+  { key: 'competitors', label: 'Competitors', icon: Megaphone },
+  { key: 'team', label: 'Team', icon: UsersIcon },
+]
+
+export default function ClientProfilePage() {
   const params = useParams()
   const router = useRouter()
   const clientId = (params?.id as string) ?? ''
 
-  // keep stable across renders
   const supabase = useMemo(() => createClient(), [])
 
   const [userRole, setUserRole] = useState<string | null>(null)
-  const canArchiveClient = userRole === 'admin' || userRole === 'manager'
-  const canDeleteClient = userRole === 'admin'
+  const canArchive = userRole === 'admin' || userRole === 'manager'
+  const canDelete = userRole === 'admin'
 
   const [client, setClient] = useState<ClientRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isArchiving, setIsArchiving] = useState(false)
+  const [tab, setTab] = useState<TabKey>('overview')
 
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [portalLink, setPortalLink] = useState<string | null>(null)
-  const [intakeToken, setIntakeToken] = useState<string | null>(null)
+  const [confirmKind, setConfirmKind] = useState<null | 'archive' | 'delete'>(null)
   const [isGeneratingIntake, setIsGeneratingIntake] = useState(false)
 
-  const [formData, setFormData] = useState<ClientFormData>({
-    name: '',
-    business_name: '',
-    industry: '',
-    profile_picture_url: '',
-    target_audience: '',
-    brand_doc_text: '',
-    brand_doc_url: '',
-    dos_and_donts: '',
-    topics_library: '',
-    key_stories: '',
-    unique_mechanisms: '',
-    social_proof: '',
-    competitor_insights: '',
-    website_url: '',
-    content_tier: 'beginner',
-    brand_profile: defaultBrandProfile(),
-  })
-
-  const mapClientToForm = useCallback((row: ClientRow): ClientFormData => {
-    return {
-      name: row.name ?? '',
-      business_name: row.business_name ?? '',
-      industry: row.industry ?? '',
-      profile_picture_url: row.profile_picture_url ?? '',
-      target_audience: row.target_audience ?? '',
-      brand_doc_text: row.brand_doc_text ?? '',
-      brand_doc_url: row.brand_doc_url ?? '',
-      dos_and_donts: row.dos_and_donts ?? '',
-      topics_library: row.topics_library ?? '',
-      key_stories: row.key_stories ?? '',
-      unique_mechanisms: row.unique_mechanisms ?? '',
-      social_proof: row.social_proof ?? '',
-      competitor_insights: row.competitor_insights ?? '',
-      website_url: row.website_url ?? '',
-      content_tier: (row.content_tier ?? 'beginner') as ContentTier,
-      brand_profile: row.brand_profile ?? defaultBrandProfile(),
-    }
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const flash = useCallback((type: 'success' | 'error', message: string, ms = 2500) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), ms)
   }, [])
 
-  const fetchClient = useCallback(async (): Promise<ClientRow | null> => {
-    if (!clientId) return null
-
-    const { data, error } = await supabase.from('clients').select('*').eq('id', clientId).single()
-
-    if (error) {
-      console.error('fetchClient error:', error)
-      return null
-    }
-
-    return data as ClientRow
-  }, [supabase, clientId])
-
-  const fetchPortalLink = useCallback(async (): Promise<string | null> => {
-    if (!clientId) return null
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('invitation_token, invitation_accepted, created_at')
-      .eq('client_id', clientId)
-      .eq('role', 'client')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      console.error('fetchPortalUser error:', error)
-      return null
-    }
-
-    if (data?.invitation_token && !data.invitation_accepted) {
-      return `${window.location.origin}/invite/${data.invitation_token}`
-    }
-
-    return null
-  }, [supabase, clientId])
-
-  const refresh = useCallback(async () => {
-    try {
-      const [row, link] = await Promise.all([fetchClient(), fetchPortalLink()])
-
-      if (row) {
-        setClient(row)
-        setFormData(mapClientToForm(row))
-        setIntakeToken(row.brand_intake_token ?? null)
-      } else {
-        setClient(null)
-      }
-
-      setPortalLink(link)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [fetchClient, fetchPortalLink, mapClientToForm])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    ;(async () => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  useEffect(() => {
+    void (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-
       if (!user) return
-
-      const { data, error } = await supabase.from('users').select('role').eq('id', user.id).single()
-
-      if (error) {
-        console.error('fetch user role error:', error)
-        return
-      }
-
+      const { data } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
       setUserRole((data?.role as string) ?? null)
     })()
   }, [supabase])
 
-  // Avoid "set-state-in-effect" by deferring the refresh to a microtask.
-  useEffect(() => {
-    let cancelled = false
-
-    queueMicrotask(() => {
-      if (cancelled) return
-      void refresh()
-    })
-
-    return () => {
-      cancelled = true
+  const refresh = useCallback(async () => {
+    if (!clientId) return
+    setIsLoading(true)
+    const { data, error } = await supabase.from('clients').select('*').eq('id', clientId).single()
+    if (error) {
+      console.error('load client error:', error)
+      setClient(null)
+    } else {
+      setClient(data as ClientRow)
     }
+    setIsLoading(false)
+  }, [supabase, clientId])
+
+  useEffect(() => {
+    void refresh()
   }, [refresh])
 
-  const handleArchive = async () => {
-    if (!confirm('Archive this client and their CRM? You can unarchive later.')) return
-    if (!clientId) return
-
-    setIsArchiving(true)
-
-    const { error } = await supabase
-      .from('clients')
-      .update({ archived_at: new Date().toISOString() })
-      .eq('id', clientId)
-
-    if (error) {
-      setNotification({ type: 'error', message: 'Failed to archive client' })
-      setIsArchiving(false)
-      return
-    }
-
-    router.push('/clients')
-    setIsArchiving(false)
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSave = async () => {
-    if (!clientId) return
-    setIsSaving(true)
-
-    const updatePayload = {
-      name: formData.name,
-      business_name: formData.business_name,
-      industry: formData.industry,
-      profile_picture_url: formData.profile_picture_url ? formData.profile_picture_url : null,
-      target_audience: formData.target_audience,
-      brand_doc_text: formData.brand_doc_text,
-      brand_doc_url: formData.brand_doc_url ? formData.brand_doc_url : null,
-      dos_and_donts: formData.dos_and_donts,
-      topics_library: formData.topics_library,
-      key_stories: formData.key_stories,
-      unique_mechanisms: formData.unique_mechanisms,
-      social_proof: formData.social_proof,
-      competitor_insights: formData.competitor_insights,
-      website_url: formData.website_url,
-      content_tier: formData.content_tier,
-      brand_profile: formData.brand_profile,
-    }
-
-    const { error } = await supabase.from('clients').update(updatePayload).eq('id', clientId)
-
-    if (error) {
-      console.error('save error:', error)
-      setNotification({ type: 'error', message: 'Failed to save changes' })
-    } else {
-      setNotification({ type: 'success', message: 'Client updated successfully!' })
-      await refresh()
-    }
-
-    setIsSaving(false)
-    setTimeout(() => setNotification(null), 3000)
-  }
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this client? This cannot be undone.')) return
-    if (!clientId) return
-
-    setIsDeleting(true)
-
-    const { error: usersDelErr } = await supabase.from('users').delete().eq('client_id', clientId)
-    if (usersDelErr) console.error('Failed to delete client users:', usersDelErr)
-
-    const { error } = await supabase.from('clients').delete().eq('id', clientId)
-
-    if (error) {
-      setNotification({ type: 'error', message: 'Failed to delete client' })
-      setIsDeleting(false)
-      return
-    }
-
-    router.push('/clients')
-  }
-
+  // ---- Action handlers ---------------------------------------------------
   const handleCreateContent = () => {
-    sessionStorage.setItem('selectedClientId', clientId)
+    if (!clientId) return
+    try {
+      sessionStorage.setItem('selectedClientId', clientId)
+    } catch {}
     router.push('/dashboard')
   }
 
-  const copyPortalLink = async () => {
-    if (!portalLink) return
-    await navigator.clipboard.writeText(portalLink)
-    setNotification({ type: 'success', message: 'Portal link copied!' })
-    setTimeout(() => setNotification(null), 2000)
+  const intakeLink = client?.brand_intake_token
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/intake/${client.brand_intake_token}`
+    : null
+
+  const handleCopyIntake = async () => {
+    if (!intakeLink) {
+      flash('error', 'Generate an intake link first')
+      return
+    }
+    await navigator.clipboard.writeText(intakeLink)
+    flash('success', 'Intake link copied')
   }
 
-  const intakeLink = intakeToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/intake/${intakeToken}` : null
-
-  const generateIntakeLink = async () => {
+  const handleRegenerateIntake = async () => {
     if (!clientId) return
     setIsGeneratingIntake(true)
     try {
@@ -323,31 +175,51 @@ export default function ClientDetailPage() {
       })
       const data = await res.json()
       if (!data.success) {
-        setNotification({ type: 'error', message: data.error || 'Failed to generate link' })
+        flash('error', data.error || 'Failed to regenerate link')
       } else {
-        setIntakeToken(data.token)
-        setNotification({ type: 'success', message: 'Intake link generated' })
+        flash('success', 'New intake link generated')
+        await refresh()
       }
-    } catch (e) {
-      console.error('generate intake link error:', e)
-      setNotification({ type: 'error', message: 'Failed to generate link' })
     } finally {
       setIsGeneratingIntake(false)
-      setTimeout(() => setNotification(null), 2500)
     }
   }
 
-  const copyIntakeLink = async () => {
-    if (!intakeLink) return
-    await navigator.clipboard.writeText(intakeLink)
-    setNotification({ type: 'success', message: 'Intake link copied!' })
-    setTimeout(() => setNotification(null), 2000)
+  const handleArchive = async () => {
+    if (!clientId) return
+    const { error } = await supabase
+      .from('clients')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', clientId)
+    if (error) throw new Error('Failed to archive client')
+    router.push('/clients')
   }
 
+  const handleDelete = async (password?: string) => {
+    if (!clientId) return
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user?.email) throw new Error('Could not verify session')
+    const { error: pwErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: password ?? '',
+    })
+    if (pwErr) throw new Error('Incorrect password')
+
+    await supabase.from('users').delete().eq('client_id', clientId)
+    const { error } = await supabase.from('clients').delete().eq('id', clientId)
+    if (error) throw new Error('Failed to delete client')
+
+    router.push('/clients')
+  }
+
+  // ---- Render ------------------------------------------------------------
   if (isLoading) {
     return (
       <>
-        <div className="p-8 text-center">Loading...</div>
+        <Header title="Client profile" />
+        <ClientProfileSkeleton />
       </>
     )
   }
@@ -355,361 +227,985 @@ export default function ClientDetailPage() {
   if (!client) {
     return (
       <>
-        <div className="p-8 text-center">Client not found</div>
+        <Header title="Client" />
+        <div className="p-4 md:p-8 text-center">
+          <p className="text-gray-500 mb-4">Client not found</p>
+          <Link href="/clients" className="text-[#2B79F7] hover:underline">
+            Back to clients
+          </Link>
+        </div>
       </>
     )
   }
 
+  const profile = normalizeBrandProfile(client.brand_profile)
+  const submittedAt = client.brand_intake_submitted_at
+    ? new Date(client.brand_intake_submitted_at)
+    : null
+
   return (
     <>
-      <Header title={client.name ?? ''} subtitle={client.business_name ?? ''} />
-
-      <div className="p-8 max-w-4xl">
+      <Header title="Client profile" subtitle={client.business_name || client.name || ''} />
+      <div className="p-4 md:p-8 max-w-5xl mx-auto">
+        {/* Back + notification */}
         <div className="flex items-center justify-between mb-6">
-          <Link href="/clients" className="inline-flex items-center text-[#2B79F7] hover:underline">
+          <Link
+            href="/clients"
+            className="inline-flex items-center text-[#2B79F7] hover:underline text-sm"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Clients
+            Back to clients
           </Link>
-
-          <div className="flex gap-2">
-            <Button onClick={handleCreateContent}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Create Content
-            </Button>
-
-            {canArchiveClient && (
-              <Button
-                variant="ghost"
-                onClick={handleArchive}
-                isLoading={isArchiving}
-                className="text-yellow-500 hover:bg-yellow-50"
-              >
-                Archive
-              </Button>
-            )}
-
-            {canDeleteClient && (
-              <Button
-                variant="ghost"
-                onClick={handleDelete}
-                isLoading={isDeleting}
-                className="text-red-500 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </div>
+          {client.archived_at && (
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium">
+              <ArchiveIcon className="h-3.5 w-3.5" />
+              Archived
+            </span>
+          )}
         </div>
 
         {notification && (
           <div
             className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-              notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              notification.type === 'success'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
             }`}
           >
-            {notification.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+            {notification.type === 'success' ? (
+              <CheckCircle className="h-5 w-5" />
+            ) : (
+              <AlertCircle className="h-5 w-5" />
+            )}
             {notification.message}
           </div>
         )}
 
-        {portalLink && (
-          <Card className="mb-6 border-[#2B79F7] bg-[#E8F1FF]">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-[#2B79F7]">Client Portal Invite Link</p>
-                  <p className="text-sm text-[#2B79F7]/70 truncate max-w-md">{portalLink}</p>
+        {/* Hero card */}
+        <Card className="mb-6">
+          <CardContent className="relative p-6 md:p-8">
+            {/* Centered content - avatar, name, business, meta row. */}
+            <div className="flex flex-col items-center text-center">
+              {client.profile_picture_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={client.profile_picture_url}
+                  alt={client.name || ''}
+                  className="h-24 w-24 md:h-28 md:w-28 rounded-full object-cover ring-4 ring-[#E8F1FF] mb-4"
+                />
+              ) : (
+                <div className="h-24 w-24 md:h-28 md:w-28 rounded-full bg-brand-gradient flex items-center justify-center text-white text-3xl md:text-4xl font-bold ring-4 ring-[#E8F1FF] mb-4">
+                  {(client.name || 'U').charAt(0).toUpperCase()}
                 </div>
-                <Button size="sm" onClick={copyPortalLink}>
-                  Copy Link
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              )}
 
-        <Card className="mb-6 border-purple-200 bg-purple-50">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-medium text-purple-700">Brand Intake Link</p>
-                {intakeLink ? (
-                  <p className="text-sm text-purple-600/70 truncate">{intakeLink}</p>
-                ) : (
-                  <p className="text-sm text-purple-600/70">
-                    Generate a shareable link the client can fill out themselves.
-                  </p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                {client.name || 'Unnamed client'}
+              </h1>
+              {client.business_name && (
+                <p className="text-gray-600 mt-1">{client.business_name}</p>
+              )}
+
+              <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                {client.industry && (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {client.industry}
+                  </span>
                 )}
-                {client?.brand_intake_submitted_at && (
-                  <p className="text-xs text-green-600 mt-1">
-                    Client submitted on {new Date(client.brand_intake_submitted_at).toLocaleDateString()}
-                  </p>
+                {client.content_tier && (
+                  <span className="inline-flex items-center gap-1 capitalize">
+                    <Crown className="h-3.5 w-3.5" />
+                    {client.content_tier} tier
+                  </span>
+                )}
+                {client.website_url && (
+                  <a
+                    href={client.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[#2B79F7] hover:underline"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    Website
+                  </a>
                 )}
               </div>
-              <div className="flex gap-2 shrink-0">
-                {intakeLink && (
-                  <Button size="sm" variant="outline" onClick={copyIntakeLink}>
-                    Copy
-                  </Button>
+
+              {submittedAt && (
+                <p className="mt-3 text-xs text-gray-400">
+                  Brand intake submitted {submittedAt.toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            {/* 3-dot menu - anchored top-right so it doesn't push the hero
+                content off-center. */}
+            <div className="absolute top-3 right-3 md:top-4 md:right-4" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  aria-label="Client actions"
+                  aria-expanded={menuOpen}
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <MenuItem
+                      icon={Sparkles}
+                      label="Create content"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        handleCreateContent()
+                      }}
+                    />
+                    <MenuItem
+                      icon={Pencil}
+                      label="Edit profile"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        router.push(`/clients/${clientId}/edit`)
+                      }}
+                    />
+                    <MenuItem
+                      icon={Copy}
+                      label={intakeLink ? 'Copy intake link' : 'Generate intake link'}
+                      onClick={async () => {
+                        setMenuOpen(false)
+                        if (intakeLink) await handleCopyIntake()
+                        else await handleRegenerateIntake()
+                      }}
+                    />
+                    <MenuItem
+                      icon={RefreshCw}
+                      label="Regenerate intake link"
+                      disabled={isGeneratingIntake}
+                      onClick={async () => {
+                        setMenuOpen(false)
+                        await handleRegenerateIntake()
+                      }}
+                    />
+                    {canArchive && !client.archived_at && (
+                      <MenuItem
+                        icon={ArchiveIcon}
+                        label="Archive client"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setConfirmKind('archive')
+                        }}
+                      />
+                    )}
+                    {canDelete && (
+                      <MenuItem
+                        icon={Trash2}
+                        label="Delete client"
+                        tone="danger"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setConfirmKind('delete')
+                        }}
+                      />
+                    )}
+                  </div>
                 )}
-                <Button size="sm" onClick={generateIntakeLink} isLoading={isGeneratingIntake}>
-                  {intakeLink ? 'Regenerate' : 'Generate Link'}
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Profile Picture</h3>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                {formData.profile_picture_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={formData.profile_picture_url}
-                    alt={formData.name}
-                    className="h-20 w-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="h-20 w-20 rounded-full bg-brand-gradient flex items-center justify-center text-white text-2xl font-bold">
-                    {formData.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-
-                <div className="flex-1 space-y-2">
-                  <FileUpload
-                    label="Upload Client Profile Picture"
-                    folder="client-profile-pictures"
-                    accept="image/*"
-                    onUpload={(url) => setFormData((prev) => ({ ...prev, profile_picture_url: url }))}
-                  />
-
-                  <Input
-                    label="Or use URL"
-                    name="profile_picture_url"
-                    value={formData.profile_picture_url}
-                    onChange={handleChange}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="Client Name" name="name" value={formData.name} onChange={handleChange} />
-                <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} />
-              </div>
-
-              <Input label="Industry" name="industry" value={formData.industry} onChange={handleChange} />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
-                <textarea
-                  name="target_audience"
-                  value={formData.target_audience}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-
-              <Input
-                label="Website URL (optional)"
-                name="website_url"
-                value={formData.website_url}
-                onChange={handleChange}
-                placeholder="https://example.com"
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Tier</label>
-                <select
-                  name="content_tier"
-                  value={formData.content_tier}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, content_tier: e.target.value as ContentTier }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+        {/* Tabs - icons only on mobile so the strip never overflows. */}
+        <div className="mb-4 flex justify-center">
+          <div className="inline-flex bg-white rounded-xl border border-gray-200 p-1 gap-1">
+            {TABS.map((t) => {
+              const active = tab === t.key
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  title={t.label}
+                  aria-label={t.label}
+                  className={`inline-flex items-center gap-2 px-2.5 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    active
+                      ? 'bg-[#2B79F7] text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
                 >
-                  <option value="beginner">Beginner</option>
-                  <option value="mid">Mid</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Profile Builder</h3>
-              <p className="text-sm text-gray-500 mt-1">Structured brand details for more accurate scripts.</p>
-            </CardHeader>
-            <CardContent>
-              <BrandProfileForm
-                value={formData.brand_profile}
-                onChange={(next) => setFormData((prev) => ({ ...prev, brand_profile: next }))}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-              <p className="text-sm text-gray-500 mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {formData.brand_doc_url ? (
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <a
-                    href={formData.brand_doc_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-green-700 text-sm flex-1 truncate hover:underline"
-                  >
-                    {formData.brand_doc_url}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, brand_doc_url: '' }))}
-                    className="text-green-700 text-xs hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <FileUpload
-                    folder="brand-docs"
-                    accept="application/pdf"
-                    label="Upload PDF brand document"
-                    onUpload={(url) => setFormData((prev) => ({ ...prev, brand_doc_url: url }))}
-                  />
-                  <div className="flex items-center gap-3">
-                    <div className="h-px bg-gray-200 flex-1" />
-                    <span className="text-xs text-gray-400">or paste a link</span>
-                    <div className="h-px bg-gray-200 flex-1" />
-                  </div>
-                  <Input
-                    name="brand_doc_url"
-                    value={formData.brand_doc_url}
-                    onChange={handleChange}
-                    placeholder="https://docs.google.com/document/d/..."
-                  />
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Content Guidelines</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Do&apos;s and Don&apos;ts</label>
-                <textarea
-                  name="dos_and_donts"
-                  value={formData.dos_and_donts}
-                  onChange={handleChange}
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Topics Library</label>
-                <textarea
-                  name="topics_library"
-                  value={formData.topics_library}
-                  onChange={handleChange}
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Stories & Social Proof</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Key Stories</label>
-                <textarea
-                  name="key_stories"
-                  value={formData.key_stories}
-                  onChange={handleChange}
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unique Mechanisms</label>
-                <textarea
-                  name="unique_mechanisms"
-                  value={formData.unique_mechanisms}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Social Proof & Results</label>
-                <textarea
-                  name="social_proof"
-                  value={formData.social_proof}
-                  onChange={handleChange}
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <TopicsBank clientId={clientId} />
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Competitor Insights</h3>
-              <p className="text-sm text-gray-500 mt-1">Saved from competitor analysis. Used by AI for content creation.</p>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                name="competitor_insights"
-                value={formData.competitor_insights}
-                onChange={handleChange}
-                placeholder="Competitor insights will appear here after you analyze competitors..."
-                rows={8}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none font-mono text-sm"
-              />
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSave} isLoading={isSaving}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
+                  <t.icon className="h-4 w-4 shrink-0" />
+                  <span className="hidden md:inline">{t.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
+
+        {/* Tab content */}
+        {tab === 'overview' && <OverviewTab client={client} profile={profile} />}
+        {tab === 'audience' && <AudienceTab client={client} profile={profile} />}
+        {tab === 'guidelines' && <GuidelinesTab client={client} profile={profile} flash={flash} />}
+        {tab === 'competitors' && <CompetitorsTab client={client} profile={profile} />}
+        {tab === 'team' && <ClientAssignees clientId={clientId} />}
       </div>
+
+      <ConfirmModal
+        open={confirmKind === 'archive'}
+        title="Archive client?"
+        message="Archived clients are hidden from the main list and won't appear in dashboards. You can unarchive later from the archive view."
+        confirmLabel="Archive"
+        tone="warning"
+        onClose={() => setConfirmKind(null)}
+        onConfirm={async () => {
+          await handleArchive()
+        }}
+      />
+      <ConfirmModal
+        open={confirmKind === 'delete'}
+        title="Delete client?"
+        message={
+          <span>
+            This permanently deletes <span className="font-medium">{client.name}</span>, all related
+            users, and the brand profile. This cannot be undone.
+          </span>
+        }
+        confirmLabel="Delete client"
+        tone="danger"
+        requirePassword
+        onClose={() => setConfirmKind(null)}
+        onConfirm={async (password) => {
+          await handleDelete(password)
+        }}
+      />
+
     </>
   )
+}
+
+// ============================================================================
+// Subcomponents
+// ============================================================================
+
+function ClientProfileSkeleton() {
+  return (
+    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-in fade-in">
+      {/* Back link + archived chip row */}
+      <div className="flex items-center justify-between mb-6">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-6 w-24 rounded-full" />
+      </div>
+
+      {/* Hero card: centered avatar + name + business + meta */}
+      <Card className="mb-6">
+        <CardContent className="relative p-6 md:p-8">
+          <div className="absolute top-3 right-3 md:top-4 md:right-4">
+            <Skeleton className="h-9 w-9 rounded-md" />
+          </div>
+          <div className="flex flex-col items-center">
+            <Skeleton className="h-24 w-24 md:h-28 md:w-28 rounded-full mb-4" />
+            <Skeleton className="h-7 w-44 mb-2" />
+            <Skeleton className="h-4 w-32 mb-3" />
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs row */}
+      <div className="mb-4 flex justify-center">
+        <div className="inline-flex bg-white rounded-xl border border-gray-200 p-1 gap-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-9 w-9 md:w-32 rounded-lg" />
+          ))}
+        </div>
+      </div>
+
+      {/* Two stacked section cards */}
+      <div className="space-y-4">
+        {[0, 1].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-5 md:p-6 space-y-4">
+              <div>
+                <Skeleton className="h-5 w-40 mb-2" />
+                <Skeleton className="h-3 w-64" />
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Skeleton className="h-3 w-20 mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-20 mb-2" />
+                  <Skeleton className="h-4 w-5/6" />
+                </div>
+                <div>
+                  <Skeleton className="h-3 w-20 mb-2" />
+                  <Skeleton className="h-4 w-4/6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  tone,
+  disabled,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  onClick: () => void | Promise<void>
+  tone?: 'danger'
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+        tone === 'danger'
+          ? 'text-red-600 hover:bg-red-50'
+          : 'text-gray-700 hover:bg-gray-50'
+      } disabled:opacity-50 disabled:cursor-not-allowed`}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
+  )
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: React.ReactNode
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5 md:p-6">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+        </div>
+        <div className="space-y-4">{children}</div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Field({
+  label,
+  value,
+  multiline,
+}: {
+  label: string
+  value: string | null | undefined
+  multiline?: boolean
+}) {
+  const empty = !value || !String(value).trim()
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">{label}</p>
+      {empty ? (
+        <p className="text-sm text-gray-400 italic">Not specified</p>
+      ) : (
+        <p
+          className={`text-sm text-gray-900 break-words [overflow-wrap:anywhere] ${
+            multiline ? 'whitespace-pre-wrap' : ''
+          }`}
+        >
+          {value}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ScoreField({ label, score }: { label: string; score: 1 | 2 | 3 | 4 | 5 }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">{label}</p>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <span
+            key={n}
+            className={`h-2 w-6 rounded-full ${n <= score ? 'bg-[#2B79F7]' : 'bg-gray-200'}`}
+          />
+        ))}
+        <span className="ml-2 text-xs text-gray-500">{score}/5</span>
+      </div>
+    </div>
+  )
+}
+
+function ChipList({ items }: { items: string[] }) {
+  const filtered = items.filter((x) => x && x.trim())
+  if (!filtered.length) {
+    return <p className="text-sm text-gray-400 italic">Not specified</p>
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {filtered.map((item, i) => (
+        <span
+          key={`${item}-${i}`}
+          className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs"
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ============================================================================
+// Tabs
+// ============================================================================
+
+function OverviewTab({ client, profile }: { client: ClientRow; profile: BrandProfile }) {
+  return (
+    <div className="space-y-4">
+      <Section title="About" description="Mission, vision, and the problem this brand solves.">
+        <Field label="Mission" value={profile.business.mission} multiline />
+        <Field label="Vision" value={profile.business.vision} multiline />
+        <Field label="Problem solved" value={profile.business.problem_solved} multiline />
+        <Field label="What sets them apart" value={profile.business.differentiation} multiline />
+        <Field label="Signature offer" value={profile.business.signature_offer} multiline />
+      </Section>
+
+      <Section
+        title="Voice & tone"
+        description="How the brand sounds when it speaks."
+      >
+        <Field label="Voice traits" value={profile.voice.traits} multiline />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ScoreField label="Casualness" score={profile.voice.casualness} />
+          <ScoreField label="Funny" score={profile.voice.funny} />
+          <ScoreField label="Enthusiastic" score={profile.voice.enthusiastic} />
+          <ScoreField label="Emotional" score={profile.voice.emotional} />
+          <ScoreField label="Irreverent" score={profile.voice.irreverent} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <Field label="Uses jargon" value={titleCase(profile.voice.uses_jargon)} />
+          <Field
+            label="Personal stories"
+            value={titleCase(profile.voice.shares_personal_stories)}
+          />
+          <Field label="Profanity level" value={titleCase(profile.voice.profanity_level)} />
+        </div>
+      </Section>
+
+      <Section title="Strategy">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field
+            label="Primary content goal"
+            value={titleCase(profile.content_strategy.primary_content_goal)}
+          />
+          <Field
+            label="Desired action"
+            value={titleCase(profile.content_strategy.desired_action.replace(/_/g, ' '))}
+          />
+          <Field
+            label="Market position"
+            value={titleCase(profile.positioning.market_position.replace(/_/g, ' '))}
+          />
+          <Field
+            label="Brand perception"
+            value={titleCase(profile.positioning.perception.replace(/_/g, ' '))}
+          />
+        </div>
+      </Section>
+
+      <Section title="Content pillars" description="Topical pillars the brand publishes around.">
+        {profile.content_strategy.content_pillars.every(
+          (p) => !p.name && !p.covers && !p.why_it_matters,
+        ) ? (
+          <p className="text-sm text-gray-400 italic">No pillars defined yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {profile.content_strategy.content_pillars.map((p, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-lg bg-gray-50 border border-gray-100 space-y-2"
+              >
+                <p className="font-semibold text-sm text-gray-900">
+                  {p.name || `Pillar ${i + 1}`}
+                </p>
+                {p.covers && (
+                  <p className="text-xs text-gray-600">
+                    <span className="text-gray-400">Covers: </span>
+                    {p.covers}
+                  </p>
+                )}
+                {p.why_it_matters && (
+                  <p className="text-xs text-gray-600">
+                    <span className="text-gray-400">Why: </span>
+                    {p.why_it_matters}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Final reflections">
+        <Field label="What they're excited about" value={profile.final.excited} multiline />
+        <Field label="What makes them nervous" value={profile.final.nervous} multiline />
+        <Field label="Anything else" value={profile.final.anything_else} multiline />
+        <Field
+          label="Collaboration style"
+          value={titleCase(profile.final.collaboration_style.replace(/_/g, ' '))}
+        />
+      </Section>
+
+      {client.brand_intake_submitted_at && (
+        <p className="text-xs text-gray-400 text-center">
+          Brand intake last submitted{' '}
+          {new Date(client.brand_intake_submitted_at).toLocaleString()}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AudienceTab({ client, profile }: { client: ClientRow; profile: BrandProfile }) {
+  return (
+    <div className="space-y-4">
+      <Section
+        title="Target audience"
+        description="Free-form description from the brief."
+      >
+        <Field label="Audience description" value={client.target_audience} multiline />
+        <Field
+          label="Address them as"
+          value={profile.voice.address_audience_as}
+        />
+      </Section>
+
+      <Section title="Demographics">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Age range" value={profile.audience.age_range} />
+          <Field label="Gender" value={titleCase(profile.audience.gender)} />
+          <Field label="Location" value={profile.audience.location} />
+          <Field label="Work / roles" value={profile.audience.work_roles} />
+          <Field label="Family situation" value={profile.audience.family_situation} />
+          <Field label="Where they hang out" value={profile.audience.hangouts} />
+        </div>
+      </Section>
+
+      <Section title="Psychographics">
+        <Field label="Core values" value={profile.audience.core_values} multiline />
+        <Field label="Fears" value={profile.audience.fears} multiline />
+        <Field label="Desires" value={profile.audience.desires} multiline />
+      </Section>
+
+      <Section title="Pain points" description="Top 5 problems they're trying to solve.">
+        {profile.audience.pain_points.every((p) => !p?.trim()) ? (
+          <p className="text-sm text-gray-400 italic">No pain points listed.</p>
+        ) : (
+          <ol className="space-y-2 list-decimal list-inside marker:text-gray-400">
+            {profile.audience.pain_points
+              .filter((p) => p && p.trim())
+              .map((p, i) => (
+                <li key={i} className="text-sm text-gray-900">
+                  {p}
+                </li>
+              ))}
+          </ol>
+        )}
+      </Section>
+
+      <Section title="Triggers & objections">
+        <Field
+          label="What they've tried & why it failed"
+          value={profile.audience.tried_failed}
+          multiline
+        />
+        <Field label="Common objections" value={profile.audience.objections} multiline />
+        <Field label="What makes them say yes" value={profile.audience.yes_triggers} multiline />
+      </Section>
+    </div>
+  )
+}
+
+function GuidelinesTab({
+  client,
+  profile,
+  flash,
+}: {
+  client: ClientRow
+  profile: BrandProfile
+  flash: (type: 'success' | 'error', message: string, ms?: number) => void
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Brand doc */}
+      <Section
+        title="Brand document"
+        description="The official brand guidelines file or page."
+      >
+        {client.brand_doc_url ? (
+          <BrandDocBlock url={client.brand_doc_url} clientName={client.name || 'brand'} flash={flash} />
+        ) : (
+          <p className="text-sm text-gray-400 italic">No brand document uploaded.</p>
+        )}
+        {client.brand_doc_text && (
+          <Field label="Notes" value={client.brand_doc_text} multiline />
+        )}
+      </Section>
+
+      <Section title="Do's and don'ts">
+        <Field label="Guidelines" value={client.dos_and_donts} multiline />
+      </Section>
+
+      <Section title="Topics">
+        <Field label="Topics library" value={client.topics_library} multiline />
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Evergreen topics
+          </p>
+          <ChipList items={profile.content_strategy.evergreen_topics} />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Off-limits topics
+          </p>
+          <ChipList items={profile.content_strategy.off_limits_topics} />
+        </div>
+      </Section>
+
+      <Section title="Stories & differentiation">
+        <Field label="Key stories" value={client.key_stories} multiline />
+        <Field label="Unique mechanisms" value={client.unique_mechanisms} multiline />
+        <Field label="Social proof" value={client.social_proof} multiline />
+      </Section>
+
+      <Section title="Voice details">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Signature phrases
+          </p>
+          <ChipList items={profile.voice.signature_phrases} />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Forbidden words
+          </p>
+          <ChipList items={profile.voice.forbidden_words} />
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Banned phrases
+          </p>
+          <ChipList items={profile.voice.banned_phrases} />
+        </div>
+        <Field label="Common enemy" value={profile.voice.common_enemy} multiline />
+      </Section>
+
+      <Section title="Visual identity">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <ColorSwatch label="Primary" hex={profile.visual.colors.primary} />
+          <ColorSwatch label="Secondary" hex={profile.visual.colors.secondary} />
+          <ColorSwatch label="Accent" hex={profile.visual.colors.accent} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <Field label="Vibe" value={titleCase(profile.visual.colors.vibe)} />
+          <Field
+            label="Typography personality"
+            value={titleCase(profile.visual.typography.personality)}
+          />
+          <Field label="Primary font" value={profile.visual.typography.primary_font} />
+          <Field label="Secondary font" value={profile.visual.typography.secondary_font} />
+          <Field
+            label="Photo / video style"
+            value={titleCase(profile.visual.style.photo_video_style.replace(/_/g, ' '))}
+          />
+          <Field
+            label="Graphic style"
+            value={titleCase(profile.visual.style.graphic_style)}
+          />
+          <Field
+            label="Color treatment"
+            value={titleCase(profile.visual.style.editing_color_treatment.replace(/_/g, ' '))}
+          />
+        </div>
+      </Section>
+
+      <Section title="Content rules">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ChecklistBlock
+            title="Must include"
+            tone="positive"
+            items={Object.entries(profile.content_strategy.must_include).map(([key, on]) => ({
+              key,
+              label: titleCase(key.replace(/_/g, ' ')),
+              on,
+            }))}
+          />
+          <ChecklistBlock
+            title="Never do"
+            tone="negative"
+            items={Object.entries(profile.content_strategy.never_do).map(([key, on]) => ({
+              key,
+              label: titleCase(key.replace(/_/g, ' ')),
+              on,
+            }))}
+          />
+        </div>
+      </Section>
+
+      <Section title="Myths & hot takes">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+            Myths vs truth
+          </p>
+          {profile.content_strategy.myths.every((m) => !m.myth && !m.truth) ? (
+            <p className="text-sm text-gray-400 italic">No myths captured.</p>
+          ) : (
+            <div className="space-y-2">
+              {profile.content_strategy.myths
+                .filter((m) => m.myth || m.truth)
+                .map((m, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <p className="text-xs text-gray-500">
+                      <span className="font-semibold">Myth:</span> {m.myth || '-'}
+                    </p>
+                    <p className="text-xs text-gray-700 mt-1">
+                      <span className="font-semibold">Truth:</span> {m.truth || '-'}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Hot takes
+          </p>
+          <ChipList items={profile.content_strategy.hot_takes} />
+        </div>
+      </Section>
+
+      <Section title="Legal">
+        <Field label="Disclaimers" value={profile.legal.disclaimers} multiline />
+        <Field
+          label="Compliance requirements"
+          value={profile.legal.compliance_requirements}
+          multiline
+        />
+      </Section>
+    </div>
+  )
+}
+
+function CompetitorsTab({ client, profile }: { client: ClientRow; profile: BrandProfile }) {
+  const intakeCompetitors = profile.competitors.filter(
+    (c) => c.name_or_handle || c.does_well || c.does_poorly || c.differentiate,
+  )
+
+  return (
+    <div className="space-y-4">
+      <Section
+        title="Competitor insights"
+        description="Saved from the competitor analysis tool."
+      >
+        {client.competitor_insights ? (
+          <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed break-words [overflow-wrap:anywhere]">
+            {client.competitor_insights}
+          </p>
+        ) : (
+          <p className="text-sm text-gray-400 italic">
+            No competitor insights yet. Run a competitor analysis to populate this.
+          </p>
+        )}
+      </Section>
+
+      {intakeCompetitors.length > 0 && (
+        <Section
+          title="Competitors from brand intake"
+          description="Competitors the client called out in their brand intake form."
+        >
+          <div className="space-y-3">
+            {intakeCompetitors.map((c, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-lg border border-gray-200 bg-white space-y-2"
+              >
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <p className="font-semibold text-sm text-gray-900">
+                    {c.name_or_handle || `Competitor ${i + 1}`}
+                  </p>
+                  {c.follower_count && (
+                    <span className="text-xs text-gray-500">
+                      {c.follower_count} followers
+                    </span>
+                  )}
+                </div>
+                <Field label="Does well" value={c.does_well} multiline />
+                <Field label="Does poorly" value={c.does_poorly} multiline />
+                <Field
+                  label="How we differentiate"
+                  value={c.differentiate}
+                  multiline
+                />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Smaller components
+// ============================================================================
+
+function BrandDocBlock({
+  url,
+  clientName,
+  flash,
+}: {
+  url: string
+  clientName: string
+  flash: (type: 'success' | 'error', message: string, ms?: number) => void
+}) {
+  const [downloading, setDownloading] = useState(false)
+  const filename = useMemo(() => {
+    try {
+      const u = new URL(url)
+      const last = u.pathname.split('/').filter(Boolean).pop()
+      if (last) return decodeURIComponent(last)
+    } catch {}
+    return `${clientName.replace(/\s+/g, '-').toLowerCase()}-brand-doc`
+  }, [url, clientName])
+
+  const onDownload = async () => {
+    setDownloading(true)
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('fetch failed')
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = filename || 'brand-doc'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(objectUrl)
+    } catch (e) {
+      // CORS or non-file URL - fall back to opening in a new tab
+      console.error('brand doc download failed; opening in new tab', e)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      flash('error', 'Could not download - opened in a new tab instead', 3500)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg flex-wrap">
+      <FileText className="h-5 w-5 text-green-600 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-green-800 truncate">{filename}</p>
+        <p className="text-xs text-green-700/80 truncate">{url}</p>
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        Preview
+      </a>
+      <button
+        type="button"
+        onClick={onDownload}
+        disabled={downloading}
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition disabled:opacity-50"
+      >
+        <Download className="h-3.5 w-3.5" />
+        {downloading ? 'Downloading…' : 'Download'}
+      </button>
+    </div>
+  )
+}
+
+function ColorSwatch({ label, hex }: { label: string; hex: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="h-10 w-10 rounded-lg border border-gray-200 shrink-0"
+        style={{ backgroundColor: hex || '#ffffff' }}
+        aria-label={`${label} color`}
+      />
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{label}</p>
+        <p className="text-sm font-mono text-gray-900">{hex || '-'}</p>
+      </div>
+    </div>
+  )
+}
+
+function ChecklistBlock({
+  title,
+  tone,
+  items,
+}: {
+  title: string
+  tone: 'positive' | 'negative'
+  items: { key: string; label: string; on: boolean }[]
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-4">
+      <p className="text-sm font-semibold text-gray-900 mb-3">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((it) => {
+          const active = it.on
+          return (
+            <li key={it.key} className="flex items-center gap-2 text-sm">
+              {active ? (
+                <Check
+                  className={`h-4 w-4 shrink-0 ${
+                    tone === 'positive' ? 'text-green-600' : 'text-red-600'
+                  }`}
+                />
+              ) : (
+                <XIcon className="h-4 w-4 shrink-0 text-gray-300" />
+              )}
+              <span className={active ? 'text-gray-900' : 'text-gray-400 line-through'}>
+                {it.label}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function titleCase(s: string | null | undefined): string {
+  if (!s) return ''
+  return s
+    .split(' ')
+    .map((w) => (w ? w[0]?.toUpperCase() + w.slice(1) : ''))
+    .join(' ')
 }

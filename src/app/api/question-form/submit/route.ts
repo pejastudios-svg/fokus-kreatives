@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { FormQuestion } from '@/lib/types/questionForm'
 import type { TopicPillar } from '@/lib/types/topics'
+import { getAgencyRecipientsForClient } from '@/lib/clientRecipients'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,13 +28,11 @@ async function notifyAgency(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
   const clientUrl = `${appUrl}/clients/${clientId}`
 
-  try {
-    const { data: teamUsers } = await supabase
-      .from('users')
-      .select('id')
-      .neq('role', 'client')
+  const recipients = await getAgencyRecipientsForClient(supabase, clientId)
+  const userIds = recipients.map((r) => r.id).filter(Boolean)
+  const emails = recipients.map((r) => r.email).filter((e): e is string => Boolean(e))
 
-    const userIds = (teamUsers || []).map((u) => u.id).filter(Boolean)
+  try {
     if (userIds.length) {
       await fetch(`${appUrl}/api/notifications/create`, {
         method: 'POST',
@@ -57,6 +56,7 @@ async function notifyAgency(
   try {
     const secret = process.env.APPS_SCRIPT_SECRET
     if (secret) {
+      const to = emails.length ? Array.from(new Set([...emails, AGENCY_NOTIFY_EMAIL])) : [AGENCY_NOTIFY_EMAIL]
       await fetch(`${appUrl}/api/notify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +64,7 @@ async function notifyAgency(
           type: 'question_form_submitted',
           payload: {
             secret,
-            to: [AGENCY_NOTIFY_EMAIL],
+            to,
             clientName: clientName || 'A client',
             businessName: businessName || '',
             count,

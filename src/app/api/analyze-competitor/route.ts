@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Please paste the competitor script or transcript — we break it down line by line.',
+          error: 'Please paste the competitor script or transcript - we break it down line by line.',
         },
         { status: 400 },
       )
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 You will receive a full script/transcript. Your job is to return a JSON object that breaks it down into:
 1. What the script actually does (hook, structure, CTA, voice)
 2. What works and what doesn't (honest critique)
-3. Takeaways our client can plug into their own scripts right now — formulas, structural moves, new angles
+3. Takeaways our client can plug into their own scripts right now - formulas, structural moves, new angles
 
 Be specific. No generic advice like "be more engaging". Quote short snippets when useful, but never copy full sentences for the client to reuse. Rate hook and CTA on a 1-10 scale based on real-world stopping power and conversion likelihood.`
 
@@ -187,9 +187,9 @@ Return a JSON object with exactly this shape (no extra keys, no markdown, just J
     "notable_patterns": ["repeated phrases, stylistic moves"]
   },
   "what_works": ["5-8 specific things this script does well"],
-  "what_doesnt_work": ["3-6 specific weaknesses, misses, or risks — be honest"],
+  "what_doesnt_work": ["3-6 specific weaknesses, misses, or risks - be honest"],
   "takeaways_for_client": {
-    "hook_formulas": ["5-8 new hook formulas inspired by this, NOT copied — written so the client can plug in their own topic"],
+    "hook_formulas": ["5-8 new hook formulas inspired by this, NOT copied - written so the client can plug in their own topic"],
     "cta_formulas": ["5-8 CTA formulas in the same energy"],
     "structural_moves": ["3-5 structural moves (pacing, order, transitions) worth stealing"],
     "new_angles": ["3-5 fresh content angles our client could make in this style on their own topic"]
@@ -217,7 +217,7 @@ Return ONLY the JSON. No preamble, no trailing commentary.`
     } catch (e) {
       console.error('analyze-competitor parse error:', e, raw.slice(0, 500))
       return NextResponse.json(
-        { success: false, error: 'AI returned an unparseable response — try again.' },
+        { success: false, error: 'AI returned an unparseable response - try again.' },
         { status: 500 },
       )
     }

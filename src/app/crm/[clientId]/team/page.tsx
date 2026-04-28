@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Users, Trash2, Shield, Search, X, CheckCircle, AlertCircle, Copy, Mail } from 'lucide-react'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 type CRMRole = 'admin' | 'manager'
 type AppRole = 'admin' | 'manager' | 'employee' | 'client'
@@ -46,6 +47,7 @@ export default function CRMTeamPage() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string; link?: string } | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null)
 
   const canInvite = currentCrmRole === 'admin'
   const canRemove = currentCrmRole === 'admin'
@@ -327,10 +329,6 @@ export default function CRMTeamPage() {
   const handleRemoveMember = async (userId: string) => {
     if (!canRemove) return
 
-    const confirmed = window.confirm('Remove this member from THIS client CRM?')
-    if (!confirmed) return
-
-    // Optimistic remove
     const prev = members
     setMembers((p) => p.filter((m) => m.id !== userId))
 
@@ -343,6 +341,7 @@ export default function CRMTeamPage() {
     if (error) {
       console.error('Remove CRM member error:', error)
       setMembers(prev)
+      throw new Error('Failed to remove member')
     }
   }
 
@@ -532,7 +531,7 @@ export default function CRMTeamPage() {
                     <td className="px-6 py-4 text-right">
                       {canRemove && (
                         <button
-                          onClick={() => handleRemoveMember(member.id)}
+                          onClick={() => setRemoveTarget(member)}
                           className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Remove from this CRM"
                         >
@@ -606,6 +605,24 @@ export default function CRMTeamPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!removeTarget}
+        title="Remove member from this CRM?"
+        message={
+          removeTarget
+            ? `${removeTarget.email} will lose access to this client's CRM workspace. They keep agency access.`
+            : ''
+        }
+        confirmLabel="Remove"
+        tone="danger"
+        onConfirm={async () => {
+          if (!removeTarget) return
+          await handleRemoveMember(removeTarget.id)
+          setRemoveTarget(null)
+        }}
+        onClose={() => setRemoveTarget(null)}
+      />
     </div>
   )
 }

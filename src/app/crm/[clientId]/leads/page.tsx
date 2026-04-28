@@ -789,7 +789,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             />
                           ) : (
                             <span className="text-white block min-h-6 px-2 py-1 rounded hover:bg-[#334155] transition-colors">
-                              {(value as string) || <span className="text-gray-500">—</span>}
+                              {(value as string) || <span className="text-gray-500">-</span>}
                             </span>
                             )}
                           </td>
@@ -1210,7 +1210,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 // Status Badge Component
 function StatusBadge({ value, options }: { value: string; options: StatusOption[] }) {
   const option = options.find(o => o.value === value)
-  if (!option) return <span className="text-gray-500">—</span>
+  if (!option) return <span className="text-gray-500">-</span>
 
   return (
     <span 
@@ -1232,7 +1232,7 @@ function StatusBadge({ value, options }: { value: string; options: StatusOption[
 
 // URL Display Component
 function UrlDisplay({ value, displayType, fieldName }: { value: string; displayType: 'button' | 'link' | 'hyperlink'; fieldName?: string }) {
-  if (!value) return <span className="text-gray-500">—</span>
+  if (!value) return <span className="text-gray-500">-</span>
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()

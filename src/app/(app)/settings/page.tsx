@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { FileUpload } from '@/components/ui/FileUpload'
+import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
 import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
@@ -90,21 +89,45 @@ useEffect(() => {
   }
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      setNotification({ type: 'error', message: 'Enter your current password' })
+      return
+    }
+
     if (newPassword !== confirmPassword) {
       setNotification({ type: 'error', message: 'Passwords do not match' })
       return
     }
 
-    if (newPassword.length < 6) {
-      setNotification({ type: 'error', message: 'Password must be at least 6 characters' })
+    if (newPassword.length < 8) {
+      setNotification({ type: 'error', message: 'Password must be at least 8 characters' })
+      return
+    }
+
+    if (newPassword === currentPassword) {
+      setNotification({ type: 'error', message: 'New password must be different from current password' })
       return
     }
 
     setIsChangingPassword(true)
 
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
+    if (!email) {
+      setNotification({ type: 'error', message: 'No email on session' })
+      setIsChangingPassword(false)
+      return
+    }
+
+    const { error: verifyErr } = await supabase.auth.signInWithPassword({
+      email,
+      password: currentPassword,
     })
+    if (verifyErr) {
+      setNotification({ type: 'error', message: 'Current password is incorrect' })
+      setIsChangingPassword(false)
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
 
     if (error) {
       setNotification({ type: 'error', message: error.message })
@@ -121,18 +144,15 @@ useEffect(() => {
 
 function SettingsSkeleton() {
   return (
-    <div className="max-w-4xl animate-in fade-in">
+    <div className="animate-in fade-in">
       <Card className="mb-6">
         <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-6">
-            <Skeleton className="h-20 w-20 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
+          {/* Profile picture (centered, large) */}
+          <div className="flex justify-center">
+            <Skeleton className="h-36 w-36 rounded-full" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
             <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
           </div>
@@ -143,12 +163,12 @@ function SettingsSkeleton() {
       <Card className="mb-6">
         <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
         <CardContent className="space-y-4">
-           <Skeleton className="h-10 w-full" />
-           <div className="grid grid-cols-2 gap-4">
-             <Skeleton className="h-10 w-full" />
-             <Skeleton className="h-10 w-full" />
-           </div>
-           <div className="flex justify-end"><Skeleton className="h-10 w-40" /></div>
+          <Skeleton className="h-10 w-full" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="flex justify-end"><Skeleton className="h-10 w-40" /></div>
         </CardContent>
       </Card>
     </div>
@@ -161,7 +181,7 @@ function SettingsSkeleton() {
         title="Settings" 
         subtitle="Manage your account and preferences"
       />
-      <div className="p-8 max-w-4xl">
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
         {notification && (
           <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
             notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
@@ -182,36 +202,17 @@ function SettingsSkeleton() {
                 <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center gap-6">
-                  {profilePicture ? (
-                    <Image
-                      src={profilePicture}
-                      alt="Profile"
-                      width={80}
-                      height={80}
-                      className="h-20 w-20 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-20 w-20 rounded-full bg-brand-gradient flex items-center justify-center text-white text-2xl font-bold">
-                      {name.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
-                  )}
-                  <div className="flex-1 space-y-2">
-                    <FileUpload
-                      label="Upload Profile Picture"
-                      folder="profile-pictures"
-                      accept="image/*"
-                      onUpload={(url) => setProfilePicture(url)}
-                    />
-                    <Input
-                      label="Or use URL"
-                      value={profilePicture}
-                      onChange={(e) => setProfilePicture(e.target.value)}
-                      placeholder="https://example.com/photo.jpg"
-                    />
-                  </div>
+                <div className="flex justify-center">
+                  <ProfilePictureUpload
+                    value={profilePicture}
+                    onChange={(url) => setProfilePicture(url)}
+                    folder="profile-pictures"
+                    fallback={name ? 'initial' : 'user'}
+                    initialChar={name.charAt(0) || 'U'}
+                    ariaLabel="Your profile picture"
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Full Name"
                     value={name}
@@ -255,7 +256,7 @@ function SettingsSkeleton() {
                     {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative">
                     <Input
                       label="New Password"
@@ -290,10 +291,10 @@ function SettingsSkeleton() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <Button 
-                    onClick={handleChangePassword} 
+                  <Button
+                    onClick={handleChangePassword}
                     isLoading={isChangingPassword}
-                    disabled={!newPassword || !confirmPassword}
+                    disabled={!currentPassword || !newPassword || !confirmPassword}
                   >
                     Change Password
                   </Button>

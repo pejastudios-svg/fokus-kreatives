@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
 import type { FormQuestion } from '@/lib/types/questionForm'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 
 interface PublicClient {
   id: string
@@ -38,7 +39,10 @@ export default function QuestionFormPage() {
 
   const [form, setForm] = useState<PublicForm | null>(null)
   const [client, setClient] = useState<PublicClient | null>(null)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers, clearAnswers] = useFormPersistence<Record<string, string>>(
+    `question-form:${token}`,
+    {},
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -88,6 +92,7 @@ export default function QuestionFormPage() {
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {
+        clearAnswers()
         setSuccess(true)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
@@ -127,7 +132,7 @@ export default function QuestionFormPage() {
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks — we got it!</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks - we got it!</h2>
             <p className="text-gray-500">
               Your answers are being turned into content ideas right now. You can close this page.
             </p>
@@ -170,11 +175,11 @@ export default function QuestionFormPage() {
             </div>
 
             <p className="text-sm text-gray-600">
-              Answer what you can. Every answer becomes a script. Specifics win — real stories,
+              Answer what you can. Every answer becomes a script. Specifics win - real stories,
               mistakes, wins, and hot takes turn into content that actually sounds like you.
               {form.already_submitted && (
                 <span className="block mt-2 text-xs text-gray-500">
-                  You&apos;ve submitted this before — feel free to add more answers and resubmit.
+                  You&apos;ve submitted this before - feel free to add more answers and resubmit.
                 </span>
               )}
             </p>
@@ -202,7 +207,7 @@ export default function QuestionFormPage() {
               <textarea
                 value={answers[q.id] ?? ''}
                 onChange={(e) => handleChange(q.id, e.target.value)}
-                placeholder={q.placeholder || 'Type your answer — 2 to 6 sentences is perfect.'}
+                placeholder={q.placeholder || 'Type your answer - 2 to 6 sentences is perfect.'}
                 rows={4}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
               />

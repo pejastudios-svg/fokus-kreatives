@@ -1,8 +1,9 @@
 // src/app/approvals/[id]/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +18,9 @@ import {
   MessageCircle,
   Paperclip,
   Copy,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react'
 
 interface ApprovalDetail {
@@ -29,6 +33,7 @@ interface ApprovalDetail {
   clickup_task_name: string | null
   auto_approve_at: string | null
   created_at: string
+  share_token: string | null
   clients?: {
     name: string
     business_name: string
@@ -57,14 +62,22 @@ interface Assignee {
   } | null
 }
 
+interface CommentAttachment {
+  url: string
+  name: string
+  size: number | null
+}
+
 interface Comment {
   id: string
   approval_id: string
   approval_item_id: string | null
-  user_id: string
+  user_id: string | null
   content: string
   file_url: string | null
   file_name: string | null
+  reviewer_email: string | null
+  attachments: CommentAttachment[] | null
   resolved: boolean
   parent_comment_id: string | null
   created_at: string
@@ -99,6 +112,16 @@ export default function ApprovalDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    name: string
+    email: string
+    profile_picture_url: string | null
+  } | null>(null)
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const showToast = (kind: 'success' | 'error', text: string, ms = 2400) => {
+    setToast({ kind, text })
+    setTimeout(() => setToast((t) => (t?.text === text ? null : t)), ms)
+  }
 
   // Editing item
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -111,7 +134,6 @@ export default function ApprovalDetailPage() {
   const [commentFile, setCommentFile] = useState<File | null>(null)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
   const [previewImageName, setPreviewImageName] = useState<string | null>(null)
-  const [sendingCommentForItem, setSendingCommentForItem] = useState<string | null>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingCommentText, setEditingCommentText] = useState<string>('')
   const [resolvingCommentId, setResolvingCommentId] = useState<string | null>(null)
@@ -191,10 +213,17 @@ export default function ApprovalDetailPage() {
 
     const { data: userRow } = await supabase
       .from('users')
-      .select('role')
+      .select('role, name, email, profile_picture_url')
       .eq('id', user.id)
       .single()
     setCurrentUserRole(userRow?.role || null)
+    if (userRow) {
+      setCurrentUserProfile({
+        name: userRow.name || '',
+        email: userRow.email || user.email || '',
+        profile_picture_url: userRow.profile_picture_url || null,
+      })
+    }
 
     await Promise.all([loadApproval(), loadItems(), loadAssignees(), loadComments()])
   } finally {
@@ -203,16 +232,53 @@ export default function ApprovalDetailPage() {
 }
 
   const loadApproval = async () => {
-    const { data, error } = await supabase
+    if (!approvalId) {
+      console.warn('loadApproval: missing approvalId in route params')
+      return
+    }
+    let { data, error } = await supabase
       .from('approvals')
       .select(
-        'id, client_id, title, description, status, clickup_task_id, clickup_task_name, auto_approve_at, created_at, clients(name, business_name)'
+        'id, client_id, title, description, status, clickup_task_id, clickup_task_name, auto_approve_at, created_at, share_token, clients(name, business_name)'
       )
       .eq('id', approvalId)
-      .single()
+      .maybeSingle()
+
+    // Older DBs don't have share_token yet — fall back so the page still loads.
+    if (
+      error &&
+      ((error as { code?: string }).code === '42703' ||
+        (error as { code?: string }).code === 'PGRST204')
+    ) {
+      const fallback = await supabase
+        .from('approvals')
+        .select(
+          'id, client_id, title, description, status, clickup_task_id, clickup_task_name, auto_approve_at, created_at, clients(name, business_name)'
+        )
+        .eq('id', approvalId)
+        .maybeSingle()
+      data = fallback.data
+        ? { ...fallback.data, share_token: null }
+        : null
+      error = fallback.error
+    }
 
     if (error) {
-      console.error('Load approval detail error:', error)
+      // Supabase errors don't expose enumerable fields by default — pluck the
+      // useful ones explicitly so we can see what's actually wrong instead of
+      // an empty `{}` in the console.
+      console.error('Load approval detail error:', {
+        approvalId,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      })
+      return
+    }
+    if (!data) {
+      console.warn('Approval not found or not accessible to current user', { approvalId })
+      setApproval(null)
       return
     }
 
@@ -226,6 +292,8 @@ export default function ApprovalDetailPage() {
       clickup_task_name: data.clickup_task_name,
       auto_approve_at: data.auto_approve_at,
       created_at: data.created_at,
+      share_token:
+        (data as { share_token?: string | null }).share_token ?? null,
       clients: Array.isArray(data.clients) ? data.clients[0] : data.clients,
     }
 
@@ -233,6 +301,7 @@ export default function ApprovalDetailPage() {
   }
 
   const loadItems = async () => {
+    if (!approvalId) return
     const { data, error } = await supabase
       .from('approval_items')
       .select('*')
@@ -240,21 +309,34 @@ export default function ApprovalDetailPage() {
       .order('position', { ascending: true })
 
     if (error) {
-      console.error('Load approval items error:', error)
+      console.error('Load approval items error:', {
+        approvalId,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      })
       return
     }
-
+    console.debug('[approval-detail] items loaded', { approvalId, count: data?.length ?? 0 })
     setItems(data || [])
   }
 
   const loadAssignees = async () => {
+  if (!approvalId) return
   const { data, error } = await supabase
     .from('approval_assignees')
     .select('id, role, user_id, users(name, email, profile_picture_url)')
     .eq('approval_id', approvalId)
 
   if (error) {
-    console.error('Load assignees error:', error)
+    console.error('Load assignees error:', {
+      approvalId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    })
     return
   }
 
@@ -277,16 +359,23 @@ export default function ApprovalDetailPage() {
 }
 
   const loadComments = async () => {
+  if (!approvalId) return
   const { data, error } = await supabase
     .from('approval_comments')
     .select(
-      'id, approval_id, approval_item_id, user_id, content, file_url, file_name, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
+      'id, approval_id, approval_item_id, user_id, content, file_url, file_name, reviewer_email, attachments, resolved, parent_comment_id, created_at, users(name, email, profile_picture_url)'
     )
     .eq('approval_id', approvalId)
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Load comments error:', error)
+    console.error('Load comments error:', {
+      approvalId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    })
     return
   }
 
@@ -295,10 +384,12 @@ export default function ApprovalDetailPage() {
       id: string
       approval_id: string
       approval_item_id: string | null
-      user_id: string
+      user_id: string | null
       content: string
       file_url: string | null
       file_name: string | null
+      reviewer_email: string | null
+      attachments: CommentAttachment[] | null
       resolved: boolean
       parent_comment_id: string | null
       created_at: string
@@ -312,6 +403,8 @@ export default function ApprovalDetailPage() {
       content: r.content,
       file_url: r.file_url,
       file_name: r.file_name,
+      reviewer_email: r.reviewer_email,
+      attachments: r.attachments,
       resolved: r.resolved,
       parent_comment_id: r.parent_comment_id,
       created_at: r.created_at,
@@ -340,23 +433,36 @@ export default function ApprovalDetailPage() {
   const canEditItems = currentUserRole && currentUserRole !== 'client'
 
   const handleCopyLink = async () => {
-  try {
-    const origin =
-      typeof window !== 'undefined' ? window.location.origin : ''
-    const portalUrl = `${origin}/portal/approvals/${approvalId}`
-    await navigator.clipboard.writeText(portalUrl)
-    alert('Approval link copied to clipboard.')
-  } catch (err) {
-    console.error('Copy link error', err)
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const url = approval?.share_token
+        ? `${origin}/review/${approval.share_token}`
+        : `${origin}/portal/approvals/${approvalId}`
+      await navigator.clipboard.writeText(url)
+      showToast(
+        'success',
+        approval?.share_token ? 'Review link copied' : 'Link copied',
+      )
+    } catch (err) {
+      console.error('Copy link error', err)
+      showToast('error', "Couldn't copy. Try again.")
+    }
   }
-}
+
+  // Per-item race lock: ignore re-entry for an item that's already toggling.
+  // (A user double-clicking the same Approve button shouldn't fire two PATCH
+  // requests + two recomputes; same for clicking it then immediately undoing.)
+  const togglingItemsRef = useRef<Set<string>>(new Set())
+  const [togglingItemIds, setTogglingItemIds] = useState<Set<string>>(new Set())
 
   const toggleItemStatus = async (item: ApprovalItem) => {
     if (!currentUserId) return
+    if (togglingItemsRef.current.has(item.id)) return
+    togglingItemsRef.current.add(item.id)
+    setTogglingItemIds(new Set(togglingItemsRef.current))
 
     const newStatus = item.status === 'approved' ? 'pending' : 'approved'
 
-    // Optimistic update
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, status: newStatus } : i))
     )
@@ -371,18 +477,19 @@ export default function ApprovalDetailPage() {
         console.error('Toggle item status error:', error)
         await loadItems()
       } else {
-        // If all items are approved, set approval to approved & sync ClickUp
-        // If any item is pending, set approval to pending
         await fetch('/api/approvals/recompute', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ approvalId, actorId: currentUserId }),
-})
-await loadApproval()
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approvalId, actorId: currentUserId }),
+        })
+        await loadApproval()
       }
     } catch (err) {
       console.error('Toggle item exception', err)
       await loadItems()
+    } finally {
+      togglingItemsRef.current.delete(item.id)
+      setTogglingItemIds(new Set(togglingItemsRef.current))
     }
   }
 
@@ -451,76 +558,107 @@ await loadApproval()
 }
 
   const sendComment = async (itemId: string | null) => {
-  if (!currentUserId) return
+    if (!currentUserId) return
 
-  const key = itemId || 'general'
-  const text = (newCommentText[key] || '').trim()
-  if (!text && !commentFile) return
+    const key = itemId || 'general'
+    const text = (newCommentText[key] || '').trim()
+    if (!text && !commentFile) return
 
-  setSendingCommentForItem(key)
+    // Snapshot then clear inputs immediately so the user can keep typing.
+    const fileToUpload = commentFile
+    const replyToCommentId =
+      replyTarget && replyTarget.itemId === itemId ? replyTarget.commentId : null
+    setNewCommentText((prev) => ({ ...prev, [key]: '' }))
+    setCommentFile(null)
+    setReplyTarget((prev) => (prev && prev.itemId === itemId ? null : prev))
 
-  let fileUrl: string | null = null
-  let fileName: string | null = null
+    // Optimistic comment — gets replaced once realtime/loadComments brings in
+    // the real one (it'll have a real uuid and our temp- one drops out).
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const optimisticPreviewUrl = fileToUpload
+      ? URL.createObjectURL(fileToUpload)
+      : null
+    const optimistic: Comment = {
+      id: tempId,
+      approval_id: approvalId,
+      approval_item_id: itemId,
+      user_id: currentUserId,
+      content: text,
+      file_url: optimisticPreviewUrl,
+      file_name: fileToUpload?.name || null,
+      reviewer_email: null,
+      attachments: null,
+      resolved: false,
+      parent_comment_id: replyToCommentId,
+      created_at: new Date().toISOString(),
+      users: currentUserProfile
+        ? { ...currentUserProfile }
+        : { name: 'You', email: '', profile_picture_url: null },
+    }
+    setComments((prev) => [...prev, optimistic])
 
-  // Upload file if present
-  if (commentFile) {
-    const formData = new FormData()
-    formData.append('file', commentFile)
-    formData.append('folder', `approvals/${approvalId}/comments`)
+    // Background send so the UI never waits.
+    ;(async () => {
+      let fileUrl: string | null = null
+      let fileName: string | null = null
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-      const uploadData = await res.json()
-      if (uploadData.success) {
-        fileUrl = uploadData.url
-        fileName = commentFile.name
+      if (fileToUpload) {
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+        formData.append('folder', `approvals/${approvalId}/comments`)
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          })
+          const uploadData = await res.json()
+          if (uploadData.success) {
+            fileUrl = uploadData.url
+            fileName = fileToUpload.name
+          }
+        } catch (err) {
+          console.error('Comment file upload error:', err)
+        }
       }
-    } catch (err) {
-      console.error('Comment file upload error:', err)
-    }
-  }
 
-  try {
-    const res = await fetch('/api/approvals/comment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        approvalId,
-        approvalItemId: itemId,
-        userId: currentUserId,
-        content: text,
-        fileUrl,
-        fileName,
-        parentCommentId:
-          replyTarget && replyTarget.itemId === itemId
-            ? replyTarget.commentId
-            : null,
-      }),
-    })
+      try {
+        const res = await fetch('/api/approvals/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            approvalId,
+            approvalItemId: itemId,
+            userId: currentUserId,
+            content: text,
+            fileUrl,
+            fileName,
+            parentCommentId: replyToCommentId,
+          }),
+        })
 
-    const apiData = await res.json()
-    if (!apiData.success) {
-      console.error('Send comment API error:', apiData.error)
-      alert('Failed to send comment')
-    } else {
-      setNewCommentText((prev) => ({ ...prev, [key]: '' }))
-      setCommentFile(null)
-      setReplyTarget((prev) =>
-        prev && prev.itemId === itemId ? null : prev
-      )
-      // Realtime should refresh comments, but we can also reload
-      await loadComments()
-    }
-  } catch (err) {
-    console.error('Send comment exception', err)
-    alert('Failed to send comment')
-  } finally {
-    setSendingCommentForItem(null)
+        const apiData = await res.json()
+        if (!apiData.success) {
+          console.error('Send comment API error:', apiData.error)
+          // Roll back the optimistic comment.
+          setComments((prev) => prev.filter((c) => c.id !== tempId))
+          if (optimisticPreviewUrl) URL.revokeObjectURL(optimisticPreviewUrl)
+          alert('Failed to send comment')
+          return
+        }
+
+        // Realtime usually refreshes within a tick, but reload as a fallback
+        // so the temp comment is replaced by the real row.
+        await loadComments()
+        setComments((prev) => prev.filter((c) => c.id !== tempId))
+        if (optimisticPreviewUrl) URL.revokeObjectURL(optimisticPreviewUrl)
+      } catch (err) {
+        console.error('Send comment exception', err)
+        setComments((prev) => prev.filter((c) => c.id !== tempId))
+        if (optimisticPreviewUrl) URL.revokeObjectURL(optimisticPreviewUrl)
+        alert('Failed to send comment')
+      }
+    })()
   }
-}
 
   const startEditComment = (comment: Comment) => {
     setEditingCommentId(comment.id)
@@ -604,10 +742,56 @@ await loadApproval()
     }
   }
 
+  const normalizeMentionKey = (s: string) =>
+    (s || '').toLowerCase().replace(/[^a-z0-9_]/g, '')
+
+  // Map normalized first-name / full-name → user record so we can render
+  // @-mentions as inline pills with avatar + display name.
+  const mentionLookup = (() => {
+    const map = new Map<
+      string,
+      { id: string; name: string; profile_picture_url: string | null }
+    >()
+    for (const u of mentionUsers) {
+      const first = normalizeMentionKey(u.name.split(' ')[0] || '')
+      const full = normalizeMentionKey(u.name.replace(/\s+/g, ''))
+      if (first) map.set(first, u)
+      if (full) map.set(full, u)
+    }
+    return map
+  })()
+
+  const renderMentionPill = (
+    user: { id: string; name: string; profile_picture_url: string | null },
+    key: string | number,
+  ) => (
+    <span
+      key={key}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium align-baseline"
+    >
+      {user.profile_picture_url ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={user.profile_picture_url}
+          alt={user.name}
+          className="h-3.5 w-3.5 rounded-full object-cover"
+        />
+      ) : (
+        <span className="h-3.5 w-3.5 rounded-full bg-[#2B79F7] text-white flex items-center justify-center text-[8px] font-semibold">
+          {user.name.charAt(0).toUpperCase()}
+        </span>
+      )}
+      <span>@{user.name}</span>
+    </span>
+  )
+
   const formatComment = (content: string) => {
     const parts = content.split(/(\s+)/)
     return parts.map((part, idx) => {
       if (part.startsWith('@') && part.length > 1) {
+        const token = normalizeMentionKey(part.slice(1))
+        const user = mentionLookup.get(token)
+        if (user) return renderMentionPill(user, idx)
         return (
           <span key={idx} className="text-[#2563EB] font-medium">
             {part}
@@ -618,15 +802,55 @@ await loadApproval()
     })
   }
 
-  if (isLoading || !approval) {
+  // Resolved mentions in the *current draft* text — used to show a "Tagging:"
+  // preview row under the input so the author sees who'll be notified.
+  const resolveDraftMentions = (text: string) => {
+    const seen = new Set<string>()
+    const out: { id: string; name: string; profile_picture_url: string | null }[] = []
+    const tokens = text.match(/@([a-zA-Z0-9_]+)/g) || []
+    for (const t of tokens) {
+      const u = mentionLookup.get(normalizeMentionKey(t.slice(1)))
+      if (u && !seen.has(u.id)) {
+        seen.add(u.id)
+        out.push(u)
+      }
+    }
+    return out
+  }
+
+  if (isLoading) {
     return (
       <>
         <Header title="Approval Detail" />
-        <div className="p-8">
+        <div className="p-4 md:p-8">
           <Card>
             <CardContent className="py-10 text-center text-gray-500">
               <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
               Loading approval...
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    )
+  }
+
+  if (!approval) {
+    return (
+      <>
+        <Header title="Approval not found" />
+        <div className="p-4 md:p-8 max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="py-10 text-center space-y-3">
+              <p className="text-gray-700 font-medium">This approval can&rsquo;t be loaded.</p>
+              <p className="text-sm text-gray-500">
+                It may have been deleted, or you don&rsquo;t have access to it.
+              </p>
+              <a
+                href="/approvals"
+                className="inline-block mt-2 px-4 py-2 rounded-lg bg-[#2B79F7] text-white text-sm hover:bg-[#1E54B7]"
+              >
+                Back to approvals
+              </a>
             </CardContent>
           </Card>
         </div>
@@ -654,7 +878,32 @@ await loadApproval()
         title={approval.title}
         subtitle={`${clientName} · Created ${createdDate}`}
       />
-      <div className="p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-150">
+          <div
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
+              toast.kind === 'success'
+                ? 'bg-white border-green-200 text-green-700'
+                : 'bg-white border-red-200 text-red-700'
+            }`}
+          >
+            {toast.kind === 'success' ? (
+              <CheckCircle className="h-4 w-4 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0" />
+            )}
+            <span className="text-sm">{toast.text}</span>
+          </div>
+        </div>
+      )}
+      <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
+        <Link
+          href="/approvals"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2B79F7]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to approvals
+        </Link>
         {/* Top card */}
         <Card>
   <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 break-all">
@@ -703,37 +952,36 @@ await loadApproval()
 
             return (
               <Card key={item.id}>
-                <CardHeader className="flex flex-row items-center justify-between gap-3 break-all">
-  <div className="flex-1 min-w-0">
-    <h3 className="text-sm font-semibold text-gray-900 break-all">
-      {item.title || 'Untitled asset'}
-    </h3>
-    {item.initial_comment && (
-      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all">
-        {item.initial_comment}
-      </p>
-    )}
-  </div>
-  <div className="flex items-center gap-2 Shrink-0">
+                <CardHeader className="flex flex-col gap-3">
+                  {/* Action row — pulled above the title so the captions get
+                      full width and aren't squeezed by the button cluster. */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                         isApproved
                           ? 'bg-green-100 text-green-700'
                           : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isApproved ? 'bg-green-500' : 'bg-yellow-500'
+                        }`}
+                      />
                       {isApproved ? 'Approved' : 'Pending'}
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleItemStatus(item)}
-                    >
-                      {isApproved ? 'Un-approve' : 'Approve'}
-                    </Button>
-                    {canEditItems && (
-                      <>
-                        {editingItemId === item.id ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleItemStatus(item)}
+                        isLoading={togglingItemIds.has(item.id)}
+                        disabled={togglingItemIds.has(item.id)}
+                      >
+                        {isApproved ? 'Un-approve' : 'Approve'}
+                      </Button>
+                      {canEditItems && (
+                        editingItemId === item.id ? (
                           <>
                             <Button
                               size="sm"
@@ -761,8 +1009,20 @@ await loadApproval()
                             <Edit3 className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
-                        )}
-                      </>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title + caption, full width. */}
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-gray-900 break-words [overflow-wrap:anywhere]">
+                      {item.title || 'Untitled asset'}
+                    </h3>
+                    {item.initial_comment && (
+                      <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        {item.initial_comment}
+                      </p>
                     )}
                   </div>
                 </CardHeader>
@@ -840,7 +1100,7 @@ await loadApproval()
                                   />
                                 ) : (
                                   <div className="h-6 w-6 rounded-full bg-brand-gradient flex items-center justify-center text-white text-[10px] font-semibold">
-                                    {(c.users?.name || c.users?.email || 'U')
+                                    {(c.users?.name || c.users?.email || c.reviewer_email || 'U')
                                       .charAt(0)
                                       .toUpperCase()}
                                   </div>
@@ -849,7 +1109,15 @@ await loadApproval()
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
                                   <p className="font-semibold text-gray-800 truncate">
-                                    {c.users?.name || c.users?.email || 'User'}
+                                    {c.users?.name ||
+                                      c.users?.email ||
+                                      c.reviewer_email ||
+                                      'User'}
+                                    {!c.user_id && c.reviewer_email && (
+                                      <span className="ml-1 text-[10px] font-normal text-gray-400 uppercase tracking-wide">
+                                        client
+                                      </span>
+                                    )}
                                   </p>
                                   <span className="text-[10px] text-gray-400">
                                     {new Date(
@@ -957,6 +1225,47 @@ await loadApproval()
     })()}
   </div>
 )}
+    {c.attachments && c.attachments.length > 0 && (
+      <div className="mt-1 grid grid-cols-2 gap-1.5">
+        {c.attachments.map((att, i) => {
+          const isImage = /\.(png|jpe?g|gif|webp|svg|avif|heic)(\?|$)/i.test(
+            att.name || att.url,
+          )
+          if (isImage) {
+            return (
+              <button
+                key={`${att.url}-${i}`}
+                type="button"
+                onClick={() => {
+                  setPreviewImageUrl(att.url)
+                  setPreviewImageName(att.name || 'Image')
+                }}
+                className="block aspect-video rounded-lg border border-gray-200 overflow-hidden bg-gray-50 hover:border-[#2B79F7] focus:outline-none"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={att.url}
+                  alt={att.name || 'Attachment'}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            )
+          }
+          return (
+            <a
+              key={`${att.url}-${i}`}
+              href={att.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-gray-200 text-[11px] text-[#2B79F7] hover:border-[#2B79F7]"
+            >
+              <Paperclip className="h-3 w-3 shrink-0" />
+              <span className="truncate">{att.name || 'Attachment'}</span>
+            </a>
+          )
+        })}
+      </div>
+    )}
                                     <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
   <button
     type="button"
@@ -1036,6 +1345,35 @@ await loadApproval()
     className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
     placeholder="Leave a comment... use @name to tag someone."
   />
+  {(() => {
+    const draft = resolveDraftMentions(newCommentText[item.id] || '')
+    if (draft.length === 0) return null
+    return (
+      <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500">
+        <span>Tagging:</span>
+        {draft.map((u) => (
+          <span
+            key={u.id}
+            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium"
+          >
+            {u.profile_picture_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={u.profile_picture_url}
+                alt={u.name}
+                className="h-3.5 w-3.5 rounded-full object-cover"
+              />
+            ) : (
+              <span className="h-3.5 w-3.5 rounded-full bg-[#2B79F7] text-white flex items-center justify-center text-[8px] font-semibold">
+                {u.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="text-[10px]">@{u.name}</span>
+          </span>
+        ))}
+      </div>
+    )
+  })()}
   {mentionTargetItemId === item.id && mentionQuery && (
   <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
     {mentionUsers
@@ -1114,7 +1452,6 @@ await loadApproval()
       size="sm"
       variant="outline"
       onClick={() => sendComment(item.id)}
-      isLoading={sendingCommentForItem === item.id}
       disabled={
         !commentFile &&
         !(newCommentText[item.id] || '').trim()

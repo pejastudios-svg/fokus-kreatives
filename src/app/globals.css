@@ -28,12 +28,22 @@ input[type="date"], input[type="time"] {
   box-sizing: border-box;
 }
 
-.font-inter {
-  font-family: var(--font-inter), system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+/* Project-wide typography: Montserrat. Headings render bold, body regular,
+   captions/meta in lighter weights. The actual weight comes from Tailwind
+   utilities (font-thin / font-light / font-normal / font-semibold / font-bold)
+   on each element. */
+:root {
+  --font-sans: var(--font-montserrat), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
-.font-poppins {
-  font-family: var(--font-poppins), system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+html, body {
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .route-transition {
@@ -93,14 +103,17 @@ input[type="date"], input[type="time"] {
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
 }
 
-* {
+/* Theme color transition — opt-in via class, so it doesn't fight Tailwind's
+   `transition-transform` / `transition-[width]` utilities on every element. */
+.theme-transition {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Poppins, Ubuntu, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  font-weight: 400;
 }
 
 /* Scrollbar styling */
@@ -230,6 +243,11 @@ body {
   100% { background-position: 200% 0; }
 }
 
+@keyframes approval-progress {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(400%); }
+}
+
 .animate-in {
   animation-duration: 200ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -341,8 +359,19 @@ body {
 }
 
 select {
-  padding: 0.5rem 1rem; /* similar to .input-premium */
+  padding: 0.5rem 2.5rem 0.5rem 1rem; /* extra right padding for chevron */
   border-radius: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 8 10 12 14 8'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem 1rem;
+}
+
+select::-ms-expand {
+  display: none;
 }
 
 .input-premium::placeholder {

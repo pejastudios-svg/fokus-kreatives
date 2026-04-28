@@ -112,7 +112,7 @@ export default function CalendarDetailPage() {
   return (
     <>
       <Header title="Calendar" subtitle="Click any item to edit/copy/paste script" />
-      <div className="p-8 space-y-4">
+      <div className="p-4 md:p-8 space-y-4">
         {isLoading ? (
           <Card><CardContent className="py-10 text-center text-gray-500">Loading…</CardContent></Card>
         ) : items.length === 0 ? (

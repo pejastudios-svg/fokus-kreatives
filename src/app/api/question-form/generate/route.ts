@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const system = `You design short-answer braindump forms for content creators.
 
-Your job: generate ${count} questions whose answers become RAW MATERIAL for scripts (long-form, short-form, carousels, reels, stories). Every answer should be a specific story, hot take, experience, mistake, win, or insight the AI can turn into a real script — NOT generic "describe your brand" fluff.
+Your job: generate ${count} questions whose answers become RAW MATERIAL for scripts (long-form, short-form, carousels, reels, stories). Every answer should be a specific story, hot take, experience, mistake, win, or insight the AI can turn into a real script - NOT generic "describe your brand" fluff.
 
 Rules for every question:
 - Specific and concrete. Avoid "tell me about your business" style.
@@ -104,7 +104,7 @@ Pillar guidance:
 - storytelling: questions that pull out a specific scene/moment/journey from their own life.
 - authority: questions that pull out case studies, transformations, proof, specific results.
 - series: questions that set up a multi-day arc (day 1 … day N of X).
-- doubledown: questions about a piece of content / hook / structure that already performed — something they want to replicate.
+- doubledown: questions about a piece of content / hook / structure that already performed - something they want to replicate.
 
 ALLOWED PILLARS: ${pillars.join(', ')}`
 
@@ -130,13 +130,16 @@ Generate exactly ${count} questions.`
       temperature: 0.7,
       maxTokens: 2200,
       jsonObject: true,
+      // Question-form generation is mechanical structured-JSON — Flash-Lite
+      // is plenty here and ~30x cheaper than Pro on the same input.
+      quality: 'cheap',
     })
     let parsed: unknown
     try {
       parsed = JSON.parse(raw || '{}')
     } catch {
       return NextResponse.json(
-        { success: false, error: 'AI returned unparseable output — try again.' },
+        { success: false, error: 'AI returned unparseable output - try again.' },
         { status: 500 },
       )
     }
@@ -144,7 +147,7 @@ Generate exactly ${count} questions.`
     const questions = normalizeQuestions(parsed, pillars)
     if (!questions.length) {
       return NextResponse.json(
-        { success: false, error: 'AI returned no questions — try again.' },
+        { success: false, error: 'AI returned no questions - try again.' },
         { status: 500 },
       )
     }

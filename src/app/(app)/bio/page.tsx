@@ -119,7 +119,7 @@ export default function BioTemplatesPage() {
   return (
     <>
       <Header title="Bio Templates" subtitle="Generate high-converting bio options from the saved client profile" />
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <Card>
           <CardContent className="py-4 space-y-4">
             <div className="grid grid-cols-3 gap-4">
@@ -133,7 +133,7 @@ export default function BioTemplatesPage() {
                   <option value="">Select a client…</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} — {c.business_name}
+                      {c.name} - {c.business_name}
                     </option>
                   ))}
                 </select>

@@ -1,11 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import Image from 'next/image'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { FileUpload } from '@/components/ui/FileUpload'
+import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
 import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -332,31 +331,15 @@ function SettingsSkeleton() {
                   <p className="text-sm text-gray-400">Loading profile...</p>
                 ) : (
                   <>
-                    <div className="flex items-center gap-4">
-                      {profilePicture ? (
-                          <Image
-                          src={profilePicture}
-                          alt={profileName}
-                          width={48}
-                          height={48}
-                          className="h-12 w-12 rounded-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-brand-gradient flex items-center justify-center text-white font-semibold">
-                          {(profileName || profileEmail || 'U')
-                            .charAt(0)
-                            .toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <FileUpload
-                          label="Upload profile picture"
-                          folder="user-profile-pictures"
-                          accept="image/*"
-                          onUpload={url => setProfilePicture(url)}
-                        />
-                      </div>
+                    <div className="flex justify-center">
+                      <ProfilePictureUpload
+                        value={profilePicture}
+                        onChange={(url) => setProfilePicture(url)}
+                        folder="user-profile-pictures"
+                        fallback={profileName || profileEmail ? 'initial' : 'user'}
+                        initialChar={(profileName || profileEmail || 'U').charAt(0)}
+                        ariaLabel="Your profile picture"
+                      />
                     </div>
 
                     <Input

@@ -19,36 +19,39 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
 import type { CompetitorAnalysis } from '@/app/api/analyze-competitor/route'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
+import { ClientPicker } from '@/components/dashboard/ClientPicker'
 
 interface Client {
   id: string
   name: string
   business_name: string
   industry: string
+  profile_picture_url: string | null
 }
 
 export default function CompetitorsPage() {
   const [clients, setClients] = useState<Client[]>([])
-  const [selectedClientId, setSelectedClientId] = useState('')
+  const [selectedClientId, setSelectedClientId] = useFormPersistence<string>('competitors:clientId', '')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [competitorHandle, setCompetitorHandle] = useState('')
-  const [platform, setPlatform] = useState('instagram')
+  const [competitorHandle, setCompetitorHandle, clearHandle] = useFormPersistence<string>('competitors:handle', '')
+  const [platform, setPlatform] = useFormPersistence<string>('competitors:platform', 'instagram')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [analysis, setAnalysis] = useState<CompetitorAnalysis | null>(null)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const supabase = useMemo(() => createClient(), [])
-  const [transcript, setTranscript] = useState('')
+  const [transcript, setTranscript, clearTranscript] = useFormPersistence<string>('competitors:transcript', '')
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchClients = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('clients')
-        .select('id, name, business_name, industry')
+        .select('id, name, business_name, industry, profile_picture_url')
         .order('name')
-      if (data) setClients(data)
+      if (data) setClients(data as Client[])
     } finally {
       setIsLoading(false)
     }
@@ -156,6 +159,9 @@ export default function CompetitorsPage() {
         .eq('id', selectedClientId)
 
       setSaved(true)
+      clearHandle()
+      clearTranscript()
+      setAnalysis(null)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       console.error('Save error:', err)
@@ -215,18 +221,12 @@ export default function CompetitorsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                  <select
+                  <ClientPicker
+                    clients={clients}
                     value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  >
-                    <option value="">Choose client…</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name} — {client.business_name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(id) => setSelectedClientId(id)}
+                    placeholder="Choose client…"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Platform</label>
@@ -261,7 +261,7 @@ export default function CompetitorsPage() {
                   placeholder="Paste the full transcript or script here…"
                 />
                 <p className="mt-1 text-xs text-gray-400">
-                  Used as inspiration only — we never copy sentences into your client&apos;s content.
+                  Used as inspiration only - we never copy sentences into your client&apos;s content.
                 </p>
               </div>
 
@@ -315,7 +315,7 @@ export default function CompetitorsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { n: 1, title: 'Paste the script', sub: "Full transcript from a competitor's best video" },
-                  { n: 2, title: 'Get a full breakdown', sub: 'Hook, structure, CTA, good/bad — scored' },
+                  { n: 2, title: 'Get a full breakdown', sub: 'Hook, structure, CTA, good/bad - scored' },
                   { n: 3, title: 'Steal what works', sub: "Plug-in formulas and new angles for your client's scripts" },
                 ].map((s) => (
                   <div key={s.n} className="text-center">

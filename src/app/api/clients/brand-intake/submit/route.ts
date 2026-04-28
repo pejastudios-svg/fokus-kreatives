@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { normalizeBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
+import { getAgencyRecipientsForClient } from '@/lib/clientRecipients'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,14 +50,12 @@ async function notifyAgency(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
   const clientUrl = `${appUrl}/clients/${clientId}`
 
-  // 1) In-app notifications to all team users (role !== 'client')
-  try {
-    const { data: teamUsers } = await supabase
-      .from('users')
-      .select('id')
-      .neq('role', 'client')
+  const recipients = await getAgencyRecipientsForClient(supabase, clientId)
+  const userIds = recipients.map((r) => r.id).filter(Boolean)
+  const emails = recipients.map((r) => r.email).filter((e): e is string => Boolean(e))
 
-    const userIds = (teamUsers || []).map((u) => u.id).filter(Boolean)
+  // 1) In-app notifications to assigned team members (or admins/managers as fallback)
+  try {
     if (userIds.length) {
       await fetch(`${appUrl}/api/notifications/create`, {
         method: 'POST',
@@ -80,6 +79,7 @@ async function notifyAgency(
   try {
     const secret = process.env.APPS_SCRIPT_SECRET
     if (secret) {
+      const to = emails.length ? Array.from(new Set([...emails, AGENCY_NOTIFY_EMAIL])) : [AGENCY_NOTIFY_EMAIL]
       await fetch(`${appUrl}/api/notify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,7 +87,7 @@ async function notifyAgency(
           type: 'brand_intake_submitted',
           payload: {
             secret,
-            to: [AGENCY_NOTIFY_EMAIL],
+            to,
             clientName: clientName || 'A client',
             businessName: businessName || '',
             url: clientUrl,

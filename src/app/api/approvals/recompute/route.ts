@@ -170,60 +170,6 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
       )
     }
 
-    // Notify ONLY when it transitions to approved
-    if (approval.status !== 'approved' && newStatus === 'approved') {
-      // Load assignees
-      const { data: assigneesRows } = await supabase
-        .from('approval_assignees')
-        .select('user_id')
-        .eq('approval_id', approvalId)
-
-            const watcherIds = (assigneesRows || []).map((r: AssigneeRow) => r.user_id).filter(Boolean)
-      const uniqueIds = Array.from(new Set(watcherIds)).filter((id) => id !== actorId)
-
-      const approvalWithClients2 = approval as unknown as { clients: ClientRef | ClientRef[] | null }
-      const relClients2 = approvalWithClients2.clients
-      
-      let clientName = 'Client'
-      if (Array.isArray(relClients2) && relClients2.length > 0) {
-        clientName = relClients2[0]?.business_name || relClients2[0]?.name || 'Client'
-      } else if (relClients2 && !Array.isArray(relClients2)) {
-        const singleClient = relClients2 as ClientRef
-        clientName = singleClient.business_name || singleClient.name || 'Client'
-      }
-
-      if (uniqueIds.length > 0) {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userIds: uniqueIds,
-            type: 'approval_approved',
-            data: {
-              approvalId,
-              title: approval.title,
-               clientName: clientDisplayName,
-              actorId: actorId || null,
-            },
-          }),
-        })
-
-        // Email
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'approval_approved',
-            payload: {
-              to: uniqueIds, // if your Apps Script expects emails, change this to emails; otherwise keep IDs if it maps
-              clientName,
-              approvalTitle: approval.title,
-            },
-          }),
-        })
-      }
-    }
-
     return NextResponse.json({ success: true, status: newStatus })
   } catch (err: unknown) {
     console.error('Recompute approval status error:', err)

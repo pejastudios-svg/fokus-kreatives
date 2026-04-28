@@ -28,6 +28,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface Client {
   id: string
@@ -56,6 +57,10 @@ export default function ClientsPage() {
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set())
   const [activeCount, setActiveCount] = useState<number>(0)
   const [archivedCount, setArchivedCount] = useState<number>(0)
+  const [confirmAction, setConfirmAction] = useState<
+    | null
+    | { kind: 'archive' | 'unarchive' | 'delete'; clientId: string; clientName: string }
+  >(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -182,9 +187,6 @@ export default function ClientsPage() {
   }
 
   const handleArchive = async (clientId: string) => {
-    setOpenMenuId(null)
-    if (!window.confirm('Archive this client and their CRM? You can unarchive later.')) return
-
     setPendingActions((prev) => new Set([...prev, clientId]))
     const originalClients = clients
     setClients((prev) => prev.filter((c) => c.id !== clientId))
@@ -212,9 +214,6 @@ export default function ClientsPage() {
   }
 
   const handleUnarchive = async (clientId: string) => {
-    setOpenMenuId(null)
-    if (!window.confirm('Unarchive this client and reopen their CRM?')) return
-
     setPendingActions((prev) => new Set([...prev, clientId]))
     const originalClients = clients
     setClients((prev) => prev.filter((c) => c.id !== clientId))
@@ -251,14 +250,14 @@ export default function ClientsPage() {
     router.push('/dashboard')
   }
 
-  const handleDelete = async (clientId: string) => {
-    setOpenMenuId(null)
-    if (
-      !window.confirm(
-        'Are you sure you want to delete this client? This will also delete all associated data. This action cannot be undone.',
-      )
-    )
-      return
+  const handleDelete = async (clientId: string, password?: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) throw new Error('Could not verify session')
+    const { error: pwErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: password ?? '',
+    })
+    if (pwErr) throw new Error('Incorrect password')
 
     setPendingActions((prev) => new Set([...prev, clientId]))
     const originalClients = [...clients]
@@ -280,6 +279,7 @@ export default function ClientsPage() {
       console.error('Delete error:', err)
       setClients(originalClients)
       showNotification('Failed to delete client')
+      throw err instanceof Error ? err : new Error('Failed to delete client')
     } finally {
       setPendingActions((prev) => {
         const next = new Set(prev)
@@ -345,7 +345,10 @@ export default function ClientsPage() {
           <div className="my-1 border-t border-theme-primary" />
           {showArchived ? (
             <button
-              onClick={() => handleUnarchive(client.id)}
+              onClick={() => {
+                setOpenMenuId(null)
+                setConfirmAction({ kind: 'unarchive', clientId: client.id, clientName: client.name })
+              }}
               className="w-full px-4 py-2.5 text-left text-sm text-theme-primary hover:bg-theme-tertiary flex items-center gap-3 transition-colors"
             >
               <ArchiveRestore className="h-4 w-4 text-theme-tertiary" />
@@ -353,7 +356,10 @@ export default function ClientsPage() {
             </button>
           ) : (
             <button
-              onClick={() => handleArchive(client.id)}
+              onClick={() => {
+                setOpenMenuId(null)
+                setConfirmAction({ kind: 'archive', clientId: client.id, clientName: client.name })
+              }}
               className="w-full px-4 py-2.5 text-left text-sm text-theme-primary hover:bg-theme-tertiary flex items-center gap-3 transition-colors"
             >
               <Archive className="h-4 w-4 text-theme-tertiary" />
@@ -367,7 +373,10 @@ export default function ClientsPage() {
         <>
           <div className="my-1 border-t border-theme-primary" />
           <button
-            onClick={() => handleDelete(client.id)}
+            onClick={() => {
+              setOpenMenuId(null)
+              setConfirmAction({ kind: 'delete', clientId: client.id, clientName: client.name })
+            }}
             className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
           >
             <Trash2 className="h-4 w-4" />
@@ -407,13 +416,13 @@ export default function ClientsPage() {
             <ViewModeToggle mode={viewMode} onChange={setView} />
 
             <div className="relative flex-1 min-w-[200px] md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-theme-tertiary" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-tertiary pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search clients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 input-premium"
+                className="w-full pl-11 pr-4 py-2.5 input-premium"
               />
             </div>
           </div>
@@ -537,7 +546,7 @@ export default function ClientsPage() {
           </div>
         ) : (
           <Card className="card-premium overflow-hidden">
-            <ul className="divide-y divide-theme-primary">
+            <ul className="divide-y divide-gray-200">
               {filteredClients.map((client) => (
                 <li
                   key={client.id}
@@ -610,6 +619,58 @@ export default function ClientsPage() {
           </Card>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirmAction?.kind === 'archive'}
+        title="Archive client?"
+        message={
+          confirmAction?.kind === 'archive'
+            ? `${confirmAction.clientName} and their CRM will be archived. You can unarchive them later.`
+            : ''
+        }
+        confirmLabel="Archive"
+        tone="warning"
+        onConfirm={async () => {
+          if (confirmAction?.kind !== 'archive') return
+          await handleArchive(confirmAction.clientId)
+          setConfirmAction(null)
+        }}
+        onClose={() => setConfirmAction(null)}
+      />
+      <ConfirmModal
+        open={confirmAction?.kind === 'unarchive'}
+        title="Unarchive client?"
+        message={
+          confirmAction?.kind === 'unarchive'
+            ? `${confirmAction.clientName} will be reopened and visible in your active clients.`
+            : ''
+        }
+        confirmLabel="Unarchive"
+        onConfirm={async () => {
+          if (confirmAction?.kind !== 'unarchive') return
+          await handleUnarchive(confirmAction.clientId)
+          setConfirmAction(null)
+        }}
+        onClose={() => setConfirmAction(null)}
+      />
+      <ConfirmModal
+        open={confirmAction?.kind === 'delete'}
+        title="Delete client?"
+        message={
+          confirmAction?.kind === 'delete'
+            ? `This permanently deletes ${confirmAction.clientName} and all associated CRM data. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        requirePassword
+        onConfirm={async (password) => {
+          if (confirmAction?.kind !== 'delete') return
+          await handleDelete(confirmAction.clientId, password)
+          setConfirmAction(null)
+        }}
+        onClose={() => setConfirmAction(null)}
+      />
     </>
   )
 }
@@ -816,7 +877,7 @@ function GridSkeleton() {
 function ListSkeleton() {
   return (
     <Card className="card-premium overflow-hidden animate-in fade-in">
-      <ul className="divide-y divide-theme-primary">
+      <ul className="divide-y divide-gray-200">
         {[1, 2, 3, 4, 5].map((i) => (
           <li key={i} className="px-6 py-4 flex items-center gap-4">
             <Skeleton className="h-10 w-10 rounded-full" />

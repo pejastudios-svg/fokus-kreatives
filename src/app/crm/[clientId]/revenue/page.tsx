@@ -18,6 +18,7 @@ import {
   Search,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface Payment {
   id: string
@@ -64,6 +65,7 @@ export default function CRMRevenue() {
   const [isSavingPayment, setIsSavingPayment] = useState(false)
   const [filter, setFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all')
   const [nextPayment, setNextPayment] = useState<Payment | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const [leads, setLeads] = useState<LeadOption[]>([])
   const [leadSearch, setLeadSearch] = useState('')
@@ -372,9 +374,6 @@ export default function CRMRevenue() {
   }
 
   const handleDeletePayment = async (paymentId: string) => {
-    const confirmed = window.confirm('Delete this payment record?')
-    if (!confirmed) return
-
     const prev = payments
     const updated = payments.filter(p => p.id !== paymentId)
     setPayments(updated)
@@ -387,6 +386,7 @@ export default function CRMRevenue() {
     if (error) {
       console.error('Failed to delete payment:', error)
       setPayments(prev)
+      throw new Error('Failed to delete payment')
     }
   }
 
@@ -622,7 +622,7 @@ function RevenueSkeleton() {
                     </td>
 
                     <td className="px-6 py-4 text-gray-300">
-                      {leadData.name || '—'}
+                      {leadData.name || '-'}
                       {leadData.email && (
                         <div className="text-xs text-gray-500">
                           {leadData.email}
@@ -652,15 +652,15 @@ function RevenueSkeleton() {
                     <td className="px-6 py-4 text-gray-300">
                       {payment.due_date
                         ? new Date(payment.due_date).toLocaleDateString()
-                        : '—'}
+                        : '-'}
                     </td>
 
                     <td className="px-6 py-4 text-gray-400">
-                      {payment.invoice_number || '—'}
+                      {payment.invoice_number || '-'}
                     </td>
 
                     <td className="px-6 py-4 text-gray-400 max-w-xs truncate">
-                      {payment.notes || '—'}
+                      {payment.notes || '-'}
                     </td>
 
                     <td className="px-6 py-4">
@@ -682,7 +682,7 @@ function RevenueSkeleton() {
 
                     <td className="px-6 py-4">
                       <button
-                        onClick={() => handleDeletePayment(payment.id)}
+                        onClick={() => setPendingDeleteId(payment.id)}
                         className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -796,7 +796,7 @@ function RevenueSkeleton() {
                   return (
                     <option key={lead.id} value={lead.id}>
                       {(data.name || 'Unnamed') +
-                        (data.email ? ` — ${data.email}` : '')}
+                        (data.email ? ` - ${data.email}` : '')}
                     </option>
                   )
                 })}
@@ -923,6 +923,20 @@ function RevenueSkeleton() {
           </div>
         </Modal>
       )}
+
+      <ConfirmModal
+        open={!!pendingDeleteId}
+        title="Delete payment record?"
+        message="This permanently removes the payment from your records."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          if (!pendingDeleteId) return
+          await handleDeletePayment(pendingDeleteId)
+          setPendingDeleteId(null)
+        }}
+        onClose={() => setPendingDeleteId(null)}
+      />
     </div>
   )
 }

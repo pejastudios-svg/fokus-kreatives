@@ -224,7 +224,7 @@ if (!data?.success) {
     <>
       <Header title="Content Calendars" subtitle="Research-based monthly calendars (no guessing)" />
 
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <Card>
           <CardContent className="py-4 flex items-center justify-between gap-4">
             <div className="w-96">
@@ -237,7 +237,7 @@ if (!data?.success) {
                 <option value="">Select a client…</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} — {c.business_name}
+                    {c.name} - {c.business_name}
                   </option>
                 ))}
               </select>
@@ -282,7 +282,7 @@ if (!data?.success) {
                     Tier: <span className="font-medium">{c.tier}</span>
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Platforms: <span className="font-medium">{(c.platforms || []).join(', ') || '—'}</span>
+                    Platforms: <span className="font-medium">{(c.platforms || []).join(', ') || '-'}</span>
                   </p>
                 </CardContent>
               </Card>

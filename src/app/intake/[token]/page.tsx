@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
-import { CheckCircle, AlertCircle, Camera } from 'lucide-react'
+import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
 import { defaultBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 
 interface IntakeClient {
   id: string
@@ -69,7 +71,10 @@ export default function BrandIntakePage() {
   const token = (params?.token as string) || ''
 
   const [client, setClient] = useState<IntakeClient | null>(null)
-  const [form, setForm] = useState<IntakeFormData>(emptyForm)
+  const [form, setForm, clearForm, draftRestored] = useFormPersistence<IntakeFormData>(
+    `intake-form:${token}`,
+    emptyForm,
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -86,22 +91,24 @@ export default function BrandIntakePage() {
         }
         const c = data.client as IntakeClient
         setClient(c)
-        setForm({
-          name: c.name ?? '',
-          business_name: c.business_name ?? '',
-          industry: c.industry ?? '',
-          target_audience: c.target_audience ?? '',
-          website_url: c.website_url ?? '',
-          profile_picture_url: c.profile_picture_url ?? '',
-          brand_doc_url: c.brand_doc_url ?? '',
-          dos_and_donts: c.dos_and_donts ?? '',
-          topics_library: c.topics_library ?? '',
-          key_stories: c.key_stories ?? '',
-          unique_mechanisms: c.unique_mechanisms ?? '',
-          social_proof: c.social_proof ?? '',
-          competitor_insights: c.competitor_insights ?? '',
-          brand_profile: c.brand_profile ?? defaultBrandProfile(),
-        })
+        if (!draftRestored) {
+          setForm({
+            name: c.name ?? '',
+            business_name: c.business_name ?? '',
+            industry: c.industry ?? '',
+            target_audience: c.target_audience ?? '',
+            website_url: c.website_url ?? '',
+            profile_picture_url: c.profile_picture_url ?? '',
+            brand_doc_url: c.brand_doc_url ?? '',
+            dos_and_donts: c.dos_and_donts ?? '',
+            topics_library: c.topics_library ?? '',
+            key_stories: c.key_stories ?? '',
+            unique_mechanisms: c.unique_mechanisms ?? '',
+            social_proof: c.social_proof ?? '',
+            competitor_insights: c.competitor_insights ?? '',
+            brand_profile: c.brand_profile ?? defaultBrandProfile(),
+          })
+        }
       } catch (e) {
         console.error('intake load error:', e)
         setError('Failed to load intake form')
@@ -110,7 +117,7 @@ export default function BrandIntakePage() {
       }
     }
     if (token) load()
-  }, [token])
+  }, [token, draftRestored, setForm])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -130,6 +137,7 @@ export default function BrandIntakePage() {
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {
+        clearForm()
         setSuccess(true)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
@@ -169,7 +177,7 @@ export default function BrandIntakePage() {
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks — we got it!</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks - we got it!</h2>
             <p className="text-gray-500">
               Your brand intake has been saved. Your team will use this to create content for you.
             </p>
@@ -205,11 +213,11 @@ export default function BrandIntakePage() {
             </div>
 
             <p className="text-sm text-gray-600">
-              The more detail you share here, the more the content sounds like <em>you</em> — not a generic
+              The more detail you share here, the more the content sounds like <em>you</em> - not a generic
               AI. Nothing is public; it only feeds our content engine.
               {client?.already_submitted && (
                 <span className="block mt-2 text-xs text-gray-500">
-                  You&apos;ve submitted this before — feel free to update anything and resubmit.
+                  You&apos;ve submitted this before - feel free to update anything and resubmit.
                 </span>
               )}
             </p>
@@ -219,47 +227,21 @@ export default function BrandIntakePage() {
         <Card>
           <CardHeader>
             <h3 className="text-lg font-semibold text-gray-900">Profile Picture</h3>
-            <p className="text-sm text-gray-500 mt-1">Logo or personal photo — whatever represents the brand.</p>
+            <p className="text-sm text-gray-500 mt-1">Logo or personal photo - whatever represents the brand.</p>
           </CardHeader>
           <CardContent>
-            {form.profile_picture_url ? (
-              <div className="flex items-center gap-4">
-                <img
-                  src={form.profile_picture_url}
-                  alt="Profile"
-                  className="h-20 w-20 rounded-full object-cover border border-gray-200"
-                />
-                <div className="flex-1">
-                  <FileUpload
-                    folder="profile-pictures"
-                    accept="image/*"
-                    label="Replace image"
-                    onUpload={(url) => setForm((prev) => ({ ...prev, profile_picture_url: url }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, profile_picture_url: '' }))}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                  <Camera className="h-8 w-8" />
-                </div>
-                <div className="flex-1">
-                  <FileUpload
-                    folder="profile-pictures"
-                    accept="image/*"
-                    label="Upload profile picture"
-                    onUpload={(url) => setForm((prev) => ({ ...prev, profile_picture_url: url }))}
-                  />
-                </div>
-              </div>
-            )}
+            <div className="flex justify-center">
+              <ProfilePictureUpload
+                value={form.profile_picture_url}
+                onChange={(url) =>
+                  setForm((prev) => ({ ...prev, profile_picture_url: url }))
+                }
+                folder="profile-pictures"
+                fallback={form.name ? 'initial' : 'user'}
+                initialChar={form.name.charAt(0) || 'C'}
+                ariaLabel="Brand profile picture"
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -388,7 +370,7 @@ export default function BrandIntakePage() {
                 name="topics_library"
                 value={form.topics_library}
                 onChange={handleChange}
-                placeholder="Topics we should cover — one per line."
+                placeholder="Topics we should cover - one per line."
                 rows={5}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
               />
@@ -399,7 +381,7 @@ export default function BrandIntakePage() {
         <Card>
           <CardHeader>
             <h3 className="text-lg font-semibold text-gray-900">Stories & Social Proof</h3>
-            <p className="text-sm text-gray-500 mt-1">Used as inspiration — never copied word-for-word.</p>
+            <p className="text-sm text-gray-500 mt-1">Used as inspiration - never copied word-for-word.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -443,7 +425,7 @@ export default function BrandIntakePage() {
             <h3 className="text-lg font-semibold text-gray-900">Competitors</h3>
             <p className="text-sm text-gray-500 mt-1">
               Who else plays in your space? Paste links to their best content or profiles. We&apos;ll use these for
-              inspiration — never to copy.
+              inspiration - never to copy.
             </p>
           </CardHeader>
           <CardContent>

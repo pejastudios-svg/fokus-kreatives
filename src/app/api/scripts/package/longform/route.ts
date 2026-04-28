@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Body
     const topicAnswer = (body.topicAnswer || '').trim()
     if (!topicAnswer) {
-      return NextResponse.json({ success: false, error: 'topicAnswer is required — pick a topic from the bank first.' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'topicAnswer is required - pick a topic from the bank first.' }, { status: 400 })
     }
 
     const prompt = buildLongformPackagePrompt({
@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
         user: userPrompt,
         temperature: prompt.temperature,
         maxTokens: prompt.maxTokens,
+        // Longform is the user-facing money output — pay for Pro.
+        quality: 'high',
       })
       let sanitized = sanitize(content)
       for (let i = 0; i < 2; i++) {

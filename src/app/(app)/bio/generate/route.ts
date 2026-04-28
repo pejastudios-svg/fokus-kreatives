@@ -52,7 +52,7 @@ function pickCategory(industry: string): string {
 
 function extractMechanismNames(uniqueMechanisms: string): string[] {
   // Try to grab “named systems” from your unique mechanisms field.
-  // e.g. "Shoot‑Once Content System™ — ..." => "Shoot‑Once Content System™"
+  // e.g. "Shoot‑Once Content System™ - ..." => "Shoot‑Once Content System™"
   const lines = (uniqueMechanisms || '')
     .split('\n')
     .map(l => normalizeOneLine(l))
@@ -60,7 +60,7 @@ function extractMechanismNames(uniqueMechanisms: string): string[] {
 
   const names: string[] = []
   for (const l of lines) {
-    const beforeDash = l.split('—')[0]?.trim() || ''
+    const beforeDash = l.split('-')[0]?.trim() || ''
     const beforeColon = l.split(':')[0]?.trim() || ''
     const candidate =
       (beforeDash.length >= 6 && beforeDash.length <= 40) ? beforeDash :

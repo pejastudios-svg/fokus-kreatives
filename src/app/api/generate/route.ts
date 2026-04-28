@@ -103,10 +103,10 @@ async function groqWithRetry<T>(makeCall: () => Promise<T>): Promise<T> {
 const hookFormulas = [
   'You think X… but it’s actually Y',
   'If I were you”: “If I had to start from 0 in [niche], I’d do this…',
-  'You’re doing [thing] wrong — here’s the fix',
+  'You’re doing [thing] wrong - here’s the fix',
   'I almost quit when… then this happened',
   'Here’s what changed when we did ONE thing…',
-  'You don’t need [common belief] — you need this instead',
+  'You don’t need [common belief] - you need this instead',
   'Steal this script for when someone says…',
   '3 signs your content isn’t converting (and the quick fix)',
   'Want to double your {outcome}? This is how you do it.',
@@ -428,7 +428,7 @@ Your voice is **conversational, confident, and modern** – never corporate.
 ❌ NEVER include any numbers (%, x-times, "22 times", etc.) unless present in CLIENT CONTEXT
 ❌ If a CTA is provided, do NOT add any other “comment below / DM me / share” requests anywhere else.
 ❌ NEVER use placeholder examples from other industries (e.g., "fitness coach", "marketing coach", "small business owner") unless that is the client’s niche
-❌ NEVER write generic advice that could apply to anyone — every example must fit the client’s niche and target audience from CLIENT CONTEXT
+❌ NEVER write generic advice that could apply to anyone - every example must fit the client’s niche and target audience from CLIENT CONTEXT
 ❌ NEVER invent results, proof, or outcomes that are not in CLIENT CONTEXT (especially for beginner tier)
 ❌ NEVER mention studies, research, Harvard, “statistics show”, or any %/multipliers unless they appear in CLIENT CONTEXT or IDEA text
 ❌ NEVER invent client results, testimonials, or performance claims unless they appear in CLIENT CONTEXT (social_proof)
@@ -837,9 +837,9 @@ ${finalCtaText
 \`\`\`
 ${finalCtaText}
 \`\`\``
-  : 'NO CTA PROVIDED — omit CTA section entirely.'}
+  : 'NO CTA PROVIDED - omit CTA section entirely.'}
 
-  ## ROTATION MEMORY (LEVEL 2 — AVOID REPETITION)
+  ## ROTATION MEMORY (LEVEL 2 - AVOID REPETITION)
 Avoid reusing these from the last 30 scripts:
 - Previously used story openers: ${memory.usedOpeners.slice(0, 12).join(' | ') || 'none'}
 - Previously used hook categories: ${memory.usedCategories.join(', ') || 'none'}

@@ -28,6 +28,7 @@ import {
   Paperclip,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 // Form field types
 interface FormField {
@@ -102,6 +103,7 @@ export default function CaptureForms() {
   const [currentForm, setCurrentForm] = useState<CaptureForm | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+  const [pendingDeleteFormId, setPendingDeleteFormId] = useState<string | null>(null)
 
   const loadForms = useCallback(async () => {
     setIsLoading(true)
@@ -185,8 +187,6 @@ export default function CaptureForms() {
   }
 
   const deleteForm = async (formId: string) => {
-    if (!confirm('Are you sure you want to delete this form? This cannot be undone.')) return
-    
     try {
       await supabase.from('capture_forms').delete().eq('id', formId)
       setForms(forms.filter(f => f.id !== formId))
@@ -194,6 +194,7 @@ export default function CaptureForms() {
     } catch (error) {
       console.error('Failed to delete form:', error)
       setNotification({ type: 'error', message: 'Failed to delete form' })
+      throw error instanceof Error ? error : new Error('Failed to delete form')
     }
   }
 
@@ -378,7 +379,7 @@ export default function CaptureForms() {
                           <Settings className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => deleteForm(form.id)}
+                          onClick={() => setPendingDeleteFormId(form.id)}
                           className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
                           title="Delete"
                         >
@@ -402,6 +403,20 @@ export default function CaptureForms() {
             isSaving={isSaving}
           />
         )}
+
+        <ConfirmModal
+          open={!!pendingDeleteFormId}
+          title="Delete this form?"
+          message="This permanently deletes the form. Anyone with the link will no longer be able to submit."
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={async () => {
+            if (!pendingDeleteFormId) return
+            await deleteForm(pendingDeleteFormId)
+            setPendingDeleteFormId(null)
+          }}
+          onClose={() => setPendingDeleteFormId(null)}
+        />
       </div>
     </CRMLayout>
   )

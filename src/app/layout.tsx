@@ -1,16 +1,12 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { Inter, Poppins } from 'next/font/google'
+import { Montserrat } from 'next/font/google'
 
-const inter = Inter({
+const montserrat = Montserrat({
   subsets: ['latin'],
-  variable: '--font-inter',
-})
-
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-poppins',
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
+  variable: '--font-montserrat',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -21,7 +17,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // Added suppressHydrationWarning to ignore extension injections like 'webcrx'
-    <html lang="en" className={`${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
+    <html lang="en" className={montserrat.variable} suppressHydrationWarning>
       <body className="antialiased bg-white text-gray-900">
         {children}
       </body>

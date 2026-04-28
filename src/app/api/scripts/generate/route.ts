@@ -33,8 +33,17 @@ function isRateLimit(msg: string): boolean {
   return /rate_limit_exceeded|Rate limit reached|RESOURCE_EXHAUSTED|429/i.test(msg || '')
 }
 
-async function callLLM(system: string, user: string, maxTokens: number, temperature: number): Promise<string> {
-  const { content } = await generateScript({ system, user, temperature, maxTokens })
+async function callLLM(
+  system: string,
+  user: string,
+  maxTokens: number,
+  temperature: number,
+  // Default to 'standard' (Flash) here — this legacy route generates ad-hoc
+  // scripts and supporting micro-completions where Pro isn't needed. The
+  // dedicated longform package route is what pays for Pro.
+  quality: 'high' | 'standard' | 'cheap' = 'standard',
+): Promise<string> {
+  const { content } = await generateScript({ system, user, temperature, maxTokens, quality })
   return content
 }
 
@@ -51,7 +60,8 @@ HASHTAGS: (12–18 tags)
 
 SCRIPT:
 """${script}"""`
-  const raw = await callLLM(system, user, 700, 0.4)
+  // Auxiliary description/CTA stub — short, mechanical, doesn't need Pro.
+  const raw = await callLLM(system, user, 700, 0.4, 'cheap')
   return `${script.trim()}\n\n${sanitize(raw).trim()}\n`
 }
 
@@ -75,7 +85,8 @@ Rewrite: ${offender}
 After: ${after}`
 
   try {
-    const raw = await callLLM(system, user, 200, 0.4)
+    // One-sentence micro-repair — cheap tier is plenty for swapping a banned phrase.
+    const raw = await callLLM(system, user, 200, 0.4, 'cheap')
     const fixed = raw.trim().replace(/^["']|["']$/g, '')
     if (!fixed || fixed.toLowerCase().includes(phrase.toLowerCase())) {
       return surgicalBanRemoval(text, phrase)
@@ -138,7 +149,7 @@ function formatIndividualIssuesForRetry(issues: IndividualIssue[]): string {
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
-      return NextResponse.json({ success: false, error: 'Missing LLM credentials — set GEMINI_API_KEY (preferred) or GROQ_API_KEY.' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Missing LLM credentials - set GEMINI_API_KEY (preferred) or GROQ_API_KEY.' }, { status: 500 })
     }
 
     const body = (await request.json()) as GenerateBody
@@ -182,7 +193,7 @@ export async function POST(request: NextRequest) {
       output = sanitize(output)
     }
 
-    // ===== 4. Final ban check — soft fail, never 422 the user =====
+    // ===== 4. Final ban check - soft fail, never 422 the user =====
     const finalBan = findHardBanHit(output)
     if (finalBan) {
       output = surgicalBanRemoval(output, finalBan)
