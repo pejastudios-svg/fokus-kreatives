@@ -113,11 +113,18 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
 
   // Flip them to 'sending' so a parallel tick won't pick them up. We then
   // re-select to get the full payload + current attempt count.
+  //
+  // NOTE: don't chain `.eq('status', 'pending')` here. PostgREST's
+  // `Prefer: return=representation` evaluates that filter against the
+  // POST-update state, so the returned rows would be empty (they're now
+  // 'sending', not 'pending') even though the update did flip them. The
+  // `.in('id', ids)` scope is sufficient because we just SELECTed those
+  // exact ids one statement above - a parallel worker hasn't had time to
+  // touch them in any practical sense.
   const { data: claimed, error } = await admin()
     .from('email_outbox')
     .update({ status: 'sending' })
     .in('id', ids)
-    .eq('status', 'pending')
     .select('id, type, payload, attempts')
 
   if (error) {

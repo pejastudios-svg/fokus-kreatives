@@ -112,11 +112,10 @@ export async function GET(req: NextRequest) {
         .lte('next_attempt_at', nowIso)
         .order('next_attempt_at', { ascending: true })
         .limit(25)
-      // Now run the IDENTICAL query through the lib's exported admin()
-      // function. If `viaLib` differs from `fullClaim`, the bug is inside
-      // emailOutbox.ts (different bundling / different module instance /
-      // something we haven't spotted in the source). If they match, the
-      // bug is later in claimDueEmails (UPDATE step or .map / control flow).
+      // Read-only sanity check via the lib's exported admin() so the probe
+      // confirms the lib's client construction is sound. We deliberately do
+      // NOT call claimDueEmails here - that would consume rows the main
+      // flow then tries to send.
       const viaLibClient = outboxAdmin()
       const viaLib = await viaLibClient
         .from('email_outbox')
@@ -125,7 +124,6 @@ export async function GET(req: NextRequest) {
         .lte('next_attempt_at', nowIso)
         .order('next_attempt_at', { ascending: true })
         .limit(25)
-      const viaLibFn = await claimDueEmails(25)
 
       probe = {
         nowIso,
@@ -136,7 +134,6 @@ export async function GET(req: NextRequest) {
         fullClaimError: fullClaim.error?.message ?? null,
         viaLibCount: viaLib.data?.length ?? null,
         viaLibError: viaLib.error?.message ?? null,
-        viaLibFnCount: viaLibFn.length,
         sampleRow: all.data?.[0] ?? null,
       }
     } catch (e) {
