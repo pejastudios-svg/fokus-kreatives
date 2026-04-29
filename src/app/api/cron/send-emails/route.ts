@@ -85,14 +85,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Raw probe: build a fresh client at request time (no module-scope
-    // cache) and run unfiltered SELECTs. Surfaces exactly what the worker
-    // sees vs the SQL editor.
+    // cache) and run progressively narrower queries. The first one that
+    // returns 0 rows is the filter that's breaking.
     let probe: Record<string, unknown> = {}
     try {
       const fresh = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
+      const nowIso = new Date().toISOString()
       const all = await fresh
         .from('email_outbox')
         .select('id, status, next_attempt_at', { count: 'exact', head: false })
@@ -100,12 +101,26 @@ export async function GET(req: NextRequest) {
         .from('email_outbox')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending')
+      const dueOnly = await fresh
+        .from('email_outbox')
+        .select('id', { count: 'exact', head: true })
+        .lte('next_attempt_at', nowIso)
+      const fullClaim = await fresh
+        .from('email_outbox')
+        .select('id')
+        .eq('status', 'pending')
+        .lte('next_attempt_at', nowIso)
+        .order('next_attempt_at', { ascending: true })
+        .limit(25)
       probe = {
+        nowIso,
         allCount: all.count,
-        allRowsReturned: all.data?.length ?? null,
-        allError: all.error?.message ?? null,
         pendingCount: pendingOnly.count,
-        pendingError: pendingOnly.error?.message ?? null,
+        dueCount: dueOnly.count,
+        fullClaimCount: fullClaim.data?.length ?? null,
+        fullClaimError: fullClaim.error?.message ?? null,
+        // Sample row so we can eyeball next_attempt_at format vs nowIso
+        sampleRow: all.data?.[0] ?? null,
       }
     } catch (e) {
       probe = { probeException: e instanceof Error ? e.message : String(e) }
