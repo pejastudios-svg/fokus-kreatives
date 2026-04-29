@@ -643,6 +643,68 @@ function ReviewItemCard({
   } | null>(null)
   const isApproved = item.status === 'approved'
 
+  // Scrollable chat + new-comment preview, mirroring the agency/portal flow
+  // so a long thread on a phone-shaped review screen doesn't push the
+  // composer below the fold.
+  const commentsListRef = useRef<HTMLUListElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [unreadPreview, setUnreadPreview] = useState<{
+    id: string
+    name: string
+    preview: string
+    avatar: string | null
+  } | null>(null)
+  const seenCommentIdsRef = useRef<Set<string>>(new Set())
+  const seenInitialisedRef = useRef(false)
+  const pendingScrollAfterSendRef = useRef(false)
+
+  const handleCommentsScroll = () => {
+    const el = commentsListRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+    const atBottom = distanceFromBottom < 40
+    setIsAtBottom((prev) => (prev === atBottom ? prev : atBottom))
+    if (atBottom && unreadPreview) setUnreadPreview(null)
+  }
+  const scrollCommentsToBottom = () => {
+    const el = commentsListRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
+
+  // Detect new comments arriving while scrolled away. Skips the initial
+  // batch + anything posted by this reviewer.
+  useEffect(() => {
+    if (!seenInitialisedRef.current) {
+      for (const c of comments) {
+        seenCommentIdsRef.current.add(c.id)
+      }
+      seenInitialisedRef.current = true
+      return
+    }
+    for (const c of comments) {
+      if (seenCommentIdsRef.current.has(c.id)) continue
+      seenCommentIdsRef.current.add(c.id)
+      // Did THIS reviewer post it? (No user_id; matched by reviewer_email.)
+      if (signedInAs && c.reviewer_email === signedInAs) continue
+      if (isAtBottom) continue
+      setUnreadPreview({
+        id: c.id,
+        name: c.users?.name || c.users?.email || c.reviewer_email || 'Someone',
+        preview: (c.content || '').slice(0, 60),
+        avatar: c.users?.profile_picture_url || null,
+      })
+    }
+  }, [comments, isAtBottom, signedInAs])
+
+  // After this reviewer sends a comment, scroll the list to the bottom
+  // once the new bubble actually renders.
+  useEffect(() => {
+    if (!pendingScrollAfterSendRef.current) return
+    pendingScrollAfterSendRef.current = false
+    requestAnimationFrame(() => scrollCommentsToBottom())
+  }, [comments])
+
   const handleGrabTime = () => {
     const handle = assetRendererRef.current
     if (!handle) return
@@ -882,6 +944,10 @@ function ReviewItemCard({
       setDraft('')
       setPendingFiles([])
       setPendingAnnotation(null)
+      // Tell the comments-list effect to scroll to the bottom once the
+      // new bubble lands in the DOM. Avoids the user feeling like their
+      // message scrolled off when the chat is long.
+      pendingScrollAfterSendRef.current = true
     } finally {
       setIsPosting(false)
     }
@@ -940,7 +1006,11 @@ function ReviewItemCard({
         {comments.length === 0 ? (
           <p className="text-xs text-gray-400 italic">No comments yet.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul
+            ref={commentsListRef}
+            onScroll={handleCommentsScroll}
+            className="space-y-3 max-h-72 overflow-y-auto pr-1"
+          >
             {comments.map((c) => {
               const author =
                 c.users?.name ||
@@ -1040,6 +1110,40 @@ function ReviewItemCard({
               )
             })}
           </ul>
+        )}
+
+        {/* New-comment preview bubble - same UX as agency/portal. Animates
+            in when a comment from someone else arrives while the reviewer
+            is scrolled away. Tap to jump to the bottom of the thread. */}
+        {unreadPreview && (
+          <button
+            type="button"
+            onClick={() => {
+              scrollCommentsToBottom()
+              setUnreadPreview(null)
+            }}
+            aria-label={`Jump to new comment from ${unreadPreview.name}`}
+            className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+          >
+            {unreadPreview.avatar ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={unreadPreview.avatar}
+                alt=""
+                className="h-6 w-6 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <span className="h-6 w-6 rounded-full bg-gray-200 text-gray-600 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                {(unreadPreview.name || 'U').charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="font-semibold truncate max-w-[80px]">
+              {unreadPreview.name.split(' ')[0]}
+            </span>
+            <span className="text-gray-500 truncate max-w-[180px]">
+              {unreadPreview.preview || 'sent an attachment'}
+            </span>
+          </button>
         )}
 
         <form
