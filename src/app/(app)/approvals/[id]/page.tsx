@@ -12,6 +12,7 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import {
@@ -360,6 +361,7 @@ export default function ApprovalDetailPage() {
   const [editingCommentText, setEditingCommentText] = useState<string>('')
   const [resolvingCommentId, setResolvingCommentId] = useState<string | null>(null)
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
+  const [pendingDeleteComment, setPendingDeleteComment] = useState<Comment | null>(null)
   const [mentionTargetItemId, setMentionTargetItemId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string>('')
   const [replyTarget, setReplyTarget] = useState<{
@@ -2095,7 +2097,7 @@ export default function ApprovalDetailPage() {
       </button>
       <button
         type="button"
-        onClick={() => deleteComment(c)}
+        onClick={() => setPendingDeleteComment(c)}
         className="hover:text-red-500"
         disabled={deletingCommentId === c.id}
       >
@@ -2375,6 +2377,20 @@ export default function ApprovalDetailPage() {
   </div>
 )}
       </div>
+      <ConfirmModal
+        open={!!pendingDeleteComment}
+        title="Delete this comment?"
+        message="This will permanently remove your comment for everyone."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={async () => {
+          const target = pendingDeleteComment
+          if (!target) return
+          await deleteComment(target)
+          setPendingDeleteComment(null)
+        }}
+        onClose={() => setPendingDeleteComment(null)}
+      />
     </>
   )
 }

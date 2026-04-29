@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
 import { formatTimestamp } from '@/lib/types/annotations'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
   CheckCircle,
   Loader2,
@@ -423,6 +424,9 @@ export default function ReviewPage() {
                   onCommentEdited={(c) =>
                     setComments((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...c } : x)))
                   }
+                  onCommentDeleted={(id) =>
+                    setComments((prev) => prev.filter((x) => x.id !== id))
+                  }
                   onError={(msg) => flash('error', msg)}
                   onPreviewMedia={(att, kind) =>
                     setMediaPreview({ url: att.url, name: att.name, kind })
@@ -621,6 +625,7 @@ function ReviewItemCard({
   onToggleApprove,
   onCommentPosted,
   onCommentEdited,
+  onCommentDeleted,
   onError,
   onPreviewMedia,
 }: {
@@ -633,6 +638,7 @@ function ReviewItemCard({
   onToggleApprove: () => void
   onCommentPosted: (c: CommentRow) => void
   onCommentEdited: (c: CommentRow) => void
+  onCommentDeleted: (id: string) => void
   onError: (msg: string) => void
   onPreviewMedia: (att: CommentAttachment, kind: 'image' | 'video') => void
 }) {
@@ -702,6 +708,25 @@ function ReviewItemCard({
     } finally {
       setIsEditing(false)
     }
+  }
+
+  // Delete-own-comment flow. The Delete button just stages a pending id;
+  // the ConfirmModal does the actual POST. The server runs the same
+  // reviewer_email ownership check the edit route does.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return
+    const res = await fetch('/api/review/comment/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, commentId: pendingDeleteId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!data.success) {
+      throw new Error(data.error || "Couldn't delete the comment")
+    }
+    onCommentDeleted(pendingDeleteId)
+    setPendingDeleteId(null)
   }
 
   const handleCommentsScroll = () => {
@@ -1228,13 +1253,22 @@ function ReviewItemCard({
                           signedInAs &&
                           (c.reviewer_email || '').toLowerCase() ===
                             signedInAs.toLowerCase() && (
-                            <button
-                              type="button"
-                              onClick={() => startEdit(c)}
-                              className="hover:text-[#2B79F7] transition-colors"
-                            >
-                              Edit
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => startEdit(c)}
+                                className="hover:text-[#2B79F7] transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingDeleteId(c.id)}
+                                className="hover:text-red-600 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </>
                           )}
                       </div>
                     )}
@@ -1484,6 +1518,15 @@ function ReviewItemCard({
           )}
         </form>
       </div>
+      <ConfirmModal
+        open={!!pendingDeleteId}
+        title="Delete this comment?"
+        message="This will permanently remove your comment for everyone."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDeleteId(null)}
+      />
     </div>
   )
 }
