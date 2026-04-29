@@ -23,7 +23,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
  * codebase uses, so we don't trip any edge case the diagnostic probe
  * already proved works.
  */
-function admin() {
+export function admin() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

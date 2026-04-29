@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { claimDueEmails, deliverEmail, markFailed, markSent } from '@/lib/emailOutbox'
+import { admin as outboxAdmin, claimDueEmails, deliverEmail, markFailed, markSent } from '@/lib/emailOutbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -112,6 +112,21 @@ export async function GET(req: NextRequest) {
         .lte('next_attempt_at', nowIso)
         .order('next_attempt_at', { ascending: true })
         .limit(25)
+      // Now run the IDENTICAL query through the lib's exported admin()
+      // function. If `viaLib` differs from `fullClaim`, the bug is inside
+      // emailOutbox.ts (different bundling / different module instance /
+      // something we haven't spotted in the source). If they match, the
+      // bug is later in claimDueEmails (UPDATE step or .map / control flow).
+      const viaLibClient = outboxAdmin()
+      const viaLib = await viaLibClient
+        .from('email_outbox')
+        .select('id')
+        .eq('status', 'pending')
+        .lte('next_attempt_at', nowIso)
+        .order('next_attempt_at', { ascending: true })
+        .limit(25)
+      const viaLibFn = await claimDueEmails(25)
+
       probe = {
         nowIso,
         allCount: all.count,
@@ -119,7 +134,9 @@ export async function GET(req: NextRequest) {
         dueCount: dueOnly.count,
         fullClaimCount: fullClaim.data?.length ?? null,
         fullClaimError: fullClaim.error?.message ?? null,
-        // Sample row so we can eyeball next_attempt_at format vs nowIso
+        viaLibCount: viaLib.data?.length ?? null,
+        viaLibError: viaLib.error?.message ?? null,
+        viaLibFnCount: viaLibFn.length,
         sampleRow: all.data?.[0] ?? null,
       }
     } catch (e) {
