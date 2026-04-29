@@ -117,27 +117,28 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
   const ids = await selectDueEmailIds(limit)
   if (ids.length === 0) return []
 
-  // Flip them to 'sending' so a parallel tick won't pick them up. We then
-  // re-select to get the full payload + current attempt count.
-  //
-  // NOTE: don't chain `.eq('status', 'pending')` here. PostgREST's
-  // `Prefer: return=representation` evaluates that filter against the
-  // POST-update state, so the returned rows would be empty (they're now
-  // 'sending', not 'pending') even though the update did flip them. The
-  // `.in('id', ids)` scope is sufficient because we just SELECTed those
-  // exact ids one statement above - a parallel worker hasn't had time to
-  // touch them in any practical sense.
-  const { data: claimed, error } = await admin()
+  // Flip the rows to 'sending', then SELECT them as a separate call. The
+  // chained `.update(...).in(...).select(...)` pattern returned empty data
+  // in production despite the WHERE actually matching - sidestep that
+  // entirely by doing the two operations independently.
+  const { error: updateErr } = await admin()
     .from('email_outbox')
     .update({ status: 'sending' })
     .in('id', ids)
-    .select('id, type, payload, attempts')
-
-  if (error) {
-    console.error('email_outbox claim error:', error)
+  if (updateErr) {
+    console.error('email_outbox claim update error:', updateErr)
     return []
   }
-  return (claimed || []) as OutboxRow[]
+
+  const { data: rows, error: selectErr } = await admin()
+    .from('email_outbox')
+    .select('id, type, payload, attempts')
+    .in('id', ids)
+  if (selectErr) {
+    console.error('email_outbox claim select error:', selectErr)
+    return []
+  }
+  return (rows || []) as OutboxRow[]
 }
 
 export async function markSent(id: string): Promise<void> {
