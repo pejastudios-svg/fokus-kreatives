@@ -250,6 +250,7 @@ export async function POST(req: NextRequest) {
       timestampSeconds?: number | null
       region?: unknown
       attachmentIndex?: number | null
+      parentCommentId?: string | null
     }
     const token = (body.token || '').trim()
     const text = (body.body || '').trim()
@@ -323,6 +324,19 @@ export async function POST(req: NextRequest) {
         ? Math.floor(rawAttachmentIndex)
         : null
 
+    // Validate the parent comment, if any. Must belong to the same approval.
+    let parentCommentId: string | null = null
+    if (body.parentCommentId) {
+      const { data: parent } = await reviewAdmin
+        .from('approval_comments')
+        .select('id, approval_id')
+        .eq('id', body.parentCommentId)
+        .maybeSingle()
+      if (parent && parent.approval_id === approval.id) {
+        parentCommentId = parent.id as string
+      }
+    }
+
     const { data: created, error } = await reviewAdmin
       .from('approval_comments')
       .insert({
@@ -335,9 +349,10 @@ export async function POST(req: NextRequest) {
         timestamp_seconds: timestampSeconds,
         region,
         attachment_index: attachmentIndex,
+        parent_comment_id: parentCommentId,
       })
       .select(
-        'id, content, created_at, approval_item_id, reviewer_email, attachments, timestamp_seconds, region, attachment_index',
+        'id, content, created_at, updated_at, approval_item_id, reviewer_email, attachments, timestamp_seconds, region, attachment_index, parent_comment_id',
       )
       .single()
 

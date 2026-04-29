@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       reviewAdmin
         .from('approval_comments')
         .select(
-          'id, approval_item_id, content, created_at, user_id, reviewer_email, attachments, file_url, file_name, timestamp_seconds, region, attachment_index, users:user_id (name, email, profile_picture_url)',
+          'id, approval_item_id, content, created_at, updated_at, user_id, reviewer_email, attachments, file_url, file_name, timestamp_seconds, region, attachment_index, parent_comment_id, users:user_id (name, email, profile_picture_url)',
         )
         .eq('approval_id', approval.id)
         .order('created_at', { ascending: true }),

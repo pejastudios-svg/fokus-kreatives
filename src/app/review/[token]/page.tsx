@@ -66,6 +66,7 @@ interface CommentRow {
   approval_item_id: string | null
   content: string
   created_at: string
+  updated_at?: string | null
   user_id: string | null
   reviewer_email: string | null
   attachments: CommentAttachment[] | null
@@ -74,6 +75,7 @@ interface CommentRow {
   timestamp_seconds: number | null
   region: import('@/lib/types/annotations').CommentRegion | null
   attachment_index: number | null
+  parent_comment_id: string | null
   users: { name: string | null; email: string; profile_picture_url: string | null } | null
 }
 
@@ -418,6 +420,9 @@ export default function ReviewPage() {
                   assignees={assignees}
                   onToggleApprove={() => void handleToggleApprove(item)}
                   onCommentPosted={(c) => setComments((prev) => [...prev, c as CommentRow])}
+                  onCommentEdited={(c) =>
+                    setComments((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...c } : x)))
+                  }
                   onError={(msg) => flash('error', msg)}
                   onPreviewMedia={(att, kind) =>
                     setMediaPreview({ url: att.url, name: att.name, kind })
@@ -615,6 +620,7 @@ function ReviewItemCard({
   assignees,
   onToggleApprove,
   onCommentPosted,
+  onCommentEdited,
   onError,
   onPreviewMedia,
 }: {
@@ -626,6 +632,7 @@ function ReviewItemCard({
   assignees: AssigneeOption[]
   onToggleApprove: () => void
   onCommentPosted: (c: CommentRow) => void
+  onCommentEdited: (c: CommentRow) => void
   onError: (msg: string) => void
   onPreviewMedia: (att: CommentAttachment, kind: 'image' | 'video') => void
 }) {
@@ -657,6 +664,45 @@ function ReviewItemCard({
   const seenCommentIdsRef = useRef<Set<string>>(new Set())
   const seenInitialisedRef = useRef(false)
   const pendingScrollAfterSendRef = useRef(false)
+
+  // Reply / edit state. Replies attach via parent_comment_id; edits go
+  // through /api/review/comment/edit which only allows the reviewer to
+  // change their own rows (matched server-side by reviewer_email).
+  const [replyTo, setReplyTo] = useState<{ commentId: string; authorName: string } | null>(null)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingDraft, setEditingDraft] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+
+  const startEdit = (c: CommentRow) => {
+    setEditingCommentId(c.id)
+    setEditingDraft(c.content)
+  }
+  const cancelEdit = () => {
+    setEditingCommentId(null)
+    setEditingDraft('')
+  }
+  const saveEdit = async () => {
+    if (!editingCommentId) return
+    const next = editingDraft.trim()
+    if (!next) return
+    setIsEditing(true)
+    try {
+      const res = await fetch('/api/review/comment/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, commentId: editingCommentId, body: next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.success) {
+        onError(data.error || "Couldn't save the edit")
+        return
+      }
+      onCommentEdited(data.comment as CommentRow)
+      cancelEdit()
+    } finally {
+      setIsEditing(false)
+    }
+  }
 
   const handleCommentsScroll = () => {
     const el = commentsListRef.current
@@ -929,6 +975,7 @@ function ReviewItemCard({
           timestampSeconds: pendingAnnotation?.timestampSeconds ?? null,
           region: pendingAnnotation?.region ?? null,
           attachmentIndex: pendingAnnotation?.attachmentIndex ?? null,
+          parentCommentId: replyTo?.commentId ?? null,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -944,6 +991,7 @@ function ReviewItemCard({
       setDraft('')
       setPendingFiles([])
       setPendingAnnotation(null)
+      setReplyTo(null)
       // Tell the comments-list effect to scroll to the bottom once the
       // new bubble lands in the DOM. Avoids the user feeling like their
       // message scrolled off when the chat is long.
@@ -1046,7 +1094,29 @@ function ReviewItemCard({
                           minute: '2-digit',
                         })}
                       </span>
+                      {c.updated_at && c.updated_at !== c.created_at && (
+                        <span className="text-[10px] text-gray-400 italic">(edited)</span>
+                      )}
                     </div>
+                    {c.parent_comment_id && (() => {
+                      const parent = comments.find((p) => p.id === c.parent_comment_id)
+                      if (!parent) return null
+                      const parentAuthor =
+                        parent.users?.name ||
+                        parent.users?.email ||
+                        parent.reviewer_email ||
+                        'Reviewer'
+                      const snippet =
+                        parent.content.length > 80
+                          ? parent.content.slice(0, 80) + '…'
+                          : parent.content
+                      return (
+                        <div className="mt-1 px-2 py-1 bg-gray-50 border-l-2 border-gray-200 rounded text-[10px] text-gray-500">
+                          Replying to <span className="font-semibold">{parentAuthor}</span>:{' '}
+                          <span className="italic">&ldquo;{snippet}&rdquo;</span>
+                        </div>
+                      )
+                    })()}
                     {(c.timestamp_seconds != null || c.region) && (
                       <div className="mt-0.5 flex flex-wrap gap-1">
                         {c.timestamp_seconds != null && (
@@ -1077,10 +1147,39 @@ function ReviewItemCard({
                         )}
                       </div>
                     )}
-                    {body && (
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
-                        {formatCommentBody(body)}
-                      </p>
+                    {editingCommentId === c.id ? (
+                      <div className="mt-1 space-y-1.5">
+                        <textarea
+                          value={editingDraft}
+                          onChange={(e) => setEditingDraft(e.target.value)}
+                          rows={2}
+                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="px-2.5 py-1 rounded text-xs text-gray-600 hover:bg-gray-100"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveEdit()}
+                            disabled={isEditing || !editingDraft.trim()}
+                            className="px-2.5 py-1 rounded bg-[#2B79F7] text-white text-xs hover:bg-[#1E54B7] disabled:opacity-50"
+                          >
+                            {isEditing ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      body && (
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
+                          {formatCommentBody(body)}
+                        </p>
+                      )
                     )}
                     {(() => {
                       // Coalesce legacy file_url/file_name (single-file comments
@@ -1105,6 +1204,40 @@ function ReviewItemCard({
                         />
                       ) : null
                     })()}
+                    {editingCommentId !== c.id && (
+                      <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyTo({ commentId: c.id, authorName: author })
+                            // Bring the textbox into view so the user knows
+                            // their next message will land as a reply.
+                            requestAnimationFrame(() => {
+                              textareaRef.current?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                              })
+                              textareaRef.current?.focus({ preventScroll: true })
+                            })
+                          }}
+                          className="hover:text-[#2B79F7] transition-colors"
+                        >
+                          Reply
+                        </button>
+                        {c.user_id === null &&
+                          signedInAs &&
+                          (c.reviewer_email || '').toLowerCase() ===
+                            signedInAs.toLowerCase() && (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(c)}
+                              className="hover:text-[#2B79F7] transition-colors"
+                            >
+                              Edit
+                            </button>
+                          )}
+                      </div>
+                    )}
                   </div>
                 </li>
               )
@@ -1205,6 +1338,21 @@ function ReviewItemCard({
               )}
             </div>
           )}
+          {replyTo && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] text-gray-600">
+              <span className="truncate">
+                Replying to <span className="font-semibold">{replyTo.authorName}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="text-red-500 hover:underline shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {item.attachments && item.attachments.length > 0 && (
             <div className="flex items-center justify-center gap-4">
               <button
