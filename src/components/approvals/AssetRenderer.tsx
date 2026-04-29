@@ -140,19 +140,44 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       setFlashedRegion((prev) => (prev ? null : prev))
     }, [])
 
-    // Lock body scroll while the user is drawing a region. Without this, an
-    // iOS Safari finger drag inside the canvas can rubber-band the whole
-    // page underneath, which makes precise drawing on phones impossible.
+    // Lock body scroll while the user is drawing a region. iOS Safari ignores
+    // `overflow:hidden` for momentum scroll + the address-bar collapse, so we
+    // pin the body with `position:fixed` at the current scroll offset and
+    // restore it on exit. This is the only pattern that reliably freezes the
+    // viewport on phones while the draw canvas is open.
     useEffect(() => {
       if (typeof document === 'undefined') return
       if (!drawingMode) return
-      const previousOverflow = document.body.style.overflow
-      const previousTouchAction = document.body.style.touchAction
-      document.body.style.overflow = 'hidden'
-      document.body.style.touchAction = 'none'
+      const scrollY = window.scrollY
+      const body = document.body
+      const prev = {
+        position: body.style.position,
+        top: body.style.top,
+        left: body.style.left,
+        right: body.style.right,
+        width: body.style.width,
+        overflow: body.style.overflow,
+        touchAction: body.style.touchAction,
+        overscroll: body.style.overscrollBehavior,
+      }
+      body.style.position = 'fixed'
+      body.style.top = `-${scrollY}px`
+      body.style.left = '0'
+      body.style.right = '0'
+      body.style.width = '100%'
+      body.style.overflow = 'hidden'
+      body.style.touchAction = 'none'
+      body.style.overscrollBehavior = 'none'
       return () => {
-        document.body.style.overflow = previousOverflow
-        document.body.style.touchAction = previousTouchAction
+        body.style.position = prev.position
+        body.style.top = prev.top
+        body.style.left = prev.left
+        body.style.right = prev.right
+        body.style.width = prev.width
+        body.style.overflow = prev.overflow
+        body.style.touchAction = prev.touchAction
+        body.style.overscrollBehavior = prev.overscroll
+        window.scrollTo(0, scrollY)
       }
     }, [drawingMode])
 
