@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { claimDueEmails, deliverEmail, markFailed, markSent } from '@/lib/emailOutbox'
 
 export const runtime = 'nodejs'
@@ -83,6 +84,33 @@ export async function GET(req: NextRequest) {
       hasAppsScriptSecret: !!process.env.APPS_SCRIPT_SECRET,
     }
 
+    // Raw probe: build a fresh client at request time (no module-scope
+    // cache) and run unfiltered SELECTs. Surfaces exactly what the worker
+    // sees vs the SQL editor.
+    let probe: Record<string, unknown> = {}
+    try {
+      const fresh = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+      const all = await fresh
+        .from('email_outbox')
+        .select('id, status, next_attempt_at', { count: 'exact', head: false })
+      const pendingOnly = await fresh
+        .from('email_outbox')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      probe = {
+        allCount: all.count,
+        allRowsReturned: all.data?.length ?? null,
+        allError: all.error?.message ?? null,
+        pendingCount: pendingOnly.count,
+        pendingError: pendingOnly.error?.message ?? null,
+      }
+    } catch (e) {
+      probe = { probeException: e instanceof Error ? e.message : String(e) }
+    }
+
     const claimed = await claimDueEmails(25)
     let sent = 0
     let failed = 0
@@ -101,7 +129,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, claimed: claimed.length, sent, failed, env })
+    return NextResponse.json({ success: true, claimed: claimed.length, sent, failed, env, probe })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('cron/send-emails error:', err)
