@@ -43,6 +43,11 @@ const MAX_IMAGE_DIMENSION = 2048
 // Above this we'll resize. Below it we send the original bytes.
 const RESIZE_THRESHOLD_BYTES = 1024 * 1024 // 1 MB
 
+/** Hard cap on a single approval asset upload. Cloudinary will compress
+ *  videos heavily on its end, but we still don't want a 5GB raw file
+ *  saturating someone's data plan to find out. */
+export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024 // 500 MB
+
 const IMAGE_PREFIXES = ['image/']
 const VIDEO_PREFIXES = ['video/']
 
@@ -117,6 +122,12 @@ export async function uploadToCloudinary(
   const kind = fileKind(file)
   if (kind === 'other') {
     throw new Error(`Unsupported file type: ${file.type}`)
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    const mb = Math.round(file.size / (1024 * 1024))
+    throw new Error(
+      `${file.name} is ${mb} MB. Max upload size is 500 MB.`,
+    )
   }
 
   // 1) Get a fresh signature from our server.

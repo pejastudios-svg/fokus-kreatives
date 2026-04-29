@@ -1206,7 +1206,7 @@ function ReviewItemCard({
             </div>
           )}
           {item.attachments && item.attachments.length > 0 && (
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center justify-center gap-4">
               <button
                 type="button"
                 onClick={handleGrabTime}
@@ -1334,9 +1334,6 @@ function ReviewItemCard({
               ))}
             </div>
           )}
-          <p className="text-[10px] text-gray-400">
-            Up to {MAX_FILES} files · 5MB each
-          </p>
         </form>
       </div>
     </div>
