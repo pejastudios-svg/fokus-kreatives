@@ -11,10 +11,25 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
  * duplicate enqueues at the DB layer, so a retried POST never double-sends.
  */
 
-const admin = createServiceClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+/**
+ * Build a fresh service-role client per call. Module-scope caching
+ * breaks intermittently in Vercel serverless reuse - the cached client's
+ * auth state can drift across warm-lambda invocations and the SELECT path
+ * returns empty without erroring. Per-call construction is cheap (the
+ * client is just a config wrapper) and fixes it deterministically.
+ */
+function admin() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  )
+}
 
 export interface EmailEnqueueArgs {
   /** Apps Script email type: 'approval_comment', 'approval_mention', etc. */
@@ -38,7 +53,7 @@ const MAX_ATTEMPTS = 5
  */
 export async function enqueueEmail(args: EmailEnqueueArgs): Promise<boolean> {
   try {
-    const insert = await admin
+    const insert = await admin()
       .from('email_outbox')
       .insert({
         type: args.type,
@@ -81,7 +96,7 @@ interface OutboxRow {
  */
 export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
   const nowIso = new Date().toISOString()
-  const { data: due, error: dueErr } = await admin
+  const { data: due, error: dueErr } = await admin()
     .from('email_outbox')
     .select('id')
     .eq('status', 'pending')
@@ -99,7 +114,7 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
 
   // Flip them to 'sending' so a parallel tick won't pick them up. We then
   // re-select to get the full payload + current attempt count.
-  const { data: claimed, error } = await admin
+  const { data: claimed, error } = await admin()
     .from('email_outbox')
     .update({ status: 'sending' })
     .in('id', ids)
@@ -114,7 +129,7 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
 }
 
 export async function markSent(id: string): Promise<void> {
-  await admin
+  await admin()
     .from('email_outbox')
     .update({ status: 'sent', sent_at: new Date().toISOString(), last_error: null })
     .eq('id', id)
@@ -129,7 +144,7 @@ export async function markFailed(id: string, attempts: number, err: unknown): Pr
   const nextAttempts = attempts + 1
   const errMsg = err instanceof Error ? err.message : String(err)
   if (nextAttempts >= MAX_ATTEMPTS) {
-    await admin
+    await admin()
       .from('email_outbox')
       .update({
         status: 'dead',
@@ -141,7 +156,7 @@ export async function markFailed(id: string, attempts: number, err: unknown): Pr
   }
   // 2^n minutes: 2, 4, 8, 16, 32. Cap at 60.
   const backoffMs = Math.min(60, 2 ** nextAttempts) * 60 * 1000
-  await admin
+  await admin()
     .from('email_outbox')
     .update({
       status: 'pending',
