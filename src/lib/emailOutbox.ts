@@ -17,17 +17,16 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
  * auth state can drift across warm-lambda invocations and the SELECT path
  * returns empty without erroring. Per-call construction is cheap (the
  * client is just a config wrapper) and fixes it deterministically.
+ *
+ * No auth options - default `persistSession: true` is fine in serverless
+ * (no localStorage to persist into) and matches what the rest of the
+ * codebase uses, so we don't trip any edge case the diagnostic probe
+ * already proved works.
  */
 function admin() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    },
   )
 }
 
