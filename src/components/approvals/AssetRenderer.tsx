@@ -140,6 +140,22 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       setFlashedRegion((prev) => (prev ? null : prev))
     }, [])
 
+    // Lock body scroll while the user is drawing a region. Without this, an
+    // iOS Safari finger drag inside the canvas can rubber-band the whole
+    // page underneath, which makes precise drawing on phones impossible.
+    useEffect(() => {
+      if (typeof document === 'undefined') return
+      if (!drawingMode) return
+      const previousOverflow = document.body.style.overflow
+      const previousTouchAction = document.body.style.touchAction
+      document.body.style.overflow = 'hidden'
+      document.body.style.touchAction = 'none'
+      return () => {
+        document.body.style.overflow = previousOverflow
+        document.body.style.touchAction = previousTouchAction
+      }
+    }, [drawingMode])
+
     // When the active slide changes, pause every other video so audio doesn't
     // bleed across slides. (Carousel-only - in grid mode each video is its own
     // independent player.)
@@ -336,7 +352,11 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       return (
         <div
           ref={containerRef}
-          className="relative overflow-hidden rounded-lg select-none"
+          // touch-pan-y tells the browser the carousel reserves horizontal
+          // gestures for itself - the page won't scroll horizontally while
+          // the user swipes between slides. Vertical scroll still bubbles
+          // up so the page can scroll past the carousel naturally.
+          className="relative overflow-hidden rounded-lg select-none touch-pan-y"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
