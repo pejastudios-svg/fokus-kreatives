@@ -22,6 +22,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
+    // Surface env-var presence in the response so Apps Script logs show it
+    // immediately if a key is missing - saves a Vercel-logs round-trip when
+    // diagnosing the cron worker.
+    const env = {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasAppsScriptUrl: !!process.env.APPS_SCRIPT_WEBHOOK_URL,
+      hasAppsScriptSecret: !!process.env.APPS_SCRIPT_SECRET,
+    }
+
     const claimed = await claimDueEmails(25)
     let sent = 0
     let failed = 0
@@ -40,7 +50,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, claimed: claimed.length, sent, failed })
+    return NextResponse.json({ success: true, claimed: claimed.length, sent, failed, env })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('cron/send-emails error:', err)

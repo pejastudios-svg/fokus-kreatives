@@ -81,13 +81,18 @@ interface OutboxRow {
  */
 export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
   const nowIso = new Date().toISOString()
-  const { data: due } = await admin
+  const { data: due, error: dueErr } = await admin
     .from('email_outbox')
     .select('id')
     .eq('status', 'pending')
     .lte('next_attempt_at', nowIso)
     .order('next_attempt_at', { ascending: true })
     .limit(limit)
+
+  if (dueErr) {
+    console.error('email_outbox due-select error:', dueErr)
+    throw dueErr
+  }
 
   const ids = (due || []).map((r) => r.id as string)
   if (ids.length === 0) return []
