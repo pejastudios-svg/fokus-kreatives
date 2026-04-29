@@ -44,12 +44,41 @@ export async function GET(req: NextRequest) {
     // Surface env-var presence in the response so Apps Script logs show it
     // immediately if a key is missing - saves a Vercel-logs round-trip when
     // diagnosing the cron worker.
+    // Pull the project ref out of the URL so we can compare it against the
+    // Supabase dashboard without leaking the full URL. Format:
+    // https://<projectref>.supabase.co
+    const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const projectRef = (() => {
+      try {
+        const host = new URL(supaUrl).hostname
+        return host.split('.')[0] || null
+      } catch {
+        return null
+      }
+    })()
+    // Also surface the JWT's `ref` claim (Supabase puts the project ref in
+    // the JWT). If projectRef !== jwtRef, the URL and key are from
+    // different projects.
+    const jwtRef = (() => {
+      const jwt = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!jwt) return null
+      const parts = jwt.split('.')
+      if (parts.length < 2) return null
+      try {
+        const payload = JSON.parse(
+          Buffer.from(parts[1], 'base64url').toString('utf8'),
+        ) as { ref?: string }
+        return payload.ref || null
+      } catch {
+        return null
+      }
+    })()
     const env = {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      projectRef,
       hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      // The role claim - "service_role" if the right key is wired,
-      // "anon" if the anon key was pasted in by mistake.
       serviceRoleClaim: decodeJwtRole(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      jwtRef,
       hasAppsScriptUrl: !!process.env.APPS_SCRIPT_WEBHOOK_URL,
       hasAppsScriptSecret: !!process.env.APPS_SCRIPT_SECRET,
     }
