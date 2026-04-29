@@ -19,6 +19,7 @@ import {
   Film,
   Download,
   Clock as ClockIcon,
+  Pen as PenIcon,
 } from 'lucide-react'
 
 interface ApprovalSummary {
@@ -636,7 +637,8 @@ function ReviewItemCard({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const assetRendererRef = useRef<AssetRendererHandle | null>(null)
   const [pendingAnnotation, setPendingAnnotation] = useState<{
-    timestampSeconds: number
+    timestampSeconds?: number | null
+    region?: import('@/lib/types/annotations').CommentRegion | null
     attachmentIndex: number | null
   } | null>(null)
   const isApproved = item.status === 'approved'
@@ -646,20 +648,55 @@ function ReviewItemCard({
     if (!handle) return
     const time = handle.getCurrentTime()
     if (time === null) {
+      handle.scrollIntoView()
       onError('Play or seek the video first, then click Grab time.')
       return
     }
-    setPendingAnnotation({
+    handle.scrollIntoView()
+    setPendingAnnotation((prev) => ({
+      ...(prev ?? { attachmentIndex: null }),
       timestampSeconds: time,
       attachmentIndex: handle.getActiveIndex(),
+    }))
+  }
+
+  const handleAnnotate = async (shape: 'circle' | 'freeform') => {
+    const handle = assetRendererRef.current
+    if (!handle) return
+    handle.scrollIntoView()
+    const result = await handle.enterDrawMode(shape)
+    if (!result) return
+    setPendingAnnotation((prev) => ({
+      // Drawing on a video implicitly tags the playback time as well.
+      timestampSeconds: prev?.timestampSeconds ?? result.timestampSeconds ?? null,
+      region: result.region,
+      attachmentIndex: handle.getActiveIndex(),
+    }))
+    if (textareaRef.current) {
+      textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      textareaRef.current.focus({ preventScroll: true })
+    }
+  }
+
+  const handleClearPendingField = (field: 'timestampSeconds' | 'region') => {
+    setPendingAnnotation((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, [field]: null }
+      if (!next.timestampSeconds && !next.region) return null
+      return next
     })
   }
 
   const handleFocusComment = (
     timestampSeconds: number | null,
     attachmentIndex: number | null,
+    region: import('@/lib/types/annotations').CommentRegion | null = null,
   ) => {
-    assetRendererRef.current?.focusAnnotation({ attachmentIndex, timestampSeconds })
+    assetRendererRef.current?.focusAnnotation({
+      attachmentIndex,
+      timestampSeconds,
+      region,
+    })
   }
 
   const onDraftChange = (value: string) => {
@@ -828,6 +865,7 @@ function ReviewItemCard({
           body: text,
           attachments: uploaded,
           timestampSeconds: pendingAnnotation?.timestampSeconds ?? null,
+          region: pendingAnnotation?.region ?? null,
           attachmentIndex: pendingAnnotation?.attachmentIndex ?? null,
         }),
       })
@@ -915,9 +953,18 @@ function ReviewItemCard({
               const body = stripEmailPrefix(c.content)
               return (
                 <li key={c.id} className="flex items-start gap-2">
-                  <div className="h-7 w-7 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center shrink-0">
-                    {(author || '?').charAt(0).toUpperCase()}
-                  </div>
+                  {c.users?.profile_picture_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={c.users.profile_picture_url}
+                      alt={author}
+                      className="h-7 w-7 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded-full bg-gray-100 text-gray-600 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                      {(author || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs font-medium text-gray-900 truncate">{author}</span>
@@ -930,16 +977,35 @@ function ReviewItemCard({
                         })}
                       </span>
                     </div>
-                    {c.timestamp_seconds !== null && c.timestamp_seconds !== undefined && (
-                      <button
-                        type="button"
-                        onClick={() => handleFocusComment(c.timestamp_seconds, c.attachment_index)}
-                        title="Jump to this moment"
-                        className="inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
-                      >
-                        <ClockIcon className="h-3 w-3" />
-                        {formatTimestamp(c.timestamp_seconds)}
-                      </button>
+                    {(c.timestamp_seconds != null || c.region) && (
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {c.timestamp_seconds != null && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleFocusComment(c.timestamp_seconds, c.attachment_index, c.region)
+                            }
+                            title="Jump to this moment"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                          >
+                            <ClockIcon className="h-3 w-3" />
+                            {formatTimestamp(c.timestamp_seconds)}
+                          </button>
+                        )}
+                        {c.region && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleFocusComment(c.timestamp_seconds, c.attachment_index, c.region)
+                            }
+                            title="Show the highlighted region"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+                          >
+                            <PenIcon className="h-3 w-3" />
+                            View highlight
+                          </button>
+                        )}
+                      </div>
                     )}
                     {body && (
                       <p className="text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
@@ -1006,25 +1072,37 @@ function ReviewItemCard({
             </ul>
           )}
 
-          <div className="flex items-center justify-between gap-2">
-            {pendingAnnotation ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                <span>Tagged at:</span>
+          {pendingAnnotation && (pendingAnnotation.timestampSeconds || pendingAnnotation.region) && (
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+              <span>Tagged:</span>
+              {pendingAnnotation.timestampSeconds != null && (
                 <button
                   type="button"
-                  onClick={() => setPendingAnnotation(null)}
+                  onClick={() => handleClearPendingField('timestampSeconds')}
                   title="Remove timestamp"
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
                 >
                   <ClockIcon className="h-3 w-3" />
-                  {formatTimestamp(pendingAnnotation.timestampSeconds)}
+                  {formatTimestamp(pendingAnnotation.timestampSeconds!)}
                   <XIcon className="h-3 w-3" />
                 </button>
-              </div>
-            ) : (
-              <span />
-            )}
-            {item.attachments && item.attachments.length > 0 && (
+              )}
+              {pendingAnnotation.region && (
+                <button
+                  type="button"
+                  onClick={() => handleClearPendingField('region')}
+                  title="Remove highlight"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+                >
+                  <PenIcon className="h-3 w-3" />
+                  {pendingAnnotation.region.shape === 'circle' ? 'Circle' : 'Highlight'}
+                  <XIcon className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )}
+          {item.attachments && item.attachments.length > 0 && (
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={handleGrabTime}
@@ -1034,8 +1112,17 @@ function ReviewItemCard({
                 <ClockIcon className="h-3 w-3" />
                 <span>Grab time</span>
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => handleAnnotate('circle')}
+                title="Draw a region on the asset"
+                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+              >
+                <PenIcon className="h-3 w-3" />
+                <span>Annotate</span>
+              </button>
+            </div>
+          )}
 
           <div className="flex items-end gap-2 relative">
             <input
