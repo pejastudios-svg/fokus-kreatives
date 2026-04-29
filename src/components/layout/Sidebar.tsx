@@ -16,6 +16,7 @@ import {
   ClipboardList,
   ChevronsLeft,
   ChevronsRight,
+  Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -27,6 +28,7 @@ const baseNavigation = [
   { name: 'Team', href: '/team', icon: UserCircle },
   { name: 'Competitors', href: '/competitors', icon: Search },
   { name: 'Approvals', href: '/approvals', icon: ClipboardList },
+  { name: 'Campaigns', href: '/campaigns', icon: Sparkles },
 ]
 
 interface SidebarProps {

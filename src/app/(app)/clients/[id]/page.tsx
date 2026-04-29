@@ -32,10 +32,12 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { ClientAssignees } from '@/components/clients/ClientAssignees'
+import { TopicsBank } from '@/components/clients/TopicsBank'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
 
 type ContentTier = 'beginner' | 'mid' | 'advanced'
+type PackageTier = 'top' | 'middle' | 'lower'
 
 interface ClientRow {
   id: string
@@ -54,11 +56,18 @@ interface ClientRow {
   competitor_insights: string | null
   website_url: string | null
   content_tier: ContentTier | null
+  package_tier: PackageTier | null
   brand_profile: BrandProfile | null
   archived_at: string | null
   brand_intake_token: string | null
   brand_intake_submitted_at: string | null
   created_at: string
+}
+
+const PACKAGE_TIER_LABEL: Record<PackageTier, string> = {
+  top: 'Top (Authority Engine)',
+  middle: 'Middle (Growth)',
+  lower: 'Lower (Foundation)',
 }
 
 type TabKey = 'overview' | 'audience' | 'guidelines' | 'competitors' | 'team'
@@ -319,6 +328,12 @@ export default function ClientProfilePage() {
                     {client.content_tier} tier
                   </span>
                 )}
+                {client.package_tier && (
+                  <span className="inline-flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {PACKAGE_TIER_LABEL[client.package_tier]}
+                  </span>
+                )}
                 {client.website_url && (
                   <a
                     href={client.website_url}
@@ -410,6 +425,44 @@ export default function ClientProfilePage() {
                     )}
                   </div>
                 )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Brand intake link - mirror of the edit-page banner so the agency
+            can grab the link without going into edit mode. Generate button
+            shown when no token exists yet. */}
+        <Card className="mb-6 border-purple-200 bg-purple-50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-purple-700">Brand intake link</p>
+                {intakeLink ? (
+                  <p className="text-sm text-purple-600/70 truncate">{intakeLink}</p>
+                ) : (
+                  <p className="text-sm text-purple-600/70">No intake link generated yet.</p>
+                )}
+              </div>
+              {intakeLink ? (
+                <button
+                  type="button"
+                  onClick={handleCopyIntake}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy link
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRegenerateIntake}
+                  disabled={isGeneratingIntake}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {isGeneratingIntake ? 'Generating…' : 'Generate'}
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -883,6 +936,12 @@ function GuidelinesTab({
             Off-limits topics
           </p>
           <ChipList items={profile.content_strategy.off_limits_topics} />
+        </div>
+        <div className="pt-2">
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+            Topics bank
+          </p>
+          <TopicsBank clientId={client.id} />
         </div>
       </Section>
 

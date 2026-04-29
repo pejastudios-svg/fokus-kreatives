@@ -44,11 +44,14 @@ interface ClientRow {
   competitor_insights?: string | null
   website_url?: string | null
   content_tier?: ContentTier | null
+  package_tier?: PackageTier | null
   brand_profile?: BrandProfile | null
   archived_at?: string | null
   brand_intake_token?: string | null
   brand_intake_submitted_at?: string | null
 }
+
+type PackageTier = 'top' | 'middle' | 'lower'
 
 type ClientFormData = {
   name: string
@@ -66,6 +69,7 @@ type ClientFormData = {
   competitor_insights: string
   website_url: string
   content_tier: ContentTier
+  package_tier: PackageTier | ''
   brand_profile: BrandProfile
 }
 
@@ -112,6 +116,7 @@ export default function ClientDetailPage() {
       competitor_insights: '',
       website_url: '',
       content_tier: 'beginner',
+      package_tier: '',
       brand_profile: defaultBrandProfile(),
     },
   )
@@ -133,6 +138,7 @@ export default function ClientDetailPage() {
       competitor_insights: row.competitor_insights ?? '',
       website_url: row.website_url ?? '',
       content_tier: (row.content_tier ?? 'beginner') as ContentTier,
+      package_tier: (row.package_tier ?? '') as PackageTier | '',
       brand_profile: row.brand_profile ?? defaultBrandProfile(),
     }
   }, [])
@@ -244,6 +250,13 @@ export default function ClientDetailPage() {
     })()
   }, [supabase])
 
+  // Auto-dismiss the toast after a few seconds so it doesn't linger.
+  useEffect(() => {
+    if (!notification) return
+    const t = setTimeout(() => setNotification(null), 3500)
+    return () => clearTimeout(t)
+  }, [notification])
+
   // Avoid "set-state-in-effect" by deferring the refresh to a microtask.
   useEffect(() => {
     let cancelled = false
@@ -304,6 +317,7 @@ export default function ClientDetailPage() {
       competitor_insights: formData.competitor_insights,
       website_url: formData.website_url,
       content_tier: formData.content_tier,
+      package_tier: formData.package_tier || null,
       brand_profile: formData.brand_profile,
     }
 
@@ -368,7 +382,7 @@ export default function ClientDetailPage() {
   const copyPortalLink = async () => {
     if (!portalLink) return
     await navigator.clipboard.writeText(portalLink)
-    setNotification({ type: 'success', message: 'Portal link copied!' })
+    setNotification({ type: 'success', message: 'CRM invite link copied!' })
     setTimeout(() => setNotification(null), 2000)
   }
 
@@ -467,12 +481,19 @@ export default function ClientDetailPage() {
 
         {notification && (
           <div
-            className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-              notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            role="status"
+            className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              notification.type === 'success'
+                ? 'bg-green-600 text-white'
+                : 'bg-red-600 text-white'
             }`}
           >
-            {notification.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-            {notification.message}
+            {notification.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 shrink-0" />
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
           </div>
         )}
 
@@ -481,7 +502,7 @@ export default function ClientDetailPage() {
             <CardContent className="py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-[#2B79F7]">Client Portal Invite Link</p>
+                  <p className="font-medium text-[#2B79F7]">CRM Invite Link</p>
                   <p className="text-sm text-[#2B79F7]/70 truncate max-w-md">{portalLink}</p>
                 </div>
                 <Button size="sm" onClick={copyPortalLink}>
@@ -577,7 +598,7 @@ export default function ClientDetailPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Tier</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content Voice Tier</label>
                 <select
                   name="content_tier"
                   value={formData.content_tier}
@@ -591,6 +612,27 @@ export default function ClientDetailPage() {
 
                 <p className="mt-1 text-xs text-gray-500">
                   Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Package Tier</label>
+                <select
+                  name="package_tier"
+                  value={formData.package_tier}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, package_tier: e.target.value as PackageTier | '' }))
+                  }
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                >
+                  <option value="">Not set</option>
+                  <option value="top">Top (Authority Engine)</option>
+                  <option value="middle">Middle (Growth)</option>
+                  <option value="lower">Lower (Foundation)</option>
+                </select>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Subscription level. Drives task deliverables and CRM access. Changes apply immediately.
                 </p>
               </div>
             </CardContent>
@@ -801,14 +843,22 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button onClick={handleSave} isLoading={isSaving}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
-          </div>
         </div>
       </div>
+
+      {/* Sticky save FAB - the only save control. Always visible regardless
+          of scroll position; bottom-left so it doesn't clash with the toast
+          (bottom-right). */}
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={isSaving}
+        className="fixed bottom-6 left-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        aria-label="Save changes"
+      >
+        <Save className="h-4 w-4" />
+        {isSaving ? 'Saving...' : 'Save changes'}
+      </button>
 
       <ConfirmModal
         open={confirmKind === 'archive'}

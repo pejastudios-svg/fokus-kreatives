@@ -1375,6 +1375,17 @@ await loadApproval()
                             handleNewCommentChange(item.id, e.target.value)
                           }
                           rows={2}
+                          onFocus={() => {
+                            // Mobile keyboard fix: re-scroll into view once
+                            // the keyboard finishes animating so it doesn't
+                            // sit on top of the composer.
+                            setTimeout(() => {
+                              composerTextareaRefs.current[item.id]?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                              })
+                            }, 300)
+                          }}
                           className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           placeholder="Leave a comment... use @name to tag someone."
                         />

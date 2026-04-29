@@ -35,13 +35,25 @@ function LoginForm() {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        router.push('/dashboard')
+        // Already-authed users skip the form. Clients land in their own CRM,
+        // everyone else (admin/manager/employee) goes to the agency dashboard.
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('role, client_id')
+          .eq('id', user.id)
+          .single()
+
+        if (userRow?.role === 'client' && userRow.client_id) {
+          router.push(`/crm/${userRow.client_id}/dashboard`)
+        } else {
+          router.push('/dashboard')
+        }
         return
       }
       setIsChecking(false)
     }
     checkAuth()
-  }, [router, supabase.auth])
+  }, [router, supabase])
 
   const switchMode = (next: Mode) => {
     setError('')
@@ -79,8 +91,8 @@ function LoginForm() {
         .eq('id', user.id)
         .single()
 
-      if (userRow?.role === 'client') {
-        router.push('/portal/approvals')
+      if (userRow?.role === 'client' && userRow.client_id) {
+        router.push(`/crm/${userRow.client_id}/dashboard`)
       } else {
         router.push('/dashboard')
       }

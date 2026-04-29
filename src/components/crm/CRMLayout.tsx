@@ -16,6 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCircleIcon,
+  Sparkles,
+  X,
+  Lock,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Loading } from '@/components/ui/Loading'
@@ -35,7 +38,10 @@ interface ClientInfo {
   name: string
   business_name: string
   archived_at?: string | null
+  package_tier?: 'top' | 'middle' | 'lower' | null
 }
+
+type PackageTier = 'top' | 'middle' | 'lower'
 
 export function CRMLayout({ children }: CRMLayoutProps) {
   const pathname = usePathname()
@@ -56,6 +62,11 @@ useEffect(() => {
 
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null)
 
+  // Whether the *currently signed-in user* is a client portal user (vs agency
+  // staff). Tier-based nav filtering only applies to client users; agency
+  // staff always see every CRM tab so they can manage on the client's behalf.
+  const [isClientUser, setIsClientUser] = useState(false)
+
   const [userRole, setUserRole] = useState<Role>('employee')
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -63,6 +74,7 @@ useEffect(() => {
 
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // FIX: Track which client ID we have successfully authorized
   const successClientId = useRef<string | null>(null)
@@ -144,7 +156,7 @@ useEffect(() => {
   const loadClientInfo = useCallback(async () => {
     const { data } = await supabase
       .from('clients')
-      .select('id, name, business_name, archived_at')
+      .select('id, name, business_name, archived_at, package_tier')
       .eq('id', clientId)
       .single()
 
@@ -213,12 +225,31 @@ if (role !== 'client' && role !== 'admin') {
       return
     }
 
-    // Client: can only access their own CRM
+    // Client: can only access their own CRM, and only if their package_tier
+    // includes CRM at all (Lower has no CRM access, Middle is gated to a
+    // subset via the navigation filter below).
     if (role === 'client') {
       if (!userClientId || userClientId !== clientId) {
         router.push('/login')
         return
       }
+
+      const { data: clientRow } = await supabase
+        .from('clients')
+        .select('package_tier')
+        .eq('id', clientId)
+        .single()
+      const tier = (clientRow?.package_tier ?? null) as PackageTier | null
+
+      // Only block when the tier is *explicitly* 'lower'. Null tiers stay
+      // backwards-compatible with existing clients (full access) until you
+      // assign them a tier on the client edit page.
+      if (tier === 'lower') {
+        router.push('/portal')
+        return
+      }
+
+      setIsClientUser(true)
       setUserRole('admin') // client acts as admin in their CRM
       await loadClientInfo()
       setIsAuthorized(true)
@@ -337,15 +368,110 @@ if (role !== 'client' && role !== 'admin') {
     router.push('/login')
   }
 
-  const navigation = [
-    { name: 'Dashboard', href: `/crm/${clientId}/dashboard`, icon: LayoutDashboard, roles: ['admin','manager','employee','guest'] as Role[] },
-    { name: 'Leads', href: `/crm/${clientId}/leads`, icon: Users, roles: ['admin','manager'] as Role[] },
-    { name: 'Revenue', href: `/crm/${clientId}/revenue`, icon: DollarSign, roles: ['admin','manager'] as Role[] },
-    { name: 'Meetings', href: `/crm/${clientId}/meetings`, icon: Calendar, roles: ['admin','manager'] as Role[] },
-    { name: 'Team', href: `/crm/${clientId}/team`, icon: UserCircleIcon, roles: ['admin', 'manager'] as Role[] },
-    { name: 'Capture Pages', href: `/crm/${clientId}/capture`, icon: FileInput, roles: ['admin','manager'] as Role[] },
-    { name: 'Settings', href: `/crm/${clientId}/settings`, icon: Settings, roles: ['admin','manager'] as Role[] },
-  ].filter((n) => n.roles.includes(userRole))
+  // Tier-scoped tabs - only enforced for client portal users. Agency staff
+  // always see every tab regardless of the client's package tier so they can
+  // manage on the client's behalf. Null tier = backwards-compatible full
+  // access (existing clients keep what they had until you assign a tier).
+  const allowedTiersByTab: Record<string, PackageTier[]> = {
+    Dashboard: ['top'],
+    Leads: ['top', 'middle'],
+    Revenue: ['top'],
+    Meetings: ['top', 'middle'],
+    Team: ['top'],
+    'Capture Pages': ['top', 'middle'],
+    Settings: ['top'],
+  }
+  const clientTier = (clientInfo?.package_tier ?? null) as PackageTier | null
+  const passesTier = (name: string) => {
+    if (!isClientUser) return true
+    if (clientTier === null) return true
+    return allowedTiersByTab[name]?.includes(clientTier) ?? false
+  }
+
+  // Tab name → URL segment. Most are lowercase but "Capture Pages" lands at
+  // /capture so we hardcode the map rather than slugify dynamically.
+  const tabSlug = (name: string): string => {
+    const map: Record<string, string> = {
+      Dashboard: 'dashboard',
+      Leads: 'leads',
+      Revenue: 'revenue',
+      Meetings: 'meetings',
+      Team: 'team',
+      'Capture Pages': 'capture',
+      Settings: 'settings',
+    }
+    return map[name] || name.toLowerCase()
+  }
+
+  // Short copy that explains each tab in the upgrade modal. Keep these tight
+  // - they show in a tooltip-style popover, not as marketing copy.
+  const featureCopy: Record<string, string> = {
+    Dashboard:
+      'At-a-glance KPIs for your CRM - leads, meetings, revenue trends in one view.',
+    Leads: 'Capture, track, and manage every lead that comes through your business.',
+    Revenue:
+      'Track invoices, payments, and revenue forecasts for your client work.',
+    Meetings: 'Schedule meetings, send reminders, and keep a log of every call.',
+    Team: 'Manage who on your side has access to this CRM workspace.',
+    'Capture Pages':
+      'Build embeddable lead-capture pages tied to this CRM in minutes.',
+    Settings:
+      'Custom field definitions, capture-page styling, and integration toggles.',
+  }
+  const allTabs = [
+    { name: 'Dashboard', icon: LayoutDashboard, roles: ['admin','manager','employee','guest'] as Role[] },
+    { name: 'Leads', icon: Users, roles: ['admin','manager'] as Role[] },
+    { name: 'Revenue', icon: DollarSign, roles: ['admin','manager'] as Role[] },
+    { name: 'Meetings', icon: Calendar, roles: ['admin','manager'] as Role[] },
+    { name: 'Team', icon: UserCircleIcon, roles: ['admin', 'manager'] as Role[] },
+    { name: 'Capture Pages', icon: FileInput, roles: ['admin','manager'] as Role[] },
+    { name: 'Settings', icon: Settings, roles: ['admin','manager'] as Role[] },
+  ]
+
+  const navigation = allTabs
+    .map((t) => ({ ...t, href: `/crm/${clientId}/${tabSlug(t.name)}` }))
+    .filter((n) => n.roles.includes(userRole))
+    .filter((n) => passesTier(n.name))
+
+  // Tabs the current client tier doesn't include - drives the "Unlock more"
+  // modal. Empty for top-tier and for null-tier (backwards-compat full access).
+  const lockedTabs = isClientUser
+    ? allTabs.filter(
+        (t) =>
+          allowedTiersByTab[t.name]?.includes(clientTier as PackageTier) === false,
+      )
+    : []
+  const showUnlockButton = isClientUser && clientTier === 'middle' && lockedTabs.length > 0
+
+  // Defense-in-depth: if a client portal user navigates directly to a tab
+  // their tier doesn't include (e.g., Middle visiting /revenue), bounce them
+  // to the first tab they CAN see. Agency staff aren't tier-gated so they
+  // skip this guard.
+  useEffect(() => {
+    if (!isAuthorized) return
+    if (!isClientUser) return
+    if (clientTier === null) return
+    const segment = pathname.split('/')[3] || ''
+    const segmentToTabName: Record<string, string> = {
+      dashboard: 'Dashboard',
+      leads: 'Leads',
+      revenue: 'Revenue',
+      meetings: 'Meetings',
+      team: 'Team',
+      capture: 'Capture Pages',
+      settings: 'Settings',
+    }
+    const tabName = segmentToTabName[segment]
+    if (!tabName) return
+    const allowed = allowedTiersByTab[tabName]
+    if (allowed?.includes(clientTier)) return
+    const fallback = navigation[0]?.href
+    if (fallback) router.replace(fallback)
+    else router.replace('/portal')
+    // navigation + allowedTiersByTab are recomputed every render, so we key
+    // off the primitives that actually trigger a real re-check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, isAuthorized, isClientUser, clientTier, router])
 
   if (isLoading || !isAuthorized) {
     return <Loading fullScreen text="Loading workspace..." />
@@ -465,6 +591,33 @@ if (role !== 'client' && role !== 'admin') {
           })}
         </nav>
 
+        {/* Unlock More - middle-tier client portal users only. Shows the
+            tabs they can't access today as a teaser, with hover tooltips
+            explaining each feature. Top-tier sees nothing here, lower-tier
+            never gets here at all (they're redirected to /portal). */}
+        {showUnlockButton && (
+          sidebarOpen ? (
+            <button
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="mx-3 mb-2 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>Unlock more features</span>
+            </button>
+          ) : (
+            <Tooltip content="Unlock more features" position="right">
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(true)}
+                className="mx-3 mb-2 flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white hover:opacity-90 transition-opacity"
+              >
+                <Sparkles className="h-5 w-5" />
+              </button>
+            </Tooltip>
+          )
+        )}
+
         {/* User / Logout */}
         <div className="px-3 py-4 border-t border-[#1E293B]">
           <div className="relative">
@@ -539,6 +692,63 @@ if (role !== 'client' && role !== 'admin') {
 
         {/* Global notifications popup (approvals + mentions etc) */}
         <NotificationPopupListener />
+
+        {/* Upgrade-tier modal: shows the locked features as badges with a
+            hover tooltip per badge. Backdrop click closes. Only renders for
+            middle-tier client portal users (button is hidden otherwise). */}
+        {showUpgradeModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowUpgradeModal(false)}
+          >
+            <div
+              className="relative w-full max-w-lg rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1E293B] transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="p-6">
+                <div className="flex items-center gap-2 text-[#2B79F7]">
+                  <Sparkles className="h-5 w-5" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Available on the Top tier</span>
+                </div>
+                <h3 className="mt-2 text-xl font-semibold text-white">Unlock more features</h3>
+                <p className="mt-1 text-sm text-gray-400">
+                  Upgrade to the Top package to add the features below to your CRM.
+                </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  {lockedTabs.map((t) => (
+                    <Tooltip
+                      key={t.name}
+                      content={featureCopy[t.name] || ''}
+                      position="top"
+                    >
+                      <div className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#1E293B] border border-[#334155] text-gray-300 cursor-default">
+                        <t.icon className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                        <span className="text-sm font-medium truncate">{t.name}</span>
+                        <Lock className="h-3 w-3 ml-auto shrink-0 text-[#64748B]" />
+                      </div>
+                    </Tooltip>
+                  ))}
+                </div>
+
+                <p className="mt-5 text-[11px] text-gray-500">
+                  Hover any badge for a quick description. Reach out to your account manager to upgrade.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

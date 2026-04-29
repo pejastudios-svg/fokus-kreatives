@@ -179,21 +179,21 @@ export default function InvitePage() {
       setSuccess(true)
 
       // Redirect logic:
-      // - client portal users go to portal approvals
-      // - CRM invites go to that CRM
-      // - otherwise agency dashboard
-      if (userData.role === 'client') {
-        router.push('/portal/approvals')
+      // - client portal users land on their CRM dashboard so they don't have
+      //   to re-paste a separate CRM URL after setting their password.
+      // - agency-staff CRM invites (membership-based) go to that specific
+      //   client's CRM.
+      // - everyone else falls through to the agency dashboard.
+      if (userData.role === 'client' && userData.client_id) {
+        router.push(`/crm/${userData.client_id}/dashboard`)
         return
       }
 
-      // If crmInviteInfo exists, go to that CRM
       if (crmInviteInfo?.clientId) {
         router.push(`/crm/${crmInviteInfo.clientId}/dashboard`)
         return
       }
 
-      // Otherwise go to agency dashboard
       router.push('/dashboard')
     } finally {
       setIsSubmitting(false)

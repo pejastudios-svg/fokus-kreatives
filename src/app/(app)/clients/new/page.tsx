@@ -34,8 +34,11 @@ type NewClientFormData = {
   social_proof: string
   website_url: string
   content_tier: ClientTier
+  package_tier: PackageTier | ''
   brand_profile: BrandProfile
 }
+
+type PackageTier = 'top' | 'middle' | 'lower'
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message
@@ -52,6 +55,8 @@ export default function NewClientPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [roleLoading, setRoleLoading] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [currentUserName, setCurrentUserName] = useState('')
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null)
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -71,6 +76,7 @@ export default function NewClientPage() {
       social_proof: '',
       website_url: '',
       content_tier: 'beginner',
+      package_tier: '',
       brand_profile: defaultBrandProfile(),
     },
   )
@@ -79,6 +85,13 @@ export default function NewClientPage() {
   const canCreateClient = userRole === 'admin'
 
   // ✅ Load current user's role once
+  // Auto-dismiss the toast after a few seconds so it doesn't linger.
+  useEffect(() => {
+    if (!notification) return
+    const t = setTimeout(() => setNotification(null), 3500)
+    return () => clearTimeout(t)
+  }, [notification])
+
   useEffect(() => {
     let cancelled = false
 
@@ -93,7 +106,11 @@ export default function NewClientPage() {
           return
         }
 
-        const { data, error } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
+        const { data, error } = await supabase
+          .from('users')
+          .select('role, name, profile_picture_url')
+          .eq('id', user.id)
+          .maybeSingle()
 
         if (error) {
           console.error('Role lookup failed:', error.code, error.message, error)
@@ -101,7 +118,11 @@ export default function NewClientPage() {
           return
         }
 
-        if (!cancelled) setUserRole(data?.role || null)
+        if (!cancelled) {
+          setUserRole(data?.role || null)
+          setCurrentUserName(data?.name || user.email || '')
+          setCurrentUserAvatar(data?.profile_picture_url || user.user_metadata?.avatar_url || null)
+        }
       } finally {
         if (!cancelled) setRoleLoading(false)
       }
@@ -150,6 +171,7 @@ export default function NewClientPage() {
           social_proof: formData.social_proof,
           website_url: formData.website_url || null,
           content_tier: formData.content_tier || 'beginner',
+          package_tier: formData.package_tier || null,
           brand_profile: formData.brand_profile,
         })
         .select()
@@ -240,6 +262,32 @@ export default function NewClientPage() {
       })
       if (supportChannelError) console.warn('Failed to create support channel:', supportChannelError)
 
+      // Helper: fire the CRM invite email so the agency doesn't have to copy
+      // the link manually. Mirrors the team-page workspace_invite pattern.
+      const sendCrmInviteEmail = async (email: string, token: string) => {
+        try {
+          const res = await fetch('/api/notify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'crm_invite',
+              payload: {
+                to: email,
+                inviteeName: formData.name,
+                inviterName: currentUserName || 'Someone',
+                inviterAvatarUrl: currentUserAvatar || '',
+                role: 'client',
+                workspaceName: formData.business_name || 'your CRM workspace',
+                acceptUrl: `${window.location.origin}/invite/${token}`,
+              },
+            }),
+          })
+          if (!res.ok) console.error('crm_invite email failed:', await res.text())
+        } catch (err) {
+          console.error('crm_invite email exception:', err)
+        }
+      }
+
       // Step 6: Portal user invite (optional)
       if (formData.email) {
         const emailLower = formData.email.trim().toLowerCase()
@@ -266,18 +314,19 @@ export default function NewClientPage() {
 
           if (userError) {
             console.warn('Failed to create portal user:', userError)
-            setNotification({ type: 'success', message: `Client created! (Portal invite failed: ${userError.message})` })
+            setNotification({ type: 'success', message: `Client created! (CRM invite failed: ${userError.message})` })
           } else {
+            await sendCrmInviteEmail(emailLower, token)
             setNotification({
               type: 'success',
-              message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}`,
+              message: `Client created and CRM invite emailed to ${emailLower}.`,
             })
           }
         } else {
           if (existing.role !== 'client') {
             setNotification({
               type: 'success',
-              message: `Client created! Portal invite NOT created because ${emailLower} already exists as a team user.`,
+              message: `Client created! CRM invite NOT created because ${emailLower} already exists as a team user.`,
             })
           } else {
             const { error: updateErr } = await supabase
@@ -293,11 +342,12 @@ export default function NewClientPage() {
 
             if (updateErr) {
               console.warn('Failed to update portal user:', updateErr)
-              setNotification({ type: 'success', message: `Client created! (Portal invite failed: ${updateErr.message})` })
+              setNotification({ type: 'success', message: `Client created! (CRM invite failed: ${updateErr.message})` })
             } else {
+              await sendCrmInviteEmail(emailLower, token)
               setNotification({
                 type: 'success',
-                message: `Client created! Portal invite link: ${window.location.origin}/invite/${token}`,
+                message: `Client created and CRM invite emailed to ${emailLower}.`,
               })
             }
           }
@@ -328,16 +378,19 @@ export default function NewClientPage() {
 
         {notification && (
           <div
-            className={`mb-6 p-4 rounded-lg flex items-start gap-3 ${
-              notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            role="status"
+            className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              notification.type === 'success'
+                ? 'bg-green-600 text-white'
+                : 'bg-red-600 text-white'
             }`}
           >
             {notification.type === 'success' ? (
-              <CheckCircle className="h-5 w-5 mt-0.5" />
+              <CheckCircle className="h-5 w-5 shrink-0" />
             ) : (
-              <AlertCircle className="h-5 w-5 mt-0.5" />
+              <AlertCircle className="h-5 w-5 shrink-0" />
             )}
-            <span className="break-all">{notification.message}</span>
+            <span className="text-sm font-medium break-words">{notification.message}</span>
           </div>
         )}
 
@@ -398,7 +451,7 @@ export default function NewClientPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Tier</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content Voice Tier</label>
                 <select
                   name="content_tier"
                   value={formData.content_tier}
@@ -411,6 +464,26 @@ export default function NewClientPage() {
 
                 <p className="mt-1 text-xs text-gray-500">
                   Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Package Tier</label>
+                <select
+                  name="package_tier"
+                  value={formData.package_tier}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, package_tier: e.target.value as PackageTier | '' }))
+                  }
+                >
+                  <option value="">Not set</option>
+                  <option value="top">Top (Authority Engine)</option>
+                  <option value="middle">Middle (Growth)</option>
+                  <option value="lower">Lower (Foundation)</option>
+                </select>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Subscription level. Drives task deliverables and CRM access. Leave blank if not yet decided.
                 </p>
               </div>
             </CardContent>
@@ -559,11 +632,19 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                 Cancel
               </Button>
             </Link>
-
-            <Button type="submit" isLoading={isLoading} disabled={roleLoading || !canCreateClient}>
-              Create Client
-            </Button>
           </div>
+
+          {/* Sticky create FAB - the only create control. Lives inside the
+              form so it triggers handleSubmit. Bottom-left so it doesn't
+              clash with the bottom-right toast. */}
+          <button
+            type="submit"
+            disabled={isLoading || roleLoading || !canCreateClient}
+            className="fixed bottom-6 left-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Create client"
+          >
+            {isLoading ? 'Creating...' : 'Create client'}
+          </button>
         </form>
       </div>
     </>
