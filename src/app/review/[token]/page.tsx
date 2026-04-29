@@ -1228,7 +1228,7 @@ function ReviewItemCard({
             </div>
           )}
 
-          <div className="flex items-end gap-2 relative">
+          <div className="flex items-center gap-2 relative">
             <input
               ref={fileInputRef}
               type="file"
