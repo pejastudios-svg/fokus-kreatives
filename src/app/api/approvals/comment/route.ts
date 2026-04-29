@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sanitizeRegion } from '@/lib/types/annotations'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 // Types for Supabase responses
 interface ClientRef {
@@ -171,6 +172,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 3) Resolve assignees + the @-mention map.
+    //
+    // Tokens can resolve to either a user (assignee) or a "raw" client-side
+    // email address (the client.email column or any user with role='client'
+    // tied to this client_id). The latter exists so an agency user can write
+    // @ClientName and have the email reach the canonical contact even if
+    // they don't yet have a portal user account.
     const { data: assigneesRows } = await supabase
       .from('approval_assignees')
       .select('user_id, users(name, email)')
@@ -194,6 +201,48 @@ export async function POST(req: NextRequest) {
       if (emailLocal) tokenToUserId.set(emailLocal, uid)
     }
 
+    // Pull every client-role user tied to this client_id and add them to the
+    // mention map. Even if they aren't on approval_assignees, the client's
+    // own people are mention-able.
+    const clientId = (approval as unknown as { client_id?: string })?.client_id || null
+    const tokenToClientEmail = new Map<string, string>()
+    if (clientId) {
+      const { data: clientUsers } = await supabase
+        .from('users')
+        .select('id, email, name, role')
+        .eq('client_id', clientId)
+        .eq('role', 'client')
+      for (const cu of (clientUsers || []) as { id: string; email: string | null; name: string | null }[]) {
+        if (!cu.email) continue
+        const name = cu.name || ''
+        const first = normalizeKey(name.split(' ')[0] || '')
+        const full = normalizeKey(name.replace(/\s+/g, ''))
+        const emailLocal = normalizeKey((cu.email.split('@')[0] || ''))
+        if (first) tokenToUserId.set(first, cu.id)
+        if (full) tokenToUserId.set(full, cu.id)
+        if (emailLocal) tokenToUserId.set(emailLocal, cu.id)
+      }
+
+      // The client's own canonical contact (clients.name, clients.business_name,
+      // clients.email). May not have a user account at all - resolved as a
+      // raw email instead of a user_id.
+      const clientName =
+        (Array.isArray(relClients) ? relClients[0]?.name : (relClients as ClientRef | null)?.name) || ''
+      const clientBusiness =
+        (Array.isArray(relClients) ? relClients[0]?.business_name : (relClients as ClientRef | null)?.business_name) || ''
+      if (clientEmail) {
+        const tokens = [
+          normalizeKey(clientName.split(' ')[0] || ''),
+          normalizeKey(clientName.replace(/\s+/g, '')),
+          normalizeKey(clientBusiness.split(' ')[0] || ''),
+          normalizeKey(clientBusiness.replace(/\s+/g, '')),
+          normalizeKey((clientEmail.split('@')[0] || '')),
+          'client',
+        ].filter(Boolean)
+        for (const t of tokens) tokenToClientEmail.set(t, clientEmail)
+      }
+    }
+
     // Mentions take precedence: if anyone is @-tagged we notify ONLY them.
     // Otherwise we broadcast to every assignee + the client (minus the author).
     const mentionTokens = extractMentions(content)
@@ -204,8 +253,16 @@ export async function POST(req: NextRequest) {
           .filter(Boolean) as string[]
       )
     ).filter((id) => id !== userId)
+    const mentionRawEmails = Array.from(
+      new Set(
+        mentionTokens
+          .map((t) => tokenToClientEmail.get(normalizeKey(t)))
+          .filter(Boolean) as string[]
+      )
+    )
 
-    const isMentionMode = mentionTokens.length > 0 && mentionTargetIds.length > 0
+    const isMentionMode =
+      mentionTokens.length > 0 && (mentionTargetIds.length > 0 || mentionRawEmails.length > 0)
     const notifyType = isMentionMode ? 'approval_mention' : 'approval_comment'
 
     let inAppTargetIds: string[] = []
@@ -247,14 +304,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5) Email notifications.
+    // 5) Email notifications - written to the outbox so a transient Apps
+    // Script blip can't lose them. Each row carries a stable idempotency
+    // key tied to the comment id, so retried POSTs collapse at the DB.
     try {
-      const secret = process.env.APPS_SCRIPT_SECRET
-      if (!secret) {
-        console.warn('APPS_SCRIPT_SECRET not configured')
-        return NextResponse.json({ success: true, comment: commentRow })
-      }
-
       const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
       const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
       const reviewUrl = shareToken
@@ -264,61 +317,55 @@ export async function POST(req: NextRequest) {
       const emailSnippet =
         content.length > 200 ? content.slice(0, 200) + '...' : content
 
+      const basePayload = {
+        clientName: clientDisplayName,
+        approvalTitle: approval?.title || '',
+        approvalId,
+        commentSnippet: emailSnippet,
+      }
+
       if (isMentionMode) {
-        // Only the @-tagged folks get email.
-        const { data: mentionUsers } = await supabase
-          .from('users')
-          .select('id, email, role')
-          .in('id', mentionTargetIds)
+        // Only the @-tagged folks get email. Split team vs client so each
+        // recipient gets the right URL (agency dashboard vs review portal).
+        const { data: mentionUsers } = mentionTargetIds.length
+          ? await supabase
+              .from('users')
+              .select('id, email, role')
+              .in('id', mentionTargetIds)
+          : { data: [] as UserRow[] }
 
         const clientUserEmails = (mentionUsers || [])
           .filter((u: UserRow) => u.role === 'client')
           .map((u: UserRow) => u.email)
-          .filter(Boolean)
+          .filter(Boolean) as string[]
         const teamEmails = (mentionUsers || [])
           .filter((u: UserRow) => u.role !== 'client')
           .map((u: UserRow) => u.email)
-          .filter(Boolean)
+          .filter(Boolean) as string[]
 
-        if (clientUserEmails.length > 0) {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_mention',
-              payload: {
-                secret,
-                to: clientUserEmails,
-                clientName: clientDisplayName,
-                approvalTitle: approval?.title || '',
-                approvalId,
-                commentSnippet: emailSnippet,
-                url: reviewUrl,
-              },
-            }),
+        // Raw client emails resolved from @-mentions of the client's own name.
+        const clientToList = Array.from(
+          new Set([...clientUserEmails, ...mentionRawEmails]),
+        )
+
+        if (clientToList.length > 0) {
+          await enqueueEmail({
+            type: 'approval_mention',
+            payload: { ...basePayload, to: clientToList, url: reviewUrl },
+            idempotencyKey: `comment:${commentRow.id}:client-mention`,
           })
         }
-
         if (teamEmails.length > 0) {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_mention',
-              payload: {
-                secret,
-                to: teamEmails,
-                clientName: clientDisplayName,
-                approvalTitle: approval?.title || '',
-                approvalId,
-                commentSnippet: emailSnippet,
-                url: agencyUrl,
-              },
-            }),
+          await enqueueEmail({
+            type: 'approval_mention',
+            payload: { ...basePayload, to: teamEmails, url: agencyUrl },
+            idempotencyKey: `comment:${commentRow.id}:team-mention`,
           })
         }
       } else {
-        // Broadcast emails are throttled (mentions don't go through this branch).
+        // Broadcast emails are throttled per-approval to keep a chatty
+        // session from flooding inboxes. The outbox idempotency key still
+        // protects against retries within the same throttle window.
         const canEmail = await tryClaimEmailSlot(approvalId)
         if (!canEmail) {
           console.log('Skipping approval_comment broadcast email (cooldown)', {
@@ -327,7 +374,6 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: true, comment: commentRow })
         }
 
-        // Broadcast: every assignee + the client.
         const { data: assigneeUsers } = inAppTargetIds.length
           ? await supabase
               .from('users')
@@ -338,57 +384,33 @@ export async function POST(req: NextRequest) {
         const teamEmails = (assigneeUsers || [])
           .filter((u: UserRow) => u.role !== 'client')
           .map((u: UserRow) => u.email)
-          .filter(Boolean)
+          .filter(Boolean) as string[]
         const clientUserEmails = (assigneeUsers || [])
           .filter((u: UserRow) => u.role === 'client')
           .map((u: UserRow) => u.email)
-          .filter(Boolean)
+          .filter(Boolean) as string[]
 
         if (teamEmails.length > 0) {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_comment',
-              payload: {
-                secret,
-                to: teamEmails,
-                clientName: clientDisplayName,
-                approvalTitle: approval?.title || '',
-                approvalId,
-                commentSnippet: emailSnippet,
-                url: agencyUrl,
-              },
-            }),
+          await enqueueEmail({
+            type: 'approval_comment',
+            payload: { ...basePayload, to: teamEmails, url: agencyUrl },
+            idempotencyKey: `comment:${commentRow.id}:team-broadcast`,
           })
         }
 
         const clientToList = Array.from(
-          new Set(
-            [...clientUserEmails, clientEmail].filter(Boolean) as string[],
-          ),
+          new Set([...clientUserEmails, clientEmail].filter(Boolean) as string[]),
         )
         if (clientToList.length > 0) {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_comment',
-              payload: {
-                secret,
-                to: clientToList,
-                clientName: clientDisplayName,
-                approvalTitle: approval?.title || '',
-                approvalId,
-                commentSnippet: emailSnippet,
-                url: reviewUrl,
-              },
-            }),
+          await enqueueEmail({
+            type: 'approval_comment',
+            payload: { ...basePayload, to: clientToList, url: reviewUrl },
+            idempotencyKey: `comment:${commentRow.id}:client-broadcast`,
           })
         }
       }
     } catch (emailErr) {
-      console.error('Approval comment email notification error:', emailErr)
+      console.error('Approval comment email enqueue error:', emailErr)
     }
 
     return NextResponse.json({ success: true, comment: commentRow })

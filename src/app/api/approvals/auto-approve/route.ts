@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 // Types for Supabase responses
 interface ClientRef {
@@ -91,7 +92,6 @@ export async function GET(req: NextRequest) {
 
       if (userIds.length > 0) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-        const secret2 = process.env.APPS_SCRIPT_SECRET
 
         await fetch(`${appUrl}/api/notifications/create`, {
           method: 'POST',
@@ -103,53 +103,45 @@ export async function GET(req: NextRequest) {
           }),
         })
 
-        if (secret2) {
-          const { data: users } = await supabase
-            .from('users')
-            .select('id, email, role')
-            .in('id', userIds)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .in('id', userIds)
 
-          const clientEmails = (users || []).filter((u: UserRow) => u.role === 'client').map((u: UserRow) => u.email).filter(Boolean)
-          const teamEmails = (users || []).filter((u: UserRow) => u.role !== 'client').map((u: UserRow) => u.email).filter(Boolean)
+        const clientEmails = (users || []).filter((u: UserRow) => u.role === 'client').map((u: UserRow) => u.email).filter(Boolean) as string[]
+        const teamEmails = (users || []).filter((u: UserRow) => u.role !== 'client').map((u: UserRow) => u.email).filter(Boolean) as string[]
 
-          const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
-          const agencyUrl = `${appUrl}/approvals/${approvalId}`
+        const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+        const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
-          if (clientEmails.length) {
-            await fetch(`${appUrl}/api/notify-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'approval_approved',
-                payload: {
-                  secret: secret2,
-                  to: clientEmails,
-                  clientName,
-                  approvalTitle: a.title,
-                  approvalId,
-                  url: portalUrl,
-                },
-              }),
-            })
-          }
+        if (clientEmails.length) {
+          await enqueueEmail({
+            type: 'approval_approved',
+            payload: {
+              to: clientEmails,
+              clientName,
+              approvalTitle: a.title,
+              approvalId,
+              url: portalUrl,
+            },
+            // Idempotency key tied to (approval, kind) so the cron firing
+            // twice for the same auto-approval can't double-send.
+            idempotencyKey: `auto-approve:${approvalId}:client`,
+          })
+        }
 
-          if (teamEmails.length) {
-            await fetch(`${appUrl}/api/notify-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'approval_approved',
-                payload: {
-                  secret: secret2,
-                  to: teamEmails,
-                  clientName,
-                  approvalTitle: a.title,
-                  approvalId,
-                  url: agencyUrl,
-                },
-              }),
-            })
-          }
+        if (teamEmails.length) {
+          await enqueueEmail({
+            type: 'approval_approved',
+            payload: {
+              to: teamEmails,
+              clientName,
+              approvalTitle: a.title,
+              approvalId,
+              url: agencyUrl,
+            },
+            idempotencyKey: `auto-approve:${approvalId}:team`,
+          })
         }
       }
 

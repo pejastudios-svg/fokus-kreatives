@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { updateClickUpStatus } from '@/app/api/clickup/helpers'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 // Types for Supabase responses
 interface ClientRef {
@@ -121,43 +122,34 @@ if (statusWas !== 'approved' && newStatus === 'approved') {
       .map((u: UserRow) => u.email)
       .filter(Boolean)
 
-    const secret = process.env.APPS_SCRIPT_SECRET
     const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${approvalId}`
     const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${approvalId}`
 
-    if (secret && clientEmails.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'approval_approved',
-          payload: {
-            secret,
-            to: clientEmails,
-            clientName: clientDisplayName,
-            approvalTitle: approval.title,
-            approvalId,
-            url: portalUrl,
-          },
-        }),
+    if (clientEmails.length > 0) {
+      await enqueueEmail({
+        type: 'approval_approved',
+        payload: {
+          to: clientEmails,
+          clientName: clientDisplayName,
+          approvalTitle: approval.title,
+          approvalId,
+          url: portalUrl,
+        },
+        idempotencyKey: `recompute-approve:${approvalId}:client`,
       })
     }
 
-    if (secret && teamEmails.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'approval_approved',
-          payload: {
-            secret,
-            to: teamEmails,
-            clientName: clientDisplayName,
-            approvalTitle: approval.title,
-            approvalId,
-            url: agencyUrl,
-          },
-        }),
+    if (teamEmails.length > 0) {
+      await enqueueEmail({
+        type: 'approval_approved',
+        payload: {
+          to: teamEmails,
+          clientName: clientDisplayName,
+          approvalTitle: approval.title,
+          approvalId,
+          url: agencyUrl,
+        },
+        idempotencyKey: `recompute-approve:${approvalId}:team`,
       })
     }
   }

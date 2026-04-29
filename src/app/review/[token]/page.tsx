@@ -71,6 +71,7 @@ interface CommentRow {
   user_id: string | null
   reviewer_email: string | null
   attachments: CommentAttachment[] | null
+  resolved?: boolean | null
   file_url: string | null
   file_name: string | null
   timestamp_seconds: number | null
@@ -162,7 +163,7 @@ export default function ReviewPage() {
           (c) =>
             `${c.id}:${c.content}:${c.approval_item_id ?? ''}:${
               c.attachments ? c.attachments.length : 0
-            }:${c.file_url ?? ''}`,
+            }:${c.file_url ?? ''}:${c.resolved ? 1 : 0}`,
         )
         .join('|')
 
@@ -193,7 +194,11 @@ export default function ReviewPage() {
       }
     }
 
-    const id = window.setInterval(() => void tick(), 5000)
+    // 2-second poll keeps resolve flips + new agency comments showing up
+    // close to real time. The state route only returns when something
+    // actually changed (the keys above gate setState), so a tighter interval
+    // is cheap on the client.
+    const id = window.setInterval(() => void tick(), 2000)
     return () => {
       cancelled = true
       window.clearInterval(id)
@@ -729,6 +734,30 @@ function ReviewItemCard({
     setPendingDeleteId(null)
   }
 
+  // Anyone in the conversation can flip a comment's resolved flag - same as
+  // the agency + portal sides. We optimistically update the bubble and roll
+  // back if the API call fails.
+  const [resolvingCommentId, setResolvingCommentId] = useState<string | null>(null)
+  const toggleResolve = async (c: CommentRow) => {
+    const next = !c.resolved
+    setResolvingCommentId(c.id)
+    onCommentEdited({ ...c, resolved: next })
+    try {
+      const res = await fetch('/api/review/comment/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, commentId: c.id, resolved: next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.success) {
+        onCommentEdited({ ...c, resolved: c.resolved })
+        onError(data.error || "Couldn't update the comment")
+      }
+    } finally {
+      setResolvingCommentId(null)
+    }
+  }
+
   const handleCommentsScroll = () => {
     const el = commentsListRef.current
     if (!el) return
@@ -774,6 +803,20 @@ function ReviewItemCard({
     if (!pendingScrollAfterSendRef.current) return
     pendingScrollAfterSendRef.current = false
     requestAnimationFrame(() => scrollCommentsToBottom())
+  }, [comments])
+
+  // First-paint: jump the comments list to the bottom so the latest message
+  // is visible without manual scrolling. Runs once per card per session.
+  const initialScrollDoneRef = useRef(false)
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return
+    if (comments.length === 0) return
+    const el = commentsListRef.current
+    if (!el) return
+    initialScrollDoneRef.current = true
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight
+    })
   }, [comments])
 
   const handleGrabTime = () => {
@@ -1010,6 +1053,11 @@ function ReviewItemCard({
       }
       onCommentPosted({
         ...data.comment,
+        // The reviewer flow always writes user_id=null and reviewer_email=session.email,
+        // so backstop those here in case the API select is ever stripped down.
+        user_id: data.comment?.user_id ?? null,
+        reviewer_email: data.comment?.reviewer_email ?? signedInAs,
+        resolved: data.comment?.resolved ?? false,
         attachments: uploaded.length ? uploaded : data.comment?.attachments ?? null,
         users: null,
       })
@@ -1082,7 +1130,7 @@ function ReviewItemCard({
           <ul
             ref={commentsListRef}
             onScroll={handleCommentsScroll}
-            className="space-y-3 max-h-72 overflow-y-auto pr-1"
+            className="space-y-3 max-h-72 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pr-1"
           >
             {comments.map((c) => {
               const author =
@@ -1095,7 +1143,12 @@ function ReviewItemCard({
               // double-render the email.
               const body = stripEmailPrefix(c.content)
               return (
-                <li key={c.id} className="flex items-start gap-2">
+                <li
+                  key={c.id}
+                  className={`flex items-start gap-2 rounded-lg p-2 -mx-2 transition-colors ${
+                    c.resolved ? 'bg-green-50' : ''
+                  }`}
+                >
                   {c.users?.profile_picture_url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
@@ -1231,6 +1284,18 @@ function ReviewItemCard({
                     })()}
                     {editingCommentId !== c.id && (
                       <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                        <button
+                          type="button"
+                          onClick={() => void toggleResolve(c)}
+                          disabled={resolvingCommentId === c.id}
+                          className={`px-2 py-0.5 rounded-full border transition-colors ${
+                            c.resolved
+                              ? 'border-green-500 text-green-600 bg-green-50'
+                              : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
+                          } disabled:opacity-50`}
+                        >
+                          {c.resolved ? 'Resolved' : 'Mark resolved'}
+                        </button>
                         <button
                           type="button"
                           onClick={() => {

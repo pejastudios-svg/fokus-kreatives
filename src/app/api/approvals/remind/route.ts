@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -66,7 +67,6 @@ export async function GET(req: NextRequest) {
   let sent = 0
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-  const appsScriptSecret = process.env.APPS_SCRIPT_SECRET
 
   for (const a of approvals) {
     const approvalId = a.id
@@ -123,60 +123,53 @@ export async function GET(req: NextRequest) {
         }),
       })
 
-      // Email split (client vs team)
-      if (appsScriptSecret) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, email, role')
-          .in('id', userIds)
+      // Email split (client vs team) - written to the outbox so a flaky
+      // Apps Script can't lose a reminder. Idempotency key tied to the
+      // (approval, setField) so a re-run of the cron in the same window
+      // can't re-fire even if the column-set ack got lost.
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .in('id', userIds)
 
-        const clientEmails = (users || [])
-          .filter((u) => u.role === 'client')
-          .map((u) => u.email)
-          .filter((e): e is string => !!e)
+      const clientEmails = (users || [])
+        .filter((u) => u.role === 'client')
+        .map((u) => u.email)
+        .filter((e): e is string => !!e)
 
-        const teamEmails = (users || [])
-          .filter((u) => u.role !== 'client')
-          .map((u) => u.email)
-          .filter((e): e is string => !!e)
+      const teamEmails = (users || [])
+        .filter((u) => u.role !== 'client')
+        .map((u) => u.email)
+        .filter((e): e is string => !!e)
 
-        if (clientEmails.length > 0) {
-          await fetch(`${appUrl}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_reminder',
-              payload: {
-                secret: appsScriptSecret,
-                to: clientEmails,
-                clientName,
-                approvalTitle: a.title,
-                approvalId,
-                reminderLabel: label,
-                url: portalUrl,
-              },
-            }),
-          })
-        }
+      if (clientEmails.length > 0) {
+        await enqueueEmail({
+          type: 'approval_reminder',
+          payload: {
+            to: clientEmails,
+            clientName,
+            approvalTitle: a.title,
+            approvalId,
+            reminderLabel: label,
+            url: portalUrl,
+          },
+          idempotencyKey: `remind:${approvalId}:${setField}:client`,
+        })
+      }
 
-        if (teamEmails.length > 0) {
-          await fetch(`${appUrl}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_reminder',
-              payload: {
-                secret: appsScriptSecret,
-                to: teamEmails,
-                clientName,
-                approvalTitle: a.title,
-                approvalId,
-                reminderLabel: label,
-                url: agencyUrl,
-              },
-            }),
-          })
-        }
+      if (teamEmails.length > 0) {
+        await enqueueEmail({
+          type: 'approval_reminder',
+          payload: {
+            to: teamEmails,
+            clientName,
+            approvalTitle: a.title,
+            approvalId,
+            reminderLabel: label,
+            url: agencyUrl,
+          },
+          idempotencyKey: `remind:${approvalId}:${setField}:team`,
+        })
       }
 
       // mark sent so it doesn't repeat

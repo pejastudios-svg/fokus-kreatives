@@ -5,6 +5,7 @@ import {
   loadApprovalByShareToken,
   readReviewSessionFromRequest,
 } from '@/lib/reviewSession'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,46 +86,138 @@ async function tryClaimEmailSlot(approvalId: string): Promise<boolean> {
   return false
 }
 
-async function notifyAgencyOfReviewerComment(args: {
+/**
+ * Notify all stakeholders when a reviewer posts. Recipients:
+ *   - Agency team (assignees + workspace owners) → agencyUrl, in-app + email
+ *   - Other client-role users tied to client_id → reviewUrl, email
+ *   - The client's primary contact email (clients.email), if different from
+ *     the reviewer themselves → reviewUrl, email
+ *
+ * The author's own email is always excluded from recipients.
+ *
+ * Mentions extend the recipients map: @firstname / @business / @client all
+ * resolve, including the client's canonical name from the clients table.
+ *
+ * Display name: we resolve the reviewer's email back to a real name via the
+ * users table or clients.name when possible, so emails read "Acme Co
+ * commented" instead of "noreply@gmail.com commented".
+ */
+async function notifyOnReviewerComment(args: {
   approvalId: string
+  clientId: string | null
   approvalTitle: string
+  shareToken: string | null
   reviewerEmail: string
   content: string
   commentId: string
   approvalItemId: string | null
 }) {
   try {
-    const { data: rows } = await reviewAdmin
-      .from('approval_assignees')
-      .select('user_id, users(name, email, role)')
-      .eq('approval_id', args.approvalId)
+    const reviewerLower = args.reviewerEmail.trim().toLowerCase()
 
-    const assignees = (rows || []) as unknown as AssigneeUserRow[]
-    const teamUserIds: string[] = []
-    const teamEmails: string[] = []
+    const [assigneesRes, clientRowRes, clientUsersRes] = await Promise.all([
+      reviewAdmin
+        .from('approval_assignees')
+        .select('user_id, users(id, name, email, role)')
+        .eq('approval_id', args.approvalId),
+      args.clientId
+        ? reviewAdmin
+            .from('clients')
+            .select('name, business_name, email')
+            .eq('id', args.clientId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      args.clientId
+        ? reviewAdmin
+            .from('users')
+            .select('id, name, email, role, client_id')
+            .eq('client_id', args.clientId)
+        : Promise.resolve({ data: [] as { id: string; name: string | null; email: string | null; role: string | null; client_id: string | null }[] }),
+    ])
+
+    const assignees = (assigneesRes.data || []) as unknown as AssigneeUserRow[]
+    const clientRow = clientRowRes.data as
+      | { name: string | null; business_name: string | null; email: string | null }
+      | null
+    const clientUsers = (clientUsersRes.data || []) as {
+      id: string
+      name: string | null
+      email: string | null
+      role: string | null
+      client_id: string | null
+    }[]
+
+    // ---- Build the mention token map --------------------------------------
+    // Tokens can resolve to a user_id (in-app + email via lookup) or a raw
+    // email (e.g. clients.email when there's no portal user).
     const tokenToUserId = new Map<string, string>()
+    const tokenToRawEmail = new Map<string, string>()
     const userIdToEmail = new Map<string, string>()
+    const userIdToRole = new Map<string, string>()
+    const teamUserIds: string[] = []
+    const otherClientUserIds: string[] = []
+
+    const addUserTokens = (
+      uid: string,
+      name: string | null,
+      email: string | null,
+    ) => {
+      const first = normalizeMentionKey((name || '').split(' ')[0] || '')
+      const full = normalizeMentionKey((name || '').replace(/\s+/g, ''))
+      const localPart = normalizeMentionKey((email || '').split('@')[0] || '')
+      if (first) tokenToUserId.set(first, uid)
+      if (full) tokenToUserId.set(full, uid)
+      if (localPart) tokenToUserId.set(localPart, uid)
+    }
 
     for (const row of assignees) {
       if (!row.user_id) continue
       const u = Array.isArray(row.users) ? row.users[0] : row.users
-      if (!u || u.role === 'client') continue
-      teamUserIds.push(row.user_id)
-      if (u.email) {
-        teamEmails.push(u.email)
-        userIdToEmail.set(row.user_id, u.email)
-      }
-      const name = u.name || ''
-      const email = u.email || ''
-      const first = normalizeMentionKey(name.split(' ')[0] || '')
-      const full = normalizeMentionKey(name.replace(/\s+/g, ''))
-      const localPart = normalizeMentionKey((email.split('@')[0] || ''))
-      if (first) tokenToUserId.set(first, row.user_id)
-      if (full) tokenToUserId.set(full, row.user_id)
-      if (localPart) tokenToUserId.set(localPart, row.user_id)
+      if (!u) continue
+      const isTeam = u.role !== 'client'
+      const isReviewerSelf = !!u.email && u.email.trim().toLowerCase() === reviewerLower
+      if (u.email) userIdToEmail.set(row.user_id, u.email)
+      if (u.role) userIdToRole.set(row.user_id, u.role)
+      addUserTokens(row.user_id, u.name, u.email)
+      if (isReviewerSelf) continue
+      if (isTeam) teamUserIds.push(row.user_id)
+      else otherClientUserIds.push(row.user_id)
     }
 
-    // Resolve any @-mentions to a subset of team user IDs.
+    // Add every client-role user tied to client_id, even if not on this
+    // approval's assignee list - so reviewers can mention each other and so
+    // an inactive client teammate still gets the email when broadcasting.
+    for (const cu of clientUsers) {
+      if (!cu.id) continue
+      if (cu.role && cu.role !== 'client') continue
+      if (cu.email) userIdToEmail.set(cu.id, cu.email)
+      if (cu.role) userIdToRole.set(cu.id, cu.role)
+      addUserTokens(cu.id, cu.name, cu.email)
+      const isReviewerSelf =
+        !!cu.email && cu.email.trim().toLowerCase() === reviewerLower
+      if (isReviewerSelf) continue
+      if (!otherClientUserIds.includes(cu.id)) otherClientUserIds.push(cu.id)
+    }
+
+    // The client's canonical contact (clients.email) may not correspond to
+    // any user account. Map their name + business_name + "client" to the
+    // raw email so @-mentions reach them either way.
+    if (clientRow?.email) {
+      const clientEmailLower = clientRow.email.trim().toLowerCase()
+      if (clientEmailLower !== reviewerLower) {
+        const tokens = [
+          normalizeMentionKey((clientRow.name || '').split(' ')[0] || ''),
+          normalizeMentionKey((clientRow.name || '').replace(/\s+/g, '')),
+          normalizeMentionKey((clientRow.business_name || '').split(' ')[0] || ''),
+          normalizeMentionKey((clientRow.business_name || '').replace(/\s+/g, '')),
+          normalizeMentionKey((clientRow.email || '').split('@')[0] || ''),
+          'client',
+        ].filter(Boolean)
+        for (const t of tokens) tokenToRawEmail.set(t, clientRow.email)
+      }
+    }
+
+    // ---- Resolve mentions -------------------------------------------------
     const tokens = extractMentions(args.content)
     const mentionedUserIds = Array.from(
       new Set(
@@ -133,75 +226,140 @@ async function notifyAgencyOfReviewerComment(args: {
           .filter(Boolean) as string[],
       ),
     )
+    const mentionedRawEmails = Array.from(
+      new Set(
+        tokens
+          .map((t) => tokenToRawEmail.get(normalizeMentionKey(t)))
+          .filter(Boolean) as string[],
+      ),
+    )
+    const isMentionMode =
+      tokens.length > 0 && (mentionedUserIds.length > 0 || mentionedRawEmails.length > 0)
 
-    const isMentionMode = mentionedUserIds.length > 0
+    // ---- Resolve a display name for the reviewer --------------------------
+    let actorName = args.reviewerEmail
+    for (const cu of clientUsers) {
+      if (
+        cu.email &&
+        cu.email.trim().toLowerCase() === reviewerLower &&
+        (cu.name || '').trim()
+      ) {
+        actorName = cu.name as string
+        break
+      }
+    }
+    if (
+      actorName === args.reviewerEmail &&
+      clientRow?.email &&
+      clientRow.email.trim().toLowerCase() === reviewerLower
+    ) {
+      actorName = clientRow.business_name || clientRow.name || actorName
+    }
+
+    // ---- In-app notifications --------------------------------------------
     const inAppType = isMentionMode ? 'approval_mention' : 'approval_comment'
     const inAppRecipients = isMentionMode
       ? mentionedUserIds
-      : Array.from(new Set(teamUserIds))
+      : Array.from(new Set([...teamUserIds, ...otherClientUserIds]))
 
     const snippet =
       args.content.length > 120 ? args.content.slice(0, 120) + '...' : args.content
 
-    // 1) In-app notification — fires every time so the agency sees real-time
-    //    activity even when emails are suppressed.
     if (inAppRecipients.length > 0) {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds: inAppRecipients,
-          type: inAppType,
-          data: {
-            approvalId: args.approvalId,
-            title: args.approvalTitle,
-            reviewerEmail: args.reviewerEmail,
-            commentId: args.commentId,
-            itemId: args.approvalItemId,
-            contentSnippet: snippet,
-          },
-        }),
-      })
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userIds: inAppRecipients,
+            type: inAppType,
+            data: {
+              approvalId: args.approvalId,
+              title: args.approvalTitle,
+              reviewerEmail: args.reviewerEmail,
+              actorName,
+              commentId: args.commentId,
+              itemId: args.approvalItemId,
+              contentSnippet: snippet,
+            },
+          }),
+        })
+      } catch (e) {
+        console.error('reviewer comment in-app notify error:', e)
+      }
     }
 
-    // 2) Email
-    const secret = process.env.APPS_SCRIPT_SECRET
-    if (!secret) return
+    // ---- Email recipients (split by URL) ---------------------------------
     const agencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/approvals/${args.approvalId}`
+    const reviewUrl = args.shareToken
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/review/${args.shareToken}`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/portal/approvals/${args.approvalId}`
     const emailSnippet =
       args.content.length > 200 ? args.content.slice(0, 200) + '...' : args.content
 
-    if (isMentionMode) {
-      // Mentions are explicit asks — bypass the cooldown so the @'d person
-      // gets the email even if the broadcast slot is closed.
-      const mentionEmails = mentionedUserIds
-        .map((id) => userIdToEmail.get(id))
-        .filter(Boolean) as string[]
-      const dedup = Array.from(new Set(mentionEmails))
-      if (dedup.length === 0) return
+    const basePayload = {
+      clientName: actorName,
+      approvalTitle: args.approvalTitle,
+      approvalId: args.approvalId,
+      commentSnippet: emailSnippet,
+    }
 
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const teamFromUserIds = (ids: string[]) =>
+      Array.from(
+        new Set(
+          ids
+            .filter((id) => (userIdToRole.get(id) || 'team') !== 'client')
+            .map((id) => userIdToEmail.get(id))
+            .filter(Boolean) as string[],
+        ),
+      ).filter((e) => e.trim().toLowerCase() !== reviewerLower)
+    const clientFromUserIds = (ids: string[]) =>
+      Array.from(
+        new Set(
+          ids
+            .filter((id) => userIdToRole.get(id) === 'client')
+            .map((id) => userIdToEmail.get(id))
+            .filter(Boolean) as string[],
+        ),
+      ).filter((e) => e.trim().toLowerCase() !== reviewerLower)
+
+    if (isMentionMode) {
+      // Mention path: only the @-targets get email. Bypass the broadcast
+      // throttle - a mention is high-signal.
+      const teamEmails = teamFromUserIds(mentionedUserIds)
+      const clientEmails = Array.from(
+        new Set([...clientFromUserIds(mentionedUserIds), ...mentionedRawEmails]),
+      ).filter((e) => e.trim().toLowerCase() !== reviewerLower)
+
+      if (teamEmails.length > 0) {
+        await enqueueEmail({
           type: 'approval_mention',
-          payload: {
-            secret,
-            to: dedup,
-            clientName: args.reviewerEmail,
-            approvalTitle: args.approvalTitle,
-            approvalId: args.approvalId,
-            commentSnippet: emailSnippet,
-            url: agencyUrl,
-          },
-        }),
-      })
+          payload: { ...basePayload, to: teamEmails, url: agencyUrl },
+          idempotencyKey: `comment:${args.commentId}:team-mention`,
+        })
+      }
+      if (clientEmails.length > 0) {
+        await enqueueEmail({
+          type: 'approval_mention',
+          payload: { ...basePayload, to: clientEmails, url: reviewUrl },
+          idempotencyKey: `comment:${args.commentId}:client-mention`,
+        })
+      }
       return
     }
 
-    // Broadcast email — throttled.
-    const dedupedTeam = Array.from(new Set(teamEmails))
-    if (dedupedTeam.length === 0) return
+    // Broadcast path: agency team + every other client. Throttled per-approval.
+    const teamEmails = teamFromUserIds([...teamUserIds, ...otherClientUserIds])
+    const clientEmails = Array.from(
+      new Set([
+        ...clientFromUserIds(otherClientUserIds),
+        ...(clientRow?.email && clientRow.email.trim().toLowerCase() !== reviewerLower
+          ? [clientRow.email]
+          : []),
+      ]),
+    )
+
+    if (teamEmails.length === 0 && clientEmails.length === 0) return
 
     const canEmail = await tryClaimEmailSlot(args.approvalId)
     if (!canEmail) {
@@ -211,24 +369,22 @@ async function notifyAgencyOfReviewerComment(args: {
       return
     }
 
-    await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notify-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    if (teamEmails.length > 0) {
+      await enqueueEmail({
         type: 'approval_comment',
-        payload: {
-          secret,
-          to: dedupedTeam,
-          clientName: args.reviewerEmail,
-          approvalTitle: args.approvalTitle,
-          approvalId: args.approvalId,
-          commentSnippet: emailSnippet,
-          url: agencyUrl,
-        },
-      }),
-    })
+        payload: { ...basePayload, to: teamEmails, url: agencyUrl },
+        idempotencyKey: `comment:${args.commentId}:team-broadcast`,
+      })
+    }
+    if (clientEmails.length > 0) {
+      await enqueueEmail({
+        type: 'approval_comment',
+        payload: { ...basePayload, to: clientEmails, url: reviewUrl },
+        idempotencyKey: `comment:${args.commentId}:client-broadcast`,
+      })
+    }
   } catch (err) {
-    console.error('notifyAgencyOfReviewerComment error:', err)
+    console.error('notifyOnReviewerComment error:', err)
   }
 }
 
@@ -352,7 +508,7 @@ export async function POST(req: NextRequest) {
         parent_comment_id: parentCommentId,
       })
       .select(
-        'id, content, created_at, updated_at, approval_item_id, reviewer_email, attachments, timestamp_seconds, region, attachment_index, parent_comment_id',
+        'id, content, created_at, updated_at, approval_item_id, user_id, reviewer_email, attachments, resolved, timestamp_seconds, region, attachment_index, parent_comment_id',
       )
       .single()
 
@@ -370,11 +526,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Notify the agency: in-app + email to every assignee on this approval.
-    // Reviewer is anonymous so we never have to exclude them.
-    void notifyAgencyOfReviewerComment({
+    // Notify everyone on this approval: agency team + other clients sharing
+    // the same review. The reviewer's own email is excluded inside the helper.
+    void notifyOnReviewerComment({
       approvalId: approval.id as string,
+      clientId: (approval as unknown as { client_id?: string | null }).client_id ?? null,
       approvalTitle: (approval.title as string) || '',
+      shareToken: (approval as unknown as { share_token?: string | null }).share_token ?? null,
       reviewerEmail: session.email,
       content: text,
       commentId: created.id as string,

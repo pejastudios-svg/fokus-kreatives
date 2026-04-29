@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchClickUpTaskName, updateClickUpStatus } from '@/app/api/clickup/helpers'
+import { enqueueEmail } from '@/lib/emailOutbox'
 
 interface AssigneeInsert {
   approval_id: string
@@ -235,69 +236,58 @@ export async function POST(req: NextRequest) {
       console.error('Approval created in-app notification error:', notifyErr)
     }
 
-    // 5) Email notifications via Apps Script (/api/notify-email)
+    // 5) Email notifications - written to the outbox so a transient Apps
+    // Script blip can't lose the "your approval is ready" email.
     try {
-      const secret = process.env.APPS_SCRIPT_SECRET
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+      const watcherIds = assigneeRows.map((r) => r.user_id)
+      const { data: watcherUsers } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .in('id', watcherIds)
 
-      if (secret) {
-        const watcherIds = assigneeRows.map((r) => r.user_id)
-        const { data: watcherUsers } = await supabase
-          .from('users')
-          .select('id, email, role')
-          .in('id', watcherIds)
+      const clientEmails = (watcherUsers || [])
+        .filter((u: UserRow) => u.role === 'client')
+        .map((u: UserRow) => u.email)
+        .filter(Boolean) as string[]
 
-        const clientEmails = (watcherUsers || [])
-          .filter((u: UserRow) => u.role === 'client')
-          .map((u: UserRow) => u.email)
-          .filter(Boolean)
+      const teamEmails = (watcherUsers || [])
+        .filter((u: UserRow) => u.role !== 'client')
+        .map((u: UserRow) => u.email)
+        .filter(Boolean) as string[]
 
-        const teamEmails = (watcherUsers || [])
-          .filter((u: UserRow) => u.role !== 'client')
-          .map((u: UserRow) => u.email)
-          .filter(Boolean)
+      const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
-        const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
-        const agencyUrl = `${appUrl}/approvals/${approvalId}`
+      if (clientEmails.length > 0) {
+        await enqueueEmail({
+          type: 'approval_created',
+          payload: {
+            to: clientEmails,
+            clientName: clientDisplayName,
+            approvalTitle: title,
+            approvalId,
+            url: portalUrl,
+          },
+          idempotencyKey: `created:${approvalId}:client`,
+        })
+      }
 
-        if (clientEmails.length > 0) {
-          await fetch(`${appUrl}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_created',
-              payload: {
-                secret,
-                to: clientEmails,
-                clientName: clientDisplayName,
-                approvalTitle: title,
-                approvalId,
-                url: portalUrl,
-              },
-            }),
-          })
-        }
-
-        if (teamEmails.length > 0) {
-          await fetch(`${appUrl}/api/notify-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'approval_created',
-              payload: {
-                secret,
-                to: teamEmails,
-                clientName: clientDisplayName,
-                approvalTitle: title,
-                approvalId,
-                url: agencyUrl,
-              },
-            }),
-          })
-        }
+      if (teamEmails.length > 0) {
+        await enqueueEmail({
+          type: 'approval_created',
+          payload: {
+            to: teamEmails,
+            clientName: clientDisplayName,
+            approvalTitle: title,
+            approvalId,
+            url: agencyUrl,
+          },
+          idempotencyKey: `created:${approvalId}:team`,
+        })
       }
     } catch (emailErr) {
-      console.error('Approval created email notification error:', emailErr)
+      console.error('Approval created email enqueue error:', emailErr)
     }
 
     return NextResponse.json({ success: true, approvalId })

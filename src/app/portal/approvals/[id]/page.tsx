@@ -315,6 +315,22 @@ export default function PortalApprovalDetailPage() {
     setPendingScrollToCommentId(null)
   }, [pendingScrollToCommentId, comments])
 
+  // On first paint after the page hydrates, jump each item's comments list to
+  // the bottom so the latest message is visible without manual scrolling.
+  const initialScrollDoneRef = useRef(false)
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return
+    if (isLoading) return
+    if (comments.length === 0) return
+    initialScrollDoneRef.current = true
+    requestAnimationFrame(() => {
+      for (const itemId of Object.keys(commentsListRefs.current)) {
+        const el = commentsListRefs.current[itemId]
+        if (el) el.scrollTop = el.scrollHeight
+      }
+    })
+  }, [isLoading, comments])
+
   useEffect(() => {
     let channel: RealtimeChannel | null = null
 
@@ -331,7 +347,38 @@ export default function PortalApprovalDetailPage() {
           table: 'approval_comments',
           filter: `approval_id=eq.${approvalId}`,
         },
-        () => loadComments()
+        // Apply the change directly from the realtime payload so the message
+        // shows up the instant the websocket delivers it, instead of paying
+        // for a full re-fetch round-trip. loadComments() runs as a backfill
+        // for INSERT (the payload doesn't carry the users join, so the
+        // avatar/name only land after the backfill resolves).
+        (payload) => {
+          const evt = payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE'
+          if (evt === 'DELETE') {
+            const oldId = (payload.old as { id?: string } | null)?.id
+            if (oldId) setComments((prev) => prev.filter((c) => c.id !== oldId))
+            return
+          }
+          const row = payload.new as Partial<Comment> & { id: string }
+          if (evt === 'INSERT') {
+            setComments((prev) => {
+              if (prev.some((c) => c.id === row.id)) return prev
+              const hasOptimistic = prev.some(
+                (c) =>
+                  c.id.startsWith('temp-') &&
+                  c.user_id === (row.user_id ?? null) &&
+                  c.content === row.content,
+              )
+              if (hasOptimistic) return prev
+              return [...prev, { ...(row as Comment), users: null }]
+            })
+            loadComments()
+            return
+          }
+          setComments((prev) =>
+            prev.map((c) => (c.id === row.id ? { ...c, ...row } : c)),
+          )
+        }
       )
       .on(
         'postgres_changes',
@@ -1037,7 +1084,7 @@ await loadApproval()
                         commentsListRefs.current[item.id] = el
                       }}
                       onScroll={handleCommentsScroll(item.id)}
-                      className="relative space-y-3 max-h-64 overflow-y-auto"
+                      className="relative space-y-3 max-h-64 overflow-y-auto overscroll-contain touch-pan-y"
                     >
                       {itemComments.length === 0 ? (
                         <p className="text-xs text-gray-400">
