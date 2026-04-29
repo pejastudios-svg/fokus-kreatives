@@ -5,6 +5,25 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Best-effort decode of a Supabase JWT to report its `role` claim. Used only
+ * for diagnostics in the worker response - if this returns "anon" the wrong
+ * key is wired into SUPABASE_SERVICE_ROLE_KEY. We don't verify the signature;
+ * we only need the claim.
+ */
+function decodeJwtRole(jwt: string | undefined): string | null {
+  if (!jwt) return null
+  const parts = jwt.split('.')
+  if (parts.length < 2) return null
+  try {
+    const payload = Buffer.from(parts[1], 'base64url').toString('utf8')
+    const obj = JSON.parse(payload) as { role?: string }
+    return obj.role || null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Drain the email_outbox. Each tick claims up to N due rows, calls Apps
  * Script for each one, and marks the row sent or failed (with backoff).
  *
@@ -28,6 +47,9 @@ export async function GET(req: NextRequest) {
     const env = {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      // The role claim - "service_role" if the right key is wired,
+      // "anon" if the anon key was pasted in by mistake.
+      serviceRoleClaim: decodeJwtRole(process.env.SUPABASE_SERVICE_ROLE_KEY),
       hasAppsScriptUrl: !!process.env.APPS_SCRIPT_WEBHOOK_URL,
       hasAppsScriptSecret: !!process.env.APPS_SCRIPT_SECRET,
     }
