@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.email_outbox (
   payload jsonb NOT NULL,
   idempotency_key text,
   status text NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'sent', 'failed', 'dead')),
+    CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'dead')),
   attempts integer NOT NULL DEFAULT 0,
   next_attempt_at timestamptz NOT NULL DEFAULT now(),
   last_error text,

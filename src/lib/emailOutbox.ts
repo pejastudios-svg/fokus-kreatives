@@ -121,13 +121,17 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
   // chained `.update(...).in(...).select(...)` pattern returned empty data
   // in production despite the WHERE actually matching - sidestep that
   // entirely by doing the two operations independently.
+  //
+  // Throw on errors instead of returning [] so the cron route surfaces the
+  // exact PostgREST message - silent empty arrays mask CHECK-constraint
+  // violations and other "shouldn't happen" failures.
   const { error: updateErr } = await admin()
     .from('email_outbox')
     .update({ status: 'sending' })
     .in('id', ids)
   if (updateErr) {
     console.error('email_outbox claim update error:', updateErr)
-    return []
+    throw new Error(`claim update: ${updateErr.message || JSON.stringify(updateErr)}`)
   }
 
   const { data: rows, error: selectErr } = await admin()
@@ -136,7 +140,7 @@ export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
     .in('id', ids)
   if (selectErr) {
     console.error('email_outbox claim select error:', selectErr)
-    return []
+    throw new Error(`claim select: ${selectErr.message || JSON.stringify(selectErr)}`)
   }
   return (rows || []) as OutboxRow[]
 }
