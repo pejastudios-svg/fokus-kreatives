@@ -140,46 +140,6 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       setFlashedRegion((prev) => (prev ? null : prev))
     }, [])
 
-    // Lock body scroll while the user is drawing a region. iOS Safari ignores
-    // `overflow:hidden` for momentum scroll + the address-bar collapse, so we
-    // pin the body with `position:fixed` at the current scroll offset and
-    // restore it on exit. This is the only pattern that reliably freezes the
-    // viewport on phones while the draw canvas is open.
-    useEffect(() => {
-      if (typeof document === 'undefined') return
-      if (!drawingMode) return
-      const scrollY = window.scrollY
-      const body = document.body
-      const prev = {
-        position: body.style.position,
-        top: body.style.top,
-        left: body.style.left,
-        right: body.style.right,
-        width: body.style.width,
-        overflow: body.style.overflow,
-        touchAction: body.style.touchAction,
-        overscroll: body.style.overscrollBehavior,
-      }
-      body.style.position = 'fixed'
-      body.style.top = `-${scrollY}px`
-      body.style.left = '0'
-      body.style.right = '0'
-      body.style.width = '100%'
-      body.style.overflow = 'hidden'
-      body.style.touchAction = 'none'
-      body.style.overscrollBehavior = 'none'
-      return () => {
-        body.style.position = prev.position
-        body.style.top = prev.top
-        body.style.left = prev.left
-        body.style.right = prev.right
-        body.style.width = prev.width
-        body.style.overflow = prev.overflow
-        body.style.touchAction = prev.touchAction
-        body.style.overscrollBehavior = prev.overscroll
-        window.scrollTo(0, scrollY)
-      }
-    }, [drawingMode])
 
     // When the active slide changes, pause every other video so audio doesn't
     // bleed across slides. (Carousel-only - in grid mode each video is its own
@@ -345,18 +305,25 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
     if (isCarousel) {
       const safeIndex = Math.max(0, Math.min(active, attachments.length - 1))
 
+      // While the draw canvas is open we ignore swipes on the carousel so a
+      // stray finger drag can't slide the slide the user is annotating off
+      // screen. Page-level scrolling is not affected.
+      const isLocked = drawingMode !== null
       const handleTouchStart = (e: React.TouchEvent) => {
+        if (isLocked) return
         swipeStartXRef.current = e.touches[0].clientX
         swipeDeltaRef.current = 0
         setIsDragging(true)
       }
       const handleTouchMove = (e: React.TouchEvent) => {
+        if (isLocked) return
         if (swipeStartXRef.current === null) return
         const delta = e.touches[0].clientX - swipeStartXRef.current
         swipeDeltaRef.current = delta
         setDragOffset(delta)
       }
       const handleTouchEnd = () => {
+        if (isLocked) return
         const delta = swipeDeltaRef.current
         if (delta > SWIPE_THRESHOLD_PX) {
           setActive((i) => (i - 1 + attachments.length) % attachments.length)
@@ -380,8 +347,12 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           // touch-pan-y tells the browser the carousel reserves horizontal
           // gestures for itself - the page won't scroll horizontally while
           // the user swipes between slides. Vertical scroll still bubbles
-          // up so the page can scroll past the carousel naturally.
-          className="relative overflow-hidden rounded-lg select-none touch-pan-y"
+          // up so the page can scroll past the carousel naturally. While
+          // the draw canvas is open we strip both axes from the carousel so
+          // a finger drag stays inside the canvas instead of paging slides.
+          className={`relative overflow-hidden rounded-lg select-none ${
+            isLocked ? 'touch-none' : 'touch-pan-y'
+          }`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -416,7 +387,8 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           <button
             type="button"
             onClick={() => setActive((i) => (i - 1 + attachments.length) % attachments.length)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+            disabled={isLocked}
+            className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
             aria-label="Previous"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -424,7 +396,8 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           <button
             type="button"
             onClick={() => setActive((i) => (i + 1) % attachments.length)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+            disabled={isLocked}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
             aria-label="Next"
           >
             <ChevronRight className="h-4 w-4" />
@@ -435,10 +408,11 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                 key={i}
                 type="button"
                 onClick={() => setActive(i)}
+                disabled={isLocked}
                 aria-label={`Go to slide ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all ${
                   i === safeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'
-                }`}
+                } disabled:pointer-events-none`}
               />
             ))}
           </div>
