@@ -93,22 +93,28 @@ interface OutboxRow {
  * we trust the worker to only run on one schedule at a time. If two
  * workers race the same row, one of them just no-ops on the second update.
  */
-export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
+/**
+ * Read-only helper: returns the IDs of pending due rows. Exposed separately
+ * so the cron route can probe the SELECT step in isolation when diagnosing.
+ */
+export async function selectDueEmailIds(limit = 25): Promise<string[]> {
   const nowIso = new Date().toISOString()
-  const { data: due, error: dueErr } = await admin()
+  const { data, error } = await admin()
     .from('email_outbox')
     .select('id')
     .eq('status', 'pending')
     .lte('next_attempt_at', nowIso)
     .order('next_attempt_at', { ascending: true })
     .limit(limit)
-
-  if (dueErr) {
-    console.error('email_outbox due-select error:', dueErr)
-    throw dueErr
+  if (error) {
+    console.error('email_outbox due-select error:', error)
+    throw error
   }
+  return (data || []).map((r) => r.id as string)
+}
 
-  const ids = (due || []).map((r) => r.id as string)
+export async function claimDueEmails(limit = 25): Promise<OutboxRow[]> {
+  const ids = await selectDueEmailIds(limit)
   if (ids.length === 0) return []
 
   // Flip them to 'sending' so a parallel tick won't pick them up. We then

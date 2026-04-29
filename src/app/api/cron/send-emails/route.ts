@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { admin as outboxAdmin, claimDueEmails, deliverEmail, markFailed, markSent } from '@/lib/emailOutbox'
+import {
+  admin as outboxAdmin,
+  claimDueEmails,
+  deliverEmail,
+  markFailed,
+  markSent,
+  selectDueEmailIds,
+} from '@/lib/emailOutbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -125,6 +132,18 @@ export async function GET(req: NextRequest) {
         .order('next_attempt_at', { ascending: true })
         .limit(25)
 
+      // Read-only call to the lib's SELECT step. If this is 3 but the
+      // main flow's claimed.length is 0, the bug is purely in the UPDATE
+      // path of claimDueEmails - not in the SELECT. (Doesn't consume rows.)
+      let selectFnCount: number | null = null
+      let selectFnError: string | null = null
+      try {
+        const ids = await selectDueEmailIds(25)
+        selectFnCount = ids.length
+      } catch (e) {
+        selectFnError = e instanceof Error ? e.message : String(e)
+      }
+
       probe = {
         nowIso,
         allCount: all.count,
@@ -134,6 +153,8 @@ export async function GET(req: NextRequest) {
         fullClaimError: fullClaim.error?.message ?? null,
         viaLibCount: viaLib.data?.length ?? null,
         viaLibError: viaLib.error?.message ?? null,
+        selectFnCount,
+        selectFnError,
         sampleRow: all.data?.[0] ?? null,
       }
     } catch (e) {
