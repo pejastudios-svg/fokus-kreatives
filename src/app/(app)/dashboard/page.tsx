@@ -81,28 +81,30 @@ function ModeSwitcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => v
   const active = MODES.find((m) => m.id === mode)
   return (
     <div className="space-y-2">
-      <div className="inline-flex items-center gap-1 p-1 rounded-full border border-theme-primary bg-theme-card">
-        {MODES.map((m) => {
-          const selected = mode === m.id
-          return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onChange(m.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                selected
-                  ? 'bg-[#2B79F7] text-white shadow-sm'
-                  : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
-              }`}
-            >
-              <m.icon className="h-3.5 w-3.5" />
-              <span>{m.label}</span>
-            </button>
-          )
-        })}
+      <div className="flex justify-center sm:justify-start">
+        <div className="inline-flex items-center gap-1 p-1 rounded-full border border-theme-primary bg-theme-card max-w-full overflow-x-auto scrollbar-none">
+          {MODES.map((m) => {
+            const selected = mode === m.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onChange(m.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
+                  selected
+                    ? 'bg-[#2B79F7] text-white shadow-sm'
+                    : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+                }`}
+              >
+                <m.icon className="h-3.5 w-3.5" />
+                <span>{m.label}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
       {active && (
-        <p className="text-[11px] text-theme-tertiary px-1">{active.description}</p>
+        <p className="text-[11px] text-theme-tertiary px-1 text-center sm:text-left">{active.description}</p>
       )}
     </div>
   )
