@@ -639,26 +639,26 @@ const deleteSubmission = async () => {
 
 function CaptureSkeleton() {
   return (
-    <div className="space-y-4 animate-in fade-in">
+    <div className="space-y-3 animate-in fade-in">
       {[1, 2, 3].map((i) => (
         <Card key={i} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
-          <CardContent className="p-5 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 w-full">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
-              <div className="space-y-2 w-full max-w-md">
+          <CardContent className="p-4 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              <Skeleton className="h-9 w-9 rounded-lg bg-[var(--bg-card-hover)] shrink-0" />
+              <div className="space-y-2 min-w-0 flex-1">
                 <div className="flex gap-2">
-                  <Skeleton className="h-5 w-32 bg-[var(--bg-card-hover)]" />
-                  <Skeleton className="h-5 w-16 rounded-full bg-[var(--bg-card-hover)]" />
+                  <Skeleton className="h-4 w-24 sm:w-32 bg-[var(--bg-card-hover)]" />
+                  <Skeleton className="h-4 w-12 sm:w-16 rounded-full bg-[var(--bg-card-hover)]" />
                 </div>
-                <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
-                <Skeleton className="h-3 w-64 bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-3 w-32 sm:w-48 bg-[var(--bg-card-hover)]" />
+                <Skeleton className="hidden sm:block h-3 w-64 bg-[var(--bg-card-hover)]" />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-8 w-24 bg-[var(--bg-card-hover)]" />
-              <div className="flex gap-2 justify-end">
-                <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
-                <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
+            <div className="flex flex-col gap-2 shrink-0">
+              <Skeleton className="h-7 w-16 sm:w-24 bg-[var(--bg-card-hover)]" />
+              <div className="flex gap-1.5 justify-end">
+                <Skeleton className="h-7 w-7 rounded-lg bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-7 w-7 rounded-lg bg-[var(--bg-card-hover)]" />
               </div>
             </div>
           </CardContent>
@@ -668,7 +668,7 @@ function CaptureSkeleton() {
   )
 }
 
-  return <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-3 sm:p-4 lg:p-6 min-h-full">
         {notification && (
           <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />

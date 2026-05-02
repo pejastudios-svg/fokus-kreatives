@@ -417,41 +417,42 @@ export default function CRMRevenue() {
 
 function RevenueSkeleton() {
   return (
-    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
-      <div className="flex justify-between mb-8">
-        <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
-        </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <Skeleton className="h-3 w-40 bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-            <div className="flex gap-3 mb-3">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
+          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Skeleton className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-3 w-16 sm:w-20 bg-[var(--bg-card-hover)]" />
             </div>
-            <Skeleton className="h-8 w-32 bg-[var(--bg-card-hover)]" />
+            <Skeleton className="h-6 sm:h-7 w-20 sm:w-24 bg-[var(--bg-card-hover)]" />
           </div>
+        ))}
+      </div>
+
+      <div className="flex gap-1.5 mb-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-7 sm:h-9 w-16 sm:w-20 rounded-xl bg-[var(--bg-card-hover)]" />
         ))}
       </div>
 
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
         <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-4 w-full bg-[var(--bg-card-hover)]" />
+            <Skeleton key={i} className="h-3 w-20 sm:w-24 bg-[var(--bg-card-hover)] shrink-0" />
           ))}
         </div>
         <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="p-4 flex gap-4">
-              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
+              {[1, 2, 3, 4, 5].map((j) => (
+                <Skeleton key={j} className="h-5 w-20 sm:w-24 bg-[var(--bg-card-hover)] shrink-0" />
+              ))}
             </div>
           ))}
         </div>
@@ -465,90 +466,73 @@ function RevenueSkeleton() {
   }
 
   return (
-    <div className="p-4 lg:p-6 min-h-full">
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <p className="text-xs text-[var(--text-tertiary)]">Track payments and invoices</p>
         <Button size="sm" onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add Payment
+          <Plus className="h-4 w-4 sm:mr-1.5" />
+          <span className="hidden sm:inline">Add Payment</span>
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
         {nextPayment && (
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Next Payment</h3>
-            <p className="text-2xl font-bold text-[var(--text-primary)]">
+          <div className="col-span-2 lg:col-span-1 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-3 sm:p-5">
+            <h3 className="text-xs sm:text-sm font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">Next Payment</h3>
+            <p className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tabular-nums">
               ${nextPayment.amount.toLocaleString()}{' '}
-              <span className="text-sm text-[var(--text-tertiary)]">{nextPayment.currency}</span>
+              <span className="text-xs sm:text-sm text-[var(--text-tertiary)] font-normal">{nextPayment.currency}</span>
             </p>
-            <p className="text-[var(--text-tertiary)] mt-1">
-              Due on {new Date(nextPayment.due_date as string).toLocaleDateString()}
+            <p className="text-[var(--text-tertiary)] text-[11px] sm:text-xs mt-1">
+              Due {new Date(nextPayment.due_date as string).toLocaleDateString()}
             </p>
             {nextPayment.notes && (
-              <p className="text-[var(--text-tertiary)] text-sm mt-2">{nextPayment.notes}</p>
+              <p className="text-[var(--text-tertiary)] text-[11px] sm:text-xs mt-1.5 truncate">{nextPayment.notes}</p>
             )}
           </div>
         )}
 
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-green-500/20 rounded-lg">
-              <DollarSign className="h-5 w-5 text-green-400" />
-            </div>
-            <span className="text-[var(--text-tertiary)] text-sm">Total Revenue</span>
-          </div>
-          <p className="text-3xl font-bold text-[var(--text-primary)]">
-            ${stats.total.toLocaleString()}
-          </p>
-        </div>
-
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-blue-400" />
-            </div>
-            <span className="text-[var(--text-tertiary)] text-sm">This Month</span>
-          </div>
-          <p className="text-3xl font-bold text-[var(--text-primary)]">
-            ${stats.thisMonth.toLocaleString()}
-          </p>
-        </div>
-
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-yellow-500/20 rounded-lg">
-              <Clock className="h-5 w-5 text-yellow-400" />
-            </div>
-            <span className="text-[var(--text-tertiary)] text-sm">Pending</span>
-          </div>
-          <p className="text-3xl font-bold text-yellow-400">
-            ${stats.pending.toLocaleString()}
-          </p>
-        </div>
-
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-red-500/20 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-red-400" />
-            </div>
-            <span className="text-[var(--text-tertiary)] text-sm">Overdue</span>
-          </div>
-          <p className="text-3xl font-bold text-red-400">
-            ${stats.overdue.toLocaleString()}
-          </p>
-        </div>
+        <RevenueKpi
+          icon={DollarSign}
+          iconBg="bg-green-500/20"
+          iconColor="text-green-400"
+          label="Total Revenue"
+          value={`$${stats.total.toLocaleString()}`}
+        />
+        <RevenueKpi
+          icon={TrendingUp}
+          iconBg="bg-blue-500/20"
+          iconColor="text-blue-400"
+          label="This Month"
+          value={`$${stats.thisMonth.toLocaleString()}`}
+        />
+        <RevenueKpi
+          icon={Clock}
+          iconBg="bg-yellow-500/20"
+          iconColor="text-yellow-400"
+          label="Pending"
+          value={`$${stats.pending.toLocaleString()}`}
+          valueColor="text-yellow-400"
+        />
+        <RevenueKpi
+          icon={AlertCircle}
+          iconBg="bg-red-500/20"
+          iconColor="text-red-400"
+          label="Overdue"
+          value={`$${stats.overdue.toLocaleString()}`}
+          valueColor="text-red-400"
+        />
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
         {(['all', 'pending', 'paid', 'overdue'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors shrink-0 ${
               filter === f
                 ? 'bg-[#2B79F7] text-white'
                 : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-[var(--border-primary)]'
@@ -561,6 +545,7 @@ function RevenueSkeleton() {
 
       {/* Payments Table */}
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
@@ -691,6 +676,7 @@ function RevenueSkeleton() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Add Payment Modal */}
@@ -967,6 +953,38 @@ function Modal(props: { children: React.ReactNode; onClose: () => void; title: s
           {children}
         </div>
       </div>
+    </div>
+  )
+}
+
+function RevenueKpi({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  label,
+  value,
+  valueColor,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  iconBg: string
+  iconColor: string
+  label: string
+  value: string
+  valueColor?: string
+}) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-3 sm:p-4">
+      <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+        <div className={`p-1.5 sm:p-2 ${iconBg} rounded-lg`}>
+          <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${iconColor}`} />
+        </div>
+        <span className="text-[var(--text-tertiary)] text-[11px] sm:text-xs uppercase tracking-wider font-semibold truncate">
+          {label}
+        </span>
+      </div>
+      <p className={`text-lg sm:text-2xl font-bold tabular-nums truncate ${valueColor || 'text-[var(--text-primary)]'}`}>
+        {value}
+      </p>
     </div>
   )
 }

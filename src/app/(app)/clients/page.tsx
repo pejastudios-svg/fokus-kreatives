@@ -546,7 +546,7 @@ export default function ClientsPage() {
           </div>
         ) : (
           <Card className="card-premium overflow-hidden">
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-[var(--border-primary)]">
               {filteredClients.map((client) => (
                 <li
                   key={client.id}
@@ -877,7 +877,7 @@ function GridSkeleton() {
 function ListSkeleton() {
   return (
     <Card className="card-premium overflow-hidden animate-in fade-in">
-      <ul className="divide-y divide-gray-200">
+      <ul className="divide-y divide-[var(--border-primary)]">
         {[1, 2, 3, 4, 5].map((i) => (
           <li key={i} className="px-6 py-4 flex items-center gap-4">
             <Skeleton className="h-10 w-10 rounded-full" />

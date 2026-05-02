@@ -351,36 +351,34 @@ export default function CRMTeamPage() {
 
   function TeamSkeleton() {
   return (
-    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
-      <div className="flex justify-between mb-6">
-        <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <div className="space-y-1.5 min-w-0">
+          <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-3 w-32 bg-[var(--bg-card-hover)]" />
         </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
-      <Skeleton className="h-10 w-80 mb-4 rounded-xl bg-[var(--bg-card-hover)]" />
+      <Skeleton className="h-9 sm:h-10 w-full sm:w-80 mb-4 rounded-xl bg-[var(--bg-card-hover)]" />
 
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
-        <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
-          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+        <div className="hidden sm:flex border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 gap-4">
+          <Skeleton className="h-3 w-32 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-3 w-32 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-3 w-32 bg-[var(--bg-card-hover)]" />
         </div>
         <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-9 rounded-full bg-[var(--bg-card-hover)]" />
-                <div className="space-y-1">
-                  <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
-                  <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
+            <div key={i} className="p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <Skeleton className="h-9 w-9 rounded-full bg-[var(--bg-card-hover)] shrink-0" />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <Skeleton className="h-4 w-24 sm:w-32 bg-[var(--bg-card-hover)]" />
+                  <Skeleton className="h-3 w-32 sm:w-48 bg-[var(--bg-card-hover)]" />
                 </div>
               </div>
-              <Skeleton className="h-6 w-24 rounded-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-6 w-20 rounded-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-5 w-16 sm:w-20 rounded-full bg-[var(--bg-card-hover)] shrink-0" />
             </div>
           ))}
         </div>
@@ -394,7 +392,7 @@ export default function CRMTeamPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 min-h-full">
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full">
       {notification && (
         <div className={`mb-6 p-4 rounded-lg ${notification.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
           <div className="flex items-start gap-3">
@@ -427,20 +425,20 @@ export default function CRMTeamPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="min-w-0">
-          <p className="text-xs text-[var(--text-tertiary)]">Members who can access this client CRM</p>
-          <p className="text-[var(--text-tertiary)] text-[11px] mt-0.5">
-            CRM role: <span className="font-semibold text-[var(--text-secondary)]">{currentCrmRole}</span>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-[var(--text-tertiary)] truncate">Members who can access this client CRM</p>
+          <p className="text-[var(--text-tertiary)] text-[11px] mt-0.5 truncate">
+            CRM: <span className="font-semibold text-[var(--text-secondary)]">{currentCrmRole}</span>
             {' · '}
-            Agency role: <span className="font-semibold text-[var(--text-secondary)]">{currentAppRole}</span>
+            Agency: <span className="font-semibold text-[var(--text-secondary)]">{currentAppRole}</span>
           </p>
         </div>
 
         {canInvite && (
-          <Button size="sm" onClick={() => setShowInviteModal(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            Invite Member
+          <Button size="sm" onClick={() => setShowInviteModal(true)} className="shrink-0">
+            <Plus className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Invite Member</span>
           </Button>
         )}
       </div>

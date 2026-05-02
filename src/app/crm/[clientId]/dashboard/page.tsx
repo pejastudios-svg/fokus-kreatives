@@ -257,7 +257,7 @@ export default function CRMDashboard() {
   const greeting = greetingForHour(new Date().getHours())
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
+    <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Hero greeting */}
       <div>
         <p className="text-sm text-[var(--text-secondary)]">
@@ -270,7 +270,7 @@ export default function CRMDashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <KpiCard
           icon={Users}
           label="New leads"
@@ -299,7 +299,7 @@ export default function CRMDashboard() {
       </div>
 
       {/* Chart row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card className="lg:col-span-2">
           <CardContent>
             <div className="flex items-center justify-between mb-4">
@@ -358,7 +358,7 @@ export default function CRMDashboard() {
       </div>
 
       {/* Lists row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* Recent leads */}
         <Card>
           <CardContent>
@@ -513,14 +513,14 @@ function KpiCard({
 }) {
   return (
     <Card>
-      <CardContent>
+      <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between">
-          <div className="h-9 w-9 rounded-full bg-[var(--bg-tertiary)] text-[#2B79F7] flex items-center justify-center">
-            <Icon className="h-4 w-4" />
+          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-[var(--bg-tertiary)] text-[#2B79F7] flex items-center justify-center">
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </div>
           {change !== undefined && change !== 0 && (
             <span
-              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+              className={`inline-flex items-center gap-0.5 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                 change > 0
                   ? 'bg-green-500/15 text-green-500'
                   : 'bg-red-500/15 text-red-500'
@@ -531,11 +531,11 @@ function KpiCard({
             </span>
           )}
         </div>
-        <p className="mt-3 text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+        <p className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold truncate">
           {label}
         </p>
-        <p className="text-2xl font-bold text-[var(--text-primary)] mt-1 tabular-nums">{value}</p>
-        {sub && <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">{sub}</p>}
+        <p className="text-lg sm:text-2xl font-bold text-[var(--text-primary)] mt-1 tabular-nums truncate">{value}</p>
+        {sub && <p className="text-[10px] sm:text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">{sub}</p>}
       </CardContent>
     </Card>
   )
@@ -623,24 +623,23 @@ function timeAgo(iso: string): string {
 
 function DashboardSkeleton() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
+    <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       <div>
-        <Skeleton className="h-3 w-24 bg-[var(--bg-tertiary)] mb-2" />
-        <Skeleton className="h-7 w-64 bg-[var(--bg-tertiary)] mb-2" />
-        <Skeleton className="h-4 w-80 bg-[var(--bg-tertiary)]" />
+        <Skeleton className="h-4 w-48 bg-[var(--bg-tertiary)] mb-1.5" />
+        <Skeleton className="h-3 w-20 bg-[var(--bg-tertiary)]" />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 bg-[var(--bg-tertiary)] rounded-xl" />
+          <Skeleton key={i} className="h-[88px] sm:h-[108px] bg-[var(--bg-tertiary)] rounded-xl" />
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Skeleton className="h-56 lg:col-span-2 bg-[var(--bg-tertiary)] rounded-xl" />
-        <Skeleton className="h-56 bg-[var(--bg-tertiary)] rounded-xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <Skeleton className="h-44 sm:h-56 lg:col-span-2 bg-[var(--bg-tertiary)] rounded-xl" />
+        <Skeleton className="h-44 sm:h-56 bg-[var(--bg-tertiary)] rounded-xl" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-56 bg-[var(--bg-tertiary)] rounded-xl" />
+          <Skeleton key={i} className="h-44 sm:h-56 bg-[var(--bg-tertiary)] rounded-xl" />
         ))}
       </div>
     </div>

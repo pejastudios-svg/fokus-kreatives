@@ -325,7 +325,7 @@ function TeamSkeleton() {
       {/* List rows: avatar + name/email + kebab */}
       <Card>
         <CardContent className="p-0">
-          <ul className="divide-y divide-gray-200">
+          <ul className="divide-y divide-[var(--border-primary)]">
             {[1, 2, 3, 4].map((i) => (
               <li key={i} className="flex items-center gap-3 px-4 sm:px-6 py-4">
                 <Skeleton className="h-10 w-10 rounded-full shrink-0" />
@@ -540,7 +540,7 @@ function TeamSkeleton() {
         ) : (
           <Card>
             <CardContent className="p-0">
-              <ul className="divide-y divide-gray-200">
+              <ul className="divide-y divide-[var(--border-primary)]">
                 {filteredTeam.map((member) => {
                   const expiresAt = member.invitation_expires_at
                     ? new Date(member.invitation_expires_at)

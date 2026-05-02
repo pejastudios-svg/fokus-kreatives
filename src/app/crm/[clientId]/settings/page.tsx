@@ -230,17 +230,17 @@ export default function CRMSettingsPage() {
 
 function SettingsSkeleton() {
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in">
       {[1, 2, 3].map((i) => (
         <Card key={i} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
           <CardHeader>
-            <Skeleton className="h-6 w-48 bg-[var(--border-primary)]" />
+            <Skeleton className="h-4 w-40 sm:w-48 bg-[var(--border-primary)]" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-12 w-full bg-[var(--border-primary)]" />
-            <Skeleton className="h-12 w-full bg-[var(--border-primary)]" />
+          <CardContent className="space-y-3 sm:space-y-4">
+            <Skeleton className="h-10 sm:h-12 w-full bg-[var(--border-primary)]" />
+            <Skeleton className="h-10 sm:h-12 w-full bg-[var(--border-primary)]" />
             <div className="flex justify-end">
-                <Skeleton className="h-10 w-32 rounded-lg bg-[var(--border-primary)]" />
+              <Skeleton className="h-9 sm:h-10 w-28 sm:w-32 rounded-lg bg-[var(--border-primary)]" />
             </div>
           </CardContent>
         </Card>
@@ -249,7 +249,7 @@ function SettingsSkeleton() {
   )
 }
 
-  return <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-3 sm:p-4 lg:p-6 min-h-full">
         {/* Alerts */}
         {alert && (
           <div

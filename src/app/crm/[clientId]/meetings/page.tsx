@@ -266,33 +266,31 @@ export default function CRMMeetingsPage() {
 
   function MeetingsSkeleton() {
   return (
-    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
-      <div className="flex justify-between mb-6">
-        <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
-        </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <Skeleton className="h-8 w-24 rounded-full bg-[var(--bg-card-hover)]" />
-        <Skeleton className="h-8 w-24 rounded-full bg-[var(--bg-card-hover)]" />
+      <div className="flex gap-2 mb-4">
+        <Skeleton className="h-7 w-20 rounded-full bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-7 w-20 rounded-full bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-7 w-12 rounded-full bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex justify-between">
-            <div className="flex gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-48 bg-[var(--bg-card-hover)]" />
-                <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex justify-between gap-3">
+            <div className="flex gap-3 min-w-0 flex-1">
+              <Skeleton className="h-9 w-9 rounded-lg bg-[var(--bg-card-hover)] shrink-0" />
+              <div className="space-y-2 min-w-0 flex-1">
+                <Skeleton className="h-4 w-32 sm:w-48 bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-3 w-24 sm:w-32 bg-[var(--bg-card-hover)]" />
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <Skeleton className="h-6 w-24 rounded-full bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-4 w-16 bg-[var(--bg-card-hover)]" />
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <Skeleton className="h-5 w-20 rounded-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-3 w-12 bg-[var(--bg-card-hover)]" />
             </div>
           </div>
         ))}
@@ -334,13 +332,13 @@ export default function CRMMeetingsPage() {
   }
 }
 
-  return <div className="p-4 lg:p-6 min-h-full">
+  return <div className="p-3 sm:p-4 lg:p-6 min-h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-[var(--text-tertiary)]">See and schedule meetings for this client</p>
-          <Button size="sm" onClick={() => setShowAddModal(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add Meeting
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <p className="text-xs text-[var(--text-tertiary)] truncate">See and schedule meetings for this client</p>
+          <Button size="sm" onClick={() => setShowAddModal(true)} className="shrink-0">
+            <Plus className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Add Meeting</span>
           </Button>
         </div>
 

@@ -595,31 +595,32 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
   function LeadsSkeleton() {
   return (
-    <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
-      <div className="flex justify-between mb-6">
-        <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
+    <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <Skeleton className="h-3 w-24 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-8 w-16 rounded-lg sm:hidden bg-[var(--bg-card-hover)]" />
         </div>
-        <div className="flex gap-3">
-          <Skeleton className="h-10 w-64 rounded-xl bg-[var(--bg-card-hover)]" />
-          <Skeleton className="h-10 w-32 rounded-xl bg-[var(--bg-card-hover)]" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 sm:h-10 flex-1 rounded-xl bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-9 sm:h-10 w-32 rounded-xl bg-[var(--bg-card-hover)]" />
+          <Skeleton className="hidden sm:block h-10 w-28 rounded-lg bg-[var(--bg-card-hover)]" />
         </div>
       </div>
 
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
         <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+            <Skeleton key={i} className="h-3 w-24 sm:w-32 bg-[var(--bg-card-hover)] shrink-0" />
           ))}
         </div>
         <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="p-4 flex gap-4">
-              <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
-              <Skeleton className="h-6 w-20 rounded-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-24 sm:w-32 bg-[var(--bg-card-hover)] shrink-0" />
+              <Skeleton className="h-4 w-32 sm:w-48 bg-[var(--bg-card-hover)] shrink-0" />
+              <Skeleton className="h-4 w-20 sm:w-24 bg-[var(--bg-card-hover)] shrink-0" />
+              <Skeleton className="h-6 w-16 sm:w-20 rounded-full bg-[var(--bg-card-hover)] shrink-0" />
             </div>
           ))}
         </div>
@@ -632,31 +633,37 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     return <LeadsSkeleton />
   }
 
-  return <div className="p-4 lg:p-6 min-h-full">
+  return <div className="p-3 sm:p-4 lg:p-6 min-h-full">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <p className="text-xs text-[var(--text-tertiary)]">{leads.length} total leads</p>
-          
-          <div className="flex items-center gap-3">
+        <div className="mb-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-[var(--text-tertiary)]">{leads.length} total leads</p>
+            <Button size="sm" onClick={() => setShowAddLead(true)} className="bg-[#2B79F7] hover:bg-[#1E54B7] sm:hidden">
+              <Plus className="h-4 w-4" />
+              <span className="ml-1.5">Add</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
             {/* Search */}
-            <div className="relative">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search leads..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 lg:w-64 pl-10 pr-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
+                className="w-full pl-10 pr-3 py-2 sm:py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
               />
             </div>
 
             {/* View Toggle */}
-            <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
+            <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)] shrink-0">
               <button
                 onClick={() => setView('table')}
-                className={`p-2.5 rounded-lg transition-all ${
-                  view === 'table' 
-                    ? 'bg-[#2B79F7] text-white shadow-lg' 
+                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                  view === 'table'
+                    ? 'bg-[#2B79F7] text-white shadow-lg'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Table View"
@@ -665,9 +672,9 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
               </button>
               <button
                 onClick={() => setView('board')}
-                className={`p-2.5 rounded-lg transition-all ${
-                  view === 'board' 
-                    ? 'bg-[#2B79F7] text-white shadow-lg' 
+                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                  view === 'board'
+                    ? 'bg-[#2B79F7] text-white shadow-lg'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Board View"
@@ -676,9 +683,9 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
               </button>
               <button
                 onClick={() => setView('chart')}
-                className={`p-2.5 rounded-lg transition-all ${
-                  view === 'chart' 
-                    ? 'bg-[#2B79F7] text-white shadow-lg' 
+                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                  view === 'chart'
+                    ? 'bg-[#2B79F7] text-white shadow-lg'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Chart View"
@@ -687,9 +694,9 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
               </button>
             </div>
 
-            {/* Add Lead */}
-            <Button onClick={() => setShowAddLead(true)} className="bg-[#2B79F7] hover:bg-[#1E54B7]">
-              <Plus className="h-4 w-4 mr-2" />
+            {/* Add Lead - desktop */}
+            <Button size="sm" onClick={() => setShowAddLead(true)} className="hidden sm:inline-flex bg-[#2B79F7] hover:bg-[#1E54B7] shrink-0">
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Lead
             </Button>
           </div>
