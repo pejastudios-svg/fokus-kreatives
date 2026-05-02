@@ -420,38 +420,38 @@ function RevenueSkeleton() {
     <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
       <div className="flex justify-between mb-8">
         <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
-          <Skeleton className="h-4 w-48 bg-[#334155]" />
+          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
         </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
             <div className="flex gap-3 mb-3">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[#334155]" />
-              <Skeleton className="h-4 w-24 bg-[#334155]" />
+              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
             </div>
-            <Skeleton className="h-8 w-32 bg-[#334155]" />
+            <Skeleton className="h-8 w-32 bg-[var(--bg-card-hover)]" />
           </div>
         ))}
       </div>
 
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
-        <div className="border-b border-[#334155] bg-[#0F172A] p-4 flex gap-4">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+        <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-4 w-full bg-[#334155]" />
+            <Skeleton key={i} className="h-4 w-full bg-[var(--bg-card-hover)]" />
           ))}
         </div>
-        <div className="divide-y divide-[#334155]">
+        <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="p-4 flex gap-4">
-              <Skeleton className="h-5 w-full bg-[#334155]" />
-              <Skeleton className="h-5 w-full bg-[#334155]" />
-              <Skeleton className="h-5 w-full bg-[#334155]" />
-              <Skeleton className="h-5 w-full bg-[#334155]" />
-              <Skeleton className="h-5 w-full bg-[#334155]" />
+              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-5 w-full bg-[var(--bg-card-hover)]" />
             </div>
           ))}
         </div>
@@ -465,15 +465,12 @@ function RevenueSkeleton() {
   }
 
   return (
-    <div className="p-6 lg:p-8 min-h-full">
+    <div className="p-4 lg:p-6 min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Revenue</h1>
-          <p className="text-gray-400 mt-1">Track payments and invoices</p>
-        </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-[var(--text-tertiary)]">Track payments and invoices</p>
+        <Button size="sm" onClick={() => setShowAddModal(true)}>
+          <Plus className="h-4 w-4 mr-1.5" />
           Add Payment
         </Button>
       </div>
@@ -481,63 +478,63 @@ function RevenueSkeleton() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {nextPayment && (
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
-            <h3 className="text-lg font-semibold text-white mb-2">Next Payment</h3>
-            <p className="text-2xl font-bold text-white">
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Next Payment</h3>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">
               ${nextPayment.amount.toLocaleString()}{' '}
-              <span className="text-sm text-gray-400">{nextPayment.currency}</span>
+              <span className="text-sm text-[var(--text-tertiary)]">{nextPayment.currency}</span>
             </p>
-            <p className="text-gray-400 mt-1">
+            <p className="text-[var(--text-tertiary)] mt-1">
               Due on {new Date(nextPayment.due_date as string).toLocaleDateString()}
             </p>
             {nextPayment.notes && (
-              <p className="text-gray-500 text-sm mt-2">{nextPayment.notes}</p>
+              <p className="text-[var(--text-tertiary)] text-sm mt-2">{nextPayment.notes}</p>
             )}
           </div>
         )}
 
-        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-green-500/20 rounded-lg">
               <DollarSign className="h-5 w-5 text-green-400" />
             </div>
-            <span className="text-gray-400 text-sm">Total Revenue</span>
+            <span className="text-[var(--text-tertiary)] text-sm">Total Revenue</span>
           </div>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-3xl font-bold text-[var(--text-primary)]">
             ${stats.total.toLocaleString()}
           </p>
         </div>
 
-        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
               <TrendingUp className="h-5 w-5 text-blue-400" />
             </div>
-            <span className="text-gray-400 text-sm">This Month</span>
+            <span className="text-[var(--text-tertiary)] text-sm">This Month</span>
           </div>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-3xl font-bold text-[var(--text-primary)]">
             ${stats.thisMonth.toLocaleString()}
           </p>
         </div>
 
-        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-yellow-500/20 rounded-lg">
               <Clock className="h-5 w-5 text-yellow-400" />
             </div>
-            <span className="text-gray-400 text-sm">Pending</span>
+            <span className="text-[var(--text-tertiary)] text-sm">Pending</span>
           </div>
           <p className="text-3xl font-bold text-yellow-400">
             ${stats.pending.toLocaleString()}
           </p>
         </div>
 
-        <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-red-500/20 rounded-lg">
               <AlertCircle className="h-5 w-5 text-red-400" />
             </div>
-            <span className="text-gray-400 text-sm">Overdue</span>
+            <span className="text-[var(--text-tertiary)] text-sm">Overdue</span>
           </div>
           <p className="text-3xl font-bold text-red-400">
             ${stats.overdue.toLocaleString()}
@@ -554,7 +551,7 @@ function RevenueSkeleton() {
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filter === f
                 ? 'bg-[#2B79F7] text-white'
-                : 'bg-[#1E293B] text-gray-400 hover:text-white border border-[#334155]'
+                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-[var(--border-primary)]'
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -563,40 +560,40 @@ function RevenueSkeleton() {
       </div>
 
       {/* Payments Table */}
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-[#334155] bg-[#0F172A]">
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+            <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Amount
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Lead
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Status
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Due Date
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Invoice
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Notes
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
                 Reminder
               </th>
               <th className="w-20" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#334155]">
+          <tbody className="divide-y divide-[var(--border-primary)]">
             {filteredPayments.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-12 text-center">
-                  <DollarSign className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400">No payments found</p>
+                  <DollarSign className="h-10 w-10 text-[var(--text-secondary)] mx-auto mb-3" />
+                  <p className="text-[var(--text-tertiary)]">No payments found</p>
                 </td>
               </tr>
             ) : (
@@ -608,23 +605,23 @@ function RevenueSkeleton() {
                 return (
                   <tr
                     key={payment.id}
-                    className={`hover:bg-[#334155]/30 transition-colors group ${
+                    className={`hover:bg-[var(--bg-card-hover)]/30 transition-colors group ${
                       isTemp ? 'opacity-60 pointer-events-none' : ''
                     }`}
                   >
                     <td className="px-6 py-4">
-                      <span className="text-xl font-bold text-white">
+                      <span className="text-xl font-bold text-[var(--text-primary)]">
                         ${payment.amount.toLocaleString()}
                       </span>
-                      <span className="text-gray-500 text-sm ml-1">
+                      <span className="text-[var(--text-tertiary)] text-sm ml-1">
                         {payment.currency}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 text-gray-300">
+                    <td className="px-6 py-4 text-[var(--text-secondary)]">
                       {leadData.name || '-'}
                       {leadData.email && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-[var(--text-tertiary)]">
                           {leadData.email}
                         </div>
                       )}
@@ -649,17 +646,17 @@ function RevenueSkeleton() {
                       </select>
                     </td>
 
-                    <td className="px-6 py-4 text-gray-300">
+                    <td className="px-6 py-4 text-[var(--text-secondary)]">
                       {payment.due_date
                         ? new Date(payment.due_date).toLocaleDateString()
                         : '-'}
                     </td>
 
-                    <td className="px-6 py-4 text-gray-400">
+                    <td className="px-6 py-4 text-[var(--text-tertiary)]">
                       {payment.invoice_number || '-'}
                     </td>
 
-                    <td className="px-6 py-4 text-gray-400 max-w-xs truncate">
+                    <td className="px-6 py-4 text-[var(--text-tertiary)] max-w-xs truncate">
                       {payment.notes || '-'}
                     </td>
 
@@ -669,7 +666,7 @@ function RevenueSkeleton() {
                         className={`p-2 rounded-lg transition-colors ${
                           payment.reminder_enabled
                             ? 'bg-[#2B79F7]/20 text-[#2B79F7]'
-                            : 'bg-gray-700 text-gray-400'
+                            : 'bg-[var(--bg-card-hover)] text-[var(--text-tertiary)]'
                         }`}
                       >
                         {payment.reminder_enabled ? (
@@ -683,7 +680,7 @@ function RevenueSkeleton() {
                     <td className="px-6 py-4">
                       <button
                         onClick={() => setPendingDeleteId(payment.id)}
-                        className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-2 hover:bg-red-500/20 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -702,7 +699,7 @@ function RevenueSkeleton() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Amount
                 </label>
                 <input
@@ -712,11 +709,11 @@ function RevenueSkeleton() {
                     setNewPayment({ ...newPayment, amount: e.target.value })
                   }
                   placeholder="0.00"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Currency
                 </label>
                 <select
@@ -724,7 +721,7 @@ function RevenueSkeleton() {
                   onChange={(e) =>
                     setNewPayment({ ...newPayment, currency: e.target.value })
                   }
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -736,7 +733,7 @@ function RevenueSkeleton() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Status
                 </label>
                 <select
@@ -747,14 +744,14 @@ function RevenueSkeleton() {
                       status: e.target.value as Payment['status'],
                     })
                   }
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="pending">Pending</option>
                   <option value="paid">Paid</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Due Date
                 </label>
                 <input
@@ -763,24 +760,24 @@ function RevenueSkeleton() {
                   onChange={(e) =>
                     setNewPayment({ ...newPayment, due_date: e.target.value })
                   }
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
             </div>
 
             {/* Lead selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Lead (optional)
               </label>
               <div className="relative mb-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
                 <input
                   type="text"
                   value={leadSearch}
                   onChange={(e) => setLeadSearch(e.target.value)}
                   placeholder="Search leads by name, email, platform..."
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full pl-9 pr-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               <select
@@ -788,7 +785,7 @@ function RevenueSkeleton() {
                 onChange={(e) =>
                   setSelectedLeadId(e.target.value || null)
                 }
-                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">No lead linked</option>
                 {filteredLeadOptions.map((lead) => {
@@ -804,7 +801,7 @@ function RevenueSkeleton() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Invoice Number
               </label>
               <input
@@ -817,12 +814,12 @@ function RevenueSkeleton() {
                   })
                 }
                 placeholder="INV-001"
-                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Notes
               </label>
               <textarea
@@ -832,7 +829,7 @@ function RevenueSkeleton() {
                 }
                 placeholder="Payment notes..."
                 rows={3}
-                className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
               />
             </div>
 
@@ -846,13 +843,13 @@ function RevenueSkeleton() {
                     reminder_enabled: e.target.checked,
                   })
                 }
-                className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
+                className="w-5 h-5 rounded border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[#2B79F7] focus:ring-[#2B79F7]"
               />
-              <span className="text-gray-300">Enable payment reminders</span>
+              <span className="text-[var(--text-secondary)]">Enable payment reminders</span>
             </label>
 
             {/* Recurring Payment */}
-            <div className="border-t border-[#334155] pt-4 mt-4">
+            <div className="border-t border-[var(--border-primary)] pt-4 mt-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -863,9 +860,9 @@ function RevenueSkeleton() {
                       is_recurring: e.target.checked,
                     }))
                   }
-                  className="w-5 h-5 rounded border-gray-600 bg-[#0F172A] text-[#2B79F7] focus:ring-[#2B79F7]"
+                  className="w-5 h-5 rounded border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[#2B79F7] focus:ring-[#2B79F7]"
                 />
-                <span className="text-gray-200 text-sm">
+                <span className="text-[var(--text-primary)] text-sm">
                   Make this a recurring payment
                 </span>
               </label>
@@ -873,7 +870,7 @@ function RevenueSkeleton() {
               {newPayment.is_recurring && (
                 <div className="mt-3 grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                    <label className="block text-xs font-medium text-[var(--text-tertiary)] mb-1">
                       Every
                     </label>
                     <input
@@ -886,11 +883,11 @@ function RevenueSkeleton() {
                           recurrence_interval: Number(e.target.value) || 1,
                         }))
                       }
-                      className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                    <label className="block text-xs font-medium text-[var(--text-tertiary)] mb-1">
                       Frequency
                     </label>
                     <select
@@ -901,7 +898,7 @@ function RevenueSkeleton() {
                           recurrence_type: e.target.value as 'days' | 'weeks' | 'months',
                         }))
                       }
-                      className="w-full px-3 py-2 bg-[#0F172A] border border-[#334155] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     >
                       <option value="days">Day(s)</option>
                       <option value="weeks">Week(s)</option>
@@ -913,7 +910,7 @@ function RevenueSkeleton() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#334155]">
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
             <Button
               onClick={handleAddPayment}
               isLoading={isSavingPayment}
@@ -951,15 +948,15 @@ function Modal(props: { children: React.ReactNode; onClose: () => void; title: s
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-[#1E293B] rounded-2xl border border-[#334155] shadow-2xl flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#334155]">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-primary)]">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155] transition-colors"
+            className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>

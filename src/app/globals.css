@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults `dark:` to `prefers-color-scheme: dark`, which leaks
+   the OS theme into the app even when the user has explicitly chosen light
+   in-app. Bind `dark:` to the `.dark` class on <html> instead so ThemeProvider
+   is the single source of truth. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Dark mode base */
 .dark {
   color-scheme: dark;
@@ -89,15 +95,25 @@ h1, h2, h3, h4, h5, h6 {
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-/* Dark Theme */
+/* Dark Theme
+   Layered surfaces (darkest → lightest):
+     bg-secondary     #060B16   page background
+     bg-primary       #0F1929   top nav, dropdowns, dropdown-style surfaces
+     bg-tertiary      #0F1929   segmented-toggle outer pill (= primary so
+                                inputs/pills read as part of the chrome)
+     bg-card          #1E2A41   cards, segmented-toggle inner thumb
+                                (lighter than tertiary so the thumb looks
+                                embossed - matches light mode's white-on-gray)
+     bg-card-hover    #293548   hover state for cards / nav items
+*/
 .dark {
-  --bg-primary: #0a0f1a;
-  --bg-secondary: #0f172a;
-  --bg-tertiary: #1e293b;
-  --bg-card: #1e293b;
-  --bg-card-hover: #334155;
-  --bg-input: #0f172a;
-  --bg-sidebar: linear-gradient(180deg, #0a0f1a 0%, #0f172a 100%);
+  --bg-primary: #0F1929;
+  --bg-secondary: #060B16;
+  --bg-tertiary: #0F1929;
+  --bg-card: #1E2A41;
+  --bg-card-hover: #293548;
+  --bg-input: #1E2A41;
+  --bg-sidebar: linear-gradient(180deg, #060B16 0%, #0F1929 100%);
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
@@ -111,6 +127,37 @@ h1, h2, h3, h4, h5, h6 {
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Agency-side scope: applied at the DashboardLayout level so every agency
+   page picks up the same surface treatment.
+   - Dark mode: cards are #0A0F18 (a hair lighter than the pure-black page),
+     inputs stay at #0F1929 so they're tappable, and Card outlines are
+     stripped — surfaces are defined by their fill alone.
+   - Light mode: page bg gets a touch of warmth (#f1f5f9 vs the global
+     near-white #f8fafc) so cards have a hint more contrast. */
+.dark .agency-scope {
+  --bg-card: #0A0F18;
+  --bg-input: #0F1929;
+}
+
+:root .agency-scope,
+.light .agency-scope {
+  --bg-secondary: #f1f5f9;
+}
+
+.dark .agency-scope .bg-\[var\(--bg-card\)\].rounded-xl.border {
+  border-color: transparent;
+}
+
+/* Pillar / category badges (light blue fill + brand-blue text) read as
+   washed-out on the dark surfaces. Swap to a saturated dark-blue chip with
+   bright blue text in dark mode. Targets only elements that carry BOTH
+   the bg-[#E8F1FF] and text-[#2B79F7] classes — i.e. badges, not stray
+   icons that happen to use the brand-blue text color. */
+.dark .agency-scope [class*="bg-[#E8F1FF]"][class*="text-[#2B79F7]"] {
+  background-color: #1E3A6F;
+  color: #93C5FD;
 }
 
 /* Theme color transition — opt-in via class, so it doesn't fight Tailwind's
@@ -189,6 +236,14 @@ body {
 
   .bg-brand-gradient {
     background: linear-gradient(135deg, #2B79F7 0%, #1E54B7 50%, #143A80 100%);
+  }
+
+  /* In dark mode, the sidebar should drop the gradient and sit at the
+     dashboard card color. Scoped to `aside` so this doesn't kill the
+     gradient on every `.bg-brand-gradient` use site (e.g. avatar initial
+     badges, hero blocks). */
+  .dark aside .bg-brand-gradient {
+    background: #0A0F18;
   }
 
   .bg-dark-gradient {

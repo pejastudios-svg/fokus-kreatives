@@ -211,8 +211,8 @@ export default function CompetitorsPage() {
         ) : (
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Analyze a Script</h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Analyze a Script</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">
                 Paste the full transcript of a high-performing video. We break it down line by line
                 and pull out what your client can plug into their own content today.
               </p>
@@ -220,7 +220,7 @@ export default function CompetitorsPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Client</label>
                   <ClientPicker
                     clients={clients}
                     value={selectedClientId}
@@ -229,11 +229,11 @@ export default function CompetitorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Platform</label>
                   <select
                     value={platform}
                     onChange={(e) => setPlatform(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   >
                     <option value="instagram">Instagram</option>
                     <option value="tiktok">TikTok</option>
@@ -250,17 +250,17 @@ export default function CompetitorsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                   Script / Transcript
                 </label>
                 <textarea
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                   rows={10}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-gray-400 text-sm resize-y"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)] text-sm resize-y"
                   placeholder="Paste the full transcript or script here…"
                 />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Used as inspiration only - we never copy sentences into your client&apos;s content.
                 </p>
               </div>
@@ -298,8 +298,8 @@ export default function CompetitorsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-[#2B79F7] mx-auto mb-4" />
-              <p className="text-gray-600">Breaking down the script…</p>
-              <p className="text-sm text-gray-400 mt-2">This usually takes 10–30 seconds.</p>
+              <p className="text-[var(--text-secondary)]">Breaking down the script…</p>
+              <p className="text-sm text-[var(--text-tertiary)] mt-2">This usually takes 10–30 seconds.</p>
             </CardContent>
           </Card>
         )}
@@ -309,7 +309,7 @@ export default function CompetitorsPage() {
         {!analysis && !isAnalyzing && !isLoading && (
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">How It Works</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">How It Works</h3>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -322,8 +322,8 @@ export default function CompetitorsPage() {
                     <div className="h-12 w-12 rounded-full bg-[#E8F1FF] flex items-center justify-center mx-auto mb-3">
                       <span className="text-[#2B79F7] font-bold">{s.n}</span>
                     </div>
-                    <h4 className="font-medium text-gray-900">{s.title}</h4>
-                    <p className="text-sm text-gray-500 mt-1">{s.sub}</p>
+                    <h4 className="font-medium text-[var(--text-primary)]">{s.title}</h4>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-1">{s.sub}</p>
                   </div>
                 ))}
               </div>
@@ -352,7 +352,7 @@ function BulletList({ items, variant = 'default' }: { items: string[]; variant?:
   return (
     <ul className="space-y-1.5">
       {items.map((item, i) => (
-        <li key={i} className="flex gap-2 text-sm text-gray-700">
+        <li key={i} className="flex gap-2 text-sm text-[var(--text-secondary)]">
           <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${dot}`} />
           <span>{item}</span>
         </li>
@@ -367,10 +367,10 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
       {a.summary && (
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Summary</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Summary</h3>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 leading-relaxed">{a.summary}</p>
+            <p className="text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>
           </CardContent>
         </Card>
       )}
@@ -379,13 +379,13 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Hook</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Hook</h3>
               {a.hook.rating > 0 && <Rating value={a.hook.rating} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {a.hook.text && (
-              <blockquote className="border-l-4 border-[#2B79F7] bg-[#F5F9FF] p-3 text-sm italic text-gray-800">
+              <blockquote className="border-l-4 border-[#2B79F7] bg-[#F5F9FF] p-3 text-sm italic text-[var(--text-primary)]">
                 &ldquo;{a.hook.text}&rdquo;
               </blockquote>
             )}
@@ -411,13 +411,13 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">CTA</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">CTA</h3>
               {a.cta.rating > 0 && <Rating value={a.cta.rating} />}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {a.cta.text && (
-              <blockquote className="border-l-4 border-[#2B79F7] bg-[#F5F9FF] p-3 text-sm italic text-gray-800">
+              <blockquote className="border-l-4 border-[#2B79F7] bg-[#F5F9FF] p-3 text-sm italic text-[var(--text-primary)]">
                 &ldquo;{a.cta.text}&rdquo;
               </blockquote>
             )}
@@ -443,7 +443,7 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
 
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Structure</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Structure</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2 text-sm">
@@ -453,7 +453,7 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
               </span>
             )}
             {a.structure.pacing && (
-              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+              <span className="px-3 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                 {a.structure.pacing}
               </span>
             )}
@@ -466,8 +466,8 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-900">{b.label}</div>
-                    <div className="text-sm text-gray-600">{b.text}</div>
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">{b.label}</div>
+                    <div className="text-sm text-[var(--text-secondary)]">{b.text}</div>
                   </div>
                 </li>
               ))}
@@ -479,13 +479,13 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
       {(a.voice.tone || a.voice.notable_patterns.length > 0) && (
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Voice</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Voice</h3>
           </CardHeader>
           <CardContent className="space-y-3">
-            {a.voice.tone && <p className="text-sm text-gray-700">{a.voice.tone}</p>}
+            {a.voice.tone && <p className="text-sm text-[var(--text-secondary)]">{a.voice.tone}</p>}
             {a.voice.notable_patterns.length > 0 && (
               <div>
-                <div className="text-sm font-semibold text-gray-900 mb-2">Notable patterns</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)] mb-2">Notable patterns</div>
                 <BulletList items={a.voice.notable_patterns} />
               </div>
             )}
@@ -522,9 +522,9 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-gray-900">Takeaways for Your Client</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Takeaways for Your Client</h3>
           </div>
-          <p className="text-sm text-gray-600 mt-1">Plug these into your client&apos;s next scripts.</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Plug these into your client&apos;s next scripts.</p>
         </CardHeader>
         <CardContent className="space-y-5">
           <TakeawayBlock title="Hook Formulas" items={a.takeaways_for_client.hook_formulas} />
@@ -541,13 +541,13 @@ function TakeawayBlock({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null
   return (
     <div>
-      <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] mb-2">
         <Lightbulb className="h-4 w-4 text-[#2B79F7]" />
         {title}
       </div>
       <ul className="space-y-1.5 pl-2">
         {items.map((item, i) => (
-          <li key={i} className="text-sm text-gray-700 leading-relaxed">
+          <li key={i} className="text-sm text-[var(--text-secondary)] leading-relaxed">
             <span className="text-[#2B79F7] font-semibold mr-2">•</span>
             {item}
           </li>

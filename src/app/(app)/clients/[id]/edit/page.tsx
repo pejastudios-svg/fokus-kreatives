@@ -459,7 +459,7 @@ export default function ClientDetailPage() {
                 variant="ghost"
                 onClick={() => setConfirmKind('archive')}
                 isLoading={isArchiving}
-                className="text-yellow-500 hover:bg-yellow-50"
+                className="text-yellow-500 hover:bg-yellow-500/10"
               >
                 Archive
               </Button>
@@ -470,7 +470,7 @@ export default function ClientDetailPage() {
                 variant="ghost"
                 onClick={() => setConfirmKind('delete')}
                 isLoading={isDeleting}
-                className="text-red-500 hover:bg-red-50"
+                className="text-red-500 hover:bg-red-500/10"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
@@ -482,7 +482,7 @@ export default function ClientDetailPage() {
         {notification && (
           <div
             role="status"
-            className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+            className={`fixed bottom-24 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
               notification.type === 'success'
                 ? 'bg-green-600 text-white'
                 : 'bg-red-600 text-white'
@@ -513,15 +513,15 @@ export default function ClientDetailPage() {
           </Card>
         )}
 
-        <Card className="mb-6 border-purple-200 bg-purple-50">
+        <Card className="mb-6 border-blue-200 bg-blue-50 dark:border-transparent dark:bg-[#1E3A6F]">
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="font-medium text-purple-700">Brand Intake Link</p>
+                <p className="font-medium text-blue-700 dark:text-[#93C5FD]">Brand Intake Link</p>
                 {intakeLink ? (
-                  <p className="text-sm text-purple-600/70 truncate">{intakeLink}</p>
+                  <p className="text-sm text-blue-600/70 dark:text-[#93C5FD]/80 truncate">{intakeLink}</p>
                 ) : (
-                  <p className="text-sm text-purple-600/70">
+                  <p className="text-sm text-blue-600/70 dark:text-[#93C5FD]/80">
                     Generate a shareable link the client can fill out themselves.
                   </p>
                 )}
@@ -548,7 +548,7 @@ export default function ClientDetailPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Profile Picture</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Profile Picture</h3>
             </CardHeader>
             <CardContent>
               <div className="flex justify-center">
@@ -568,7 +568,7 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Basic Information</h3>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -579,13 +579,13 @@ export default function ClientDetailPage() {
               <Input label="Industry" name="industry" value={formData.industry} onChange={handleChange} />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Target Audience</label>
                 <textarea
                   name="target_audience"
                   value={formData.target_audience}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
 
@@ -598,32 +598,32 @@ export default function ClientDetailPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Content Voice Tier</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Content Voice Tier</label>
                 <select
                   name="content_tier"
                   value={formData.content_tier}
                   onChange={(e) => setFormData((prev) => ({ ...prev, content_tier: e.target.value as ContentTier }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="beginner">Beginner</option>
                   <option value="mid">Mid</option>
                   <option value="advanced">Advanced</option>
                 </select>
 
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Package Tier</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Package Tier</label>
                 <select
                   name="package_tier"
                   value={formData.package_tier}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, package_tier: e.target.value as PackageTier | '' }))
                   }
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="">Not set</option>
                   <option value="top">Top (Authority Engine)</option>
@@ -631,7 +631,7 @@ export default function ClientDetailPage() {
                   <option value="lower">Lower (Foundation)</option>
                 </select>
 
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Subscription level. Drives task deliverables and CRM access. Changes apply immediately.
                 </p>
               </div>
@@ -640,8 +640,8 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Profile Builder</h3>
-              <p className="text-sm text-gray-500 mt-1">Structured brand details for more accurate scripts.</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Profile Builder</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">Structured brand details for more accurate scripts.</p>
             </CardHeader>
             <CardContent>
               <BrandProfileForm
@@ -653,8 +653,8 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-              <p className="text-sm text-gray-500 mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Document</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.brand_doc_url ? (
@@ -678,7 +678,7 @@ export default function ClientDetailPage() {
                     href={formData.brand_doc_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-green-500/30 text-green-700 text-xs font-medium hover:bg-green-500/10 transition"
                     title="Preview"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -689,7 +689,7 @@ export default function ClientDetailPage() {
                     download
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-green-500/30 text-green-700 text-xs font-medium hover:bg-green-500/10 transition"
                     title="Download"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -717,9 +717,9 @@ export default function ClientDetailPage() {
                   {showBrandUrlInput ? (
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
-                        <div className="h-px bg-gray-200 flex-1" />
-                        <span className="text-xs text-gray-400">or paste a link</span>
-                        <div className="h-px bg-gray-200 flex-1" />
+                        <div className="h-px bg-[var(--border-primary)] flex-1" />
+                        <span className="text-xs text-[var(--text-tertiary)]">or paste a link</span>
+                        <div className="h-px bg-[var(--border-primary)] flex-1" />
                       </div>
                       <div className="flex items-center gap-2">
                         <Input
@@ -732,7 +732,7 @@ export default function ClientDetailPage() {
                         <button
                           type="button"
                           onClick={() => setShowBrandUrlInput(false)}
-                          className="text-xs text-gray-500 hover:text-gray-700 px-2"
+                          className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] px-2"
                         >
                           Cancel
                         </button>
@@ -742,7 +742,7 @@ export default function ClientDetailPage() {
                     <button
                       type="button"
                       onClick={() => setShowBrandUrlInput(true)}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm font-medium hover:bg-[var(--bg-tertiary)] transition"
                     >
                       <LinkIcon className="h-4 w-4" />
                       Or paste a link
@@ -755,28 +755,28 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Content Guidelines</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Content Guidelines</h3>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Do&apos;s and Don&apos;ts</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Do&apos;s and Don&apos;ts</label>
                 <textarea
                   name="dos_and_donts"
                   value={formData.dos_and_donts}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Topics Library</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Topics Library</label>
                 <textarea
                   name="topics_library"
                   value={formData.topics_library}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
             </CardContent>
@@ -784,39 +784,39 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Stories & Social Proof</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Stories & Social Proof</h3>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Key Stories</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Key Stories</label>
                 <textarea
                   name="key_stories"
                   value={formData.key_stories}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unique Mechanisms</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Unique Mechanisms</label>
                 <textarea
                   name="unique_mechanisms"
                   value={formData.unique_mechanisms}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Social Proof & Results</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Social Proof & Results</label>
                 <textarea
                   name="social_proof"
                   value={formData.social_proof}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none"
                 />
               </div>
             </CardContent>
@@ -828,8 +828,8 @@ export default function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Competitor Insights</h3>
-              <p className="text-sm text-gray-500 mt-1">Saved from competitor analysis. Used by AI for content creation.</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Competitor Insights</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">Saved from competitor analysis. Used by AI for content creation.</p>
             </CardHeader>
             <CardContent>
               <textarea
@@ -838,7 +838,7 @@ export default function ClientDetailPage() {
                 onChange={handleChange}
                 placeholder="Competitor insights will appear here after you analyze competitors..."
                 rows={8}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none font-mono text-sm"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent resize-none font-mono text-sm"
               />
             </CardContent>
           </Card>
@@ -846,14 +846,13 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      {/* Sticky save FAB - the only save control. Always visible regardless
-          of scroll position; bottom-left so it doesn't clash with the toast
-          (bottom-right). */}
+      {/* Sticky save FAB. Bottom-right is the natural action corner; the
+          toast lifts itself to bottom-24 to clear it when both are visible. */}
       <button
         type="button"
         onClick={handleSave}
         disabled={isSaving}
-        className="fixed bottom-6 left-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         aria-label="Save changes"
       >
         <Save className="h-4 w-4" />

@@ -90,10 +90,10 @@ return
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-[var(--text-tertiary)]">Loading...</p>
         </div>
       </div>
     )

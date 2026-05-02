@@ -6,7 +6,7 @@ import { ContentCreationEngine } from '@/components/dashboard/ContentCreationEng
 import { ScriptPackageEngine } from '@/components/dashboard/ScriptPackageEngine'
 import { QuestionsFormEngine } from '@/components/dashboard/QuestionsFormEngine'
 import { SeriesFormEngine } from '@/components/dashboard/SeriesFormEngine'
-import { ClipboardList, Package, Sparkles, ArrowRight, Layers } from 'lucide-react'
+import { ClipboardList, Package, Sparkles, Layers } from 'lucide-react'
 
 type Mode = 'package' | 'individual' | 'questions' | 'series'
 
@@ -78,32 +78,32 @@ const MODES: { id: Mode; label: string; description: string; icon: React.Compone
 ]
 
 function ModeSwitcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  const active = MODES.find((m) => m.id === mode)
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-      {MODES.map((m) => {
-        const selected = mode === m.id
-        return (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => onChange(m.id)}
-            className={`text-left p-4 rounded-xl border-2 transition-all ${
-              selected
-                ? 'border-[#2B79F7] bg-[#E8F1FF] shadow-premium'
-                : 'border-theme-primary hover:border-[#5A9AFF] bg-theme-card'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <m.icon className={`h-5 w-5 ${selected ? 'text-[#2B79F7]' : 'text-theme-secondary'}`} />
-              <h3 className={`text-sm font-semibold ${selected ? 'text-[#2B79F7]' : 'text-theme-primary'}`}>
-                {m.label}
-              </h3>
-              {selected && <ArrowRight className="ml-auto h-4 w-4 text-[#2B79F7]" />}
-            </div>
-            <p className="text-xs text-theme-secondary">{m.description}</p>
-          </button>
-        )
-      })}
+    <div className="space-y-2">
+      <div className="inline-flex items-center gap-1 p-1 rounded-full border border-theme-primary bg-theme-card">
+        {MODES.map((m) => {
+          const selected = mode === m.id
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onChange(m.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                selected
+                  ? 'bg-[#2B79F7] text-white shadow-sm'
+                  : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+              }`}
+            >
+              <m.icon className="h-3.5 w-3.5" />
+              <span>{m.label}</span>
+            </button>
+          )
+        })}
+      </div>
+      {active && (
+        <p className="text-[11px] text-theme-tertiary px-1">{active.description}</p>
+      )}
     </div>
   )
 }

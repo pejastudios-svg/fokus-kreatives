@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -54,6 +55,7 @@ interface ClientLite {
   name: string | null
   business_name: string | null
   package_tier: PackageTier | null
+  profile_picture_url: string | null
 }
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -67,7 +69,7 @@ const STATUS_LABEL: Record<Status, string> = {
 }
 
 const STATUS_PILL: Record<Status, string> = {
-  todo: 'bg-gray-100 text-gray-700',
+  todo: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
   in_progress: 'bg-blue-50 text-blue-700',
   ready_for_review: 'bg-purple-50 text-purple-700',
   waiting_for_feedback: 'bg-orange-50 text-orange-700',
@@ -133,7 +135,7 @@ export default function CampaignsPage() {
     void (async () => {
       const { data } = await supabase
         .from('clients')
-        .select('id, name, business_name, package_tier')
+        .select('id, name, business_name, package_tier, profile_picture_url')
         .is('archived_at', null)
         .order('business_name', { ascending: true })
       setClients((data || []) as ClientLite[])
@@ -143,12 +145,14 @@ export default function CampaignsPage() {
   // Load campaigns for the *selected client only*. Empty until a client is
   // picked - the agency doesn't want to see all clients' tasks bleeding
   // into one view when they're focused on a specific client.
-  const loadCampaigns = async (clientId: string) => {
+  // `silent` skips the loading spinner so the polling refresh doesn't
+  // flicker the UI on every tick.
+  const loadCampaigns = async (clientId: string, silent = false) => {
     if (!clientId) {
       setCampaigns([])
       return
     }
-    setIsLoading(true)
+    if (!silent) setIsLoading(true)
     try {
       const res = await fetch(`/api/campaigns?clientId=${encodeURIComponent(clientId)}`, {
         cache: 'no-store',
@@ -158,11 +162,32 @@ export default function CampaignsPage() {
         setCampaigns(data.campaigns as CampaignRow[])
       }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
   useEffect(() => {
     void loadCampaigns(selectedClientId)
+  }, [selectedClientId])
+
+  // Poll for ClickUp status changes so the board reflects moves the agency
+  // makes directly in ClickUp without a manual refresh. The API already runs
+  // a status-sync inside the GET handler, so refetching it is enough.
+  // 20s is a good balance: short enough that "drag a card" feels live within
+  // a few seconds, long enough that we don't hammer ClickUp's rate limit.
+  // Also refetch when the tab regains focus so a long-idle tab catches up
+  // immediately instead of waiting for the next tick.
+  useEffect(() => {
+    if (!selectedClientId) return
+    const tick = () => void loadCampaigns(selectedClientId, true)
+    const interval = window.setInterval(tick, 20_000)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [selectedClientId])
 
   // Pull the next slot + tier when the client changes so the create form
@@ -291,7 +316,7 @@ export default function CampaignsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Client</label>
                 <ClientCombobox
                   clients={clients}
                   selectedId={selectedClientId}
@@ -367,11 +392,11 @@ export default function CampaignsPage() {
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     active
                       ? 'bg-[#2B79F7] text-white'
-                      : 'bg-white border border-gray-200 text-gray-600 hover:border-[#2B79F7]'
+                      : 'bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#2B79F7]'
                   }`}
                 >
                   <span>{t.label}</span>
-                  <span className={`text-[10px] ${active ? 'text-white/80' : 'text-gray-400'}`}>
+                  <span className={`text-[10px] ${active ? 'text-white/80' : 'text-[var(--text-tertiary)]'}`}>
                     {count}
                   </span>
                 </button>
@@ -384,31 +409,31 @@ export default function CampaignsPage() {
         <Card>
           <CardContent className="p-0">
             {!selectedClientId ? (
-              <p className="py-12 text-center text-sm text-gray-400">
+              <p className="py-12 text-center text-sm text-[var(--text-tertiary)]">
                 Pick a client to see their campaigns.
               </p>
             ) : isLoading ? (
-              <div className="py-12 flex items-center justify-center text-gray-400">
+              <div className="py-12 flex items-center justify-center text-[var(--text-tertiary)]">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : filtered.length === 0 ? (
-              <p className="py-12 text-center text-sm text-gray-400">
+              <p className="py-12 text-center text-sm text-[var(--text-tertiary)]">
                 {tab === 'all'
                   ? 'No campaigns yet for this client.'
                   : `No campaigns in ${STATUS_LABEL[tab as Status]}.`}
               </p>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-[var(--border-primary)]">
                 {filtered.map((c) => {
                   const created = new Date(c.created_at)
                   return (
                     <li
                       key={c.id}
-                      className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                      className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--bg-card-hover)] transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-gray-900 truncate">
+                          <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                             {c.name}
                           </span>
                           <span
@@ -417,7 +442,7 @@ export default function CampaignsPage() {
                             {STATUS_LABEL[c.status]}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5 truncate">
                           {selectedClient?.business_name || selectedClient?.name || ''}
                           {c.tier_at_creation ? ` · ${TIER_LABEL[c.tier_at_creation]}` : ''}
                           {' · '}
@@ -444,7 +469,7 @@ export default function CampaignsPage() {
                       <button
                         type="button"
                         onClick={() => setPendingDelete(c)}
-                        className="shrink-0 p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="shrink-0 p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition-colors"
                         aria-label={`Delete ${c.name}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -468,7 +493,7 @@ export default function CampaignsPage() {
           onClick={() => deleteMode == null && setPendingDelete(null)}
         >
           <div
-            className="relative w-full max-w-md rounded-xl bg-white shadow-xl"
+            className="relative w-full max-w-md rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -477,15 +502,15 @@ export default function CampaignsPage() {
               type="button"
               onClick={() => setPendingDelete(null)}
               disabled={deleteMode !== null}
-              className="absolute top-3 right-3 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              className="absolute top-3 right-3 p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
             </button>
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900">Delete campaign?</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                <span className="font-medium text-gray-700">{pendingDelete.name}</span>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete campaign?</h3>
+              <p className="mt-1 text-sm text-[var(--text-tertiary)]">
+                <span className="font-medium text-[var(--text-secondary)]">{pendingDelete.name}</span>
                 {'. '}
                 Pick how far the delete should go.
               </p>
@@ -495,14 +520,14 @@ export default function CampaignsPage() {
                   type="button"
                   onClick={() => void runDelete('app')}
                   disabled={deleteMode !== null}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#2B79F7] hover:bg-blue-50 text-left transition-colors disabled:opacity-50"
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] hover:bg-blue-50 dark:hover:bg-[#1E3A6F]/40 text-left transition-colors disabled:opacity-50"
                 >
-                  <Trash2 className="h-4 w-4 mt-0.5 text-gray-500 shrink-0" />
+                  <Trash2 className="h-4 w-4 mt-0.5 text-[var(--text-tertiary)] shrink-0" />
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-[var(--text-primary)]">
                       Remove from campaigns only
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-xs text-[var(--text-tertiary)] mt-0.5">
                       The ClickUp task stays put. Useful when the work continues there but
                       shouldn&apos;t clutter the campaigns log.
                     </div>
@@ -518,7 +543,7 @@ export default function CampaignsPage() {
                   type="button"
                   onClick={() => void runDelete('app+clickup')}
                   disabled={deleteMode !== null}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-red-200 hover:border-red-500 hover:bg-red-50 text-left transition-colors disabled:opacity-50"
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-red-200 hover:border-red-500 hover:bg-red-500/10 text-left transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4 mt-0.5 text-red-600 shrink-0" />
                   <div>
@@ -607,33 +632,52 @@ function ClientCombobox({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-left text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] flex items-center justify-between"
+        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-left text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] flex items-center gap-2.5"
       >
-        <span className={selected ? '' : 'text-gray-400'}>{selectedLabel}</span>
-        <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 ml-2" />
+        {selected ? (
+          selected.profile_picture_url ? (
+            <Image
+              src={selected.profile_picture_url}
+              alt={selectedLabel}
+              width={24}
+              height={24}
+              unoptimized
+              className="rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="h-6 w-6 rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+              {selectedLabel.charAt(0).toUpperCase()}
+            </div>
+          )
+        ) : null}
+        <span className={`flex-1 truncate ${selected ? '' : 'text-[var(--text-tertiary)]'}`}>
+          {selectedLabel}
+        </span>
+        <ChevronDown className="h-4 w-4 text-[var(--text-tertiary)] shrink-0 ml-2" />
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          <div className="sticky top-0 bg-white border-b border-gray-100 p-2">
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-50">
-              <Search className="h-3.5 w-3.5 text-gray-400" />
+        <div className="absolute z-30 mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg">
+          <div className="sticky top-0 bg-[var(--bg-card)] border-b border-[var(--border-primary)] p-2">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-tertiary)]">
+              <Search className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
               <input
                 autoFocus
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search clients…"
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
               />
             </div>
           </div>
           {filtered.length === 0 ? (
-            <p className="py-6 text-center text-xs text-gray-400">No matching clients.</p>
+            <p className="py-6 text-center text-xs text-[var(--text-tertiary)]">No matching clients.</p>
           ) : (
             <ul>
               {filtered.map((c) => {
                 const active = c.id === selectedId
+                const label = c.business_name || c.name || 'Untitled'
                 return (
                   <li key={c.id}>
                     <button
@@ -643,15 +687,35 @@ function ClientCombobox({
                         setOpen(false)
                         setQuery('')
                       }}
-                      className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 ${
-                        active ? 'bg-blue-50 text-[#2B79F7]' : 'text-gray-700'
+                      className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 transition-colors ${
+                        active
+                          ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD]'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      <span className="flex-1 truncate">
-                        {c.business_name || c.name || 'Untitled'}
-                      </span>
+                      {c.profile_picture_url ? (
+                        <Image
+                          src={c.profile_picture_url}
+                          alt={label}
+                          width={22}
+                          height={22}
+                          unoptimized
+                          className="rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="h-[22px] w-[22px] rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+                          {label.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="flex-1 truncate">{label}</span>
                       {c.package_tier && (
-                        <span className="text-[10px] text-gray-400 shrink-0">
+                        <span
+                          className={`text-[10px] shrink-0 ${
+                            active
+                              ? 'text-[#1E54B7]/70 dark:text-[#93C5FD]/70'
+                              : 'text-[var(--text-tertiary)]'
+                          }`}
+                        >
                           {TIER_LABEL[c.package_tier]}
                         </span>
                       )}

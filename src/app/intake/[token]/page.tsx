@@ -151,20 +151,20 @@ export default function BrandIntakePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+        <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
   }
 
   if (error && !client) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Link not available</h2>
-            <p className="text-gray-500">{error}</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Link not available</h2>
+            <p className="text-[var(--text-tertiary)]">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -173,12 +173,12 @@ export default function BrandIntakePage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks - we got it!</h2>
-            <p className="text-gray-500">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Thanks - we got it!</h2>
+            <p className="text-[var(--text-tertiary)]">
               Your brand intake has been saved. Your team will use this to create content for you.
             </p>
           </CardContent>
@@ -188,7 +188,7 @@ export default function BrandIntakePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-tertiary)]">
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -205,18 +205,18 @@ export default function BrandIntakePage() {
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Brand Intake</h1>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)]">Brand Intake</h1>
                 {(form.business_name || client?.business_name) && (
-                  <p className="text-sm text-gray-500">for {form.business_name || client?.business_name}</p>
+                  <p className="text-sm text-[var(--text-tertiary)]">for {form.business_name || client?.business_name}</p>
                 )}
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--text-secondary)]">
               The more detail you share here, the more the content sounds like <em>you</em> - not a generic
               AI. Nothing is public; it only feeds our content engine.
               {client?.already_submitted && (
-                <span className="block mt-2 text-xs text-gray-500">
+                <span className="block mt-2 text-xs text-[var(--text-tertiary)]">
                   You&apos;ve submitted this before - feel free to update anything and resubmit.
                 </span>
               )}
@@ -226,8 +226,8 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Profile Picture</h3>
-            <p className="text-sm text-gray-500 mt-1">Logo or personal photo - whatever represents the brand.</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Profile Picture</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">Logo or personal photo - whatever represents the brand.</p>
           </CardHeader>
           <CardContent>
             <div className="flex justify-center">
@@ -247,7 +247,7 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Basic Information</h3>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,14 +283,14 @@ export default function BrandIntakePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Target Audience</label>
               <textarea
                 name="target_audience"
                 value={form.target_audience}
                 onChange={handleChange}
                 placeholder="Who is your ideal client? Age, profession, pain points, desires…"
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -298,8 +298,8 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Document</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">
               Upload a PDF or paste a Google Doc / Notion link with your full brand guidelines.
             </p>
           </CardHeader>
@@ -332,9 +332,9 @@ export default function BrandIntakePage() {
                   onUpload={(url) => setForm((prev) => ({ ...prev, brand_doc_url: url }))}
                 />
                 <div className="flex items-center gap-3">
-                  <div className="h-px bg-gray-200 flex-1" />
-                  <span className="text-xs text-gray-400">or paste a link</span>
-                  <div className="h-px bg-gray-200 flex-1" />
+                  <div className="h-px bg-[var(--bg-card-hover)] flex-1" />
+                  <span className="text-xs text-[var(--text-tertiary)]">or paste a link</span>
+                  <div className="h-px bg-[var(--bg-card-hover)] flex-1" />
                 </div>
                 <Input
                   name="brand_doc_url"
@@ -349,30 +349,30 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Content Guidelines</h3>
-            <p className="text-sm text-gray-500 mt-1">Anything we should always do or never do in your content.</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Content Guidelines</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">Anything we should always do or never do in your content.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Do&apos;s and Don&apos;ts</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Do&apos;s and Don&apos;ts</label>
               <textarea
                 name="dos_and_donts"
                 value={form.dos_and_donts}
                 onChange={handleChange}
                 placeholder={`DO: Use casual, confident tone. Use specific numbers. Tell stories.\nDON'T: Mention competitors by name. Use corporate jargon. Be generic.`}
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Topics Library</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Topics Library</label>
               <textarea
                 name="topics_library"
                 value={form.topics_library}
                 onChange={handleChange}
                 placeholder="Topics we should cover - one per line."
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -380,41 +380,41 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Stories & Social Proof</h3>
-            <p className="text-sm text-gray-500 mt-1">Used as inspiration - never copied word-for-word.</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Stories & Social Proof</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">Used as inspiration - never copied word-for-word.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Key Stories</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Key Stories</label>
               <textarea
                 name="key_stories"
                 value={form.key_stories}
                 onChange={handleChange}
                 placeholder="Personal origin, transformation, client wins, moments that shaped the brand…"
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unique Mechanisms / Frameworks</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Unique Mechanisms / Frameworks</label>
               <textarea
                 name="unique_mechanisms"
                 value={form.unique_mechanisms}
                 onChange={handleChange}
                 placeholder="Your proprietary methods, frameworks, step-by-step systems."
                 rows={4}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Social Proof & Results</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Social Proof & Results</label>
               <textarea
                 name="social_proof"
                 value={form.social_proof}
                 onChange={handleChange}
                 placeholder="Specific client wins, testimonials, numbers, press mentions, awards."
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -422,8 +422,8 @@ export default function BrandIntakePage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Competitors</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Competitors</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">
               Who else plays in your space? Paste links to their best content or profiles. We&apos;ll use these for
               inspiration - never to copy.
             </p>
@@ -435,15 +435,15 @@ export default function BrandIntakePage() {
               onChange={handleChange}
               placeholder={`https://instagram.com/competitor-1\nhttps://tiktok.com/@competitor-2\nNotes: what you like / don't like about each…`}
               rows={6}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-gray-900">Voice & Brand Profile</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Voice & Brand Profile</h3>
+            <p className="text-sm text-[var(--text-tertiary)] mt-1">
               The AI uses this to write on-brand scripts without guessing. Fill in whatever you can.
             </p>
           </CardHeader>
@@ -465,7 +465,7 @@ export default function BrandIntakePage() {
           </Button>
         </div>
 
-        <p className="text-xs text-gray-400 text-center">Powered by Fokus Kreativez</p>
+        <p className="text-xs text-[var(--text-tertiary)] text-center">Powered by Fokus Kreativez</p>
       </div>
     </div>
   )

@@ -168,7 +168,7 @@ export function ProfilePictureUpload({
               {initialChar.charAt(0).toUpperCase()}
             </div>
           ) : (
-            <div className="h-full w-full bg-gray-100 flex items-center justify-center text-gray-400">
+            <div className="h-full w-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
               <UserCircle className="h-2/3 w-2/3" strokeWidth={1.5} />
             </div>
           )}
@@ -209,19 +209,19 @@ export function ProfilePictureUpload({
             aria-hidden="true"
           />
           <div
-            className={`relative w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-200 ease-out ${
+            className={`relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl shadow-xl border border-[var(--border-primary)] overflow-hidden transition-all duration-200 ease-out ${
               menuOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2'
             }`}
             role="dialog"
             aria-modal="true"
             aria-label="Profile picture options"
           >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-              <p className="text-sm font-semibold text-gray-900">Profile picture</p>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-primary)]">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Profile picture</p>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -297,8 +297,8 @@ function ActionItem({
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-colors ${
         tone === 'danger'
-          ? 'text-red-600 hover:bg-red-50'
-          : 'text-gray-700 hover:bg-gray-50'
+          ? 'text-red-600 hover:bg-red-500/10'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]'
       }`}
     >
       <Icon className="h-4 w-4" />

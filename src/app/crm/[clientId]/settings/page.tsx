@@ -4,9 +4,11 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Toggle } from '@/components/ui/Toggle'
 import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
 import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from '@/components/providers/ThemeProvider'
 import {
   User,
   Lock,
@@ -15,12 +17,19 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Palette,
+  Sun,
+  Moon,
 } from 'lucide-react'
 
-type NotificationSettings = {
-  meetings?: boolean
-  capture_submissions?: boolean
-  leads?: boolean
+type NavMode = 'fixed' | 'hover'
+
+interface MyPreferences {
+  theme: 'light' | 'dark'
+  nav_mode: NavMode
+  notify_new_lead: boolean
+  notify_new_meeting: boolean
+  notify_payment_reminder: boolean
 }
 
 export default function CRMSettingsPage() {
@@ -30,15 +39,20 @@ export default function CRMSettingsPage() {
   const clientId = routeParams.clientid || routeParams.clientId
   const supabase = createClient()
 
-  // Workspace notification toggles
-  const [isLoading, setIsLoading] = useState(true) 
-  const [workspaceLoading, setWorkspaceLoading] = useState(true)
-  const [notifications, setNotifications] = useState<NotificationSettings>({
-    meetings: true,
-    capture_submissions: true,
-    leads: true,
+  const [isLoading, setIsLoading] = useState(true)
+
+  // User-level preferences (theme, nav-mode, per-user notification toggles).
+  // Distinct from `notifications` above which are workspace-level. Loaded
+  // from /api/me/preferences on mount; persisted on every toggle change.
+  const { setTheme } = useTheme()
+  const [prefs, setPrefs] = useState<MyPreferences>({
+    theme: 'dark',
+    nav_mode: 'fixed',
+    notify_new_lead: true,
+    notify_new_meeting: true,
+    notify_payment_reminder: true,
   })
-  const [savingWorkspace, setSavingWorkspace] = useState(false)
+  const [prefsLoaded, setPrefsLoaded] = useState(false)
 
   // User profile
   const [profileLoading, setProfileLoading] = useState(true)
@@ -63,33 +77,51 @@ export default function CRMSettingsPage() {
     message: string
   } | null>(null)
 
+  // Load user-level preferences once on mount. The endpoint auto-creates
+  // the row with defaults on first GET so we never have a missing-row path.
   useEffect(() => {
-    let mounted = true
-
-    const loadWorkspaceSettings = async () => {
-      if (!clientId) return
-      setWorkspaceLoading(true)
-      
-      const { data, error } = await supabase
-        .from('clients')
-        .select('notification_settings')
-        .eq('id', clientId)
-        .single()
-
-      if (mounted) {
-        if (error) {
-          console.error('Load workspace settings error:', error)
-        } else {
-          const ns = (data?.notification_settings || {}) as NotificationSettings
-          setNotifications({
-            meetings: ns.meetings ?? true,
-            capture_submissions: ns.capture_submissions ?? true,
-            leads: ns.leads ?? true,
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/me/preferences', { cache: 'no-store' })
+        const data = await res.json().catch(() => null)
+        if (!cancelled && data?.success && data.preferences) {
+          setPrefs({
+            theme: data.preferences.theme,
+            nav_mode: data.preferences.nav_mode,
+            notify_new_lead: data.preferences.notify_new_lead,
+            notify_new_meeting: data.preferences.notify_new_meeting,
+            notify_payment_reminder: data.preferences.notify_payment_reminder,
           })
         }
-        setWorkspaceLoading(false)
+      } finally {
+        if (!cancelled) setPrefsLoaded(true)
       }
+    })()
+    return () => {
+      cancelled = true
     }
+  }, [])
+
+  // Persist on every change. We optimistically update local state via
+  // setPrefs() before the network call so the UI feels instant; if the
+  // PATCH fails we just leave the local state alone (the next mount will
+  // pull the server's truth).
+  const updatePrefs = async (patch: Partial<MyPreferences>) => {
+    setPrefs((p) => ({ ...p, ...patch }))
+    try {
+      await fetch('/api/me/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+    } catch (err) {
+      console.error('preferences save error:', err)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
 
     const loadUserProfile = async () => {
       setProfileLoading(true)
@@ -125,9 +157,6 @@ export default function CRMSettingsPage() {
     }
 
     const init = async () => {
-        if (clientId) {
-            await loadWorkspaceSettings()
-        }
         await loadUserProfile()
         setIsLoading(false)
     }
@@ -142,29 +171,6 @@ export default function CRMSettingsPage() {
   const showAlert = (type: 'success' | 'error', message: string) => {
     setAlert({ type, message })
     setTimeout(() => setAlert(null), 3000)
-  }
-
-  const saveWorkspaceSettings = async () => {
-    setSavingWorkspace(true)
-    const payload: NotificationSettings = {
-      meetings: notifications.meetings ?? true,
-      capture_submissions: notifications.capture_submissions ?? true,
-      leads: notifications.leads ?? true,
-    }
-
-    const { error } = await supabase
-      .from('clients')
-      .update({ notification_settings: payload })
-      .eq('id', clientId)
-
-    if (error) {
-      console.error('Save workspace settings error:', error)
-      showAlert('error', 'Failed to save workspace settings')
-    } else {
-      showAlert('success', 'Workspace settings saved')
-    }
-
-    setSavingWorkspace(false)
   }
 
   const saveProfile = async () => {
@@ -226,15 +232,15 @@ function SettingsSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in">
       {[1, 2, 3].map((i) => (
-        <Card key={i} className="bg-[#1E293B] border-[#334155]">
+        <Card key={i} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
           <CardHeader>
-            <Skeleton className="h-6 w-48 bg-[#334155]" />
+            <Skeleton className="h-6 w-48 bg-[var(--border-primary)]" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <Skeleton className="h-12 w-full bg-[#334155]" />
-            <Skeleton className="h-12 w-full bg-[#334155]" />
+            <Skeleton className="h-12 w-full bg-[var(--border-primary)]" />
+            <Skeleton className="h-12 w-full bg-[var(--border-primary)]" />
             <div className="flex justify-end">
-                <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+                <Skeleton className="h-10 w-32 rounded-lg bg-[var(--border-primary)]" />
             </div>
           </CardContent>
         </Card>
@@ -262,64 +268,89 @@ function SettingsSkeleton() {
           </div>
         )}
 
-        <h1 className="text-2xl font-bold text-white mb-6">Workspace Settings</h1>
-
       {isLoading ? (
         <SettingsSkeleton />
       ) : (
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          {/* Workspace Notifications */}
-          <Card className="bg-[#1E293B] border-[#334155]">
+          {/* Appearance - theme + nav-mode preferences. User-level. */}
+          <Card>
             <CardHeader className="flex flex-row items-center gap-2">
-              <Bell className="h-5 w-5 text-[#2B79F7]" />
-              <h3 className="text-lg font-semibold text-white">
-                Notification Preferences
-              </h3>
+              <Palette className="h-4 w-4 text-[#2B79F7]" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Appearance</h3>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {workspaceLoading ? (
-                <p className="text-sm text-gray-400">Loading...</p>
-              ) : (
-                <>
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div>
-                      <p className="font-medium text-gray-100">
-                        Meeting notifications
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Emails / alerts when meetings are scheduled
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications.meetings ?? true}
-                      onChange={e =>
-                        setNotifications(prev => ({
-                          ...prev,
-                          meetings: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 rounded border-gray-500 text-[#2B79F7] focus:ring-[#2B79F7]"
-                    />
-                  </label>
+            <CardContent className="space-y-6">
+              {/* Theme picker - radio cards */}
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)] mb-2">Theme</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { value: 'light', label: 'Light', icon: Sun },
+                    { value: 'dark', label: 'Dark', icon: Moon },
+                  ] as const).map((opt) => {
+                    const active = prefs.theme === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={!prefsLoaded}
+                        onClick={() => {
+                          void updatePrefs({ theme: opt.value })
+                          setTheme(opt.value)
+                        }}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all duration-150 ${
+                          active
+                            ? 'border-[#2B79F7] bg-[#2B79F7]/10 text-[var(--text-primary)]'
+                            : 'border-[var(--border-primary)] hover:border-[#2B79F7]/50 text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <opt.icon className="h-5 w-5 shrink-0" />
+                        <span className="font-medium text-sm">{opt.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      onClick={saveWorkspaceSettings}
-                      isLoading={savingWorkspace}
-                    >
-                      Save Preferences
-                    </Button>
-                  </div>
-                </>
-              )}
+            </CardContent>
+          </Card>
+
+          {/* Personal notifications - one toggle per CRM event type. The
+              actual gating of notification firing is wired in Phase D; for
+              now these just persist the preference. */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Bell className="h-4 w-4 text-[#2B79F7]" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">My notifications</h3>
+            </CardHeader>
+            <CardContent className="space-y-1 divide-y divide-[var(--border-primary)]">
+              <Toggle
+                checked={prefs.notify_new_lead}
+                onChange={(v) => void updatePrefs({ notify_new_lead: v })}
+                disabled={!prefsLoaded}
+                label="New lead"
+                description="Ping me whenever a new lead comes in via a capture page or import."
+              />
+              <Toggle
+                checked={prefs.notify_new_meeting}
+                onChange={(v) => void updatePrefs({ notify_new_meeting: v })}
+                disabled={!prefsLoaded}
+                label="New meeting"
+                description="Notify me when a new meeting is scheduled in this CRM."
+              />
+              <Toggle
+                checked={prefs.notify_payment_reminder}
+                onChange={(v) => void updatePrefs({ notify_payment_reminder: v })}
+                disabled={!prefsLoaded}
+                label="Payment reminder"
+                description="Remind me about due or overdue invoices."
+              />
             </CardContent>
           </Card>
 
           {/* Profile & Password */}
           <div className="space-y-6">
             {/* Profile */}
-            <Card className="bg-[#1E293B] border-[#334155]">
+            <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
               <CardHeader className="flex flex-row items-center gap-2">
                 <User className="h-5 w-5 text-[#2B79F7]" />
                 <h3 className="text-lg font-semibold text-white">
@@ -328,7 +359,7 @@ function SettingsSkeleton() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {profileLoading ? (
-                  <p className="text-sm text-gray-400">Loading profile...</p>
+                  <p className="text-sm text-[var(--text-tertiary)]">Loading profile...</p>
                 ) : (
                   <>
                     <div className="flex justify-center">
@@ -367,7 +398,7 @@ function SettingsSkeleton() {
             </Card>
 
             {/* Password */}
-            <Card className="bg-[#1E293B] border-[#334155]">
+            <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
               <CardHeader className="flex flex-row items-center gap-2">
                 <Lock className="h-5 w-5 text-[#2B79F7]" />
                 <h3 className="text-lg font-semibold text-white">
@@ -386,7 +417,7 @@ function SettingsSkeleton() {
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(prev => !prev)}
-                    className="absolute right-3 top-9 text-gray-400"
+                    className="absolute right-3 top-9 text-[var(--text-tertiary)]"
                   >
                     {showNewPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -406,7 +437,7 @@ function SettingsSkeleton() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(prev => !prev)}
-                    className="absolute right-3 top-9 text-gray-400"
+                    className="absolute right-3 top-9 text-[var(--text-tertiary)]"
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-4 w-4" />

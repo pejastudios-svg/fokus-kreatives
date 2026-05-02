@@ -139,13 +139,13 @@ export function DrawCanvas({
         ref={containerRef}
         className="absolute inset-0 z-30 pointer-events-none flex items-start justify-start"
       >
-        <div className="m-2 pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white shadow-lg border border-gray-200 text-xs text-gray-600">
+        <div className="m-2 pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-card)] shadow-lg border border-[var(--border-primary)] text-xs text-[var(--text-secondary)]">
           <span className="inline-block h-2 w-2 rounded-full bg-[#2B79F7] animate-pulse" />
           <span>Annotate mode (waiting on asset)…</span>
           <button
             type="button"
             onClick={onCancel}
-            className="ml-1 px-1.5 py-0.5 rounded hover:bg-gray-100 text-gray-500"
+            className="ml-1 px-1.5 py-0.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
           >
             Cancel
           </button>
@@ -212,7 +212,7 @@ export function DrawCanvas({
 
       {/* Floating toolbar - sits above the asset */}
       <div
-        className="absolute pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-lg bg-white shadow-lg border border-gray-200"
+        className="absolute pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-lg bg-[var(--bg-card)] shadow-lg border border-[var(--border-primary)]"
         style={{ left: box.x + 8, top: box.y + 8 }}
       >
         <button
@@ -223,7 +223,7 @@ export function DrawCanvas({
           }}
           title="Circle"
           aria-label="Switch to circle"
-          className={`p-1.5 rounded ${shape === 'circle' ? 'bg-[#E8F1FF] text-[#1E54B7]' : 'text-gray-500 hover:bg-gray-100'}`}
+          className={`p-1.5 rounded ${shape === 'circle' ? 'bg-[#E8F1FF] text-[#1E54B7]' : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'}`}
         >
           <CircleIcon className="h-4 w-4" />
         </button>
@@ -235,18 +235,18 @@ export function DrawCanvas({
           }}
           title="Freeform"
           aria-label="Switch to freeform"
-          className={`p-1.5 rounded ${shape === 'freeform' ? 'bg-[#E8F1FF] text-[#1E54B7]' : 'text-gray-500 hover:bg-gray-100'}`}
+          className={`p-1.5 rounded ${shape === 'freeform' ? 'bg-[#E8F1FF] text-[#1E54B7]' : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'}`}
         >
           <Pen className="h-4 w-4" />
         </button>
-        <span className="w-px h-4 bg-gray-200 mx-0.5" />
+        <span className="w-px h-4 bg-[var(--bg-card-hover)] mx-0.5" />
         <button
           type="button"
           onClick={handleClear}
           disabled={!draft}
           title="Clear"
           aria-label="Clear drawing"
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Undo2 className="h-4 w-4" />
         </button>
@@ -255,7 +255,7 @@ export function DrawCanvas({
           onClick={onCancel}
           title="Cancel"
           aria-label="Cancel"
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100"
+          className="p-1.5 rounded text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
         >
           <X className="h-4 w-4" />
         </button>

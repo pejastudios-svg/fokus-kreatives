@@ -106,7 +106,7 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 }
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  low: 'text-gray-400',
+  low: 'text-[var(--text-tertiary)]',
   medium: 'text-blue-500',
   high: 'text-amber-500',
   urgent: 'text-red-600',
@@ -571,23 +571,23 @@ export default function TasksPage() {
             On mobile the (app) layout has a 56px hamburger header above us, on
             desktop it doesn't — so we subtract that on mobile only. */}
         <aside
-          className={`shrink-0 border-r border-gray-200 bg-white transition-[width] duration-200 ease-out overflow-hidden sticky top-0 self-start h-[calc(100dvh-3.5rem)] md:h-dvh ${
+          className={`shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-card)] transition-[width] duration-200 ease-out overflow-hidden sticky top-0 self-start h-[calc(100dvh-3.5rem)] md:h-dvh ${
             navOpen ? 'w-64' : 'w-12'
           }`}
         >
           <div className={`h-full flex flex-col ${navOpen ? '' : 'items-center'}`}>
             <div
-              className={`flex items-center ${navOpen ? 'justify-between px-3' : 'justify-center px-0'} py-3 border-b border-gray-100`}
+              className={`flex items-center ${navOpen ? 'justify-between px-3' : 'justify-center px-0'} py-3 border-b border-[var(--border-primary)]`}
             >
               {navOpen && (
-                <span className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">
+                <span className="text-[11px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
                   Clients
                 </span>
               )}
               <button
                 type="button"
                 onClick={toggleNav}
-                className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                 aria-label={navOpen ? 'Collapse navigator' : 'Expand navigator'}
                 title={navOpen ? 'Collapse' : 'Expand'}
               >
@@ -601,22 +601,22 @@ export default function TasksPage() {
 
             {navOpen && (
               <>
-                <div className="px-3 py-2 border-b border-gray-100">
+                <div className="px-3 py-2 border-b border-[var(--border-primary)]">
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-tertiary)] pointer-events-none" />
                     <input
                       type="text"
                       value={navQuery}
                       onChange={(e) => setNavQuery(e.target.value)}
                       placeholder="Search clients…"
-                      className="w-full pl-8 pr-2 py-1.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                 </div>
 
                 <ul className="flex-1 overflow-y-auto py-1">
                   {filteredClients.length === 0 ? (
-                    <li className="px-3 py-4 text-xs text-gray-400 text-center">No matches</li>
+                    <li className="px-3 py-4 text-xs text-[var(--text-tertiary)] text-center">No matches</li>
                   ) : (
                     filteredClients.map((c) => {
                       const active = c.id === clientId
@@ -626,8 +626,8 @@ export default function TasksPage() {
                           <div
                             className={`w-full flex items-center gap-1 pl-1 pr-3 py-1.5 transition-colors ${
                               active
-                                ? 'bg-[#E8F1FF] text-[#2B79F7]'
-                                : 'text-gray-700 hover:bg-gray-50'
+                                ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD]'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
                             }`}
                           >
                             <button
@@ -642,7 +642,7 @@ export default function TasksPage() {
                                 })
                               }}
                               aria-label={expanded ? 'Collapse' : 'Expand'}
-                              className="p-0.5 rounded hover:bg-gray-200/70 text-gray-400 hover:text-gray-700 shrink-0"
+                              className="p-0.5 rounded hover:bg-[var(--bg-card-hover)]/70 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] shrink-0"
                             >
                               {expanded ? (
                                 <ChevronDownIcon className="h-3.5 w-3.5" />
@@ -727,7 +727,7 @@ export default function TasksPage() {
                         type="button"
                         onClick={() => setClientId(c.id)}
                         title={c.name}
-                        className={`p-1 rounded-md transition ${active ? 'ring-2 ring-[#2B79F7]' : 'hover:bg-gray-100'}`}
+                        className={`p-1 rounded-md transition ${active ? 'ring-2 ring-[#2B79F7]' : 'hover:bg-[var(--bg-tertiary)]'}`}
                       >
                         {c.profile_picture_url ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
@@ -773,8 +773,8 @@ export default function TasksPage() {
             <Skeleton className="h-10 w-64 rounded-lg" />
           ) : !clientId ? (
             <Card>
-              <CardContent className="py-12 text-center text-gray-500">
-                <Briefcase className="h-8 w-8 mx-auto text-gray-300 mb-3" />
+              <CardContent className="py-12 text-center text-[var(--text-tertiary)]">
+                <Briefcase className="h-8 w-8 mx-auto text-[var(--text-tertiary)] mb-3" />
                 <p className="text-sm">Pick a client from the sidebar to get started.</p>
               </CardContent>
             </Card>
@@ -804,20 +804,20 @@ export default function TasksPage() {
                 <button
                   type="button"
                   onClick={() => goToBreadcrumb(-1)}
-                  className={`hover:text-gray-900 ${currentFolderId === null ? 'text-gray-900 font-medium' : 'text-gray-500'}`}
+                  className={`hover:text-[var(--text-primary)] ${currentFolderId === null ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-tertiary)]'}`}
                 >
                   All folders
                 </button>
                 {breadcrumb.map((b, idx) => (
                   <span key={b.id} className="flex items-center gap-1">
-                    <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                    <ChevronRight className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
                     <button
                       type="button"
                       onClick={() => goToBreadcrumb(idx)}
-                      className={`hover:text-gray-900 ${
+                      className={`hover:text-[var(--text-primary)] ${
                         idx === breadcrumb.length - 1
-                          ? 'text-gray-900 font-medium'
-                          : 'text-gray-500'
+                          ? 'text-[var(--text-primary)] font-medium'
+                          : 'text-[var(--text-tertiary)]'
                       }`}
                     >
                       {b.name}
@@ -846,14 +846,14 @@ export default function TasksPage() {
                   </Button>
                 </div>
 
-                <div className="inline-flex items-center bg-white rounded-xl p-1 border border-gray-200">
+                <div className="inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
                   <button
                     type="button"
                     onClick={() => setView('list')}
                     className={`p-1.5 rounded-lg transition-colors ${
                       viewMode === 'list'
                         ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900'
+                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                     }`}
                     aria-label="List view"
                     title="List view"
@@ -866,7 +866,7 @@ export default function TasksPage() {
                     className={`p-1.5 rounded-lg transition-colors ${
                       viewMode === 'board'
                         ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900'
+                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                     }`}
                     aria-label="Board view"
                     title="Board view"
@@ -892,7 +892,7 @@ export default function TasksPage() {
                         }
                       }}
                       placeholder="Folder name…"
-                      className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                     <Button size="sm" onClick={handleCreateFolder} isLoading={creating}>
                       Create
@@ -927,7 +927,7 @@ export default function TasksPage() {
                         }
                       }}
                       placeholder="Task name…"
-                      className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                     <Button size="sm" onClick={handleCreateTask} isLoading={creating}>
                       Create
@@ -982,12 +982,12 @@ export default function TasksPage() {
                               <Folder className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 truncate">{f.name}</p>
-                              <p className="text-xs text-gray-400">
+                              <p className="font-medium text-[var(--text-primary)] truncate">{f.name}</p>
+                              <p className="text-xs text-[var(--text-tertiary)]">
                                 {isOver ? 'Drop to move task here' : 'Folder'}
                               </p>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+                            <ChevronRight className="h-4 w-4 text-[var(--text-tertiary)] shrink-0" />
                           </button>
 
                           <div className="relative shrink-0" data-row-menu>
@@ -1000,13 +1000,13 @@ export default function TasksPage() {
                                     : { kind: 'folder', id: f.id },
                                 )
                               }
-                              className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                              className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                               aria-label="Folder options"
                             >
                               <MoreVertical className="h-4 w-4" />
                             </button>
                             {openMenu?.kind === 'folder' && openMenu.id === f.id && (
-                              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                              <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1014,7 +1014,7 @@ export default function TasksPage() {
                                     setRenameValue(f.name)
                                     setOpenMenu(null)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                                 >
                                   <Pencil className="h-4 w-4" />
                                   Rename
@@ -1026,7 +1026,7 @@ export default function TasksPage() {
                                     setOpenMenu(null)
                                     void handleDuplicateFolder(f.id)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
                                 >
                                   <Copy className="h-4 w-4" />
                                   {duplicatingId === f.id ? 'Duplicating…' : 'Duplicate'}
@@ -1037,7 +1037,7 @@ export default function TasksPage() {
                                     setDeleteFolderTarget(f)
                                     setOpenMenu(null)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                   Delete
@@ -1065,7 +1065,7 @@ export default function TasksPage() {
                 </div>
               ) : tasks.length === 0 ? (
                 <Card>
-                  <CardContent className="py-12 text-center text-gray-500">
+                  <CardContent className="py-12 text-center text-[var(--text-tertiary)]">
                     <p className="text-sm">No tasks here yet.</p>
                     <p className="text-xs mt-1">Create one to get started.</p>
                   </CardContent>
@@ -1074,8 +1074,8 @@ export default function TasksPage() {
                 <Card>
                   <CardContent className="p-0 overflow-x-auto">
                     <table className="w-full min-w-[760px]">
-                      <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                      <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                        <tr className="text-left text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
                           <th className="px-4 py-3 font-medium">Task</th>
                           <th className="px-4 py-3 font-medium">Status</th>
                           <th className="px-4 py-3 font-medium">Assignees</th>
@@ -1101,14 +1101,14 @@ export default function TasksPage() {
                                 setDraggingId(null)
                                 setDragOverFolder(null)
                               }}
-                              className={`hover:bg-gray-50 cursor-pointer transition-colors ${draggingId === t.id ? 'opacity-50' : ''}`}
+                              className={`hover:bg-[var(--bg-tertiary)] cursor-pointer transition-colors ${draggingId === t.id ? 'opacity-50' : ''}`}
                               onClick={(e) => {
                                 const target = e.target as HTMLElement
                                 if (target.closest('[data-row-menu]')) return
                                 router.push(`/tasks/${t.id}`)
                               }}
                             >
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">
                                 {t.name}
                               </td>
                               <td className="px-4 py-3">
@@ -1133,10 +1133,10 @@ export default function TasksPage() {
                                   {PRIORITY_LABEL[t.priority]}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-500">
+                              <td className="px-4 py-3 text-sm text-[var(--text-tertiary)]">
                                 {t.start_at ? new Date(t.start_at).toLocaleDateString() : '—'}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-500">
+                              <td className="px-4 py-3 text-sm text-[var(--text-tertiary)]">
                                 {t.due_at ? new Date(t.due_at).toLocaleDateString() : '—'}
                               </td>
                               <td className="px-4 py-3 text-right" data-row-menu>
@@ -1150,20 +1150,20 @@ export default function TasksPage() {
                                           : { kind: 'task', id: t.id },
                                       )
                                     }
-                                    className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                                    className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                                     aria-label="Task options"
                                   >
                                     <MoreVertical className="h-4 w-4" />
                                   </button>
                                   {openMenu?.kind === 'task' && openMenu.id === t.id && (
-                                    <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                    <div className="absolute right-0 mt-2 w-44 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                                       <button
                                         type="button"
                                         onClick={() => {
                                           router.push(`/tasks/${t.id}`)
                                           setOpenMenu(null)
                                         }}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                                       >
                                         <Pencil className="h-4 w-4" />
                                         Open
@@ -1175,7 +1175,7 @@ export default function TasksPage() {
                                           setOpenMenu(null)
                                           void handleDuplicateTask(t.id)
                                         }}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
                                       >
                                         <Copy className="h-4 w-4" />
                                         {duplicatingId === t.id ? 'Duplicating…' : 'Duplicate'}
@@ -1186,7 +1186,7 @@ export default function TasksPage() {
                                           setDeleteTaskTarget(t)
                                           setOpenMenu(null)
                                         }}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-500/10"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         Delete
@@ -1212,8 +1212,8 @@ export default function TasksPage() {
                       return (
                         <div
                           key={col.id}
-                          className={`w-72 shrink-0 self-start bg-gray-50 rounded-xl border ${
-                            isDragOver ? 'border-[#2B79F7] ring-2 ring-[#2B79F7]/20' : 'border-gray-200'
+                          className={`w-72 shrink-0 self-start bg-[var(--bg-tertiary)] rounded-xl border ${
+                            isDragOver ? 'border-[#2B79F7] ring-2 ring-[#2B79F7]/20' : 'border-[var(--border-primary)]'
                           } transition`}
                           onDragOver={(e) => {
                             e.preventDefault()
@@ -1231,19 +1231,19 @@ export default function TasksPage() {
                             }
                           }}
                         >
-                          <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-200">
-                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          <div className="px-3 py-2.5 flex items-center justify-between border-b border-[var(--border-primary)]">
+                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                               <span
                                 className="h-2 w-2 rounded-full"
                                 style={{ backgroundColor: col.dot }}
                               />
                               {col.label}
                             </span>
-                            <span className="text-[11px] text-gray-400">{colTasks.length}</span>
+                            <span className="text-[11px] text-[var(--text-tertiary)]">{colTasks.length}</span>
                           </div>
                           <div className="p-2 space-y-2">
                             {colTasks.length === 0 ? (
-                              <p className="text-[11px] text-gray-400 text-center py-3">
+                              <p className="text-[11px] text-[var(--text-tertiary)] text-center py-3">
                                 Drop tasks here
                               </p>
                             ) : (
@@ -1262,11 +1262,11 @@ export default function TasksPage() {
                                     setDragOverFolder(null)
                                   }}
                                   onClick={() => router.push(`/tasks/${t.id}`)}
-                                  className={`bg-white border border-gray-200 rounded-lg p-3 cursor-pointer hover:shadow-md transition ${
+                                  className={`bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg p-3 cursor-pointer hover:shadow-md transition ${
                                     draggingId === t.id ? 'opacity-50' : ''
                                   }`}
                                 >
-                                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                  <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">
                                     {t.name}
                                   </p>
                                   <div className="mt-2 flex items-center justify-between gap-2">
@@ -1283,7 +1283,7 @@ export default function TasksPage() {
                                     </span>
                                   </div>
                                   {t.due_at && (
-                                    <p className="mt-1.5 text-[11px] text-gray-400 inline-flex items-center gap-1">
+                                    <p className="mt-1.5 text-[11px] text-[var(--text-tertiary)] inline-flex items-center gap-1">
                                       <CalendarIcon className="h-3 w-3" />
                                       Due {new Date(t.due_at).toLocaleDateString()}
                                     </p>
@@ -1325,7 +1325,7 @@ export default function TasksPage() {
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             placeholder="Folder name"
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
         }
         confirmLabel="Save"
@@ -1390,7 +1390,7 @@ function ClientNavTree({
   const topLevel = folders.filter((f) => f.client_id === clientId && !f.parent_folder_id)
   if (topLevel.length === 0) {
     return (
-      <p className="pl-9 pr-2 py-1 text-[11px] text-gray-400 italic">No folders yet.</p>
+      <p className="pl-9 pr-2 py-1 text-[11px] text-[var(--text-tertiary)] italic">No folders yet.</p>
     )
   }
   return (
@@ -1401,8 +1401,8 @@ function ClientNavTree({
           onClick={() => onPickFolder(null)}
           className={`w-full text-left text-[11px] px-2 py-1 rounded-md transition-colors ${
             isActiveClient && currentFolderId === null
-              ? 'bg-gray-100 text-gray-900 font-medium'
-              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+              ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
           }`}
         >
           All folders
@@ -1417,8 +1417,8 @@ function ClientNavTree({
               onClick={() => onPickFolder(f)}
               className={`w-full text-left text-[11px] px-2 py-1 rounded-md transition-colors flex items-center gap-1.5 ${
                 active
-                  ? 'bg-gray-100 text-gray-900 font-medium'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
               }`}
               title={f.name}
             >
@@ -1441,7 +1441,7 @@ function AvatarStack({
   lookup: (id: string) => AgencyMember | null
   max?: number
 }) {
-  if (ids.length === 0) return <span className="text-xs text-gray-400">—</span>
+  if (ids.length === 0) return <span className="text-xs text-[var(--text-tertiary)]">—</span>
   const visible = ids.slice(0, max)
   const overflow = ids.length - visible.length
   return (
@@ -1472,7 +1472,7 @@ function AvatarStack({
         )
       })}
       {overflow > 0 && (
-        <span className="h-6 w-6 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center ring-2 ring-white">
+        <span className="h-6 w-6 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-[10px] font-semibold flex items-center justify-center ring-2 ring-white">
           +{overflow}
         </span>
       )}

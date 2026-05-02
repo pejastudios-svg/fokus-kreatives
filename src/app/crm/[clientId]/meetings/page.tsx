@@ -31,6 +31,12 @@ interface Meeting {
   location_type: LocationType
   location_url: string | null
   created_at: string
+  creator?: {
+    id: string
+    name: string | null
+    email: string | null
+    profile_picture_url: string | null
+  } | null
 }
 
 export default function CRMMeetingsPage() {
@@ -86,7 +92,7 @@ export default function CRMMeetingsPage() {
 
     const { data, error } = await supabase
       .from('meetings')
-      .select('*')
+      .select('*, creator:created_by(id, name, email, profile_picture_url)')
       .eq('client_id', clientId)
       .order('date_time', { ascending: true })
 
@@ -263,30 +269,30 @@ export default function CRMMeetingsPage() {
     <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
       <div className="flex justify-between mb-6">
         <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
-          <Skeleton className="h-4 w-48 bg-[#334155]" />
+          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
         </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="flex gap-3 mb-6">
-        <Skeleton className="h-8 w-24 rounded-full bg-[#334155]" />
-        <Skeleton className="h-8 w-24 rounded-full bg-[#334155]" />
+        <Skeleton className="h-8 w-24 rounded-full bg-[var(--bg-card-hover)]" />
+        <Skeleton className="h-8 w-24 rounded-full bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[#1E293B] rounded-2xl border border-[#334155] p-4 flex justify-between">
+          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex justify-between">
             <div className="flex gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[#334155]" />
+              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
               <div className="space-y-2">
-                <Skeleton className="h-5 w-48 bg-[#334155]" />
-                <Skeleton className="h-4 w-32 bg-[#334155]" />
+                <Skeleton className="h-5 w-48 bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Skeleton className="h-6 w-24 rounded-full bg-[#334155]" />
-              <Skeleton className="h-4 w-16 bg-[#334155]" />
+              <Skeleton className="h-6 w-24 rounded-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-16 bg-[var(--bg-card-hover)]" />
             </div>
           </div>
         ))}
@@ -328,17 +334,12 @@ export default function CRMMeetingsPage() {
   }
 }
 
-  return <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-4 lg:p-6 min-h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Meetings</h1>
-            <p className="text-gray-400 mt-1">
-              See and schedule meetings for this client
-            </p>
-          </div>
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs text-[var(--text-tertiary)]">See and schedule meetings for this client</p>
+          <Button size="sm" onClick={() => setShowAddModal(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
             Add Meeting
           </Button>
         </div>
@@ -350,7 +351,7 @@ export default function CRMMeetingsPage() {
             className={`px-3 py-1.5 text-xs rounded-full ${
               statusFilter === 'upcoming'
                 ? 'bg-[#2B79F7] text-white'
-                : 'bg-[#1E293B] text-gray-400 hover:text-white'
+                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
             }`}
           >
             Upcoming
@@ -360,7 +361,7 @@ export default function CRMMeetingsPage() {
             className={`px-3 py-1.5 text-xs rounded-full ${
               statusFilter === 'past'
                 ? 'bg-[#2B79F7] text-white'
-                : 'bg-[#1E293B] text-gray-400 hover:text-white'
+                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
             }`}
           >
             Past
@@ -370,7 +371,7 @@ export default function CRMMeetingsPage() {
             className={`px-3 py-1.5 text-xs rounded-full ${
               statusFilter === 'all'
                 ? 'bg-[#2B79F7] text-white'
-                : 'bg-[#1E293B] text-gray-400 hover:text-white'
+                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
             }`}
           >
             All
@@ -380,8 +381,8 @@ export default function CRMMeetingsPage() {
 
         {/* Meetings List */}
         {filteredMeetings.length === 0 ? (
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-8 text-center text-gray-400">
-            <Calendar className="h-10 w-10 mx-auto mb-3 text-gray-500" />
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+            <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
             <p>No meetings found.</p>
           </div>
         ) : (
@@ -397,17 +398,17 @@ export default function CRMMeetingsPage() {
               return (
                 <div
                   key={m.id}
-                  className="bg-[#1E293B] rounded-2xl border border-[#334155] p-4 flex items-start justify-between gap-4"
+                  className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex items-start justify-between gap-4"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-[#0F172A] text-[#2B79F7]">
+                    <div className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[#2B79F7]">
                       <Calendar className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                         {m.title}
                       </h3>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">
                         <span className="inline-flex items-center gap-1 mr-3">
                           <Clock className="h-3 w-3" />
                           {dateStr} at {timeStr} ({m.duration_minutes} min)
@@ -424,7 +425,7 @@ export default function CRMMeetingsPage() {
                         )}
                       </p>
                       {m.description && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">
                           {m.description}
                         </p>
                       )}
@@ -438,6 +439,25 @@ export default function CRMMeetingsPage() {
                           <LinkIcon className="h-3 w-3" />
                           Join link
                         </a>
+                      )}
+                      {m.creator && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          {m.creator.profile_picture_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={m.creator.profile_picture_url}
+                              alt={m.creator.name || m.creator.email || ''}
+                              className="h-5 w-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-5 w-5 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] text-white flex items-center justify-center text-[9px] font-semibold">
+                              {(m.creator.name || m.creator.email || 'U').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-[11px] text-[var(--text-tertiary)]">
+                            Scheduled by {m.creator.name || m.creator.email}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -485,7 +505,7 @@ export default function CRMMeetingsPage() {
                     {/* NEW: Delete button */}
 <button
   onClick={() => setMeetingToDelete(m)}
-  className="mt-1 text-xs text-gray-400 hover:text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
+  className="mt-1 text-xs text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
 >
   Delete
 </button>
@@ -499,12 +519,12 @@ export default function CRMMeetingsPage() {
         {/* Add Meeting Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-                <h3 className="text-lg font-semibold text-white">Add Meeting</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Add Meeting</h3>
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155] transition-colors"
+                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -512,15 +532,15 @@ export default function CRMMeetingsPage() {
 
               <div className="px-6 py-4 space-y-4">
                 <div className="flex items-center gap-2">
-  <span className="text-xs font-medium text-gray-400">Mode:</span>
-  <div className="inline-flex rounded-full bg-[#0F172A] border border-[#334155] p-1">
+  <span className="text-xs font-medium text-[var(--text-tertiary)]">Mode:</span>
+  <div className="inline-flex rounded-full bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-1">
     <button
       type="button"
       onClick={() => setMode('schedule')}
       className={`px-3 py-1 text-xs rounded-full ${
         mode === 'schedule'
           ? 'bg-[#2B79F7] text-white'
-          : 'text-gray-400 hover:text-white'
+          : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
       }`}
     >
       Schedule
@@ -531,7 +551,7 @@ export default function CRMMeetingsPage() {
       className={`px-3 py-1 text-xs rounded-full ${
         mode === 'start_now'
           ? 'bg-[#2B79F7] text-white'
-          : 'text-gray-400 hover:text-white'
+          : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
       }`}
     >
       Start now
@@ -539,7 +559,7 @@ export default function CRMMeetingsPage() {
   </div>
 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                     Title
                   </label>
                   <input
@@ -547,11 +567,11 @@ export default function CRMMeetingsPage() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Strategy call"
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                     Description (optional)
                   </label>
                   <textarea
@@ -559,35 +579,35 @@ export default function CRMMeetingsPage() {
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="What is this meeting about?"
                     rows={3}
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                       Date
                     </label>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                       Time
                     </label>
                     <input
                       type="time"
                       value={time}
                       onChange={(e) => setTime(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                     Duration (minutes)
                   </label>
                   <input
@@ -596,11 +616,11 @@ export default function CRMMeetingsPage() {
                     max={480}
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value) || 30)}
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                     Location
                   </label>
                   <div className="grid grid-cols-2 gap-2 mb-2">
@@ -610,7 +630,7 @@ export default function CRMMeetingsPage() {
                       className={`px-3 py-2 text-xs rounded-lg border ${
                         locationType === 'zoom'
                           ? 'border-[#2B79F7] bg-[#2B79F7]/20 text-[#2B79F7]'
-                          : 'border-[#334155] text-gray-300 hover:bg-[#1E293B]'
+                          : 'border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
                       }`}
                     >
                       Zoom
@@ -621,7 +641,7 @@ export default function CRMMeetingsPage() {
                       className={`px-3 py-2 text-xs rounded-lg border ${
                         locationType === 'google_meet'
                           ? 'border-[#2B79F7] bg-[#2B79F7]/20 text-[#2B79F7]'
-                          : 'border-[#334155] text-gray-300 hover:bg-[#1E293B]'
+                          : 'border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
                       }`}
                     >
                       Google Meet
@@ -632,7 +652,7 @@ export default function CRMMeetingsPage() {
                       className={`px-3 py-2 text-xs rounded-lg border ${
                         locationType === 'jitsi'
                           ? 'border-[#2B79F7] bg-[#2B79F7]/20 text-[#2B79F7]'
-                          : 'border-[#334155] text-gray-300 hover:bg-[#1E293B]'
+                          : 'border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
                       }`}
                     >
                       Jitsi
@@ -643,7 +663,7 @@ export default function CRMMeetingsPage() {
                       className={`px-3 py-2 text-xs rounded-lg border ${
                         locationType === 'custom'
                           ? 'border-[#2B79F7] bg-[#2B79F7]/20 text-[#2B79F7]'
-                          : 'border-[#334155] text-gray-300 hover:bg-[#1E293B]'
+                          : 'border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
                       }`}
                     >
                       Custom link
@@ -655,13 +675,13 @@ export default function CRMMeetingsPage() {
                       value={locationUrl}
                       onChange={(e) => setLocationUrl(e.target.value)}
                       placeholder="https://..."
-                      className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
                 <Button
                   variant="outline"
                   onClick={() => setShowAddModal(false)}
@@ -681,29 +701,29 @@ export default function CRMMeetingsPage() {
         )}
         {meetingToDelete && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-        <h3 className="text-lg font-semibold text-white">Delete Meeting</h3>
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Meeting</h3>
         <button
           onClick={() => setMeetingToDelete(null)}
-          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155] transition-colors"
+          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
       <div className="px-6 py-4 space-y-3">
-        <p className="text-sm text-gray-300">
+        <p className="text-sm text-[var(--text-secondary)]">
           Are you sure you want to delete the meeting{' '}
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-[var(--text-primary)]">
             &quot;{meetingToDelete.title}&quot;
           </span>
           ?
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[var(--text-tertiary)]">
           This action cannot be undone.
         </p>
       </div>
-      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
         <Button
           variant="outline"
           onClick={() => setMeetingToDelete(null)}

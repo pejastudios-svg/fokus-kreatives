@@ -89,7 +89,7 @@ export function ClientPicker({ clients, value, onChange, loading, placeholder = 
             {selected.name.charAt(0).toUpperCase()}
           </div>
         ) : (
-          <div className="h-7 w-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+          <div className="h-7 w-7 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
             <UserCircle className="h-5 w-5" />
           </div>
         )}
@@ -143,8 +143,10 @@ export function ClientPicker({ clients, value, onChange, loading, placeholder = 
                         onChange(c.id)
                         setOpen(false)
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-theme-tertiary/50 transition-colors ${
-                        isSelected ? 'bg-[#E8F1FF]' : ''
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                        isSelected
+                          ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD]'
+                          : 'hover:bg-theme-tertiary/50 hover:text-theme-primary'
                       }`}
                     >
                       {c.profile_picture_url ? (

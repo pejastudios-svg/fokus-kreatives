@@ -124,11 +124,11 @@ export default function BioTemplatesPage() {
           <CardContent className="py-4 space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Client</label>
                 <select
                   value={selectedClientId}
                   onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="">Select a client…</option>
                   {clients.map((c) => (
@@ -147,7 +147,7 @@ export default function BioTemplatesPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tier</label>
                 <select
                   value={tierOverride}
                   onChange={(e) => {
@@ -156,7 +156,7 @@ export default function BioTemplatesPage() {
     setTierOverride(v)
   }
 }}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="beginner">Beginner</option>
                   <option value="mid">Mid</option>
@@ -180,7 +180,7 @@ export default function BioTemplatesPage() {
               <Card key={idx}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">{t.title}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t.title}</h3>
                     <Button variant="outline" size="sm" onClick={() => copyTemplate(idx)}>
                       {copiedIdx === idx ? (
                         <>
@@ -195,10 +195,10 @@ export default function BioTemplatesPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm text-gray-800">
+                  <pre className="whitespace-pre-wrap bg-[var(--bg-tertiary)] p-4 rounded-lg text-sm text-[var(--text-primary)]">
                     {formatTemplate(t)}
                   </pre>
-                  {t.notes && <p className="text-xs text-gray-500 mt-3">{t.notes}</p>}
+                  {t.notes && <p className="text-xs text-[var(--text-tertiary)] mt-3">{t.notes}</p>}
                 </CardContent>
               </Card>
             ))}

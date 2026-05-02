@@ -25,6 +25,7 @@ import {
   Megaphone,
   Building2,
   Check,
+  Mail,
   X as XIcon,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
@@ -92,6 +93,9 @@ export default function ClientProfilePage() {
   const canDelete = userRole === 'admin'
 
   const [client, setClient] = useState<ClientRow | null>(null)
+  const [clientEmails, setClientEmails] = useState<
+    { id: string; email: string; name: string | null; invitation_accepted: boolean | null }[]
+  >([])
   const [isLoading, setIsLoading] = useState(true)
   const [tab, setTab] = useState<TabKey>('overview')
 
@@ -137,13 +141,29 @@ export default function ClientProfilePage() {
   const refresh = useCallback(async () => {
     if (!clientId) return
     setIsLoading(true)
-    const { data, error } = await supabase.from('clients').select('*').eq('id', clientId).single()
+    const [{ data, error }, { data: users }] = await Promise.all([
+      supabase.from('clients').select('*').eq('id', clientId).single(),
+      supabase
+        .from('users')
+        .select('id, email, name, invitation_accepted')
+        .eq('client_id', clientId)
+        .eq('role', 'client')
+        .order('created_at', { ascending: true }),
+    ])
     if (error) {
       console.error('load client error:', error)
       setClient(null)
     } else {
       setClient(data as ClientRow)
     }
+    setClientEmails(
+      (users || []) as {
+        id: string
+        email: string
+        name: string | null
+        invitation_accepted: boolean | null
+      }[],
+    )
     setIsLoading(false)
   }, [supabase, clientId])
 
@@ -238,7 +258,7 @@ export default function ClientProfilePage() {
       <>
         <Header title="Client" />
         <div className="p-4 md:p-8 text-center">
-          <p className="text-gray-500 mb-4">Client not found</p>
+          <p className="text-[var(--text-tertiary)] mb-4">Client not found</p>
           <Link href="/clients" className="text-[#2B79F7] hover:underline">
             Back to clients
           </Link>
@@ -308,14 +328,14 @@ export default function ClientProfilePage() {
                 </div>
               )}
 
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
                 {client.name || 'Unnamed client'}
               </h1>
               {client.business_name && (
-                <p className="text-gray-600 mt-1">{client.business_name}</p>
+                <p className="text-[var(--text-secondary)] mt-1">{client.business_name}</p>
               )}
 
-              <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-gray-500">
+              <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-[var(--text-tertiary)]">
                 {client.industry && (
                   <span className="inline-flex items-center gap-1">
                     <Building2 className="h-3.5 w-3.5" />
@@ -347,8 +367,31 @@ export default function ClientProfilePage() {
                 )}
               </div>
 
+              {clientEmails.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  {clientEmails.map((u) => (
+                    <a
+                      key={u.id}
+                      href={`mailto:${u.email}`}
+                      title={
+                        u.invitation_accepted === false
+                          ? 'Invitation pending'
+                          : u.name || u.email
+                      }
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#5A9AFF]/20 transition-colors"
+                    >
+                      <Mail className="h-3 w-3" />
+                      <span className="truncate max-w-[220px]">{u.email}</span>
+                      {u.invitation_accepted === false && (
+                        <span className="text-[10px] opacity-70">(pending)</span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+
               {submittedAt && (
-                <p className="mt-3 text-xs text-gray-400">
+                <p className="mt-3 text-xs text-[var(--text-tertiary)]">
                   Brand intake submitted {submittedAt.toLocaleDateString()}
                 </p>
               )}
@@ -360,14 +403,14 @@ export default function ClientProfilePage() {
                 <button
                   type="button"
                   onClick={() => setMenuOpen((v) => !v)}
-                  className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                   aria-label="Client actions"
                   aria-expanded={menuOpen}
                 >
                   <MoreVertical className="h-5 w-5" />
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute right-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     <MenuItem
                       icon={Sparkles}
                       label="Create content"
@@ -432,22 +475,22 @@ export default function ClientProfilePage() {
         {/* Brand intake link - mirror of the edit-page banner so the agency
             can grab the link without going into edit mode. Generate button
             shown when no token exists yet. */}
-        <Card className="mb-6 border-purple-200 bg-purple-50">
+        <Card className="mb-6 border-blue-200 bg-blue-50 dark:border-transparent dark:bg-[#1E3A6F]">
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="font-medium text-purple-700">Brand intake link</p>
+                <p className="font-medium text-blue-700 dark:text-[#93C5FD]">Brand intake link</p>
                 {intakeLink ? (
-                  <p className="text-sm text-purple-600/70 truncate">{intakeLink}</p>
+                  <p className="text-sm text-blue-600/70 dark:text-[#93C5FD]/80 truncate">{intakeLink}</p>
                 ) : (
-                  <p className="text-sm text-purple-600/70">No intake link generated yet.</p>
+                  <p className="text-sm text-blue-600/70 dark:text-[#93C5FD]/80">No intake link generated yet.</p>
                 )}
               </div>
               {intakeLink ? (
                 <button
                   type="button"
                   onClick={handleCopyIntake}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2B79F7] text-white text-sm font-medium hover:bg-[#1E54B7] transition-colors"
                 >
                   <Copy className="h-3.5 w-3.5" />
                   Copy link
@@ -457,7 +500,7 @@ export default function ClientProfilePage() {
                   type="button"
                   onClick={handleRegenerateIntake}
                   disabled={isGeneratingIntake}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2B79F7] text-white text-sm font-medium hover:bg-[#1E54B7] transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   {isGeneratingIntake ? 'Generating…' : 'Generate'}
@@ -469,7 +512,7 @@ export default function ClientProfilePage() {
 
         {/* Tabs - icons only on mobile so the strip never overflows. */}
         <div className="mb-4 flex justify-center">
-          <div className="inline-flex bg-white rounded-xl border border-gray-200 p-1 gap-1">
+          <div className="inline-flex bg-[var(--bg-card)] rounded-xl border border-[var(--border-primary)] p-1 gap-1">
             {TABS.map((t) => {
               const active = tab === t.key
               return (
@@ -482,7 +525,7 @@ export default function ClientProfilePage() {
                   className={`inline-flex items-center gap-2 px-2.5 md:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     active
                       ? 'bg-[#2B79F7] text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                   }`}
                 >
                   <t.icon className="h-4 w-4 shrink-0" />
@@ -568,7 +611,7 @@ function ClientProfileSkeleton() {
 
       {/* Tabs row */}
       <div className="mb-4 flex justify-center">
-        <div className="inline-flex bg-white rounded-xl border border-gray-200 p-1 gap-1">
+        <div className="inline-flex bg-[var(--bg-card)] rounded-xl border border-[var(--border-primary)] p-1 gap-1">
           {[0, 1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-9 w-9 md:w-32 rounded-lg" />
           ))}
@@ -626,8 +669,8 @@ function MenuItem({
       disabled={disabled}
       className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
         tone === 'danger'
-          ? 'text-red-600 hover:bg-red-50'
-          : 'text-gray-700 hover:bg-gray-50'
+          ? 'text-red-600 hover:bg-red-500/10'
+          : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
       } disabled:opacity-50 disabled:cursor-not-allowed`}
     >
       <Icon className="h-4 w-4" />
@@ -649,8 +692,8 @@ function Section({
     <Card>
       <CardContent className="p-5 md:p-6">
         <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">{title}</h3>
+          {description && <p className="text-sm text-[var(--text-tertiary)] mt-0.5">{description}</p>}
         </div>
         <div className="space-y-4">{children}</div>
       </CardContent>
@@ -670,12 +713,12 @@ function Field({
   const empty = !value || !String(value).trim()
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">{label}</p>
       {empty ? (
-        <p className="text-sm text-gray-400 italic">Not specified</p>
+        <p className="text-sm text-[var(--text-tertiary)] italic">Not specified</p>
       ) : (
         <p
-          className={`text-sm text-gray-900 break-words [overflow-wrap:anywhere] ${
+          className={`text-sm text-[var(--text-primary)] break-words [overflow-wrap:anywhere] ${
             multiline ? 'whitespace-pre-wrap' : ''
           }`}
         >
@@ -689,15 +732,15 @@ function Field({
 function ScoreField({ label, score }: { label: string; score: 1 | 2 | 3 | 4 | 5 }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">{label}</p>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <span
             key={n}
-            className={`h-2 w-6 rounded-full ${n <= score ? 'bg-[#2B79F7]' : 'bg-gray-200'}`}
+            className={`h-2 w-6 rounded-full ${n <= score ? 'bg-[#2B79F7]' : 'bg-[var(--border-primary)]'}`}
           />
         ))}
-        <span className="ml-2 text-xs text-gray-500">{score}/5</span>
+        <span className="ml-2 text-xs text-[var(--text-tertiary)]">{score}/5</span>
       </div>
     </div>
   )
@@ -706,14 +749,14 @@ function ScoreField({ label, score }: { label: string; score: 1 | 2 | 3 | 4 | 5 
 function ChipList({ items }: { items: string[] }) {
   const filtered = items.filter((x) => x && x.trim())
   if (!filtered.length) {
-    return <p className="text-sm text-gray-400 italic">Not specified</p>
+    return <p className="text-sm text-[var(--text-tertiary)] italic">Not specified</p>
   }
   return (
     <div className="flex flex-wrap gap-2">
       {filtered.map((item, i) => (
         <span
           key={`${item}-${i}`}
-          className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs"
+          className="inline-flex items-center px-2.5 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs"
         >
           {item}
         </span>
@@ -784,26 +827,26 @@ function OverviewTab({ client, profile }: { client: ClientRow; profile: BrandPro
         {profile.content_strategy.content_pillars.every(
           (p) => !p.name && !p.covers && !p.why_it_matters,
         ) ? (
-          <p className="text-sm text-gray-400 italic">No pillars defined yet.</p>
+          <p className="text-sm text-[var(--text-tertiary)] italic">No pillars defined yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {profile.content_strategy.content_pillars.map((p, i) => (
               <div
                 key={i}
-                className="p-4 rounded-lg bg-gray-50 border border-gray-100 space-y-2"
+                className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] space-y-2"
               >
-                <p className="font-semibold text-sm text-gray-900">
+                <p className="font-semibold text-sm text-[var(--text-primary)]">
                   {p.name || `Pillar ${i + 1}`}
                 </p>
                 {p.covers && (
-                  <p className="text-xs text-gray-600">
-                    <span className="text-gray-400">Covers: </span>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    <span className="text-[var(--text-tertiary)]">Covers: </span>
                     {p.covers}
                   </p>
                 )}
                 {p.why_it_matters && (
-                  <p className="text-xs text-gray-600">
-                    <span className="text-gray-400">Why: </span>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    <span className="text-[var(--text-tertiary)]">Why: </span>
                     {p.why_it_matters}
                   </p>
                 )}
@@ -824,7 +867,7 @@ function OverviewTab({ client, profile }: { client: ClientRow; profile: BrandPro
       </Section>
 
       {client.brand_intake_submitted_at && (
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-xs text-[var(--text-tertiary)] text-center">
           Brand intake last submitted{' '}
           {new Date(client.brand_intake_submitted_at).toLocaleString()}
         </p>
@@ -866,13 +909,13 @@ function AudienceTab({ client, profile }: { client: ClientRow; profile: BrandPro
 
       <Section title="Pain points" description="Top 5 problems they're trying to solve.">
         {profile.audience.pain_points.every((p) => !p?.trim()) ? (
-          <p className="text-sm text-gray-400 italic">No pain points listed.</p>
+          <p className="text-sm text-[var(--text-tertiary)] italic">No pain points listed.</p>
         ) : (
-          <ol className="space-y-2 list-decimal list-inside marker:text-gray-400">
+          <ol className="space-y-2 list-decimal list-inside marker:text-[var(--text-tertiary)]">
             {profile.audience.pain_points
               .filter((p) => p && p.trim())
               .map((p, i) => (
-                <li key={i} className="text-sm text-gray-900">
+                <li key={i} className="text-sm text-[var(--text-primary)]">
                   {p}
                 </li>
               ))}
@@ -912,7 +955,7 @@ function GuidelinesTab({
         {client.brand_doc_url ? (
           <BrandDocBlock url={client.brand_doc_url} clientName={client.name || 'brand'} flash={flash} />
         ) : (
-          <p className="text-sm text-gray-400 italic">No brand document uploaded.</p>
+          <p className="text-sm text-[var(--text-tertiary)] italic">No brand document uploaded.</p>
         )}
         {client.brand_doc_text && (
           <Field label="Notes" value={client.brand_doc_text} multiline />
@@ -926,19 +969,19 @@ function GuidelinesTab({
       <Section title="Topics">
         <Field label="Topics library" value={client.topics_library} multiline />
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Evergreen topics
           </p>
           <ChipList items={profile.content_strategy.evergreen_topics} />
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Off-limits topics
           </p>
           <ChipList items={profile.content_strategy.off_limits_topics} />
         </div>
         <div className="pt-2">
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-2">
             Topics bank
           </p>
           <TopicsBank clientId={client.id} />
@@ -953,19 +996,19 @@ function GuidelinesTab({
 
       <Section title="Voice details">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Signature phrases
           </p>
           <ChipList items={profile.voice.signature_phrases} />
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Forbidden words
           </p>
           <ChipList items={profile.voice.forbidden_words} />
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Banned phrases
           </p>
           <ChipList items={profile.voice.banned_phrases} />
@@ -1027,21 +1070,21 @@ function GuidelinesTab({
 
       <Section title="Myths & hot takes">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-2">
             Myths vs truth
           </p>
           {profile.content_strategy.myths.every((m) => !m.myth && !m.truth) ? (
-            <p className="text-sm text-gray-400 italic">No myths captured.</p>
+            <p className="text-sm text-[var(--text-tertiary)] italic">No myths captured.</p>
           ) : (
             <div className="space-y-2">
               {profile.content_strategy.myths
                 .filter((m) => m.myth || m.truth)
                 .map((m, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                    <p className="text-xs text-gray-500">
+                  <div key={i} className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)]">
+                    <p className="text-xs text-[var(--text-tertiary)]">
                       <span className="font-semibold">Myth:</span> {m.myth || '-'}
                     </p>
-                    <p className="text-xs text-gray-700 mt-1">
+                    <p className="text-xs text-[var(--text-primary)] mt-1">
                       <span className="font-semibold">Truth:</span> {m.truth || '-'}
                     </p>
                   </div>
@@ -1050,7 +1093,7 @@ function GuidelinesTab({
           )}
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1">
             Hot takes
           </p>
           <ChipList items={profile.content_strategy.hot_takes} />
@@ -1081,11 +1124,11 @@ function CompetitorsTab({ client, profile }: { client: ClientRow; profile: Brand
         description="Saved from the competitor analysis tool."
       >
         {client.competitor_insights ? (
-          <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed break-words [overflow-wrap:anywhere]">
+          <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed break-words [overflow-wrap:anywhere]">
             {client.competitor_insights}
           </p>
         ) : (
-          <p className="text-sm text-gray-400 italic">
+          <p className="text-sm text-[var(--text-tertiary)] italic">
             No competitor insights yet. Run a competitor analysis to populate this.
           </p>
         )}
@@ -1100,14 +1143,14 @@ function CompetitorsTab({ client, profile }: { client: ClientRow; profile: Brand
             {intakeCompetitors.map((c, i) => (
               <div
                 key={i}
-                className="p-4 rounded-lg border border-gray-200 bg-white space-y-2"
+                className="p-4 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] space-y-2"
               >
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <p className="font-semibold text-sm text-gray-900">
+                  <p className="font-semibold text-sm text-[var(--text-primary)]">
                     {c.name_or_handle || `Competitor ${i + 1}`}
                   </p>
                   {c.follower_count && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[var(--text-tertiary)]">
                       {c.follower_count} followers
                     </span>
                   )}
@@ -1176,17 +1219,17 @@ function BrandDocBlock({
   }
 
   return (
-    <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg flex-wrap">
-      <FileText className="h-5 w-5 text-green-600 shrink-0" />
+    <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-[#1E3A6F] rounded-lg flex-wrap">
+      <FileText className="h-5 w-5 text-blue-600 dark:text-[#93C5FD] shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-green-800 truncate">{filename}</p>
-        <p className="text-xs text-green-700/80 truncate">{url}</p>
+        <p className="text-sm font-medium text-blue-800 dark:text-[#93C5FD] truncate">{filename}</p>
+        <p className="text-xs text-blue-700/80 dark:text-[#93C5FD]/80 truncate">{url}</p>
       </div>
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition"
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-blue-200 dark:border-transparent text-blue-700 dark:text-[#93C5FD] text-xs font-medium hover:bg-blue-100 dark:hover:bg-[#2B79F7]/20 transition"
       >
         <ExternalLink className="h-3.5 w-3.5" />
         Preview
@@ -1195,7 +1238,7 @@ function BrandDocBlock({
         type="button"
         onClick={onDownload}
         disabled={downloading}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition disabled:opacity-50"
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-blue-200 dark:border-transparent text-blue-700 dark:text-[#93C5FD] text-xs font-medium hover:bg-blue-100 dark:hover:bg-[#2B79F7]/20 transition disabled:opacity-50"
       >
         <Download className="h-3.5 w-3.5" />
         {downloading ? 'Downloading…' : 'Download'}
@@ -1208,13 +1251,13 @@ function ColorSwatch({ label, hex }: { label: string; hex: string }) {
   return (
     <div className="flex items-center gap-3">
       <div
-        className="h-10 w-10 rounded-lg border border-gray-200 shrink-0"
+        className="h-10 w-10 rounded-lg border border-[var(--border-primary)] shrink-0"
         style={{ backgroundColor: hex || '#ffffff' }}
         aria-label={`${label} color`}
       />
       <div>
-        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{label}</p>
-        <p className="text-sm font-mono text-gray-900">{hex || '-'}</p>
+        <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">{label}</p>
+        <p className="text-sm font-mono text-[var(--text-primary)]">{hex || '-'}</p>
       </div>
     </div>
   )
@@ -1230,8 +1273,8 @@ function ChecklistBlock({
   items: { key: string; label: string; on: boolean }[]
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <p className="text-sm font-semibold text-gray-900 mb-3">{title}</p>
+    <div className="rounded-lg border border-[var(--border-primary)] p-4">
+      <p className="text-sm font-semibold text-[var(--text-primary)] mb-3">{title}</p>
       <ul className="space-y-1.5">
         {items.map((it) => {
           const active = it.on
@@ -1244,9 +1287,9 @@ function ChecklistBlock({
                   }`}
                 />
               ) : (
-                <XIcon className="h-4 w-4 shrink-0 text-gray-300" />
+                <XIcon className="h-4 w-4 shrink-0 text-[var(--text-tertiary)]" />
               )}
-              <span className={active ? 'text-gray-900' : 'text-gray-400 line-through'}>
+              <span className={active ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)] line-through'}>
                 {it.label}
               </span>
             </li>

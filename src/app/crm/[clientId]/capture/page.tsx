@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
+import { Toggle } from '@/components/ui/Toggle'
 import {
   Plus,
   Link as LinkIcon,
@@ -21,6 +22,10 @@ import {
   List,
   Image as ImageIcon,
   ChevronDown,
+  Type,
+  CircleDot,
+  Calendar,
+  ListChecks,
 } from 'lucide-react'
 
 type FieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'date' | 'time' | 'embed'
@@ -636,24 +641,24 @@ function CaptureSkeleton() {
   return (
     <div className="space-y-4 animate-in fade-in">
       {[1, 2, 3].map((i) => (
-        <Card key={i} className="bg-[#1E293B] border-[#334155]">
+        <Card key={i} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
           <CardContent className="p-5 flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 w-full">
-              <Skeleton className="h-10 w-10 rounded-lg bg-[#334155]" />
+              <Skeleton className="h-10 w-10 rounded-lg bg-[var(--bg-card-hover)]" />
               <div className="space-y-2 w-full max-w-md">
                 <div className="flex gap-2">
-                  <Skeleton className="h-5 w-32 bg-[#334155]" />
-                  <Skeleton className="h-5 w-16 rounded-full bg-[#334155]" />
+                  <Skeleton className="h-5 w-32 bg-[var(--bg-card-hover)]" />
+                  <Skeleton className="h-5 w-16 rounded-full bg-[var(--bg-card-hover)]" />
                 </div>
-                <Skeleton className="h-4 w-48 bg-[#334155]" />
-                <Skeleton className="h-3 w-64 bg-[#334155]" />
+                <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-3 w-64 bg-[var(--bg-card-hover)]" />
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <Skeleton className="h-8 w-24 bg-[#334155]" />
+              <Skeleton className="h-8 w-24 bg-[var(--bg-card-hover)]" />
               <div className="flex gap-2 justify-end">
-                <Skeleton className="h-8 w-8 rounded-lg bg-[#334155]" />
-                <Skeleton className="h-8 w-8 rounded-lg bg-[#334155]" />
+                <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
+                <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
               </div>
             </div>
           </CardContent>
@@ -672,13 +677,8 @@ function CaptureSkeleton() {
         )}
 
         {/* Header + tabs */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Capture Pages</h1>
-            <p className="text-gray-400 mt-1">
-               (Build pages to capture leads)
-            </p>
-          </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <p className="text-xs text-[var(--text-tertiary)]">Build pages to capture leads</p>
 
           <div className="flex items-center gap-2">
             <button
@@ -687,7 +687,7 @@ function CaptureSkeleton() {
               className={`px-3 py-2 rounded-xl text-sm border ${
                 tab === 'pages'
                   ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                  : 'bg-[#1E293B] text-gray-300 border-[#334155]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-primary)]'
               }`}
             >
               <List className="h-4 w-4 inline mr-2" />
@@ -700,7 +700,7 @@ function CaptureSkeleton() {
               className={`px-3 py-2 rounded-xl text-sm border ${
                 tab === 'submissions'
                   ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                  : 'bg-[#1E293B] text-gray-300 border-[#334155]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-primary)]'
               }`}
             >
               <BarChart3 className="h-4 w-4 inline mr-2" />
@@ -722,7 +722,7 @@ function CaptureSkeleton() {
               <CaptureSkeleton />
             ) : pages.length === 0 ? (
               <Card>
-                <CardContent className="py-10 text-center text-gray-400">
+                <CardContent className="py-10 text-center text-[var(--text-tertiary)]">
                   No capture pages yet. Create one to start collecting leads.
                 </CardContent>
               </Card>
@@ -731,21 +731,21 @@ function CaptureSkeleton() {
                 {pages.map((page) => {
                   const publicUrl = `${appUrl}/capture/${page.slug}`
                   return (
-                    <Card key={page.id} className="bg-[#1E293B] border-[#334155]">
+                    <Card key={page.id} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
                       <CardContent className="p-5 flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className="p-3 rounded-lg bg-[#0F172A] shrink-0">
+                          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] shrink-0">
                             <Globe className="h-5 w-5 text-[#2B79F7]" />
                           </div>
 
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <h3 className="text-white font-semibold truncate">{page.name}</h3>
+                              <h3 className="text-[var(--text-primary)] font-semibold truncate">{page.name}</h3>
                               <span
                                 className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                   page.is_active
                                     ? 'bg-green-500/20 text-green-400'
-                                    : 'bg-gray-500/20 text-gray-400'
+                                    : 'bg-gray-500/20 text-[var(--text-tertiary)]'
                                 }`}
                               >
                                 {page.is_active ? 'Active' : 'Inactive'}
@@ -767,13 +767,13 @@ function CaptureSkeleton() {
                               )}
                             </div>
 
-                            <p className="text-xs text-gray-400 mb-2">
+                            <p className="text-xs text-[var(--text-tertiary)] mb-2">
                               Slug: <code>{page.slug}</code>
                             </p>
 
-                            {page.headline && <p className="text-sm text-gray-300">{page.headline}</p>}
+                            {page.headline && <p className="text-sm text-[var(--text-secondary)]">{page.headline}</p>}
 
-                            <p className="text-xs text-gray-500 mt-2 break-all">
+                            <p className="text-xs text-[var(--text-tertiary)] mt-2 break-all">
                               Public URL: <span className="text-[#93C5FD]">{publicUrl}</span>
                             </p>
                           </div>
@@ -798,7 +798,7 @@ function CaptureSkeleton() {
                             {canEditCapture && (
                             <button
                               onClick={() => openEditModal(page)}
-                              className="p-2 rounded-lg bg-[#0F172A] text-gray-300 hover:text-white hover:bg-[#111827] transition-colors"
+                              className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[#111827] transition-colors"
                               title="Edit"
                             >
                               <Edit3 className="h-4 w-4" />
@@ -807,7 +807,7 @@ function CaptureSkeleton() {
                 {canEditCapture && (
                             <button
                               onClick={() => setPageToDelete(page)}
-                              className="p-2 rounded-lg bg-[#0F172A] text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                               title="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -827,15 +827,15 @@ function CaptureSkeleton() {
         {tab === 'submissions' && (
           <div className="space-y-4">
             {/* Filters */}
-            <Card className="bg-[#1E293B] border-[#334155]">
+            <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
               <CardContent className="p-4 space-y-3">
                 <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                   <div className="min-w-0">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Filter by page</label>
+                    <label className="block text-xs font-medium text-[var(--text-tertiary)] mb-1">Filter by page</label>
                     <select
                       value={subPageId}
                       onChange={(e) => setSubPageId(e.target.value)}
-                      className="w-full md:w-96 px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
+                      className="w-full md:w-96 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                     >
                       <option value="">All pages</option>
                       {pages.map((p) => (
@@ -847,14 +847,14 @@ function CaptureSkeleton() {
                   </div>
 
                   <div className="min-w-0">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Search</label>
+                    <label className="block text-xs font-medium text-[var(--text-tertiary)] mb-1">Search</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
                       <input
                         value={subSearch}
                         onChange={(e) => setSubSearch(e.target.value)}
                         placeholder="Search submissions..."
-                        className="w-full md:w-80 pl-9 pr-3 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
+                        className="w-full md:w-80 pl-9 pr-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                       />
                     </div>
                   </div>
@@ -865,48 +865,48 @@ function CaptureSkeleton() {
             {/* Stats */}
             {subPageId && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-[#1E293B] border-[#334155]">
+                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
                   <CardContent className="p-4">
-                    <p className="text-xs text-gray-400">Submissions</p>
-                    <p className="text-2xl font-bold text-white mt-1">{stats.submissions}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">Submissions</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.submissions}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-[#1E293B] border-[#334155]">
+                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
                   <CardContent className="p-4">
-                    <p className="text-xs text-gray-400">Leads Created</p>
-                    <p className="text-2xl font-bold text-white mt-1">{stats.leads}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">Leads Created</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.leads}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-[#1E293B] border-[#334155]">
+                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
                   <CardContent className="p-4">
-                    <p className="text-xs text-gray-400">Meetings Booked</p>
-                    <p className="text-2xl font-bold text-white mt-1">{stats.meetings}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">Meetings Booked</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.meetings}</p>
                   </CardContent>
                 </Card>
               </div>
             )}
 
             {/* Table */}
-            <Card className="bg-[#1E293B] border-[#334155]">
+            <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
               <CardContent className="p-0">
                 {subLoading ? (
-                  <div className="p-8 text-center text-gray-400">Loading submissions…</div>
+                  <div className="p-8 text-center text-[var(--text-tertiary)]">Loading submissions…</div>
                 ) : filteredSubmissions.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400">No submissions found.</div>
+                  <div className="p-8 text-center text-[var(--text-tertiary)]">No submissions found.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-[#0F172A] border-b border-[#334155]">
+                      <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-primary)]">
                         <tr>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">When</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Name</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Email</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Phone</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Meeting</th>
-                          <th className="w-16 px-4 py-3 text-xs font-semibold text-gray-400 uppercase"></th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase">When</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Name</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Email</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Phone</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Meeting</th>
+                          <th className="w-16 px-4 py-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#334155]">
+                      <tbody className="divide-y divide-[var(--border-primary)]">
                         {filteredSubmissions.map((s) => {
                           const d = s.data || {}
                           const hasMeeting = !!(d.meeting_date && d.meeting_time)
@@ -916,19 +916,19 @@ function CaptureSkeleton() {
                             className="hover:bg-[#24324A] cursor-pointer"
                             onClick={() => setSelectedSubmission(s)}
                             >
-                              <td className="px-4 py-3 text-sm text-gray-300">
+                              <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
                                 {new Date(s.created_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.name || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.email || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-300">{s.phone || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{s.name || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{s.email || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{s.phone || '-'}</td>
                               <td className="px-4 py-3 text-sm">
                                 {hasMeeting ? (
                                   <span className="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400">
                                     Yes
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-1 rounded-full text-xs bg-gray-500/20 text-gray-400">
+                                  <span className="px-2 py-1 rounded-full text-xs bg-gray-500/20 text-[var(--text-tertiary)]">
                                     No
                                   </span>
                                 )}
@@ -938,7 +938,7 @@ function CaptureSkeleton() {
                                <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setSubmissionToDelete(s) }}
-                              className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+                              className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10"
                                 title="Delete submission"
                                    >
                                    <Trash2 className="h-4 w-4" />
@@ -960,14 +960,14 @@ function CaptureSkeleton() {
         {/* Builder Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-                <h3 className="text-lg font-semibold text-white">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   {editingPage ? 'Edit Capture Page' : 'New Capture Page'}
                 </h3>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1002,13 +1002,13 @@ function CaptureSkeleton() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-100 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Description</label>
                   <textarea
                     name="description"
                     value={form.description}
                     onChange={handleFormChange}
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                     placeholder="Short description that appears on the page..."
                   />
                 </div>
@@ -1022,15 +1022,15 @@ function CaptureSkeleton() {
                 />
 
                 {/* Branding: Banner + Logo */}
-                <div className="border-t border-[#334155] pt-5 space-y-4">
-                  <div className="flex items-center gap-2 text-white font-semibold">
+                <div className="border-t border-[var(--border-primary)] pt-5 space-y-4">
+                  <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
                     <ImageIcon className="h-4 w-4 text-[#2B79F7]" />
                     Branding
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <p className="text-sm text-gray-200 font-medium">Banner image (optional)</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">Banner image (optional)</p>
                       <FileUpload
                         label="Upload banner"
                         folder="capture-banners"
@@ -1047,7 +1047,7 @@ function CaptureSkeleton() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-sm text-gray-200 font-medium">Logo (optional)</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">Logo (optional)</p>
                       <FileUpload
                         label="Upload logo"
                         folder="capture-logos"
@@ -1064,56 +1064,45 @@ function CaptureSkeleton() {
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-[var(--text-tertiary)]">
                     Upload one or both
                   </p>
                 </div>
 
-                {/* Fields */}
-                <div className="border-t border-[#334155] pt-5 space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-white font-semibold flex items-center gap-2">
-                      <ChevronDown className="h-4 w-4 text-[#2B79F7]" />
-                      Form fields
-                    </div>
+                {/* Fields - rounded-full pills with icons make the
+                    add-field action feel like a single decision (which kind?)
+                    instead of a list of similar text buttons. */}
+                <div className="border-t border-[var(--border-primary)] pt-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-[#2B79F7]" />
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">Form fields</span>
+                  </div>
 
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { type: 'text' as FieldType, label: 'Text', icon: Type },
+                      { type: 'select' as FieldType, label: 'Dropdown', icon: ChevronDown },
+                      { type: 'radio' as FieldType, label: 'Options', icon: CircleDot },
+                      { type: 'date' as FieldType, label: 'Date', icon: Calendar },
+                      { type: 'embed' as FieldType, label: 'Embed', icon: LinkIcon },
+                    ]).map((opt) => (
                       <button
+                        key={opt.type}
                         type="button"
-                        onClick={() => addField('text')}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
+                        onClick={() => addField(opt.type)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-colors"
                       >
-                        + Text
+                        <opt.icon className="h-3.5 w-3.5" />
+                        {opt.label}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => addField('select')}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
-                      >
-                        + Dropdown
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addField('radio')}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
-                      >
-                        + Options
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addField('embed')}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
-                      >
-                        + Embed
-                      </button>
-                    </div>
+                    ))}
                   </div>
 
                   <div className="space-y-3">
                     {form.fields.map((f, idx) => (
-                      <div key={f.id} className="rounded-xl border border-[#334155] bg-[#0F172A] p-4 space-y-3">
+                      <div key={f.id} className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 space-y-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="text-xs text-gray-400">
+                          <div className="text-xs text-[var(--text-tertiary)]">
                             Field #{idx + 1} · <code>{f.id}</code>
                           </div>
 
@@ -1121,7 +1110,7 @@ function CaptureSkeleton() {
                             <button
                               type="button"
                               onClick={() => moveField(f.id, -1)}
-                              className="px-2 py-1 text-xs rounded border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
+                              className="px-2 py-1 text-xs rounded border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7]"
                               title="Move up"
                             >
                               ↑
@@ -1129,7 +1118,7 @@ function CaptureSkeleton() {
                             <button
                               type="button"
                               onClick={() => moveField(f.id, 1)}
-                              className="px-2 py-1 text-xs rounded border border-[#334155] text-gray-200 hover:border-[#2B79F7]"
+                              className="px-2 py-1 text-xs rounded border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7]"
                               title="Move down"
                             >
                               ↓
@@ -1137,7 +1126,7 @@ function CaptureSkeleton() {
                             <button
                               type="button"
                               onClick={() => removeField(f.id)}
-                              className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+                              className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10"
                               title="Delete field"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1156,11 +1145,11 @@ function CaptureSkeleton() {
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-200 mb-1">Type</label>
+                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Type</label>
                             <select
                               value={f.type}
                               onChange={(e) => updateField(f.id, { type: e.target.value as FieldType })}
-                              className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white"
+                              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                             >
                               <option value="text">Text</option>
                               <option value="email">Email</option>
@@ -1176,12 +1165,12 @@ function CaptureSkeleton() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <label className="flex items-center gap-2 text-sm text-gray-200">
+                          <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                             <input
                               type="checkbox"
                               checked={!!f.required}
                               onChange={(e) => updateField(f.id, { required: e.target.checked })}
-                              className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#2B79F7]"
+                              className="h-4 w-4 rounded border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[#2B79F7]"
                             />
                             Required
                           </label>
@@ -1205,7 +1194,7 @@ function CaptureSkeleton() {
 
                         {(f.type === 'select' || f.type === 'radio') && (
                           <div>
-                            <label className="block text-sm font-medium text-gray-200 mb-1">
+                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                               Options (one per line)
                             </label>
                             <textarea
@@ -1219,7 +1208,7 @@ function CaptureSkeleton() {
                                 })
                               }
                               rows={4}
-                              className="w-full px-4 py-2.5 rounded-lg border border-[#334155] bg-[#0F172A] text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                             />
                           </div>
                         )}
@@ -1246,18 +1235,19 @@ function CaptureSkeleton() {
                   </div>
                 </div>
 
-                {/* Meeting config (existing behavior) */}
-                <div className="border-t border-[#334155] pt-5 space-y-3">
-                  <label className="flex items-center gap-2 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={form.include_meeting}
-                      onChange={() => setForm((prev) => ({ ...prev, include_meeting: !prev.include_meeting }))}
-                      className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#2B79F7]"
-                    />
-                    Include meeting date & time field
-                  </label>
-
+                {/* Meeting + Active - proper Toggles instead of native
+                    checkboxes so the modal has consistent control vocabulary. */}
+                <div className="border-t border-[var(--border-primary)] pt-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-[#2B79F7]" />
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">Meeting</span>
+                  </div>
+                  <Toggle
+                    checked={form.include_meeting}
+                    onChange={(v) => setForm((prev) => ({ ...prev, include_meeting: v }))}
+                    label="Include meeting date & time"
+                    description="Adds a date + time picker to the form so leads can pick when they'd like to talk."
+                  />
                   {form.include_meeting && (
                     <Input
                       label="Calendly URL (optional)"
@@ -1269,19 +1259,17 @@ function CaptureSkeleton() {
                   )}
                 </div>
 
-                {/* Active toggle */}
-                <label className="flex items-center gap-2 text-sm text-gray-200">
-                  <input
-                    type="checkbox"
+                <div className="border-t border-[var(--border-primary)] pt-5">
+                  <Toggle
                     checked={form.is_active}
-                    onChange={() => setForm((prev) => ({ ...prev, is_active: !prev.is_active }))}
-                    className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#2B79F7]"
+                    onChange={(v) => setForm((prev) => ({ ...prev, is_active: v }))}
+                    label="Active"
+                    description="When off, the public capture page returns a 'no longer available' message."
                   />
-                  Active
-                </label>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
                 <Button variant="outline" onClick={() => setShowModal(false)} disabled={isSaving}>
                   Cancel
                 </Button>
@@ -1296,27 +1284,27 @@ function CaptureSkeleton() {
         {/* Delete confirm */}
         {pageToDelete && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-                <h3 className="text-lg font-semibold text-white">Delete Capture Page</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Capture Page</h3>
                 <button
                   onClick={() => setPageToDelete(null)}
-                  className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="px-6 py-4 space-y-3">
-                <p className="text-sm text-gray-300">
-                  Delete <span className="font-semibold text-white">&quot;{pageToDelete.name}&quot;</span>?
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Delete <span className="font-semibold text-[var(--text-primary)]">&quot;{pageToDelete.name}&quot;</span>?
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--text-tertiary)]">
                   This removes the configuration. Submissions already collected remain stored.
                 </p>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
                 <Button variant="outline" onClick={() => setPageToDelete(null)} disabled={isDeleting}>
                   Cancel
                 </Button>
@@ -1329,24 +1317,24 @@ function CaptureSkeleton() {
         )}
          {selectedSubmission && (
   <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-        <h3 className="text-lg font-semibold text-white">Submission Details</h3>
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">Submission Details</h3>
         <button
           onClick={() => setSelectedSubmission(null)}
-          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
       <div className="px-6 py-4 space-y-4">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-[var(--text-tertiary)]">
           Submitted: {new Date(selectedSubmission.created_at).toLocaleString()}
         </p>
 
-        <div className="rounded-xl border border-[#334155] bg-[#0F172A] p-4">
-          <p className="text-sm font-semibold text-white mb-3">All fields</p>
+        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-3">All fields</p>
           <div className="space-y-2">
             {(() => {
   const page = pages.find((p) => p.id === selectedSubmission.capture_page_id)
@@ -1357,8 +1345,8 @@ function CaptureSkeleton() {
 
     return (
       <div key={k} className="flex gap-3 text-sm">
-        <div className="w-48 text-gray-400 break-all">{label}</div>
-        <div className="flex-1 text-gray-200 break-all">
+        <div className="w-48 text-[var(--text-tertiary)] break-all">{label}</div>
+        <div className="flex-1 text-[var(--text-primary)] break-all">
           {v === null || v === undefined || String(v) === '' ? '-' : String(v)}
         </div>
       </div>
@@ -1373,22 +1361,22 @@ function CaptureSkeleton() {
 )}
 {submissionToDelete && (
   <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-        <h3 className="text-lg font-semibold text-white">Delete Submission</h3>
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Submission</h3>
         <button
           onClick={() => setSubmissionToDelete(null)}
-          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155]"
+          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="px-6 py-4 text-sm text-gray-300">
+      <div className="px-6 py-4 text-sm text-[var(--text-secondary)]">
         Are you sure you want to delete this submission? This cannot be undone.
       </div>
 
-      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
         <Button variant="outline" onClick={() => setSubmissionToDelete(null)} disabled={deletingSubmission}>
           Cancel
         </Button>

@@ -15,7 +15,7 @@ function SliderRow({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}: <span className="font-semibold">{value}</span>/5</label>
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{label}: <span className="font-semibold">{value}</span>/5</label>
       <input
         type="range"
         min={1}
@@ -46,61 +46,61 @@ export function BrandProfileForm({
       {/* Business */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Brand Foundations</h3>
-          <p className="text-sm text-gray-500 mt-1">This feeds the AI with structured brand context (mission, differentiation, offer).</p>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Foundations</h3>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">This feeds the AI with structured brand context (mission, differentiation, offer).</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Why does your business exist? (Mission)</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Why does your business exist? (Mission)</label>
             <textarea
               value={bp.business.mission}
               onChange={(e) => set('business', { ...bp.business, mission: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Share your mission..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Where do you want to be in 3-5 years? (Vision)</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Where do you want to be in 3-5 years? (Vision)</label>
             <textarea
               value={bp.business.vision}
               onChange={(e) => set('business', { ...bp.business, vision: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Describe your vision..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What problem do you solve?</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">What problem do you solve?</label>
             <textarea
               value={bp.business.problem_solved}
               onChange={(e) => set('business', { ...bp.business, problem_solved: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Describe the problem..."
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">What makes you different?</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">What makes you different?</label>
               <textarea
                 value={bp.business.differentiation}
                 onChange={(e) => set('business', { ...bp.business, differentiation: e.target.value })}
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                 placeholder="Unique value proposition..."
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">What’s your signature offer?</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">What’s your signature offer?</label>
               <textarea
                 value={bp.business.signature_offer}
                 onChange={(e) => set('business', { ...bp.business, signature_offer: e.target.value })}
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                 placeholder="Describe your core offer..."
               />
             </div>
@@ -111,8 +111,8 @@ export function BrandProfileForm({
       {/* Target Audience */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Target Audience</h3>
-          <p className="text-sm text-gray-500 mt-1">Psychographics matter: fears, desires, objections, triggers.</p>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Target Audience</h3>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">Psychographics matter: fears, desires, objections, triggers.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -123,7 +123,7 @@ export function BrandProfileForm({
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Gender</label>
             <select
               value={bp.audience.gender}
               onChange={(e) =>
@@ -132,7 +132,7 @@ export function BrandProfileForm({
     gender: e.target.value as BrandProfile['audience']['gender'],
   })
 }
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
             >
               <option value="unspecified">Unspecified / Mixed</option>
               <option value="male">Mostly male</option>
@@ -164,51 +164,51 @@ export function BrandProfileForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Core values (what they care about)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Core values (what they care about)</label>
               <textarea
                 value={bp.audience.core_values}
                 onChange={(e) => set('audience', { ...bp.audience, core_values: e.target.value })}
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                 placeholder="Their values..."
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Biggest fears</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Biggest fears</label>
               <textarea
                 value={bp.audience.fears}
                 onChange={(e) => set('audience', { ...bp.audience, fears: e.target.value })}
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                 placeholder="What keeps them up at night..."
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Biggest desires</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Biggest desires</label>
             <textarea
               value={bp.audience.desires}
               onChange={(e) => set('audience', { ...bp.audience, desires: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Their aspirations..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Where do they hang out online?</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Where do they hang out online?</label>
             <textarea
               value={bp.audience.hangouts}
               onChange={(e) => set('audience', { ...bp.audience, hangouts: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Platforms, communities..."
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Top 5 Pain Points</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)]">Top 5 Pain Points</label>
             {bp.audience.pain_points.map((p, idx) => (
               <Input
                 key={idx}
@@ -224,34 +224,34 @@ export function BrandProfileForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1"> What have they already tried that didn&apos;t work? </label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1"> What have they already tried that didn&apos;t work? </label>
             <textarea
               value={bp.audience.tried_failed}
               onChange={(e) => set('audience', { ...bp.audience, tried_failed: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Previous solutions..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Objections</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Objections</label>
             <textarea
               value={bp.audience.objections}
               onChange={(e) => set('audience', { ...bp.audience, objections: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="Their hesitations..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What makes them say “YES!”?</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">What makes them say “YES!”?</label>
             <textarea
               value={bp.audience.yes_triggers}
               onChange={(e) => set('audience', { ...bp.audience, yes_triggers: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               placeholder="What converts them..."
             />
           </div>
@@ -261,7 +261,7 @@ export function BrandProfileForm({
       {/* Voice */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Brand Voice & Personality</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Voice & Personality</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -281,7 +281,7 @@ export function BrandProfileForm({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Industry jargon?</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Industry jargon?</label>
               <select
                 value={bp.voice.uses_jargon}
                 onChange={(e) =>
@@ -290,7 +290,7 @@ export function BrandProfileForm({
     uses_jargon: e.target.value as BrandProfile['voice']['uses_jargon'],
   })
 }
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               >
                 <option value="no">No</option>
                 <option value="sometimes">Sometimes</option>
@@ -298,7 +298,7 @@ export function BrandProfileForm({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Share personal stories?</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Share personal stories?</label>
               <select
                 value={bp.voice.shares_personal_stories}
                 onChange={(e) =>
@@ -308,7 +308,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['voice']['shares_personal_stories'],
   })
 }
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               >
                 <option value="no">No</option>
                 <option value="sometimes">Sometimes</option>
@@ -316,7 +316,7 @@ export function BrandProfileForm({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Profanity level</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Profanity level</label>
               <select
                 value={bp.voice.profanity_level}
                 onChange={(e) =>
@@ -326,7 +326,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['voice']['profanity_level'],
   })
 }
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               >
                 <option value="none">None</option>
                 <option value="light">Light</option>
@@ -345,7 +345,7 @@ export function BrandProfileForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Signature Phrases (3)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Signature Phrases (3)</label>
               {bp.voice.signature_phrases.map((p, idx) => (
                 <Input
                   key={idx}
@@ -361,7 +361,7 @@ export function BrandProfileForm({
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Forbidden Words/Phrases (3)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Forbidden Words/Phrases (3)</label>
               {bp.voice.forbidden_words.map((p, idx) => (
                 <Input
                   key={idx}
@@ -377,22 +377,22 @@ export function BrandProfileForm({
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-100">
+          <div className="pt-4 border-t border-[var(--border-primary)]">
             <Input
               label="Common enemy (optional)"
               value={bp.voice.common_enemy}
               onChange={(e) => set('voice', { ...bp.voice, common_enemy: e.target.value })}
               placeholder="e.g., gurus selling overnight results, the 9-to-5 grind, cookie-cutter advice"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">
               The shared frustration you and your audience both push back against. Used in hooks and framing.
             </p>
           </div>
 
-          <div className="pt-4 border-t border-gray-100 space-y-3">
+          <div className="pt-4 border-t border-[var(--border-primary)] space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Voice samples / brain dump</label>
-              <p className="text-xs text-gray-500 mt-1 mb-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Voice samples / brain dump</label>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1 mb-2">
                 Paste anything you&apos;ve written or said that sounds like you - captions, voice memos, texts, tweets. The AI uses these as voice few-shots.
               </p>
             </div>
@@ -406,7 +406,7 @@ export function BrandProfileForm({
                     set('voice', { ...bp.voice, samples: copy })
                   }}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm"
                   placeholder={`Sample ${idx + 1} - dump a real caption, DM, or transcript chunk`}
                 />
                 <button
@@ -415,7 +415,7 @@ export function BrandProfileForm({
                     const copy = bp.voice.samples.filter((_, i) => i !== idx)
                     set('voice', { ...bp.voice, samples: copy })
                   }}
-                  className="absolute top-2 right-2 text-xs text-gray-400 hover:text-red-500"
+                  className="absolute top-2 right-2 text-xs text-[var(--text-tertiary)] hover:text-red-500"
                 >
                   Remove
                 </button>
@@ -432,10 +432,10 @@ export function BrandProfileForm({
             </button>
           </div>
 
-          <div className="pt-4 border-t border-gray-100 space-y-3">
+          <div className="pt-4 border-t border-[var(--border-primary)] space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Banned phrases (flexible list)</label>
-              <p className="text-xs text-gray-500 mt-1 mb-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Banned phrases (flexible list)</label>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1 mb-2">
                 Any phrase that sounds AI-generated or off-brand. These are stripped from every output.
               </p>
             </div>
@@ -449,7 +449,7 @@ export function BrandProfileForm({
                     copy[idx] = e.target.value
                     set('voice', { ...bp.voice, banned_phrases: copy })
                   }}
-                  className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm"
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm"
                   placeholder="e.g., game changer, dive in, buckle up"
                 />
                 <button
@@ -458,7 +458,7 @@ export function BrandProfileForm({
                     const copy = bp.voice.banned_phrases.filter((_, i) => i !== idx)
                     set('voice', { ...bp.voice, banned_phrases: copy })
                   }}
-                  className="px-3 text-sm text-gray-400 hover:text-red-500"
+                  className="px-3 text-sm text-[var(--text-tertiary)] hover:text-red-500"
                 >
                   Remove
                 </button>
@@ -480,11 +480,11 @@ export function BrandProfileForm({
       {/* Content Strategy */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Content Strategy</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Content Strategy</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Primary content goal</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Primary content goal</label>
             <select
               value={bp.content_strategy.primary_content_goal}
               onChange={(e) =>
@@ -494,7 +494,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['content_strategy']['primary_content_goal'],
   })
 }
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
             >
               <option value="leads">Generate leads</option>
               <option value="authority">Build authority</option>
@@ -505,7 +505,7 @@ export function BrandProfileForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Desired action after content</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Desired action after content</label>
             <select
               value={bp.content_strategy.desired_action}
               onChange={(e) =>
@@ -515,7 +515,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['content_strategy']['desired_action'],
   })
 }
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
             >
               <option value="follow">Follow</option>
               <option value="dm">DM</option>
@@ -526,9 +526,9 @@ export function BrandProfileForm({
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">Content Pillars (up to 5)</p>
+            <p className="text-sm font-medium text-[var(--text-secondary)]">Content Pillars (up to 5)</p>
             {bp.content_strategy.content_pillars.map((p, idx) => (
-              <div key={idx} className="rounded-lg border border-gray-200 p-3 space-y-2">
+              <div key={idx} className="rounded-lg border border-[var(--border-primary)] p-3 space-y-2">
                 <Input
                   label={`Pillar ${idx + 1} name`}
                   value={p.name}
@@ -539,7 +539,7 @@ export function BrandProfileForm({
                   }}
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">What this pillar covers</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">What this pillar covers</label>
                   <textarea
                     value={p.covers}
                     onChange={(e) => {
@@ -548,11 +548,11 @@ export function BrandProfileForm({
                       set('content_strategy', { ...bp.content_strategy, content_pillars: next })
                     }}
                     rows={2}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Why it matters</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Why it matters</label>
                   <textarea
                     value={p.why_it_matters}
                     onChange={(e) => {
@@ -561,7 +561,7 @@ export function BrandProfileForm({
                       set('content_strategy', { ...bp.content_strategy, content_pillars: next })
                     }}
                     rows={2}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
                   />
                 </div>
               </div>
@@ -573,12 +573,12 @@ export function BrandProfileForm({
       {/* Positioning + Collaboration */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Positioning & Collaboration</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Positioning & Collaboration</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Market position</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Market position</label>
               <select
                 value={bp.positioning.market_position}
                 onChange={(e) =>
@@ -588,7 +588,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['positioning']['market_position'],
   })
 }
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               >
                 <option value="premium">Premium</option>
                 <option value="mid_tier">Mid-tier</option>
@@ -598,7 +598,7 @@ export function BrandProfileForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">How you want to be perceived</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">How you want to be perceived</label>
               <select
                 value={bp.positioning.perception}
                 onChange={(e) =>
@@ -607,7 +607,7 @@ export function BrandProfileForm({
     perception: e.target.value as BrandProfile['positioning']['perception'],
   })
 }
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
               >
                 <option value="industry_leader">Industry leader</option>
                 <option value="rising_star">Rising star</option>
@@ -619,7 +619,7 @@ export function BrandProfileForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Collaboration style</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Collaboration style</label>
             <select
               value={bp.final.collaboration_style}
               onChange={(e) =>
@@ -629,7 +629,7 @@ export function BrandProfileForm({
       e.target.value as BrandProfile['final']['collaboration_style'],
   })
 }
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]"
             >
               <option value="hands_on">Very hands-on (approve everything)</option>
               <option value="collaborative">Collaborative (review + feedback)</option>

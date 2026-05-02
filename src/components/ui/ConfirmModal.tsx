@@ -86,7 +86,7 @@ export function ConfirmModal({
       onClick={() => !isSubmitting && onClose()}
     >
       <div
-        className="relative w-full max-w-md rounded-xl bg-white shadow-premium-lg"
+        className="relative w-full max-w-md rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-premium-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -95,7 +95,7 @@ export function ConfirmModal({
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="absolute top-3 right-3 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+          className="absolute top-3 right-3 p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] disabled:opacity-50"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -106,10 +106,10 @@ export function ConfirmModal({
             <div className={cn('shrink-0 mt-0.5', toneStyles.icon)}>
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <h3 className="flex-1 pt-0.5 text-lg font-semibold text-gray-900">{title}</h3>
+            <h3 className="flex-1 pt-0.5 text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
           </div>
 
-          <div className="mt-3 text-sm text-gray-600">{message}</div>
+          <div className="mt-3 text-sm text-[var(--text-secondary)]">{message}</div>
 
           {requirePassword && (
             <div className="mt-4">

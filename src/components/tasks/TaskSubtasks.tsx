@@ -105,7 +105,7 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Subtasks</p>
+        <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">Subtasks</p>
         <button
           type="button"
           onClick={() => setShowAdd((v) => !v)}
@@ -131,7 +131,7 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
               }
             }}
             placeholder="Subtask name…"
-            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
           <button
             type="button"
@@ -145,15 +145,15 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
       )}
 
       {isLoading ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-[var(--text-tertiary)]">Loading…</p>
       ) : subtasks.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">No subtasks yet.</p>
+        <p className="text-xs text-[var(--text-tertiary)] italic">No subtasks yet.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+        <ul className="divide-y divide-gray-100 border border-[var(--border-primary)] rounded-lg overflow-hidden">
           {subtasks.map((s) => (
             <li
               key={s.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 group"
+              className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-tertiary)] group"
             >
               <span
                 className="h-2 w-2 rounded-full shrink-0"
@@ -162,22 +162,22 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
               />
               <Link
                 href={`/tasks/${s.id}`}
-                className="flex-1 min-w-0 text-sm text-gray-900 truncate hover:text-[#2B79F7]"
+                className="flex-1 min-w-0 text-sm text-[var(--text-primary)] truncate hover:text-[#2B79F7]"
               >
                 {s.name}
               </Link>
-              <span className="text-[11px] text-gray-400">{STATUS_LABEL[s.status]}</span>
+              <span className="text-[11px] text-[var(--text-tertiary)]">{STATUS_LABEL[s.status]}</span>
               <button
                 type="button"
                 onClick={() => void handleDelete(s.id)}
-                className="p-1 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
+                className="p-1 rounded text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
                 aria-label="Delete subtask"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
               <Link
                 href={`/tasks/${s.id}`}
-                className="p-1 text-gray-300 hover:text-gray-700"
+                className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                 aria-label="Open subtask"
               >
                 <ChevronRight className="h-4 w-4" />

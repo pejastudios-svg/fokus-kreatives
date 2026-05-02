@@ -1433,7 +1433,7 @@ export default function ApprovalDetailPage() {
         <Header title="Approval Detail" />
         <div className="p-4 md:p-8">
           <Card>
-            <CardContent className="py-10 text-center text-gray-500">
+            <CardContent className="py-10 text-center text-[var(--text-tertiary)]">
               <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
               Loading approval...
             </CardContent>
@@ -1450,8 +1450,8 @@ export default function ApprovalDetailPage() {
         <div className="p-4 md:p-8 max-w-2xl mx-auto">
           <Card>
             <CardContent className="py-10 text-center space-y-3">
-              <p className="text-gray-700 font-medium">This approval can&rsquo;t be loaded.</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-[var(--text-secondary)] font-medium">This approval can&rsquo;t be loaded.</p>
+              <p className="text-sm text-[var(--text-tertiary)]">
                 It may have been deleted, or you don&rsquo;t have access to it.
               </p>
               <a
@@ -1492,8 +1492,8 @@ export default function ApprovalDetailPage() {
           <div
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
               toast.kind === 'success'
-                ? 'bg-white border-green-200 text-green-700'
-                : 'bg-white border-red-200 text-red-700'
+                ? 'bg-[var(--bg-card)] border-green-200 text-green-700'
+                : 'bg-[var(--bg-card)] border-red-200 text-red-700'
             }`}
           >
             {toast.kind === 'success' ? (
@@ -1508,7 +1508,7 @@ export default function ApprovalDetailPage() {
       <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
         <Link
           href="/approvals"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2B79F7]"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--text-tertiary)] hover:text-[#2B79F7]"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to approvals
@@ -1518,11 +1518,11 @@ export default function ApprovalDetailPage() {
   <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 break-all">
     <div className="flex-1 min-w-0">
       {approval.description && (
-        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-all">
+        <p className="text-sm text-[var(--text-secondary)] mb-1 whitespace-pre-wrap break-all">
           {approval.description}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-tertiary)]">
         <span>
           Status:{' '}
           {approval.status === 'approved'
@@ -1626,11 +1626,11 @@ export default function ApprovalDetailPage() {
 
                   {/* Title + caption, full width. */}
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900 break-words [overflow-wrap:anywhere]">
+                    <h3 className="text-base font-semibold text-[var(--text-primary)] break-words [overflow-wrap:anywhere]">
                       {item.title || 'Untitled asset'}
                     </h3>
                     {item.initial_comment && (
-                      <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                      <p className="text-sm text-[var(--text-secondary)] mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                         {item.initial_comment}
                       </p>
                     )}
@@ -1638,9 +1638,9 @@ export default function ApprovalDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Video/Image embed */}
-                  <div className="w-full rounded-lg overflow-hidden border border-gray-200 bg-black">
+                  <div className="w-full rounded-lg overflow-hidden border border-[var(--border-primary)] bg-black">
                     {editingItemId === item.id ? (
-                      <div className="space-y-3 p-3 bg-white">
+                      <div className="space-y-3 p-3 bg-[var(--bg-card)]">
                         <Input
                           label="Title"
                           value={editItemTitle}
@@ -1654,7 +1654,7 @@ export default function ApprovalDetailPage() {
                           placeholder="https://drive.google.com/..."
                         />
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             Comment
                           </label>
                           <textarea
@@ -1663,7 +1663,7 @@ export default function ApprovalDetailPage() {
                               setEditItemComment(e.target.value)
                             }
                             rows={3}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
 
@@ -1671,7 +1671,7 @@ export default function ApprovalDetailPage() {
                         {editItemAttachments.length > 0 && (
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <label className="block text-sm font-medium text-gray-700">
+                              <label className="block text-sm font-medium text-[var(--text-secondary)]">
                                 Attachments ({editItemAttachments.length})
                               </label>
                               <label
@@ -1701,7 +1701,7 @@ export default function ApprovalDetailPage() {
                                 return (
                                   <div
                                     key={`${a.public_id}-${j}`}
-                                    className="relative group aspect-square rounded-lg border border-gray-200 bg-gray-50 overflow-hidden"
+                                    className="relative group aspect-square rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden"
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
@@ -1721,7 +1721,7 @@ export default function ApprovalDetailPage() {
                                       <label
                                         htmlFor={replaceInputId}
                                         title="Replace this asset"
-                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-white text-gray-700 cursor-pointer"
+                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
                                       >
                                         <RefreshCw className="h-3.5 w-3.5" />
                                       </label>
@@ -1729,7 +1729,7 @@ export default function ApprovalDetailPage() {
                                         type="button"
                                         onClick={() => handleEditAttachmentDelete(j)}
                                         title="Delete this asset"
-                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-red-50 text-red-600"
+                                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-white/90 hover:bg-red-500/10 text-red-600"
                                       >
                                         <TrashIcon className="h-3.5 w-3.5" />
                                       </button>
@@ -1759,12 +1759,12 @@ export default function ApprovalDetailPage() {
                               })}
                             </div>
                             {editItemAttachments.length > 1 && (
-                              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none mt-2">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer select-none mt-2">
                                 <input
                                   type="checkbox"
                                   checked={editItemIsCarousel}
                                   onChange={(e) => setEditItemIsCarousel(e.target.checked)}
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
+                                  className="h-3.5 w-3.5 rounded border-[var(--border-primary)] text-[#2B79F7] focus:ring-[#2B79F7]"
                                 />
                                 View as a carousel
                               </label>
@@ -1776,7 +1776,7 @@ export default function ApprovalDetailPage() {
                         <div>
                           <label
                             htmlFor={`edit-add-${item.id}`}
-                            className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
+                            className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
                           >
                             <UploadIcon className="h-4 w-4" />
                             <span>
@@ -1805,7 +1805,7 @@ export default function ApprovalDetailPage() {
                           <div className="space-y-1.5">
                             {editItemUploads.map((u) => (
                               <div key={u.id} className="text-[11px]">
-                                <div className="flex items-center justify-between text-gray-600">
+                                <div className="flex items-center justify-between text-[var(--text-secondary)]">
                                   <span className="truncate pr-2">
                                     {typeof u.replaceIndex === 'number'
                                       ? `Replacing #${u.replaceIndex + 1}: `
@@ -1821,7 +1821,7 @@ export default function ApprovalDetailPage() {
                                   </span>
                                 </div>
                                 {!u.error && (
-                                  <div className="h-1 bg-gray-200 rounded overflow-hidden mt-0.5">
+                                  <div className="h-1 bg-[var(--bg-card-hover)] rounded overflow-hidden mt-0.5">
                                     <div
                                       className="h-full bg-[#2B79F7] transition-all duration-150"
                                       style={{ width: `${u.pct}%` }}
@@ -1856,10 +1856,10 @@ export default function ApprovalDetailPage() {
                   </div>
 
                   {/* Comments */}
-                  <div className="border-t border-gray-200 pt-3 space-y-3">
+                  <div className="border-t border-[var(--border-primary)] pt-3 space-y-3">
                     <div className="flex items-center gap-2">
-                      <MessageCircle className="h-4 w-4 text-gray-500" />
-                      <span className="text-xs font-semibold text-gray-700">
+                      <MessageCircle className="h-4 w-4 text-[var(--text-tertiary)]" />
+                      <span className="text-xs font-semibold text-[var(--text-secondary)]">
                         Comments ({itemComments.length})
                       </span>
                     </div>
@@ -1872,7 +1872,7 @@ export default function ApprovalDetailPage() {
                       className="relative space-y-3 max-h-64 overflow-y-auto overscroll-contain touch-pan-y"
                     >
                       {itemComments.length === 0 ? (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-[var(--text-tertiary)]">
                           No comments yet.
                         </p>
                       ) : (
@@ -1881,8 +1881,8 @@ export default function ApprovalDetailPage() {
                           return (
                             <div
                               key={c.id}
-                              className={`flex items-start gap-2 text-xs border border-gray-100 rounded-lg p-2 ${
-                                c.resolved ? 'bg-green-50' : 'bg-gray-50'
+                              className={`flex items-start gap-2 text-xs border border-[var(--border-primary)] rounded-lg p-2 ${
+                                c.resolved ? 'bg-green-50' : 'bg-[var(--bg-tertiary)]'
                               }`}
                             >
                               <div className="mt-0.5">
@@ -1903,18 +1903,18 @@ export default function ApprovalDetailPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <p className="font-semibold text-gray-800 truncate">
+                                  <p className="font-semibold text-[var(--text-primary)] truncate">
                                     {c.users?.name ||
                                       c.users?.email ||
                                       c.reviewer_email ||
                                       'User'}
                                     {!c.user_id && c.reviewer_email && (
-                                      <span className="ml-1 text-[10px] font-normal text-gray-400 uppercase tracking-wide">
+                                      <span className="ml-1 text-[10px] font-normal text-[var(--text-tertiary)] uppercase tracking-wide">
                                         client
                                       </span>
                                     )}
                                   </p>
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[10px] text-[var(--text-tertiary)]">
                                     {new Date(
                                       c.created_at
                                     ).toLocaleString(undefined, {
@@ -1933,7 +1933,7 @@ export default function ApprovalDetailPage() {
                                         setEditingCommentText(e.target.value)
                                       }
                                       rows={2}
-                                      className="w-full px-2 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
+                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
                                     />
                                     <div className="flex justify-end gap-1">
                                       <Button
@@ -1961,7 +1961,7 @@ export default function ApprovalDetailPage() {
         : parent.content
 
             return (
-        <div className="mb-1 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
+        <div className="mb-1 px-2 py-1 bg-[var(--bg-tertiary)] rounded text-[10px] text-[var(--text-tertiary)]">
           Replying to <span className="font-semibold">{parentAuthor}</span>:
           {' '}
           <span className="italic">&quot;{snippet}&quot;</span>
@@ -2009,7 +2009,7 @@ export default function ApprovalDetailPage() {
         )}
       </div>
     )}
-    <p className="mt-0.5 text-gray-700 break-all">
+    <p className="mt-0.5 text-[var(--text-secondary)] break-all">
       {formatComment(c.content)}
     </p>
     {c.file_url && (
@@ -2025,7 +2025,7 @@ export default function ApprovalDetailPage() {
             <img
               src={c.file_url || ''}
               alt={c.file_name || 'Image'}
-              className="max-h-40 rounded-lg border border-gray-200 cursor-pointer"
+              className="max-h-40 rounded-lg border border-[var(--border-primary)] cursor-pointer"
               onClick={() => {
                 setPreviewImageUrl(c.file_url!)
                 setPreviewImageName(c.file_name || 'Image')
@@ -2062,11 +2062,11 @@ export default function ApprovalDetailPage() {
 )}
     {uploadProgress[c.id] !== undefined && (
       <div className="mt-1.5">
-        <div className="flex items-center justify-between text-[10px] text-gray-500 mb-0.5">
+        <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)] mb-0.5">
           <span>Uploading…</span>
           <span>{uploadProgress[c.id]}%</span>
         </div>
-        <div className="h-1 bg-gray-200 rounded overflow-hidden">
+        <div className="h-1 bg-[var(--bg-card-hover)] rounded overflow-hidden">
           <div
             className="h-full bg-[#2B79F7] transition-all duration-150"
             style={{ width: `${uploadProgress[c.id]}%` }}
@@ -2089,7 +2089,7 @@ export default function ApprovalDetailPage() {
                   setPreviewImageUrl(att.url)
                   setPreviewImageName(att.name || 'Image')
                 }}
-                className="block aspect-video rounded-lg border border-gray-200 overflow-hidden bg-gray-50 hover:border-[#2B79F7] focus:outline-none"
+                className="block aspect-video rounded-lg border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-tertiary)] hover:border-[#2B79F7] focus:outline-none"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -2106,7 +2106,7 @@ export default function ApprovalDetailPage() {
               href={att.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-gray-200 text-[11px] text-[#2B79F7] hover:border-[#2B79F7]"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--border-primary)] text-[11px] text-[#2B79F7] hover:border-[#2B79F7]"
             >
               <Paperclip className="h-3 w-3 shrink-0" />
               <span className="truncate">{att.name || 'Attachment'}</span>
@@ -2115,14 +2115,14 @@ export default function ApprovalDetailPage() {
         })}
       </div>
     )}
-                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-tertiary)]">
   <button
     type="button"
     onClick={() => toggleResolveComment(c)}
-    className={`px-2 py-0.5 rounded-full border ${
+    className={`px-2 py-0.5 rounded-full border transition-colors ${
       c.resolved
-        ? 'border-green-500 text-green-600 bg-green-50'
-        : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
+        ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10 hover:bg-green-500/20'
+        : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[var(--bg-card-hover)]'
     }`}
     disabled={resolvingCommentId === c.id}
   >
@@ -2182,7 +2182,7 @@ export default function ApprovalDetailPage() {
                           setUnreadPreview((prev) => ({ ...prev, [item.id]: null }))
                         }}
                         aria-label={`Jump to new comment from ${unreadPreview[item.id]!.name}`}
-                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-md text-[11px] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
                       >
                         {unreadPreview[item.id]!.avatar ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
@@ -2199,16 +2199,16 @@ export default function ApprovalDetailPage() {
                         <span className="font-semibold truncate max-w-[80px]">
                           {unreadPreview[item.id]!.name.split(' ')[0]}
                         </span>
-                        <span className="text-gray-500 truncate max-w-[180px]">
+                        <span className="text-[var(--text-tertiary)] truncate max-w-[180px]">
                           {unreadPreview[item.id]!.preview || 'sent an attachment'}
                         </span>
                       </button>
                     )}
 
                     {/* New comment input */}
-                    <div className="border border-gray-200 rounded-lg p-2 space-y-2">
+                    <div className="border border-[var(--border-primary)] rounded-lg p-2 space-y-2">
   {replyTarget && replyTarget.itemId === item.id && (
-    <p className="text-[10px] text-gray-500">
+    <p className="text-[10px] text-[var(--text-tertiary)]">
       Replying to <span className="font-semibold">{replyTarget.userName}</span>
       {' '}
       <button
@@ -2240,7 +2240,7 @@ export default function ApprovalDetailPage() {
           })
         }, 300)
       }}
-      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+      className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
       placeholder="Leave a comment... use @name to tag someone."
     />
     {mentionTargetItemId === item.id && (() => {
@@ -2252,7 +2252,7 @@ export default function ApprovalDetailPage() {
         : mentionUsers
       const visible = filtered.slice(0, mentionQuery ? 5 : 3)
       return (
-        <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+        <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-[var(--border-primary)] rounded-lg bg-[var(--bg-card)] shadow-lg text-[11px] max-h-40 overflow-y-auto">
         {visible.map((u) => (
           <button
             key={u.id}
@@ -2269,7 +2269,7 @@ export default function ApprovalDetailPage() {
               setMentionTargetItemId(null)
               setMentionQuery('')
             }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--bg-tertiary)] text-left"
           >
             {u.profile_picture_url ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -2279,7 +2279,7 @@ export default function ApprovalDetailPage() {
                 className="h-4 w-4 rounded-full object-cover"
               />
             ) : (
-              <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
+              <div className="h-4 w-4 rounded-full bg-[var(--bg-card-hover)] flex items-center justify-center text-[9px] text-[var(--text-secondary)]">
                 {u.name.charAt(0).toUpperCase()}
               </div>
             )}
@@ -2287,7 +2287,7 @@ export default function ApprovalDetailPage() {
           </button>
         ))}
         {visible.length === 0 && (
-          <p className="px-2 py-1 text-gray-400">No matches</p>
+          <p className="px-2 py-1 text-[var(--text-tertiary)]">No matches</p>
         )}
       </div>
     )
@@ -2300,7 +2300,7 @@ export default function ApprovalDetailPage() {
     const draft = resolveDraftMentions(newCommentText[item.id] || '')
     if (draft.length === 0) return null
     return (
-      <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500">
+      <div className="flex items-center gap-1 flex-wrap text-[10px] text-[var(--text-tertiary)]">
         <span>Tagging:</span>
         {draft.map((u) => (
           <span
@@ -2326,7 +2326,7 @@ export default function ApprovalDetailPage() {
     )
   })()}
   {commentFile && (
-    <p className="text-[10px] text-gray-500">
+    <p className="text-[10px] text-[var(--text-tertiary)]">
       Attached: {commentFile.name}{' '}
       <button
         type="button"
@@ -2338,7 +2338,7 @@ export default function ApprovalDetailPage() {
     </p>
   )}
   {pendingAnnotation[item.id] && (pendingAnnotation[item.id].timestampSeconds || pendingAnnotation[item.id].region) && (
-    <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+    <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] flex-wrap">
       <span>Tagged:</span>
       {pendingAnnotation[item.id].timestampSeconds != null && (
         <button
@@ -2368,7 +2368,7 @@ export default function ApprovalDetailPage() {
   )}
   <div className="flex items-center justify-between gap-2">
     <div className="flex items-center gap-3">
-      <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+      <label className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] cursor-pointer">
         <Paperclip className="h-3 w-3" />
         <span>Attach file</span>
         <input
@@ -2386,7 +2386,7 @@ export default function ApprovalDetailPage() {
             type="button"
             onClick={() => handleGrabTime(item.id)}
             title="Grab the current playback time"
-            className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+            className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
           >
             <ClockIcon className="h-3 w-3" />
             <span>Grab time</span>
@@ -2395,7 +2395,7 @@ export default function ApprovalDetailPage() {
             type="button"
             onClick={() => handleAnnotate(item.id, 'circle')}
             title="Draw a region on the asset"
-            className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+            className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
           >
             <PenIcon className="h-3 w-3" />
             <span>Annotate</span>
@@ -2412,7 +2412,7 @@ export default function ApprovalDetailPage() {
       }
       title="Send comment"
       aria-label="Send comment"
-      className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#2B79F7] text-white hover:bg-[#1E54B7] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#2B79F7] text-white hover:bg-[#1E54B7] disabled:bg-[var(--bg-card-hover)] disabled:text-[var(--text-tertiary)] disabled:cursor-not-allowed transition-colors"
     >
       <SendIcon className="h-4 w-4" />
     </button>

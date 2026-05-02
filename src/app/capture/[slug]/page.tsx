@@ -288,8 +288,8 @@ export default function PublicCapturePage() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ ...bgStyle, ...fontStyle }}>
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
-            <h1 className="text-xl font-bold text-gray-900 mb-2">This page is no longer available</h1>
-            <p className="text-gray-500">{error}</p>
+            <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">This page is no longer available</h1>
+            <p className="text-[var(--text-tertiary)]">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -303,7 +303,7 @@ export default function PublicCapturePage() {
             {/* Banner + logo */}
             {pageInfo?.banner_url ? (
               <div className="mb-4">
-                <div className="relative w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                <div className="relative w-full rounded-xl overflow-hidden border border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
                   <img src={pageInfo.banner_url} alt="Banner" className="w-full h-40 sm:h-48 object-cover" />
                   {pageInfo.logo_url && (
                     <div className="absolute left-3 bottom-3 h-12 w-12 rounded-full bg-white/90 border border-white/60 shadow-md overflow-hidden">
@@ -314,18 +314,18 @@ export default function PublicCapturePage() {
               </div>
             ) : pageInfo?.logo_url ? (
               <div className="flex justify-center mb-4">
-                <div className="h-16 w-16 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-16 w-16 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
                   <img src={pageInfo.logo_url} alt={pageInfo.name || 'Logo'} className="h-full w-full object-cover" />
                 </div>
               </div>
             ) : null}
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2 text-center">
               {pageInfo?.headline || 'Get your free resource'}
             </h1>
 
             {pageInfo?.description && (
-              <p className="text-gray-600 mb-6 text-center">{pageInfo.description}</p>
+              <p className="text-[var(--text-secondary)] mb-6 text-center">{pageInfo.description}</p>
             )}
 
             {success ? (
@@ -352,7 +352,7 @@ export default function PublicCapturePage() {
 
 if (embed.kind === 'image') {
   return (
-    <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden">
+    <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
       <img src={embed.src} alt={f.label} className="w-full h-auto object-contain" />
     </div>
   )
@@ -360,7 +360,7 @@ if (embed.kind === 'image') {
 
 if (embed.kind === 'video') {
   return (
-    <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden bg-black">
+    <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden bg-black">
       <video src={embed.src} controls className="w-full h-auto" />
     </div>
   )
@@ -368,9 +368,9 @@ if (embed.kind === 'video') {
 
 if (embed.kind === 'link') {
   return (
-    <div key={f.id} className="rounded-lg border border-gray-200 p-4 bg-gray-50">
-      <p className="text-sm text-gray-700 font-medium">{f.label || 'Embed'}</p>
-      <p className="text-xs text-gray-500 mt-1">
+    <div key={f.id} className="rounded-lg border border-[var(--border-primary)] p-4 bg-[var(--bg-tertiary)]">
+      <p className="text-sm text-[var(--text-secondary)] font-medium">{f.label || 'Embed'}</p>
+      <p className="text-xs text-[var(--text-tertiary)] mt-1">
         This provider may block embedding on external sites. Open it here:
       </p>
       <a href={embed.src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#2B79F7] hover:underline break-all">
@@ -382,7 +382,7 @@ if (embed.kind === 'link') {
 
 // iframe
 return (
-  <div key={f.id} className="rounded-lg border border-gray-200 overflow-hidden">
+  <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
     <iframe
       src={embed.src}
       className="w-full border-0"
@@ -399,17 +399,17 @@ return (
                   if (f.type === 'textarea') {
                     return (
                       <div key={f.id} className="min-w-0">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                           {f.label}{f.required ? ' *' : ''}
                         </label>
                         <textarea
                           value={values[f.id] || ''}
                           onChange={(e) => setValue(f.id, e.target.value)}
                           rows={3}
-                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none text-sm"
+                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none text-sm"
                           placeholder={f.placeholder || ''}
                         />
-                        {f.description && <p className="text-xs text-gray-400 mt-1">{f.description}</p>}
+                        {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
                       </div>
                     )
                   }
@@ -417,20 +417,20 @@ return (
                   if (f.type === 'select') {
                     return (
                       <div key={f.id} className="min-w-0">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                           {f.label}{f.required ? ' *' : ''}
                         </label>
                         <select
                           value={values[f.id] || ''}
                           onChange={(e) => setValue(f.id, e.target.value)}
-                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                         >
                           <option value="">Select…</option>
                           {(f.options || []).map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>
-                        {f.description && <p className="text-xs text-gray-400 mt-1">{f.description}</p>}
+                        {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
                       </div>
                     )
                   }
@@ -438,12 +438,12 @@ return (
                   if (f.type === 'radio') {
                     return (
                       <div key={f.id} className="min-w-0">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                           {f.label}{f.required ? ' *' : ''}
                         </label>
                         <div className="space-y-2">
                           {(f.options || []).map((opt) => (
-                            <label key={opt} className="flex items-center gap-2 text-sm text-gray-700">
+                            <label key={opt} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                               <input
                                 type="radio"
                                 name={f.id}
@@ -454,7 +454,7 @@ return (
                             </label>
                           ))}
                         </div>
-                        {f.description && <p className="text-xs text-gray-400 mt-1">{f.description}</p>}
+                        {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
                       </div>
                     )
                   }
@@ -462,7 +462,7 @@ return (
                   // default input
                   return (
                     <div key={f.id} className="min-w-0">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                         {f.label}{f.required ? ' *' : ''}
                       </label>
                       <input
@@ -470,18 +470,18 @@ return (
                         value={values[f.id] || ''}
                         onChange={(e) => setValue(f.id, e.target.value)}
                         placeholder={f.placeholder || ''}
-                        className="w-full max-w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       />
-                      {f.description && <p className="text-xs text-gray-400 mt-1">{f.description}</p>}
+                      {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
                     </div>
                   )
                 })}
 
                 {/* Meeting section */}
                 {pageInfo?.include_meeting && (
-                  <div className="space-y-4 border-t border-gray-200 pt-4 mt-2">
+                  <div className="space-y-4 border-t border-[var(--border-primary)] pt-4 mt-2">
                     {pageInfo.calendly_url && (
-                      <div className="rounded-lg border border-gray-200 overflow-hidden">
+                      <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
                         <iframe
                           src={pageInfo.calendly_url || ''}
                           className="w-full border-0"
@@ -493,35 +493,43 @@ return (
                     )}
 
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {pageInfo.calendly_url
                           ? 'After you book, please confirm the date and time you scheduled'
                           : 'Preferred meeting time'}
                       </p>
 
+                      {/* Native date/time inputs on iOS Safari render their
+                          inner segments with intrinsic widths that don't
+                          always respect the parent's max-width. Wrapping each
+                          in `min-w-0 overflow-hidden` plus `w-full block` on
+                          the input itself forces them to clip to the column
+                          width on mobile. */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-full">
-                        <div className="min-w-0">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <div className="min-w-0 overflow-hidden">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             {pageInfo.calendly_url ? 'Date you scheduled' : 'Preferred date'} *
                           </label>
                           <input
                             type="date"
                             value={meeting_date}
                             onChange={(e) => setMeetingDate(e.target.value)}
-                            className="w-full max-w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900"
+                            className="block w-full min-w-0 max-w-full appearance-none px-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm"
+                            style={{ WebkitAppearance: 'none' }}
                             required
                           />
                         </div>
 
-                        <div className="min-w-0">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <div className="min-w-0 overflow-hidden">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             {pageInfo.calendly_url ? 'Time you scheduled' : 'Preferred time'} *
                           </label>
                           <input
                             type="time"
                             value={meeting_time}
                             onChange={(e) => setMeetingTime(e.target.value)}
-                            className="w-full max-w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900"
+                            className="block w-full min-w-0 max-w-full appearance-none px-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm"
+                            style={{ WebkitAppearance: 'none' }}
                             required
                           />
                         </div>
@@ -538,7 +546,7 @@ return (
               </form>
             )}
 
-            <p className="mt-6 text-xs text-gray-400 text-center">Powered by Fokus Kreativez</p>
+            <p className="mt-6 text-xs text-[var(--text-tertiary)] text-center">Powered by Fokus Kreativez</p>
           </CardContent>
         </Card>
       </div>

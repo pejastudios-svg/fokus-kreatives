@@ -138,11 +138,11 @@ export function ClientAssignees({ clientId }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <Users className="h-5 w-5 text-[#2B79F7]" />
             Assignees
           </h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">
             {canEdit
               ? 'Pick the team members responsible for this client. They’ll receive notifications for intake submissions, approvals, and form replies. If left empty, all admins and managers are notified.'
               : 'Team members responsible for this client.'}
@@ -166,27 +166,27 @@ export function ClientAssignees({ clientId }: Props) {
         )}
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading team…
           </div>
         ) : team.length === 0 ? (
-          <p className="text-sm text-gray-500">No agency team members found.</p>
+          <p className="text-sm text-[var(--text-tertiary)]">No agency team members found.</p>
         ) : (
           <>
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search team by name or email…"
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
             {isSearching && filteredTeam.length === 0 ? (
-              <p className="text-sm text-gray-500">No matches for &ldquo;{query.trim()}&rdquo;.</p>
+              <p className="text-sm text-[var(--text-tertiary)]">No matches for &ldquo;{query.trim()}&rdquo;.</p>
             ) : (
               <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {visibleTeam.map((m) => {
@@ -200,7 +200,7 @@ export function ClientAssignees({ clientId }: Props) {
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left ${
                       isSelected
                         ? 'border-[#2B79F7] bg-[#E8F1FF]'
-                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                        : 'border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'
                     } ${canEdit ? '' : 'cursor-default opacity-90'}`}
                   >
                     {m.profile_picture_url ? (
@@ -216,10 +216,10 @@ export function ClientAssignees({ clientId }: Props) {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                         {m.name || 'Unnamed'}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-[var(--text-tertiary)] truncate">
                         {m.email} · {m.role}
                       </p>
                     </div>
@@ -229,7 +229,7 @@ export function ClientAssignees({ clientId }: Props) {
                       </span>
                     ) : (
                       canEdit && (
-                        <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full border border-gray-300 text-gray-300">
+                        <span className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full border border-[var(--border-secondary)] text-[var(--text-tertiary)]">
                           <X className="h-4 w-4 opacity-0" />
                         </span>
                       )
@@ -254,7 +254,7 @@ export function ClientAssignees({ clientId }: Props) {
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="mt-3 text-xs text-gray-500 hover:underline"
+                className="mt-3 text-xs text-[var(--text-tertiary)] hover:underline"
               >
                 Show less
               </button>

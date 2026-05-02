@@ -130,16 +130,16 @@ export function NotificationPopupListener() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <button
             type="button"
             onClick={go}
             className="flex-1 min-w-0 text-left"
           >
-            <p className="text-sm font-semibold text-gray-900">{title}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
             {subtitle && (
-              <p className="text-xs text-gray-500 mt-1 truncate">{subtitle}</p>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1 truncate">{subtitle}</p>
             )}
             {target && (
               <p className="text-[11px] text-[#2B79F7] mt-2">Click to open</p>
@@ -149,7 +149,7 @@ export function NotificationPopupListener() {
           <button
             type="button"
             onClick={() => setPopup(null)}
-            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"
+            className="p-1 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />

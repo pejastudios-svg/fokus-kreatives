@@ -305,7 +305,7 @@ export default function ReviewPage() {
 
   if (phase === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-[#2B79F7]" />
       </div>
     )
@@ -313,11 +313,11 @@ export default function ReviewPage() {
 
   if (phase === 'invalid') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-sm w-full bg-white border border-gray-100 rounded-2xl shadow-sm p-6 text-center space-y-3">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-2xl shadow-sm p-6 text-center space-y-3">
           <AlertCircle className="h-8 w-8 mx-auto text-red-500" />
-          <h1 className="text-lg font-semibold text-gray-900">This link isn&rsquo;t valid</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">This link isn&rsquo;t valid</h1>
+          <p className="text-sm text-[var(--text-tertiary)]">
             The review link has expired or doesn&rsquo;t match an approval. Ask whoever shared it
             with you to send a new one.
           </p>
@@ -327,8 +327,8 @@ export default function ReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+    <div className="min-h-screen bg-[var(--bg-tertiary)]">
+      <header className="bg-[var(--bg-card)] border-b border-[var(--border-primary)] sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {approval?.clientPicture ? (
@@ -346,15 +346,15 @@ export default function ReviewPage() {
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wide text-gray-400">Review</p>
-              <p className="text-sm font-semibold text-gray-900 truncate">{approval?.title}</p>
+              <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">Review</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{approval?.title}</p>
             </div>
           </div>
           {signedInAs && (
             <button
               type="button"
               onClick={() => void handleLogout()}
-              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900 px-2 py-1 rounded-md hover:bg-gray-100"
+              className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] px-2 py-1 rounded-md hover:bg-[var(--bg-tertiary)]"
               title="Sign out of this review"
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -369,8 +369,8 @@ export default function ReviewPage() {
           <div
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
               statusBanner.kind === 'success'
-                ? 'bg-white border-green-200 text-green-700'
-                : 'bg-white border-red-200 text-red-700'
+                ? 'bg-[var(--bg-card)] border-green-200 text-green-700'
+                : 'bg-[var(--bg-card)] border-red-200 text-red-700'
             }`}
           >
             {statusBanner.kind === 'success' ? (
@@ -398,7 +398,7 @@ export default function ReviewPage() {
         {phase === 'review' && (
           <div className="space-y-4">
             {approval?.description && (
-              <div className="bg-white border border-gray-100 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl p-4 text-sm text-[var(--text-secondary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                 {approval.description}
               </div>
             )}
@@ -411,7 +411,7 @@ export default function ReviewPage() {
             )}
 
             {items.length === 0 ? (
-              <div className="bg-white border border-gray-100 rounded-xl p-6 text-center text-sm text-gray-400">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl p-6 text-center text-sm text-[var(--text-tertiary)]">
                 No assets attached yet.
               </div>
             ) : (
@@ -578,17 +578,17 @@ function EmailGate({
   onSubmit: (e: React.FormEvent) => void
 }) {
   return (
-    <div className="max-w-md mx-auto bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4">
+    <div className="max-w-md mx-auto bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-2xl shadow-sm p-6 space-y-4">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-gray-900">Review for {clientName}</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-semibold text-[var(--text-primary)]">Review for {clientName}</h1>
+        <p className="text-sm text-[var(--text-tertiary)]">
           Enter the email this approval was sent to. We&rsquo;ll check it&rsquo;s on the account
           and let you straight in.
         </p>
       </div>
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
           <input
             type="email"
             value={email}
@@ -596,7 +596,7 @@ function EmailGate({
             placeholder="you@example.com"
             required
             autoFocus
-            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
         </div>
         {errorMsg && <p className="text-xs text-red-600">{errorMsg}</p>}
@@ -608,7 +608,7 @@ function EmailGate({
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Continue
         </button>
-        <p className="text-[11px] text-gray-400 text-center">
+        <p className="text-[11px] text-[var(--text-tertiary)] text-center">
           You&rsquo;ll stay signed in on this device for 30 days.
         </p>
       </form>
@@ -1075,8 +1075,8 @@ function ReviewItemCard({
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-      <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col gap-3">
+    <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-4 sm:p-5 border-b border-[var(--border-primary)] flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -1092,7 +1092,7 @@ function ReviewItemCard({
             disabled={isToggling}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               isApproved
-                ? 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                ? 'border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                 : 'bg-[#2B79F7] text-white hover:bg-[#1E54B7]'
             } disabled:opacity-50`}
           >
@@ -1101,12 +1101,12 @@ function ReviewItemCard({
           </button>
         </div>
 
-        <h2 className="text-base font-semibold text-gray-900 break-words [overflow-wrap:anywhere]">
+        <h2 className="text-base font-semibold text-[var(--text-primary)] break-words [overflow-wrap:anywhere]">
           {item.title || 'Untitled asset'}
         </h2>
 
         {item.attachments && item.attachments.length > 0 ? (
-          <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+          <div className="rounded-lg overflow-hidden border border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
             <AssetRenderer
               ref={assetRendererRef}
               attachments={item.attachments}
@@ -1123,9 +1123,9 @@ function ReviewItemCard({
       </div>
 
       <div className="p-4 sm:p-5 space-y-3">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Comments</p>
+        <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">Comments</p>
         {comments.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No comments yet.</p>
+          <p className="text-xs text-[var(--text-tertiary)] italic">No comments yet.</p>
         ) : (
           <ul
             ref={commentsListRef}
@@ -1157,14 +1157,14 @@ function ReviewItemCard({
                       className="h-7 w-7 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <div className="h-7 w-7 rounded-full bg-gray-100 text-gray-600 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                    <div className="h-7 w-7 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[10px] font-semibold flex items-center justify-center shrink-0">
                       {(author || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-gray-900 truncate">{author}</span>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-xs font-medium text-[var(--text-primary)] truncate">{author}</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)]">
                         {new Date(c.created_at).toLocaleString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -1173,7 +1173,7 @@ function ReviewItemCard({
                         })}
                       </span>
                       {c.updated_at && c.updated_at !== c.created_at && (
-                        <span className="text-[10px] text-gray-400 italic">(edited)</span>
+                        <span className="text-[10px] text-[var(--text-tertiary)] italic">(edited)</span>
                       )}
                     </div>
                     {c.parent_comment_id && (() => {
@@ -1189,7 +1189,7 @@ function ReviewItemCard({
                           ? parent.content.slice(0, 80) + '…'
                           : parent.content
                       return (
-                        <div className="mt-1 px-2 py-1 bg-gray-50 border-l-2 border-gray-200 rounded text-[10px] text-gray-500">
+                        <div className="mt-1 px-2 py-1 bg-[var(--bg-tertiary)] border-l-2 border-[var(--border-primary)] rounded text-[10px] text-[var(--text-tertiary)]">
                           Replying to <span className="font-semibold">{parentAuthor}</span>:{' '}
                           <span className="italic">&ldquo;{snippet}&rdquo;</span>
                         </div>
@@ -1231,14 +1231,14 @@ function ReviewItemCard({
                           value={editingDraft}
                           onChange={(e) => setEditingDraft(e.target.value)}
                           rows={2}
-                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           autoFocus
                         />
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={cancelEdit}
-                            className="px-2.5 py-1 rounded text-xs text-gray-600 hover:bg-gray-100"
+                            className="px-2.5 py-1 rounded text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
                           >
                             Cancel
                           </button>
@@ -1254,7 +1254,7 @@ function ReviewItemCard({
                       </div>
                     ) : (
                       body && (
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
+                        <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
                           {formatCommentBody(body)}
                         </p>
                       )
@@ -1283,7 +1283,7 @@ function ReviewItemCard({
                       ) : null
                     })()}
                     {editingCommentId !== c.id && (
-                      <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                      <div className="flex items-center gap-3 mt-1 text-[10px] text-[var(--text-tertiary)]">
                         <button
                           type="button"
                           onClick={() => void toggleResolve(c)}
@@ -1291,7 +1291,7 @@ function ReviewItemCard({
                           className={`px-2 py-0.5 rounded-full border transition-colors ${
                             c.resolved
                               ? 'border-green-500 text-green-600 bg-green-50'
-                              : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
+                              : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7]'
                           } disabled:opacity-50`}
                         >
                           {c.resolved ? 'Resolved' : 'Mark resolved'}
@@ -1355,7 +1355,7 @@ function ReviewItemCard({
               setUnreadPreview(null)
             }}
             aria-label={`Jump to new comment from ${unreadPreview.name}`}
-            className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+            className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-md text-[11px] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
           >
             {unreadPreview.avatar ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -1365,14 +1365,14 @@ function ReviewItemCard({
                 className="h-6 w-6 rounded-full object-cover shrink-0"
               />
             ) : (
-              <span className="h-6 w-6 rounded-full bg-gray-200 text-gray-600 text-[10px] font-semibold flex items-center justify-center shrink-0">
+              <span className="h-6 w-6 rounded-full bg-[var(--bg-card-hover)] text-[var(--text-secondary)] text-[10px] font-semibold flex items-center justify-center shrink-0">
                 {(unreadPreview.name || 'U').charAt(0).toUpperCase()}
               </span>
             )}
             <span className="font-semibold truncate max-w-[80px]">
               {unreadPreview.name.split(' ')[0]}
             </span>
-            <span className="text-gray-500 truncate max-w-[180px]">
+            <span className="text-[var(--text-tertiary)] truncate max-w-[180px]">
               {unreadPreview.preview || 'sent an attachment'}
             </span>
           </button>
@@ -1390,15 +1390,15 @@ function ReviewItemCard({
               {pendingFiles.map((f, i) => (
                 <li
                   key={`${f.name}-${i}`}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-100 text-xs text-gray-700 max-w-full"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--bg-tertiary)] text-xs text-[var(--text-secondary)] max-w-full"
                 >
-                  <FileIconForName name={f.name} className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                  <FileIconForName name={f.name} className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />
                   <span className="truncate max-w-[180px]">{f.name}</span>
-                  <span className="text-[10px] text-gray-400">{formatBytes(f.size)}</span>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">{formatBytes(f.size)}</span>
                   <button
                     type="button"
                     onClick={() => removePendingFile(i)}
-                    className="text-gray-400 hover:text-red-600"
+                    className="text-[var(--text-tertiary)] hover:text-red-600"
                     aria-label={`Remove ${f.name}`}
                   >
                     <XIcon className="h-3 w-3" />
@@ -1409,7 +1409,7 @@ function ReviewItemCard({
           )}
 
           {pendingAnnotation && (pendingAnnotation.timestampSeconds || pendingAnnotation.region) && (
-            <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] flex-wrap">
               <span>Tagged:</span>
               {pendingAnnotation.timestampSeconds != null && (
                 <button
@@ -1438,7 +1438,7 @@ function ReviewItemCard({
             </div>
           )}
           {replyTo && (
-            <div className="flex items-center justify-between gap-2 px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] text-gray-600">
+            <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md text-[11px] text-[var(--text-secondary)]">
               <span className="truncate">
                 Replying to <span className="font-semibold">{replyTo.authorName}</span>
               </span>
@@ -1458,7 +1458,7 @@ function ReviewItemCard({
                 type="button"
                 onClick={handleGrabTime}
                 title="Grab the current playback time"
-                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
               >
                 <ClockIcon className="h-3 w-3" />
                 <span>Grab time</span>
@@ -1467,7 +1467,7 @@ function ReviewItemCard({
                 type="button"
                 onClick={() => handleAnnotate('circle')}
                 title="Draw a region on the asset"
-                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
               >
                 <PenIcon className="h-3 w-3" />
                 <span>Annotate</span>
@@ -1489,7 +1489,7 @@ function ReviewItemCard({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-gray-200 text-gray-500 hover:text-[#2B79F7] hover:border-[#2B79F7] transition-colors"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-[var(--border-primary)] text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:border-[#2B79F7] transition-colors"
               aria-label="Attach files"
               title="Attach files (5MB max each)"
             >
@@ -1513,7 +1513,7 @@ function ReviewItemCard({
                     textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                   }, 300)
                 }}
-                className="w-full resize-none px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-gray-400"
+                className="w-full resize-none px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && mentionQuery === null) {
                     e.preventDefault()
@@ -1525,13 +1525,13 @@ function ReviewItemCard({
                 }}
               />
               {mentionQuery !== null && filteredAssignees.length > 0 && (
-                <div className="absolute z-10 left-0 right-0 bottom-full mb-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg text-xs">
+                <div className="absolute z-10 left-0 right-0 bottom-full mb-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg text-xs">
                   {filteredAssignees.slice(0, 6).map((a) => (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => insertMention(a)}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 text-left"
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[var(--bg-tertiary)] text-left"
                     >
                       {a.profile_picture_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -1551,7 +1551,7 @@ function ReviewItemCard({
                 </div>
               )}
               {mentionQuery !== null && filteredAssignees.length === 0 && (
-                <div className="absolute z-10 left-0 right-0 bottom-full mb-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs px-2.5 py-1.5 text-gray-400">
+                <div className="absolute z-10 left-0 right-0 bottom-full mb-1 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg text-xs px-2.5 py-1.5 text-[var(--text-tertiary)]">
                   No team members match.
                 </div>
               )}
@@ -1566,7 +1566,7 @@ function ReviewItemCard({
             </button>
           </div>
           {draftMentionedAssignees.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500">
+            <div className="flex items-center gap-1 flex-wrap text-[10px] text-[var(--text-tertiary)]">
               <span>Tagging:</span>
               {draftMentionedAssignees.map((a) => (
                 <span
@@ -1644,14 +1644,14 @@ function CommentAttachments({
                 </div>
               </div>
             ) : (
-              <div className="aspect-square flex items-center justify-center text-gray-400">
+              <div className="aspect-square flex items-center justify-center text-[var(--text-tertiary)]">
                 <FileIconForName name={att.name} className="h-6 w-6" />
               </div>
             )}
-            <div className="px-2 py-1 border-t border-gray-100">
-              <p className="text-[11px] text-gray-700 truncate">{att.name}</p>
+            <div className="px-2 py-1 border-t border-[var(--border-primary)]">
+              <p className="text-[11px] text-[var(--text-secondary)] truncate">{att.name}</p>
               {att.size != null && (
-                <p className="text-[10px] text-gray-400">{formatBytes(att.size)}</p>
+                <p className="text-[10px] text-[var(--text-tertiary)]">{formatBytes(att.size)}</p>
               )}
             </div>
           </>
@@ -1663,7 +1663,7 @@ function CommentAttachments({
               <button
                 type="button"
                 onClick={() => onPreview(att, inAppKind)}
-                className="block w-full text-left rounded-lg border border-gray-200 hover:border-[#2B79F7] overflow-hidden bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="block w-full text-left rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] overflow-hidden bg-[var(--bg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 title={att.name}
               >
                 {inner}
@@ -1673,7 +1673,7 @@ function CommentAttachments({
                 href={att.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-lg border border-gray-200 hover:border-[#2B79F7] overflow-hidden bg-gray-50"
+                className="block rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] overflow-hidden bg-[var(--bg-tertiary)]"
                 title={att.name}
               >
                 {inner}
@@ -1723,7 +1723,7 @@ function CollapsibleText({
   const needsCollapse = trimmed.length > previewChars
   if (!needsCollapse) {
     return (
-      <p className="text-sm text-gray-600 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+      <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {trimmed}
       </p>
     )
@@ -1733,7 +1733,7 @@ function CollapsibleText({
   while (cut > 80 && !/\s/.test(trimmed.charAt(cut))) cut -= 1
   const preview = trimmed.slice(0, cut).trimEnd()
   return (
-    <div className="text-sm text-gray-600">
+    <div className="text-sm text-[var(--text-secondary)]">
       <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {expanded ? trimmed : `${preview}…`}
       </p>
@@ -1772,7 +1772,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (isImage) {
     return (
-      <div className="rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
+      <div className="rounded-xl overflow-hidden border border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}
@@ -1785,7 +1785,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (isVideo) {
     return (
-      <div className="rounded-xl overflow-hidden border border-gray-100 bg-black">
+      <div className="rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black">
         <video
           src={url}
           controls
@@ -1801,7 +1801,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (yt) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-black aspect-video">
+      <div className="relative rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black aspect-video">
         <iframe
           src={`https://www.youtube.com/embed/${yt}?rel=0&modestbranding=1`}
           title={title}
@@ -1815,7 +1815,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (vimeoId) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-black aspect-video">
+      <div className="relative rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black aspect-video">
         <iframe
           src={`https://player.vimeo.com/video/${vimeoId}`}
           title={title}
@@ -1829,7 +1829,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (driveEmbed) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-black aspect-video">
+      <div className="relative rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black aspect-video">
         <iframe
           src={driveEmbed}
           title={title}
@@ -1843,7 +1843,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
 
   if (dropboxEmbed) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-black aspect-video">
+      <div className="relative rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black aspect-video">
         <iframe src={dropboxEmbed} title={title} allowFullScreen className="absolute inset-0 h-full w-full" />
       </div>
     )
@@ -1857,11 +1857,11 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-xl border border-gray-200 bg-gray-50 hover:border-[#2B79F7] hover:bg-[#E8F1FF] transition-colors p-6 text-center"
+      className="block rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] hover:border-[#2B79F7] hover:bg-[#E8F1FF] transition-colors p-6 text-center"
     >
-      <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-      <p className="text-sm font-medium text-gray-700">Open asset in a new tab</p>
-      <p className="text-[11px] text-gray-400 mt-1 break-all [overflow-wrap:anywhere]">{url}</p>
+      <FileText className="h-8 w-8 mx-auto text-[var(--text-tertiary)] mb-2" />
+      <p className="text-sm font-medium text-[var(--text-secondary)]">Open asset in a new tab</p>
+      <p className="text-[11px] text-[var(--text-tertiary)] mt-1 break-all [overflow-wrap:anywhere]">{url}</p>
     </a>
   )
 }

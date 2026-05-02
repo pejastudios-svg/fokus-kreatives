@@ -145,20 +145,20 @@ export default function SeriesFormPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+        <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
   }
 
   if (error && !form) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Link not available</h2>
-            <p className="text-gray-500">{error}</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Link not available</h2>
+            <p className="text-[var(--text-tertiary)]">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -167,12 +167,12 @@ export default function SeriesFormPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Got it - thank you!</h2>
-            <p className="text-gray-500">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Got it - thank you!</h2>
+            <p className="text-[var(--text-tertiary)]">
               Your stories are about to become {form?.series_length || 30} {form?.series_label?.toLowerCase() || 'days'} of content. You can close this page.
             </p>
           </CardContent>
@@ -187,7 +187,7 @@ export default function SeriesFormPage() {
   const labelLower = form.series_label.toLowerCase()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-tertiary)]">
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -206,17 +206,17 @@ export default function SeriesFormPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-                  <h1 className="text-2xl font-bold text-gray-900">{form.title}</h1>
+                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">{form.title}</h1>
                 </div>
-                <p className="text-sm text-gray-500">for {displayName}</p>
+                <p className="text-sm text-[var(--text-tertiary)]">for {displayName}</p>
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--text-secondary)]">
               You&rsquo;re filling out the spine for a {form.series_length}-{labelLower} series.
               One question per {labelLower}. Each answer becomes that {labelLower}&rsquo;s script.
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-[var(--text-secondary)] mt-2">
               <strong>Be specific.</strong> The point is the actual moment, the actual mistake,
               the actual lesson. 3-8 sentences is perfect. Polished, generic answers turn into
               polished, generic videos. Raw turns into real.
@@ -233,17 +233,17 @@ export default function SeriesFormPage() {
           <Card key={q.id}>
             <CardHeader>
               <div className="flex items-start gap-3">
-                <span className="shrink-0 h-8 w-8 rounded-full bg-[#E8F1FF] text-[#2B79F7] text-xs font-semibold flex items-center justify-center">
+                <span className="shrink-0 h-8 w-8 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
                   {q.entry_index}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">
                     {form.series_label} {q.entry_index}
                     {q.beat_type && (
-                      <span className="ml-2 text-gray-500">· {BEAT_LABEL[q.beat_type] || q.beat_type}</span>
+                      <span className="ml-2 text-[var(--text-tertiary)]">· {BEAT_LABEL[q.beat_type] || q.beat_type}</span>
                     )}
                   </p>
-                  <h3 className="text-base font-semibold text-gray-900">{q.text}</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">{q.text}</h3>
                 </div>
               </div>
             </CardHeader>
@@ -256,7 +256,7 @@ export default function SeriesFormPage() {
                   'Tell the actual story - 3 to 8 sentences. Specific moments beat polished summaries.'
                 }
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-y"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-y"
               />
             </CardContent>
           </Card>
@@ -266,8 +266,8 @@ export default function SeriesFormPage() {
           <div className="p-4 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
         )}
 
-        <div className="flex items-center justify-between flex-wrap gap-3 sticky bottom-4 bg-gray-50/95 py-2">
-          <p className="text-sm text-gray-500">
+        <div className="flex items-center justify-between flex-wrap gap-3 sticky bottom-4 bg-[var(--bg-tertiary)]/95 py-2">
+          <p className="text-sm text-[var(--text-tertiary)]">
             {answeredCount} of {sortedQuestions.length} answered
           </p>
           <Button
@@ -280,7 +280,7 @@ export default function SeriesFormPage() {
           </Button>
         </div>
 
-        <p className="text-xs text-gray-400 text-center">Powered by Fokus Kreativez</p>
+        <p className="text-xs text-[var(--text-tertiary)] text-center">Powered by Fokus Kreativez</p>
       </div>
     </div>
   )

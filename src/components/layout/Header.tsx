@@ -260,23 +260,23 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="flex items-center justify-between h-16 md:h-20 px-4 md:px-8 bg-white border-b border-gray-200 gap-3">
+    <header className="flex items-center justify-between h-14 px-4 md:px-6 gap-3">
       <div className="min-w-0 flex-1">
-        <h1 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{title}</h1>
-        {subtitle && <p className="text-xs md:text-sm text-gray-500 mt-1 truncate">{subtitle}</p>}
+        <h1 className="text-sm md:text-base font-semibold text-[var(--text-primary)] truncate">{title}</h1>
+        {subtitle && <p className="text-[11px] text-[var(--text-tertiary)] truncate">{subtitle}</p>}
       </div>
 
       <div ref={wrapRef} className="relative shrink-0">
         <button
           type="button"
           onClick={() => setShowNotif((prev) => !prev)}
-          className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          className="relative h-9 w-9 inline-flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
           aria-label="Notifications"
           aria-expanded={showNotif}
         >
-          <Bell className="h-5 w-5 text-gray-500" />
+          <Bell className="h-4 w-4 text-[var(--text-secondary)]" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-medium flex items-center justify-center">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -284,18 +284,18 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         {notifMounted && (
           <div
-            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 z-50 origin-top-right transition-all duration-200 ease-out ${
+            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-[var(--bg-primary)] rounded-xl shadow-lg border border-[var(--border-primary)] z-50 origin-top-right transition-all duration-200 ease-out ${
               showNotif ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
             }`}
           >
-            <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold text-gray-800">Notifications</span>
+            <div className="px-4 py-2 border-b border-[var(--border-primary)] flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
               <div className="flex items-center gap-1">
                 {unreadCount > 0 && (
                   <button
                     type="button"
                     onClick={() => void markAllAsRead()}
-                    className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] px-2 py-1 rounded-md hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] px-2 py-1 rounded-md hover:bg-[var(--bg-tertiary)] transition-colors"
                     title="Mark all as read"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
@@ -306,7 +306,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                   <button
                     type="button"
                     onClick={() => void clearAll()}
-                    className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-red-600 px-2 py-1 rounded-md hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-red-600 px-2 py-1 rounded-md hover:bg-[var(--bg-tertiary)] transition-colors"
                     title="Clear all"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -316,7 +316,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                 <button
                   type="button"
                   onClick={() => setShowNotif(false)}
-                  className="p-1 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-50"
+                  className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] rounded-md hover:bg-[var(--bg-tertiary)]"
                   aria-label="Close"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -326,7 +326,7 @@ export function Header({ title, subtitle }: HeaderProps) {
 
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-gray-400 text-center">No notifications yet.</p>
+                <p className="px-4 py-6 text-xs text-[var(--text-tertiary)] text-center">No notifications yet.</p>
               ) : (
                 notifications.map((n) => (
                   <NotificationRowItem
@@ -359,7 +359,7 @@ function NotificationRowItem({
 }) {
   return (
     <div
-      className={`group relative flex items-start gap-2 border-b border-gray-100 hover:bg-gray-50 ${
+      className={`group relative flex items-start gap-2 border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] ${
         !n.read_at ? 'bg-blue-50/60' : ''
       }`}
     >
@@ -368,8 +368,8 @@ function NotificationRowItem({
         onClick={onOpen}
         className="flex-1 min-w-0 text-left px-4 py-3"
       >
-        <p className="text-xs text-gray-800 break-words">{text}</p>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-xs text-[var(--text-primary)] break-words">{text}</p>
+        <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
           {new Date(n.created_at).toLocaleString(undefined, {
             month: 'short',
             day: 'numeric',
@@ -384,7 +384,7 @@ function NotificationRowItem({
           e.stopPropagation()
           onDelete()
         }}
-        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 mt-1 mr-2 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50"
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 mt-1 mr-2 text-[var(--text-tertiary)] hover:text-red-600 rounded-md hover:bg-red-500/10"
         aria-label="Delete notification"
         title="Delete"
       >

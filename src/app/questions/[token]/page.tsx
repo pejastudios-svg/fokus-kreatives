@@ -106,20 +106,20 @@ export default function QuestionFormPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+        <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
   }
 
   if (error && !form) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Link not available</h2>
-            <p className="text-gray-500">{error}</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Link not available</h2>
+            <p className="text-[var(--text-tertiary)]">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -128,12 +128,12 @@ export default function QuestionFormPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Thanks - we got it!</h2>
-            <p className="text-gray-500">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Thanks - we got it!</h2>
+            <p className="text-[var(--text-tertiary)]">
               Your answers are being turned into content ideas right now. You can close this page.
             </p>
           </CardContent>
@@ -147,7 +147,7 @@ export default function QuestionFormPage() {
   const displayName = client?.business_name || client?.name || 'your brand'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-tertiary)]">
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -166,19 +166,19 @@ export default function QuestionFormPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">
                     {form.title || 'Content Braindump'}
                   </h1>
                 </div>
-                <p className="text-sm text-gray-500">for {displayName}</p>
+                <p className="text-sm text-[var(--text-tertiary)]">for {displayName}</p>
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--text-secondary)]">
               Answer what you can. Every answer becomes a script. Specifics win - real stories,
               mistakes, wins, and hot takes turn into content that actually sounds like you.
               {form.already_submitted && (
-                <span className="block mt-2 text-xs text-gray-500">
+                <span className="block mt-2 text-xs text-[var(--text-tertiary)]">
                   You&apos;ve submitted this before - feel free to add more answers and resubmit.
                 </span>
               )}
@@ -190,13 +190,13 @@ export default function QuestionFormPage() {
           <Card key={q.id}>
             <CardHeader>
               <div className="flex items-start gap-3">
-                <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] text-xs font-semibold flex items-center justify-center">
+                <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
                   {idx + 1}
                 </span>
                 <div className="flex-1">
-                  <h3 className="text-base font-semibold text-gray-900">{q.text}</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">{q.text}</h3>
                   <div className="mt-1">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] capitalize">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] capitalize">
                       {PILLAR_LABEL[q.pillar] || q.pillar}
                     </span>
                   </div>
@@ -209,7 +209,7 @@ export default function QuestionFormPage() {
                 onChange={(e) => handleChange(q.id, e.target.value)}
                 placeholder={q.placeholder || 'Type your answer - 2 to 6 sentences is perfect.'}
                 rows={4}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </CardContent>
           </Card>
@@ -220,7 +220,7 @@ export default function QuestionFormPage() {
         )}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-tertiary)]">
             {answeredCount} of {form.questions.length} answered
           </p>
           <Button
@@ -233,7 +233,7 @@ export default function QuestionFormPage() {
           </Button>
         </div>
 
-        <p className="text-xs text-gray-400 text-center">Powered by Fokus Kreativez</p>
+        <p className="text-xs text-[var(--text-tertiary)] text-center">Powered by Fokus Kreativez</p>
       </div>
     </div>
   )

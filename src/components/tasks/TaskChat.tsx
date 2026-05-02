@@ -223,7 +223,7 @@ export function TaskChat({ taskId, members }: Props) {
           <MessageSquare className="h-4 w-4" />
           <span className="text-sm font-medium">Chat</span>
           {messages.length > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-[#2B79F7] text-[10px] font-semibold">
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-card)] text-[#2B79F7] text-[10px] font-semibold">
               {messages.length}
             </span>
           )}
@@ -231,31 +231,31 @@ export function TaskChat({ taskId, members }: Props) {
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-30 w-full sm:w-96 bg-white border-l border-gray-200 shadow-xl flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-30 w-full sm:w-96 bg-[var(--bg-card)] border-l border-[var(--border-primary)] shadow-xl flex flex-col transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full pointer-events-none'
         }`}
         aria-hidden={!open}
       >
-        <header className="flex items-center justify-between px-4 h-14 border-b border-gray-200 shrink-0">
+        <header className="flex items-center justify-between px-4 h-14 border-b border-[var(--border-primary)] shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-[#2B79F7]" />
-            <h3 className="text-sm font-semibold text-gray-900">Task chat</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Task chat</h3>
           </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
             aria-label="Close chat"
           >
             <X className="h-4 w-4" />
           </button>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[var(--bg-tertiary)]">
           {isLoading ? (
-            <p className="text-xs text-gray-400 text-center py-4">Loading messages…</p>
+            <p className="text-xs text-[var(--text-tertiary)] text-center py-4">Loading messages…</p>
           ) : messages.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-8">
+            <p className="text-xs text-[var(--text-tertiary)] text-center py-8">
               No messages yet. Start the conversation.
             </p>
           ) : (
@@ -278,17 +278,17 @@ export function TaskChat({ taskId, members }: Props) {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-gray-900 truncate">
+                      <span className="text-xs font-medium text-[var(--text-primary)] truncate">
                         {author?.name || author?.email || 'Unknown'}
                       </span>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-[var(--text-tertiary)]">
                         {new Date(m.created_at).toLocaleTimeString(undefined, {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
+                    <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] mt-0.5">
                       {m.body}
                     </p>
                   </div>
@@ -298,15 +298,15 @@ export function TaskChat({ taskId, members }: Props) {
           )}
         </div>
 
-        <div className="relative border-t border-gray-200 p-3 bg-white shrink-0">
+        <div className="relative border-t border-[var(--border-primary)] p-3 bg-[var(--bg-card)] shrink-0">
           {mentionState && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-10">
+            <div className="absolute bottom-full left-3 right-3 mb-2 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg shadow-lg overflow-hidden z-10">
               {filteredMentions.map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => insertMention(m)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-tertiary)]"
                 >
                   {m.profile_picture_url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
@@ -321,10 +321,10 @@ export function TaskChat({ taskId, members }: Props) {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">
+                    <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                       {m.name || 'Unnamed'}
                     </p>
-                    <p className="text-[10px] text-gray-400 truncate">{m.email}</p>
+                    <p className="text-[10px] text-[var(--text-tertiary)] truncate">{m.email}</p>
                   </div>
                 </button>
               ))}
@@ -342,7 +342,7 @@ export function TaskChat({ taskId, members }: Props) {
                 onKeyDown={onKeyDown}
                 placeholder="Message… use @ to mention"
                 rows={2}
-                className="w-full resize-none px-3 py-2 pr-9 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-gray-400"
+                className="w-full resize-none px-3 py-2 pr-9 rounded-lg border border-[var(--border-primary)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
               />
               <button
                 type="button"
@@ -350,7 +350,7 @@ export function TaskChat({ taskId, members }: Props) {
                   setDraft((d) => `${d}@`)
                   inputRef.current?.focus()
                 }}
-                className="absolute right-2 bottom-2 p-1 rounded text-gray-400 hover:text-[#2B79F7]"
+                className="absolute right-2 bottom-2 p-1 rounded text-[var(--text-tertiary)] hover:text-[#2B79F7]"
                 aria-label="Insert mention"
                 tabIndex={-1}
               >

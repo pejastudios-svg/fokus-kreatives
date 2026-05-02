@@ -92,7 +92,7 @@ const STATUS_BY_ID = STATUSES.reduce(
 )
 
 const PRIORITIES: { id: TaskPriority; label: string; color: string }[] = [
-  { id: 'low',    label: 'Low',    color: 'text-gray-500' },
+  { id: 'low',    label: 'Low',    color: 'text-[var(--text-tertiary)]' },
   { id: 'medium', label: 'Medium', color: 'text-blue-500' },
   { id: 'high',   label: 'High',   color: 'text-amber-500' },
   { id: 'urgent', label: 'Urgent', color: 'text-red-600' },
@@ -397,7 +397,7 @@ export default function TaskDetailPage() {
       <>
         <Header title="Task" />
         <div className="p-4 md:p-8 text-center">
-          <p className="text-gray-500 mb-4">Task not found.</p>
+          <p className="text-[var(--text-tertiary)] mb-4">Task not found.</p>
           <Link href="/tasks" className="text-[#2B79F7] hover:underline">
             Back to tasks
           </Link>
@@ -428,7 +428,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => setShowLog((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg"
             >
               <History className="h-4 w-4" />
               History
@@ -436,7 +436,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => setShowSaveTemplate(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg"
             >
               <Bookmark className="h-4 w-4" />
               Save as template
@@ -445,7 +445,7 @@ export default function TaskDetailPage() {
               type="button"
               onClick={() => void handleDuplicate()}
               disabled={isDuplicating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg disabled:opacity-50"
             >
               <Copy className="h-4 w-4" />
               {isDuplicating ? 'Duplicating…' : 'Duplicate'}
@@ -453,7 +453,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-500/10 rounded-lg"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -489,14 +489,14 @@ export default function TaskDetailPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="w-full text-2xl md:text-3xl font-bold text-gray-900 bg-transparent border-0 outline-none focus:ring-0 p-0"
+              className="w-full text-2xl md:text-3xl font-bold text-[var(--text-primary)] bg-transparent border-0 outline-none focus:ring-0 p-0"
               placeholder="Task name"
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Status picker */}
               <div data-status-pop className="relative">
-                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1.5">
                   Status
                 </p>
                 <button
@@ -516,7 +516,7 @@ export default function TaskDetailPage() {
                   />
                 </button>
                 {statusOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-2 bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     {STATUSES.map((s) => {
                       const active = s.id === status
                       return (
@@ -524,7 +524,7 @@ export default function TaskDetailPage() {
                           key={s.id}
                           type="button"
                           onClick={() => onStatusChange(s.id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] ${
                             active ? 'bg-[#E8F1FF]' : ''
                           }`}
                         >
@@ -532,7 +532,7 @@ export default function TaskDetailPage() {
                             className="h-2.5 w-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: s.dot }}
                           />
-                          <span className="flex-1 text-gray-900">{s.label}</span>
+                          <span className="flex-1 text-[var(--text-primary)]">{s.label}</span>
                           {active && <Check className="h-4 w-4 text-[#2B79F7]" />}
                         </button>
                       )
@@ -543,7 +543,7 @@ export default function TaskDetailPage() {
 
               {/* Assignees popover */}
               <div data-assignee-pop className="relative">
-                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-1.5">
                   Assignees
                 </p>
                 <button
@@ -552,10 +552,10 @@ export default function TaskDetailPage() {
                     setAssigneePopoverOpen((v) => !v)
                     setAssigneeQuery('')
                   }}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition bg-white"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[var(--border-primary)] hover:border-[var(--border-primary)] transition bg-[var(--bg-card)]"
                 >
                   {assigneeMembers.length === 0 ? (
-                    <span className="text-sm text-gray-400">Add assignees</span>
+                    <span className="text-sm text-[var(--text-tertiary)]">Add assignees</span>
                   ) : (
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className="flex -space-x-2">
@@ -564,35 +564,35 @@ export default function TaskDetailPage() {
                         ))}
                       </div>
                       {assigneeMembers.length > 4 && (
-                        <span className="text-xs text-gray-500">+{assigneeMembers.length - 4}</span>
+                        <span className="text-xs text-[var(--text-tertiary)]">+{assigneeMembers.length - 4}</span>
                       )}
-                      <span className="text-xs text-gray-500 truncate">
+                      <span className="text-xs text-[var(--text-tertiary)] truncate">
                         {assigneeMembers.length} {assigneeMembers.length === 1 ? 'person' : 'people'}
                       </span>
                     </div>
                   )}
                   <ChevronDown
-                    className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${assigneePopoverOpen ? 'rotate-180' : ''}`}
+                    className={`h-4 w-4 text-[var(--text-tertiary)] shrink-0 transition-transform ${assigneePopoverOpen ? 'rotate-180' : ''}`}
                   />
                 </button>
                 {assigneePopoverOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-2 bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                    <div className="p-2 border-b border-gray-100">
+                  <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="p-2 border-b border-[var(--border-primary)]">
                       <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
                         <input
                           autoFocus
                           type="text"
                           value={assigneeQuery}
                           onChange={(e) => setAssigneeQuery(e.target.value)}
                           placeholder="Search team…"
-                          className="w-full pl-8 pr-2 py-1.5 rounded-md border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                         />
                       </div>
                     </div>
                     <ul className="max-h-72 overflow-y-auto py-1">
                       {filteredMembers.length === 0 ? (
-                        <li className="px-3 py-3 text-xs text-gray-400 text-center">No matches</li>
+                        <li className="px-3 py-3 text-xs text-[var(--text-tertiary)] text-center">No matches</li>
                       ) : (
                         filteredMembers.map((m) => {
                           const selected = assigneeIds.includes(m.id)
@@ -601,16 +601,16 @@ export default function TaskDetailPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleAssignee(m.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 ${
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--bg-tertiary)] ${
                                   selected ? 'bg-[#E8F1FF]' : ''
                                 }`}
                               >
                                 <Avatar member={m} className="h-7 w-7 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                                     {m.name || 'Unnamed'}
                                   </p>
-                                  <p className="text-[11px] text-gray-400 truncate">{m.email}</p>
+                                  <p className="text-[11px] text-[var(--text-tertiary)] truncate">{m.email}</p>
                                 </div>
                                 {selected && <Check className="h-4 w-4 text-[#2B79F7] shrink-0" />}
                               </button>
@@ -630,13 +630,13 @@ export default function TaskDetailPage() {
         <Card className="mb-4">
           <CardContent className="p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium flex items-center gap-1.5 mb-1.5">
+              <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium flex items-center gap-1.5 mb-1.5">
                 <Flag className="h-3.5 w-3.5" /> Priority
               </label>
               <select
                 value={priority}
                 onChange={(e) => onPriorityChange(e.target.value as TaskPriority)}
-                className="w-full pl-4 pr-10 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-4 pr-10 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -647,7 +647,7 @@ export default function TaskDetailPage() {
             </div>
 
             <div>
-              <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium flex items-center gap-1.5 mb-1.5">
+              <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium flex items-center gap-1.5 mb-1.5">
                 <Calendar className="h-3.5 w-3.5" /> Start date
               </label>
               <input
@@ -655,12 +655,12 @@ export default function TaskDetailPage() {
                 value={startAt}
                 onChange={(e) => setStartAt(e.target.value)}
                 onBlur={() => onDateBlur('start')}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
             <div>
-              <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium flex items-center gap-1.5 mb-1.5">
+              <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium flex items-center gap-1.5 mb-1.5">
                 <Calendar className="h-3.5 w-3.5" /> Due date
               </label>
               <input
@@ -668,15 +668,15 @@ export default function TaskDetailPage() {
                 value={dueAt}
                 onChange={(e) => setDueAt(e.target.value)}
                 onBlur={() => onDateBlur('due')}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
             <div>
-              <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium flex items-center gap-1.5 mb-1.5">
+              <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium flex items-center gap-1.5 mb-1.5">
                 <Users className="h-3.5 w-3.5" /> Created
               </label>
-              <p className="text-sm text-gray-700 py-2">
+              <p className="text-sm text-[var(--text-secondary)] py-2">
                 {new Date(task.created_at).toLocaleString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -690,7 +690,7 @@ export default function TaskDetailPage() {
         {/* Description */}
         <Card className="mb-4">
           <CardContent className="p-5 md:p-6">
-            <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-2">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium mb-2">
               Description
             </p>
             <textarea
@@ -699,7 +699,7 @@ export default function TaskDetailPage() {
               onBlur={onDescriptionBlur}
               placeholder="Add a description…"
               rows={4}
-              className="w-full text-sm text-gray-700 bg-transparent border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-gray-400"
+              className="w-full text-sm text-[var(--text-secondary)] bg-transparent border border-[var(--border-primary)] rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
             />
           </CardContent>
         </Card>
@@ -731,36 +731,36 @@ export default function TaskDetailPage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-[#2B79F7]" />
-                  <h3 className="text-sm font-semibold text-gray-900">Status history</h3>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Status history</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowLog(false)}
-                  className="p-1 rounded text-gray-400 hover:text-gray-700"
+                  className="p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                   aria-label="Close history"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               {statusLog.length === 0 ? (
-                <p className="text-sm text-gray-400">No status changes yet.</p>
+                <p className="text-sm text-[var(--text-tertiary)]">No status changes yet.</p>
               ) : (
                 <ul className="space-y-2">
                   {statusLog.map((entry) => (
                     <li
                       key={entry.id}
-                      className="flex items-center justify-between gap-3 text-sm py-2 border-b border-gray-100 last:border-0"
+                      className="flex items-center justify-between gap-3 text-sm py-2 border-b border-[var(--border-primary)] last:border-0"
                     >
                       <span className="inline-flex items-center gap-2">
                         {entry.from_status ? (
                           <StatusPill status={entry.from_status} muted />
                         ) : (
-                          <span className="text-gray-400 text-xs">Created</span>
+                          <span className="text-[var(--text-tertiary)] text-xs">Created</span>
                         )}
-                        <span className="text-gray-300">→</span>
+                        <span className="text-[var(--text-tertiary)]">→</span>
                         <StatusPill status={entry.to_status} />
                       </span>
-                      <span className="text-xs text-gray-400 text-right shrink-0">
+                      <span className="text-xs text-[var(--text-tertiary)] text-right shrink-0">
                         {entry.users?.name || entry.users?.email || 'System'}
                         <br />
                         {new Date(entry.changed_at).toLocaleString()}

@@ -411,7 +411,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                 disabled={isLocked}
                 aria-label={`Go to slide ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === safeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'
+                  i === safeIndex ? 'w-4 bg-[var(--bg-card)]' : 'w-1.5 bg-white/60'
                 } disabled:pointer-events-none`}
               />
             ))}
@@ -429,7 +429,7 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         {attachments.map((a, i) => (
           <div
             key={`${a.public_id}-${i}`}
-            className="aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50 relative"
+            className="aspect-square rounded-lg overflow-hidden border border-[var(--border-primary)] bg-[var(--bg-tertiary)] relative"
           >
             <AssetView
               asset={a}

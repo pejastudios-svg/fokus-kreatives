@@ -75,7 +75,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50">
+      <div className="agency-scope min-h-screen bg-[var(--bg-secondary)] dark:bg-black">
         {/* Desktop sidebar - fixed-positioned, only this controls actual width.
             `group/sidebar` lets labels inside fade on hover via group-hover. */}
         <aside
@@ -124,7 +124,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             collapsed ? 'md:pl-16' : 'md:pl-64',
           )}
         >
-          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-white border-b border-gray-200">
+          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
             <BurgerButton open={mobileOpen} onClick={() => setMobileOpen((o) => !o)} />
             <Image
               src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
@@ -136,7 +136,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <span className="w-10" />
           </header>
 
-          <main className="flex-1 overflow-auto bg-gray-100">
+          <main className="flex-1 overflow-auto bg-[var(--bg-secondary)] dark:bg-black">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>
@@ -157,7 +157,7 @@ function BurgerButton({ open, onClick }: { open: boolean; onClick: () => void })
       type="button"
       onClick={onClick}
       aria-label={open ? 'Close menu' : 'Open menu'}
-      className="relative h-10 w-10 inline-flex items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+      className="relative h-10 w-10 inline-flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
     >
       <span className="relative block h-3 w-5">
         <span

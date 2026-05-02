@@ -217,15 +217,15 @@ function LoginForm() {
 
           {mode === 'login' && (
             <>
-              <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-center text-[var(--text-primary)] mb-2">
                 Welcome Back
               </h2>
-              <p className="text-center text-gray-500 mb-8">
+              <p className="text-center text-[var(--text-tertiary)] mb-8">
                 Sign in to your account
               </p>
 
               {reason === 'idle' && (
-                <div className="mb-6 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm text-center">
+                <div className="mb-6 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 dark:bg-[#1E3A6F] dark:border-transparent dark:text-[#93C5FD] text-sm text-center">
                   You were signed out due to inactivity. Please sign in again.
                 </div>
               )}
@@ -281,15 +281,15 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
+                className="mx-auto flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to sign in
               </button>
-              <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-center text-[var(--text-primary)] mb-2">
                 Reset password
               </h2>
-              <p className="text-center text-gray-500 mb-8">
+              <p className="text-center text-[var(--text-tertiary)] mb-8">
                 We&apos;ll email you a 6-digit code to reset your password.
               </p>
 
@@ -318,15 +318,15 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => switchMode('forgot-email')}
-                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
+                className="mx-auto flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Use a different email
               </button>
-              <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-center text-[var(--text-primary)] mb-2">
                 Enter the code
               </h2>
-              <p className="text-center text-gray-500 mb-8">
+              <p className="text-center text-[var(--text-tertiary)] mb-8">
                 We sent a 6-digit code to <span className="font-medium">{resetEmail}</span>.
               </p>
 
@@ -389,8 +389,8 @@ function LoginForm() {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Password reset</h2>
-                <p className="text-gray-500">
+                <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Password reset</h2>
+                <p className="text-[var(--text-tertiary)]">
                   Your password has been updated. Sign in with your new password.
                 </p>
               </div>

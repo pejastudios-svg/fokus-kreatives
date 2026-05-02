@@ -193,7 +193,7 @@ export function TopicsBank({ clientId }: Props) {
                         Added {new Date(t.created_at).toLocaleDateString()}
                       </span>
                       {used && (
-                        <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--bg-card-hover)] text-[var(--text-secondary)]">
                           Used {new Date(t.used_at!).toLocaleDateString()}
                         </span>
                       )}
@@ -216,7 +216,7 @@ export function TopicsBank({ clientId }: Props) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-red-500 hover:bg-red-50"
+                      className="text-red-500 hover:bg-red-500/10"
                       onClick={() => setPendingDeleteId(t.id)}
                     >
                       <Trash2 className="h-4 w-4" />

@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Body
     const pillars = normalizePillars(body.pillars)
-    const count = Math.min(20, Math.max(8, body.count ?? 12))
+    const count = Math.min(100, Math.max(1, body.count ?? 12))
     const ctx = clientContext(body.clientProfile ?? null, body.clientName, body.businessName, body.industry)
 
     const system = `You design short-answer braindump forms for content creators.

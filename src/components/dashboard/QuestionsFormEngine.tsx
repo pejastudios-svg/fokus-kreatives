@@ -15,6 +15,7 @@ import {
   ExternalLink,
   RefreshCw,
   ClipboardList,
+  Eye,
 } from 'lucide-react'
 import { defaultBrandProfile, type BrandProfile } from '../clients/brandProfile'
 import type { FormQuestion, QuestionForm } from '@/lib/types/questionForm'
@@ -83,6 +84,15 @@ export function QuestionsFormEngine() {
   const [loadingForms, setLoadingForms] = useState(false)
 
   const [copiedUrl, setCopiedUrl] = useState('')
+
+  // Inline answers viewer: when the agency clicks the Eye icon on a
+  // submitted form, we fetch the question/answer pairs and expand the
+  // row to show them. Cached per-form so toggling closed/open is free.
+  const [expandedFormId, setExpandedFormId] = useState<string | null>(null)
+  const [answersByForm, setAnswersByForm] = useState<
+    Record<string, { text: string; pillar: string | null; answer: string | null }[]>
+  >({})
+  const [loadingAnswersFor, setLoadingAnswersFor] = useState<string | null>(null)
 
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === selectedClientId) || null,
@@ -225,6 +235,27 @@ export function QuestionsFormEngine() {
     setTimeout(() => setCopiedUrl(''), 2000)
   }
 
+  const toggleAnswers = async (form: { id: string; token: string }) => {
+    if (expandedFormId === form.id) {
+      setExpandedFormId(null)
+      return
+    }
+    setExpandedFormId(form.id)
+    if (answersByForm[form.id]) return
+    setLoadingAnswersFor(form.id)
+    try {
+      const res = await fetch(
+        `/api/question-form/answers?token=${encodeURIComponent(form.token)}`,
+      )
+      const data = await res.json()
+      if (data.success && data.submitted) {
+        setAnswersByForm((prev) => ({ ...prev, [form.id]: data.answers }))
+      }
+    } finally {
+      setLoadingAnswersFor(null)
+    }
+  }
+
   const [pendingDeleteFormId, setPendingDeleteFormId] = useState<string | null>(null)
 
   const deleteForm = async (id: string) => {
@@ -239,10 +270,10 @@ export function QuestionsFormEngine() {
       <Card className="card-premium">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-theme-primary">Question Form Generator</h3>
+            <ClipboardList className="h-4 w-4 text-[#2B79F7]" />
+            <h3 className="text-sm font-semibold text-theme-primary">Question Form Generator</h3>
           </div>
-          <p className="text-xs text-theme-secondary mt-1">
+          <p className="text-[11px] text-theme-tertiary mt-0.5">
             Generate a braindump form tailored to this client. Answers drop straight into their
             Topics Bank.
           </p>
@@ -278,8 +309,8 @@ export function QuestionsFormEngine() {
                     onClick={() => togglePillar(p.id)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       active
-                        ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                        : 'bg-theme-card text-theme-secondary border-theme-primary hover:border-[#5A9AFF]'
+                        ? 'bg-[#2B79F7] dark:bg-[#1E2A41] text-white border-[#2B79F7] hover:bg-[#5A9AFF] dark:hover:bg-[#243352]'
+                        : 'bg-theme-card text-theme-secondary dark:text-white border-theme-primary hover:border-[#5A9AFF] hover:bg-[var(--bg-card-hover)]'
                     }`}
                   >
                     {p.label}
@@ -296,10 +327,10 @@ export function QuestionsFormEngine() {
               </label>
               <input
                 type="number"
-                min={8}
-                max={20}
+                min={1}
+                max={100}
                 value={count}
-                onChange={(e) => setCount(Math.max(8, Math.min(20, Number(e.target.value) || 12)))}
+                onChange={(e) => setCount(Math.max(1, Math.min(100, Number(e.target.value) || 12)))}
                 className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
@@ -338,7 +369,7 @@ export function QuestionsFormEngine() {
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h3 className="text-lg font-semibold text-theme-primary">Review Questions</h3>
+                <h3 className="text-sm font-semibold text-theme-primary">Review Questions</h3>
                 <p className="text-xs text-theme-secondary">
                   Edit, reorder, or remove anything before you share the link.
                 </p>
@@ -356,7 +387,7 @@ export function QuestionsFormEngine() {
                 className="rounded-xl border border-theme-primary bg-theme-tertiary/30 p-3 space-y-2"
               >
                 <div className="flex items-start gap-2">
-                  <span className="shrink-0 h-6 w-6 rounded-full bg-[#E8F1FF] text-[#2B79F7] text-xs font-semibold flex items-center justify-center mt-1">
+                  <span className="shrink-0 h-6 w-6 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center mt-1">
                     {idx + 1}
                   </span>
                   <textarea
@@ -369,7 +400,7 @@ export function QuestionsFormEngine() {
                   <button
                     type="button"
                     onClick={() => removeQuestion(q.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0"
                     aria-label="Remove question"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -415,7 +446,7 @@ export function QuestionsFormEngine() {
           <CardHeader>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h3 className="text-lg font-semibold text-theme-primary">Past Forms</h3>
+                <h3 className="text-sm font-semibold text-theme-primary">Past Forms</h3>
                 <p className="text-xs text-theme-secondary">
                   Forms you&apos;ve shared with {selectedClient.name}.
                 </p>
@@ -442,51 +473,100 @@ export function QuestionsFormEngine() {
                 {pastForms.map((f) => {
                   const url = `${appOrigin}/questions/${f.token}`
                   const qCount = Array.isArray(f.questions) ? f.questions.length : 0
+                  const submitted = !!f.submitted_at
+                  const expanded = expandedFormId === f.id
+                  const answers = answersByForm[f.id]
                   return (
-                    <li
-                      key={f.id}
-                      className="p-3 flex flex-col md:flex-row md:items-center gap-3 bg-theme-card"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-theme-primary truncate">
-                          {f.title || 'Untitled form'}
-                        </p>
-                        <p className="text-xs text-theme-secondary">
-                          {qCount} questions ·{' '}
-                          {f.submitted_at
-                            ? `Submitted ${new Date(f.submitted_at).toLocaleDateString()}`
-                            : 'Awaiting submission'}{' '}
-                          · Created {new Date(f.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => copyUrl(url)}>
-                          {copiedUrl === url ? (
+                    <li key={f.id} className="bg-theme-card">
+                      <div className="p-3 flex flex-col md:flex-row md:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-theme-primary truncate">
+                            {f.title || 'Untitled form'}
+                          </p>
+                          <p className="text-xs text-theme-secondary">
+                            {qCount} questions ·{' '}
+                            {submitted
+                              ? `Submitted ${new Date(f.submitted_at!).toLocaleDateString()}`
+                              : 'Awaiting submission'}{' '}
+                            · Created {new Date(f.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <IconButton
+                            title={copiedUrl === url ? 'Copied' : 'Copy link'}
+                            onClick={() => copyUrl(url)}
+                          >
+                            {copiedUrl === url ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </IconButton>
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            <IconButton title="Open link">
+                              <ExternalLink className="h-4 w-4" />
+                            </IconButton>
+                          </a>
+                          {submitted && (
                             <>
-                              <Check className="h-4 w-4 mr-1" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-1" />
-                              Copy link
+                              <IconButton
+                                title={expanded ? 'Hide answers' : 'View answers'}
+                                onClick={() => toggleAnswers({ id: f.id, token: f.token })}
+                                active={expanded}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </IconButton>
+                              <IconButton
+                                title={
+                                  copiedUrl === `${appOrigin}/questions/${f.token}/answers`
+                                    ? 'Copied'
+                                    : 'Copy answers link'
+                                }
+                                onClick={() =>
+                                  copyUrl(`${appOrigin}/questions/${f.token}/answers`)
+                                }
+                              >
+                                {copiedUrl === `${appOrigin}/questions/${f.token}/answers` ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <ClipboardList className="h-4 w-4" />
+                                )}
+                              </IconButton>
                             </>
                           )}
-                        </Button>
-                        <a href={url} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="sm">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </a>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:bg-red-50"
-                          onClick={() => setPendingDeleteFormId(f.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <IconButton
+                            title="Delete"
+                            danger
+                            onClick={() => setPendingDeleteFormId(f.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
+                        </div>
                       </div>
+                      {expanded && (
+                        <div className="border-t border-theme-primary px-3 py-3 space-y-3">
+                          {loadingAnswersFor === f.id && !answers && (
+                            <p className="text-xs text-theme-tertiary">Loading answers…</p>
+                          )}
+                          {answers && answers.length === 0 && (
+                            <p className="text-xs text-theme-tertiary">No answers found.</p>
+                          )}
+                          {answers && answers.length > 0 && (
+                            <ol className="space-y-3 list-decimal list-inside">
+                              {answers.map((a, i) => (
+                                <li key={i} className="text-xs">
+                                  <span className="text-theme-primary font-medium">{a.text}</span>
+                                  <p className="mt-1 ml-5 text-theme-secondary whitespace-pre-wrap">
+                                    {a.answer || (
+                                      <span className="text-theme-tertiary italic">No answer</span>
+                                    )}
+                                  </p>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      )}
                     </li>
                   )
                 })}
@@ -510,5 +590,37 @@ export function QuestionsFormEngine() {
         onClose={() => setPendingDeleteFormId(null)}
       />
     </div>
+  )
+}
+
+function IconButton({
+  children,
+  onClick,
+  title,
+  danger,
+  active,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  title?: string
+  danger?: boolean
+  active?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors ${
+        danger
+          ? 'text-red-500 hover:bg-red-500/10'
+          : active
+            ? 'text-[#2B79F7] bg-[#2B79F7]/10'
+            : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

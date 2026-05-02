@@ -15,10 +15,10 @@ import {
 // asset URLs live in ClickUp custom fields the team fills in as they go.
 const CAMPAIGN_BRIEF = `
 Campaign brief:
-- The long-form pillar drives this campaign — produce that first.
-- Short-form, engagement reels, carousels, stories are repurposed from the long-form. Keep visual + voice consistent.
+- The long-form pillar drives this campaign. Produce that first.
+- Short-form, engagement reels, carousels, stories are repurposed from the long-form. Keep visual and voice consistent.
 - Drop links to each deliverable into the matching custom fields (Long Form Video, Short-Form Videos, Carousels, etc.) as you complete them.
-- Move this main task across the board as the campaign progresses; subtasks track each individual deliverable.
+- Move this main task across the board as the campaign progresses. Subtasks track each individual deliverable.
 `.trim()
 
 /**
@@ -28,16 +28,20 @@ Campaign brief:
  * is in the subtask name and the description carries the production rules.
  */
 const SUBTASK_INSTRUCTIONS = {
+  monthlyQuestions:
+    'Open the agency dashboard, switch to the Questions Form generator, pick this client and the number of questions you want to ask this month, generate, and share the public form link with the client. Once the client submits, open the Past Forms list, click View Answers on this submission, copy the answers link from the copy button next to it, and paste that link into the ANSWERED QUESTIONS custom field on this task.',
+  scriptCreation:
+    'Pick one of the client\'s answers from the submitted Questions form as the seed for this month\'s script. On the dashboard, switch to Script Package and generate the package against that topic. When the script is ready, paste the link into the SCRIPTS & TOPICS custom field on this task.',
   longForm:
-    'Pillar long-form video for this campaign. Produce this first; every other deliverable is cut from it.',
+    'Pillar long-form video for this campaign. Produce this first. Every other deliverable is cut from it.',
   thumbnail:
-    'YouTube thumbnail for the long-form. Test 2-3 variants if time allows. Drop the final into the Thumbnails custom field.',
+    'YouTube thumbnail for the long-form. Test 2 to 3 variants if time allows. Drop the final into the Thumbnails custom field.',
   shortForm:
-    'Cut from the long-form. 30-90 seconds each, vertical 9:16. Hook in the first 2 seconds. Drop links into the Short-Form Videos custom field.',
+    'Cut from the long-form. 30 to 90 seconds each, vertical 9:16. Hook in the first 2 seconds. Drop links into the Short-Form Videos custom field.',
   engagementReel:
-    'Punchy 15-30 second reels designed for shares and saves. Strong CTA in the caption. Drop links into the Engagement Reels custom field.',
+    'Punchy 15 to 30 second reels designed for shares and saves. Strong CTA in the caption. Drop links into the Engagement Reels custom field.',
   carousel:
-    '8-10 slides each. Slide 1 is the hook; last slide drives a save or a CTA. Drop links into the Carousels custom field.',
+    '8 to 10 slides each. Slide 1 is the hook. Last slide drives a save or a CTA. Drop links into the Carousels custom field.',
   story:
     'Native, not over-produced. Daily distribution. Drop links into the Stories custom field.',
 }
@@ -268,7 +272,20 @@ export async function POST(req: NextRequest) {
           // e.g. "Create 4 short-form videos" rather than four separate
           // subtasks. Keeps the parent task readable. Long-form + thumbnail
           // are always single-instance.
+          //
+          // The first two subtasks (monthly questions, script creation) come
+          // before the deliverables because they're the upstream inputs:
+          // questions feed the script, the script feeds the long-form, and
+          // the long-form feeds everything else.
           const planned: { name: string; description: string }[] = []
+          planned.push({
+            name: 'Generate monthly questions',
+            description: SUBTASK_INSTRUCTIONS.monthlyQuestions,
+          })
+          planned.push({
+            name: 'Script creation',
+            description: SUBTASK_INSTRUCTIONS.scriptCreation,
+          })
           planned.push({
             name: 'Create the long-form video',
             description: SUBTASK_INSTRUCTIONS.longForm,

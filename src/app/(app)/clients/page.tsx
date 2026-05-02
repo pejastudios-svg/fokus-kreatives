@@ -722,7 +722,7 @@ function SegmentedToggle({
         type="button"
         onClick={() => onChange(false)}
         className={`relative z-10 px-4 py-1.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1.5 ${
-          !showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary'
+          !showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
       >
         Active
@@ -738,7 +738,7 @@ function SegmentedToggle({
         type="button"
         onClick={() => onChange(true)}
         className={`relative z-10 px-4 py-1.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1.5 ${
-          showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary'
+          showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
       >
         Archived
@@ -763,7 +763,7 @@ function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: View
         className={`p-1.5 rounded-lg transition-colors ${
           mode === 'grid'
             ? 'bg-theme-card text-[#2B79F7] shadow-sm'
-            : 'text-theme-secondary hover:text-theme-primary'
+            : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
         aria-label="Grid view"
         title="Grid view"
@@ -776,7 +776,7 @@ function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: View
         className={`p-1.5 rounded-lg transition-colors ${
           mode === 'list'
             ? 'bg-theme-card text-[#2B79F7] shadow-sm'
-            : 'text-theme-secondary hover:text-theme-primary'
+            : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
         aria-label="List view"
         title="List view"

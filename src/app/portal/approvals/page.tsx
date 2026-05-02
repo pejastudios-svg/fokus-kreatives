@@ -145,17 +145,17 @@ export default function PortalApprovalsPage() {
     <PortalLayout>
       <div className="p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Approvals</h1>
-          <p className="text-gray-500 mt-1">Review and approve your content assets</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Approvals</h1>
+          <p className="text-[var(--text-tertiary)] mt-1">Review and approve your content assets</p>
         </div>
 
         {isLoading ? (
           <Card>
-            <CardContent className="py-10 text-center text-gray-500">Loading approvals...</CardContent>
+            <CardContent className="py-10 text-center text-[var(--text-tertiary)]">Loading approvals...</CardContent>
           </Card>
         ) : approvals.length === 0 ? (
           <Card>
-            <CardContent className="py-10 text-center text-gray-500">No approvals yet.</CardContent>
+            <CardContent className="py-10 text-center text-[var(--text-tertiary)]">No approvals yet.</CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
@@ -178,8 +178,8 @@ export default function PortalApprovalsPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">{a.title}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Created {createdDate}</p>
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{a.title}</h3>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Created {createdDate}</p>
                       </div>
                     </div>
 

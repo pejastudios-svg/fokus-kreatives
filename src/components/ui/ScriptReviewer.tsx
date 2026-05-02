@@ -68,7 +68,7 @@ export function ScriptReviewer({
             className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
               showChecklist
                 ? 'border-[#2B79F7] text-[#2B79F7] bg-[#E8F0FE]'
-                : 'border-gray-200 hover:border-[#2B79F7] hover:text-[#2B79F7]'
+                : 'border-[var(--border-primary)] hover:border-[#2B79F7] hover:text-[#2B79F7]'
             }`}
           >
             <ListChecks className="h-3.5 w-3.5" />
@@ -78,7 +78,7 @@ export function ScriptReviewer({
             <button
               type="button"
               onClick={onCopy}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-gray-200 hover:border-[#2B79F7] hover:text-[#2B79F7]"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] hover:text-[#2B79F7]"
             >
               {copied ? (
                 <Check className="h-3.5 w-3.5" />
@@ -88,7 +88,7 @@ export function ScriptReviewer({
               {copied ? 'Copied' : 'Copy'}
             </button>
           )}
-          <span className="text-[10px] text-gray-400 ml-auto">
+          <span className="text-[10px] text-[var(--text-tertiary)] ml-auto">
             Edits stay in the box. They get used the moment you copy or save.
           </span>
         </div>
@@ -97,7 +97,7 @@ export function ScriptReviewer({
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
           style={{ minHeight }}
-          className="w-full max-h-[640px] p-4 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-800 font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          className="w-full max-h-[640px] p-4 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
         />
       </div>
 
@@ -119,31 +119,31 @@ function ReviewChecklistPanel({
   onClose: () => void
 }) {
   return (
-    <aside className="lg:w-96 shrink-0 rounded-lg border border-gray-200 bg-white p-4 max-h-[640px] overflow-auto">
+    <aside className="lg:w-96 shrink-0 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 max-h-[640px] overflow-auto">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-900">How to review this script</h4>
+        <h4 className="text-sm font-semibold text-[var(--text-primary)]">How to review this script</h4>
         <button
           type="button"
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600"
+          className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
           aria-label="Close checklist"
         >
           <XIcon className="h-4 w-4" />
         </button>
       </div>
 
-      <p className="text-[11px] text-gray-500 leading-snug mb-4">
+      <p className="text-[11px] text-[var(--text-tertiary)] leading-snug mb-4">
         Walk through these in order. The model does most of the work, but it
         leaks the same handful of patterns, and a 60-second pass is what
         separates a script that sounds real from one people scroll past.
       </p>
 
       <Section title="1. Check the structure first">
-        <p className="text-[11px] text-gray-600 leading-snug mb-2">
+        <p className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
           Before you read the actual lines, scan that every section header
           is doing its job. The model sometimes glues a header to the end of
           the previous paragraph, like{' '}
-          <code className="text-[10px] bg-gray-100 px-1 rounded">
+          <code className="text-[10px] bg-[var(--bg-tertiary)] px-1 rounded">
             ...understood. [CTA]
           </code>
           . When that happens the section stops reading as a separate beat.
@@ -166,13 +166,13 @@ function ReviewChecklistPanel({
       </Section>
 
       <Section title="2. Strip the analysis labels before client delivery">
-        <p className="text-[11px] text-gray-600 leading-snug mb-2">
+        <p className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
           For longform scripts, you&apos;ll see internal labels like{' '}
           <code>CONTEXT:</code>, <code>APPLICATION:</code>,{' '}
           <code>FRAMING:</code>, <code>RE-HOOK:</code>, and{' '}
           <code>POINT N:</code> inside the body. Those are for you, not for
           the client. They help you confirm each beat does its job.{' '}
-          <strong className="text-gray-900">
+          <strong className="text-[var(--text-primary)]">
             Remove every one of them before sending the script over.
           </strong>{' '}
           The client only needs the prose.
@@ -193,7 +193,7 @@ function ReviewChecklistPanel({
       </Section>
 
       <Section title="3. Hunt the AI tells">
-        <p className="text-[11px] text-gray-600 leading-snug mb-2">
+        <p className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
           These are the patterns that scream &ldquo;AI wrote this.&rdquo; Skim
           every paragraph and rewrite each one as a direct, positive claim or
           delete it.
@@ -255,7 +255,7 @@ function ReviewChecklistPanel({
       </Section>
 
       <Section title="4. Read it out loud (or in your head)">
-        <p className="text-[11px] text-gray-600 leading-snug mb-2">
+        <p className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
           Does it sound like the creator talking, or like a polished blog
           post? If a sentence sounds like a LinkedIn comment, kill it.
         </p>
@@ -276,7 +276,7 @@ function ReviewChecklistPanel({
       </Section>
 
       <Section title="5. Final pass">
-        <p className="text-[11px] text-gray-600 leading-snug mb-2">
+        <p className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
           The polish layer. Catch the little stuff that makes the script feel
           unfinished.
         </p>
@@ -306,7 +306,7 @@ function Section({
 }) {
   return (
     <div className="mb-5 last:mb-0">
-      <h5 className="text-xs font-semibold text-gray-900 mb-1.5">{title}</h5>
+      <h5 className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">{title}</h5>
       <div className="space-y-2">{children}</div>
     </div>
   )
@@ -314,7 +314,7 @@ function Section({
 
 function Item({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-2 text-[11px] text-gray-700 leading-snug">
+    <div className="flex gap-2 text-[11px] text-[var(--text-secondary)] leading-snug">
       <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#2B79F7] shrink-0" />
       <span>{children}</span>
     </div>
@@ -381,14 +381,14 @@ function KindStructure({ kind }: { kind?: ScriptKind }) {
   }
   const sections = map[kind]
   return (
-    <div className="mt-2 pt-2 border-t border-gray-100">
-      <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+    <div className="mt-2 pt-2 border-t border-[var(--border-primary)]">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">
         Required for this format
       </div>
-      <ul className="space-y-0.5 text-[11px] text-gray-600">
+      <ul className="space-y-0.5 text-[11px] text-[var(--text-secondary)]">
         {sections.map((s, i) => (
           <li key={i} className="flex gap-1.5">
-            <span className="text-gray-400">•</span>
+            <span className="text-[var(--text-tertiary)]">•</span>
             <code className="font-mono">{s}</code>
           </li>
         ))}

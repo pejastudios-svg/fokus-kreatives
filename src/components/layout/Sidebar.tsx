@@ -17,8 +17,11 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Sparkles,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 const LOGO_URL = 'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
 
@@ -48,6 +51,14 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
   const [userName, setUserName] = useState('')
   const [userPicture, setUserPicture] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const { theme, toggleTheme } = useTheme()
+
+  // Auto-close the profile dropdown whenever the sidebar collapses (e.g. on
+  // mouse-leave). Otherwise the dropdown sits there with truncated icon-only
+  // labels because the sidebar shrank around it.
+  useEffect(() => {
+    if (collapsed) setShowUserMenu(false)
+  }, [collapsed])
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -95,7 +106,16 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
     : 'gap-3 px-3'
 
   return (
-    <div className="flex flex-col h-full w-full bg-brand-gradient overflow-hidden">
+    <div
+      className="flex flex-col h-full w-full bg-brand-gradient dark:border-r dark:border-[var(--border-primary)] overflow-hidden"
+      onMouseLeave={() => {
+        // When the desktop sidebar is in collapse-on-hover mode and the
+        // cursor leaves it, the rail shrinks back to icon-only. The profile
+        // dropdown anchored inside would visually clip to the narrow rail,
+        // so close it on the same gesture.
+        if (collapsed) setShowUserMenu(false)
+      }}
+    >
       {/* Logo + collapse toggle */}
       <div className="relative flex items-center justify-center h-16 shrink-0">
         <div
@@ -140,7 +160,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
                 'flex items-center py-3 rounded-xl text-sm font-medium transition-all duration-200',
                 rowLayoutClasses,
                 isActive
-                  ? 'bg-white text-[#2B79F7] shadow-lg'
+                  ? 'bg-white text-[#2B79F7] dark:bg-[#2B79F7] dark:text-white shadow-lg'
                   : 'text-white/80 hover:bg-white/10 hover:text-white',
               )}
             >
@@ -189,10 +209,21 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
           </button>
 
           {showUserMenu && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
+              <button
+                type="button"
+                onClick={() => toggleTheme()}
+                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  Theme
+                </span>
+                <span className="text-xs text-[var(--text-tertiary)] capitalize">{theme}</span>
+              </button>
               <Link
                 href="/settings"
-                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors border-t border-[var(--border-primary)]"
                 onClick={() => setShowUserMenu(false)}
               >
                 <Settings className="h-4 w-4" />
@@ -200,7 +231,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
               </Link>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 px-4 py-3 w-full text-sm text-red-600 hover:bg-red-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-2.5 w-full text-sm text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors border-t border-[var(--border-primary)]"
               >
                 <LogOut className="h-4 w-4" />
                 Logout

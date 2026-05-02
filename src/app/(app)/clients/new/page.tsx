@@ -379,7 +379,7 @@ export default function NewClientPage() {
         {notification && (
           <div
             role="status"
-            className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+            className={`fixed bottom-24 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
               notification.type === 'success'
                 ? 'bg-green-600 text-white'
                 : 'bg-red-600 text-white'
@@ -397,7 +397,7 @@ export default function NewClientPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Basic Information</h3>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -431,14 +431,14 @@ export default function NewClientPage() {
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Target Audience</label>
                 <textarea
                   name="target_audience"
                   value={formData.target_audience}
                   onChange={handleChange}
                   placeholder="Who is their ideal client? Age, profession, pain points, desires..."
                   rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
@@ -451,7 +451,7 @@ export default function NewClientPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Content Voice Tier</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Content Voice Tier</label>
                 <select
                   name="content_tier"
                   value={formData.content_tier}
@@ -462,13 +462,13 @@ export default function NewClientPage() {
                   <option value="advanced">Advanced</option>
                 </select>
 
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Controls how soft vs direct your hooks/CTAs are and how much authority content we use.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Package Tier</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Package Tier</label>
                 <select
                   name="package_tier"
                   value={formData.package_tier}
@@ -482,7 +482,7 @@ export default function NewClientPage() {
                   <option value="lower">Lower (Foundation)</option>
                 </select>
 
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Subscription level. Drives task deliverables and CRM access. Leave blank if not yet decided.
                 </p>
               </div>
@@ -491,8 +491,8 @@ export default function NewClientPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Profile Builder</h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Profile Builder</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">
                 Fill this once. The AI uses it to write on-brand scripts without guessing.
               </p>
             </CardHeader>
@@ -506,8 +506,8 @@ export default function NewClientPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Brand Document</h3>
-              <p className="text-sm text-gray-500 mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Brand Document</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">Upload a PDF or paste a Google Doc / Notion link.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.brand_doc_url ? (
@@ -538,9 +538,9 @@ export default function NewClientPage() {
                     onUpload={(url) => setFormData((prev) => ({ ...prev, brand_doc_url: url }))}
                   />
                   <div className="flex items-center gap-3">
-                    <div className="h-px bg-gray-200 flex-1" />
-                    <span className="text-xs text-gray-400">or paste a link</span>
-                    <div className="h-px bg-gray-200 flex-1" />
+                    <div className="h-px bg-[var(--border-primary)] flex-1" />
+                    <span className="text-xs text-[var(--text-tertiary)]">or paste a link</span>
+                    <div className="h-px bg-[var(--border-primary)] flex-1" />
                   </div>
                   <Input
                     name="brand_doc_url"
@@ -555,11 +555,11 @@ export default function NewClientPage() {
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Content Guidelines</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Content Guidelines</h3>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Do&apos;s and Don&apos;ts</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Do&apos;s and Don&apos;ts</label>
                 <textarea
                   name="dos_and_donts"
                   value={formData.dos_and_donts}
@@ -567,19 +567,19 @@ export default function NewClientPage() {
                   placeholder="DO: Use casual, confident tone. Use specific numbers. Tell stories.
 DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Topics Library</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Topics Library</label>
                 <textarea
                   name="topics_library"
                   value={formData.topics_library}
                   onChange={handleChange}
                   placeholder="List topics this client should cover. One per line."
                   rows={6}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
             </CardContent>
@@ -587,40 +587,40 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
 
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Stories & Social Proof</h3>
-              <p className="text-sm text-gray-500 mt-1">Used as inspiration (never copied word-for-word).</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Stories & Social Proof</h3>
+              <p className="text-sm text-[var(--text-tertiary)] mt-1">Used as inspiration (never copied word-for-word).</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Key Stories</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Key Stories</label>
                 <textarea
                   name="key_stories"
                   value={formData.key_stories}
                   onChange={handleChange}
                   rows={6}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unique Mechanisms / Frameworks</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Unique Mechanisms / Frameworks</label>
                 <textarea
                   name="unique_mechanisms"
                   value={formData.unique_mechanisms}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Social Proof & Results</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Social Proof & Results</label>
                 <textarea
                   name="social_proof"
                   value={formData.social_proof}
                   onChange={handleChange}
                   rows={5}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
             </CardContent>
@@ -634,13 +634,13 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
             </Link>
           </div>
 
-          {/* Sticky create FAB - the only create control. Lives inside the
-              form so it triggers handleSubmit. Bottom-left so it doesn't
-              clash with the bottom-right toast. */}
+          {/* Sticky create FAB. Lives inside the form so it triggers
+              handleSubmit. Bottom-right; the toast lifts to bottom-24 when both
+              are visible. */}
           <button
             type="submit"
             disabled={isLoading || roleLoading || !canCreateClient}
-            className="fixed bottom-6 left-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#2B79F7] text-white text-sm font-semibold shadow-xl hover:bg-[#1E54B7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Create client"
           >
             {isLoading ? 'Creating...' : 'Create client'}

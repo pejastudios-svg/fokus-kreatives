@@ -13,12 +13,12 @@ import {
   FileInput,
   Settings,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   UserCircleIcon,
   Sparkles,
   X,
   Lock,
+  Menu,
+  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Loading } from '@/components/ui/Loading'
@@ -73,8 +73,9 @@ useEffect(() => {
   const [userPicture, setUserPicture] = useState<string | null>(null)
 
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
 
   // FIX: Track which client ID we have successfully authorized
   const successClientId = useRef<string | null>(null)
@@ -379,7 +380,6 @@ if (role !== 'client' && role !== 'admin') {
     Meetings: ['top', 'middle'],
     Team: ['top'],
     'Capture Pages': ['top', 'middle'],
-    Settings: ['top'],
   }
   const clientTier = (clientInfo?.package_tier ?? null) as PackageTier | null
   const passesTier = (name: string) => {
@@ -398,13 +398,14 @@ if (role !== 'client' && role !== 'admin') {
       Meetings: 'meetings',
       Team: 'team',
       'Capture Pages': 'capture',
-      Settings: 'settings',
     }
     return map[name] || name.toLowerCase()
   }
 
   // Short copy that explains each tab in the upgrade modal. Keep these tight
   // - they show in a tooltip-style popover, not as marketing copy.
+  // Settings is no longer a nav tab (lives in the profile dropdown), so it's
+  // omitted from this map.
   const featureCopy: Record<string, string> = {
     Dashboard:
       'At-a-glance KPIs for your CRM - leads, meetings, revenue trends in one view.',
@@ -415,8 +416,6 @@ if (role !== 'client' && role !== 'admin') {
     Team: 'Manage who on your side has access to this CRM workspace.',
     'Capture Pages':
       'Build embeddable lead-capture pages tied to this CRM in minutes.',
-    Settings:
-      'Custom field definitions, capture-page styling, and integration toggles.',
   }
   const allTabs = [
     { name: 'Dashboard', icon: LayoutDashboard, roles: ['admin','manager','employee','guest'] as Role[] },
@@ -425,7 +424,6 @@ if (role !== 'client' && role !== 'admin') {
     { name: 'Meetings', icon: Calendar, roles: ['admin','manager'] as Role[] },
     { name: 'Team', icon: UserCircleIcon, roles: ['admin', 'manager'] as Role[] },
     { name: 'Capture Pages', icon: FileInput, roles: ['admin','manager'] as Role[] },
-    { name: 'Settings', icon: Settings, roles: ['admin','manager'] as Role[] },
   ]
 
   const navigation = allTabs
@@ -452,6 +450,8 @@ if (role !== 'client' && role !== 'admin') {
     if (!isClientUser) return
     if (clientTier === null) return
     const segment = pathname.split('/')[3] || ''
+    // Settings is intentionally omitted: it's reachable for everyone via
+    // the profile dropdown, so we don't tier-gate the route either.
     const segmentToTabName: Record<string, string> = {
       dashboard: 'Dashboard',
       leads: 'Leads',
@@ -459,7 +459,6 @@ if (role !== 'client' && role !== 'admin') {
       meetings: 'Meetings',
       team: 'Team',
       capture: 'Capture Pages',
-      settings: 'Settings',
     }
     const tabName = segmentToTabName[segment]
     if (!tabName) return
@@ -482,195 +481,243 @@ if (role !== 'client' && role !== 'admin') {
     return null
   }
 
-  return (
-    <div className="flex h-screen min-h-0 dark">
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'flex flex-col h-full bg-[#0A0F1C] border-r border-[#1E293B] transition-all duration-300',
-          sidebarOpen ? 'w-64' : 'w-20'
-        )}
-      >
-        {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-[#1E293B]">
-          <Link href={`/crm/${clientId}/dashboard`} className={cn('flex items-center', !sidebarOpen && 'mx-auto')}>
-            <Image
-              src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-              alt="Fokus Kreatives"
-              width={sidebarOpen ? 100 : 32}
-              height={32}
-              className="object-contain h-8 w-auto"
-              priority
-            />
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={cn(
-              'p-2 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-colors',
-              !sidebarOpen && 'hidden lg:block'
-            )}
-          >
-            {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-          </button>
-        </div>
+  const initial = (userName || userEmail || 'U').charAt(0).toUpperCase()
+  const badgeValue = (count: number) => (count > 9 ? '9+' : String(count))
 
-        {/* Client Info */}
-        {sidebarOpen && (
-          <div className="px-4 py-4 border-b border-[#1E293B]">
-            <div className="bg-[#1E293B] rounded-xl px-4 py-3">
-              <p className="text-[#64748B] text-xs font-medium uppercase tracking-wider">Workspace</p>
-              <p className="text-white text-sm font-semibold truncate mt-1">
+  return (
+    <div className="flex flex-col h-screen min-h-0 bg-[var(--bg-secondary)]">
+      {/* Top nav - three-zone layout: left = brand, center = nav, right = actions.
+          The center zone uses `flex-1 justify-center` so the nav stays
+          visually centered regardless of how much space the side groups take. */}
+      <header className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-primary)]">
+        <div className="flex items-center h-16 px-4 sm:px-6 gap-2 md:gap-4">
+          {/* LEFT: burger (mobile) + logo + workspace */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden p-2 -ml-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Link href={`/crm/${clientId}/dashboard`} className="flex items-center gap-2">
+              <Image
+                src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
+                alt="Fokus Kreatives"
+                width={32}
+                height={32}
+                className="object-contain h-7 w-auto"
+                priority
+              />
+            </Link>
+            <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--border-primary)] min-w-0 max-w-[240px]">
+              <span className="text-[var(--text-tertiary)] text-[10px] font-semibold uppercase tracking-wider shrink-0">
+                Workspace
+              </span>
+              <span className="text-[var(--text-primary)] text-sm font-semibold truncate">
                 {clientInfo?.business_name || clientInfo?.name || 'Loading...'}
-              </p>
+              </span>
             </div>
           </div>
-        )}
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0
-            const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0
-            const badgeValue = (count: number) => (count > 9 ? '9+' : String(count))
-
-            return sidebarOpen ? (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => handleNavClick(item.name)}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
-                    : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
-                )}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                <span className="flex-1">{item.name}</span>
-
-                {showLeadsBadge && (
-                  <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold">
-                    {badgeValue(newLeadsCount)}
-                  </span>
-                )}
-                {showMeetingsBadge && (
-                  <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold">
-                    {badgeValue(newMeetingsCount)}
-                  </span>
-                )}
-              </Link>
-            ) : (
-              <Tooltip key={item.name} content={item.name} position="right">
+          {/* CENTER: desktop nav (centered via flex-1) */}
+          <nav className="hidden md:flex flex-1 justify-center items-center gap-1 overflow-x-auto scrollbar-none">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0
+              const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0
+              return (
                 <Link
+                  key={item.name}
                   href={item.href}
                   onClick={() => handleNavClick(item.name)}
                   className={cn(
-                    'relative flex items-center justify-center p-3 rounded-xl transition-all duration-200',
+                    'inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 shrink-0',
                     isActive
-                      ? 'bg-[#2B79F7] text-white shadow-lg shadow-[#2B79F7]/25'
-                      : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-white'
+                      ? 'bg-[#2B79F7] text-white shadow-md shadow-[#2B79F7]/30'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]',
                   )}
                 >
-                  <div className="relative">
-                    <item.icon className="h-5 w-5" />
-                    {showLeadsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
-                        {badgeValue(newLeadsCount)}
-                      </span>
-                    )}
-                    {showMeetingsBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[#2B79F7] text-white text-[9px] font-semibold flex items-center justify-center">
-                        {badgeValue(newMeetingsCount)}
-                      </span>
-                    )}
-                  </div>
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span>{item.name}</span>
+                  {(showLeadsBadge || showMeetingsBadge) && (
+                    <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/90 text-[#1E54B7] text-[10px] font-bold">
+                      {badgeValue(showLeadsBadge ? newLeadsCount : newMeetingsCount)}
+                    </span>
+                  )}
                 </Link>
-              </Tooltip>
-            )
-          })}
-        </nav>
+              )
+            })}
+          </nav>
 
-        {/* Unlock More - middle-tier client portal users only. Shows the
-            tabs they can't access today as a teaser, with hover tooltips
-            explaining each feature. Top-tier sees nothing here, lower-tier
-            never gets here at all (they're redirected to /portal). */}
-        {showUnlockButton && (
-          sidebarOpen ? (
-            <button
-              type="button"
-              onClick={() => setShowUpgradeModal(true)}
-              className="mx-3 mb-2 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white text-sm font-medium hover:opacity-90 transition-opacity"
-            >
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span>Unlock more features</span>
-            </button>
-          ) : (
-            <Tooltip content="Unlock more features" position="right">
+          {/* RIGHT: unlock-more + profile, pinned far right */}
+          <div className="ml-auto md:ml-0 shrink-0 flex items-center gap-2">
+            {showUnlockButton && (
               <button
                 type="button"
                 onClick={() => setShowUpgradeModal(true)}
-                className="mx-3 mb-2 flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white hover:opacity-90 transition-opacity"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
               >
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-3.5 w-3.5" />
+                Unlock more
               </button>
-            </Tooltip>
-          )
-        )}
-
-        {/* User / Logout */}
-        <div className="px-3 py-4 border-t border-[#1E293B]">
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu((v) => !v)}
-              className={cn(
-                'flex items-center gap-3 w-full rounded-xl hover:bg-[#1E293B] transition-all duration-200',
-                sidebarOpen ? 'px-4 py-3' : 'p-3 justify-center'
-              )}
-            >
-              {userPicture ? (
-               <Image 
-              src={userPicture} 
-              alt={userName} 
-              width={32} 
-              height={32} 
-              unoptimized
-              className="rounded-full object-cover ring-2 ring-[#2B79F7]" 
-              />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-linear-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white text-sm font-semibold">
-                  {(userName || userEmail || 'U').charAt(0).toUpperCase()}
-                </div>
-              )}
-
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-white text-sm font-medium truncate">{userName}</p>
-                  <p className="text-[#64748B] text-xs capitalize">{userRole}</p>
-                </div>
-              )}
-            </button>
-
-            {showUserMenu && (
-              <div className={cn(
-                'absolute bottom-full mb-2 bg-[#1E293B] rounded-xl shadow-xl border border-[#334155] overflow-hidden z-50',
-                sidebarOpen ? 'left-0 right-0' : 'left-full ml-2 w-48'
-              )}>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 w-full text-sm text-red-400 hover:bg-[#334155] hover:text-red-300 transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </button>
-              </div>
             )}
+
+            {/* Profile dropdown trigger */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowUserMenu((v) => !v)}
+                className="flex items-center gap-1 p-1 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors"
+                aria-label="Profile menu"
+              >
+                {userPicture ? (
+                  <Image
+                    src={userPicture}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    unoptimized
+                    className="h-8 w-8 rounded-full object-cover ring-2 ring-[#2B79F7]"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] flex items-center justify-center text-white text-sm font-semibold">
+                    {initial}
+                  </div>
+                )}
+                <ChevronDown className="hidden sm:block h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+              </button>
+
+              {showUserMenu && (
+                <>
+                  {/* Backdrop catches outside-clicks; pointer-events on the
+                      menu itself stay live. */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowUserMenu(false)}
+                  />
+                  <div className="absolute top-full right-0 mt-2 w-64 z-50 bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-[var(--border-primary)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-4 py-3 border-b border-[var(--border-primary)]">
+                      <p className="text-[var(--text-primary)] text-sm font-semibold truncate">{userName || 'Signed in'}</p>
+                      {userEmail && (
+                        <p className="text-[var(--text-tertiary)] text-xs truncate">{userEmail}</p>
+                      )}
+                      {userRole && (
+                        <span className="mt-1.5 inline-block px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-medium">
+                          {userRole}
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      href={`/crm/${clientId}/settings`}
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                    >
+                      <Settings className="h-4 w-4 text-[var(--text-secondary)]" />
+                      Settings
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-[var(--bg-tertiary)] hover:text-red-300 transition-colors border-t border-[var(--border-primary)]"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </aside>
+      </header>
+
+      {/* Mobile slide-in nav drawer */}
+      {mobileNavOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setMobileNavOpen(false)}
+        >
+          <div
+            className="bg-[var(--bg-primary)] w-72 max-w-[85vw] h-full border-r border-[var(--border-primary)] flex flex-col animate-in slide-in-from-left duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--border-primary)]">
+              <Image
+                src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
+                alt="Fokus Kreatives"
+                width={32}
+                height={32}
+                className="object-contain h-7 w-auto"
+              />
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                aria-label="Close navigation"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-4 py-4 border-b border-[var(--border-primary)]">
+              <p className="text-[var(--text-tertiary)] text-[10px] font-semibold uppercase tracking-wider">
+                Workspace
+              </p>
+              <p className="text-[var(--text-primary)] text-sm font-semibold truncate mt-1">
+                {clientInfo?.business_name || clientInfo?.name || 'Loading...'}
+              </p>
+            </div>
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0
+                const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => {
+                      handleNavClick(item.name)
+                      setMobileNavOpen(false)
+                    }}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
+                      isActive
+                        ? 'bg-[#2B79F7] text-white'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]',
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    <span className="flex-1">{item.name}</span>
+                    {(showLeadsBadge || showMeetingsBadge) && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/90 text-[#1E54B7] text-[10px] font-bold">
+                        {badgeValue(showLeadsBadge ? newLeadsCount : newMeetingsCount)}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+              {showUnlockButton && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpgradeModal(true)
+                    setMobileNavOpen(false)
+                  }}
+                  className="w-full mt-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#2B79F7] to-[#1E54B7] text-white text-sm font-semibold"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Unlock more features
+                </button>
+              )}
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Main */}
-      <main className="flex-1 min-h-0 overflow-auto bg-[#0F172A] transition-colors duration-200">
+      <main className="flex-1 min-h-0 overflow-auto">
         <PageTransition>
           <div className="min-h-full">{children}</div>
         </PageTransition>
@@ -678,12 +725,12 @@ if (role !== 'client' && role !== 'admin') {
         {/* Local CRM popup (leads/meetings) */}
         {popup && (
           <div className="fixed bottom-4 right-4 z-50 max-w-sm">
-            <div className="bg-[#1E293B] border border-[#334155] rounded-xl px-4 py-3 shadow-theme-lg flex items-start gap-3">
+            <div className="bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-xl px-4 py-3 shadow-theme-lg flex items-start gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">{popup.title}</p>
-                {popup.subtitle && <p className="text-xs text-gray-300 mt-1 truncate">{popup.subtitle}</p>}
+                <p className="text-sm font-medium text-[var(--text-primary)]">{popup.title}</p>
+                {popup.subtitle && <p className="text-xs text-[var(--text-tertiary)] mt-1 truncate">{popup.subtitle}</p>}
               </div>
-              <button onClick={() => setPopup(null)} className="p-1 rounded-lg hover:bg-[#334155] text-gray-400">
+              <button onClick={() => setPopup(null)} className="p-1 rounded-lg hover:bg-[var(--bg-card-hover)] text-[var(--text-tertiary)]">
                 ×
               </button>
             </div>
@@ -702,7 +749,7 @@ if (role !== 'client' && role !== 'admin') {
             onClick={() => setShowUpgradeModal(false)}
           >
             <div
-              className="relative w-full max-w-lg rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-2xl"
+              className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -710,7 +757,7 @@ if (role !== 'client' && role !== 'admin') {
               <button
                 type="button"
                 onClick={() => setShowUpgradeModal(false)}
-                className="absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1E293B] transition-colors"
+                className="absolute top-3 right-3 p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -721,8 +768,8 @@ if (role !== 'client' && role !== 'admin') {
                   <Sparkles className="h-5 w-5" />
                   <span className="text-xs font-semibold uppercase tracking-wider">Available on the Top tier</span>
                 </div>
-                <h3 className="mt-2 text-xl font-semibold text-white">Unlock more features</h3>
-                <p className="mt-1 text-sm text-gray-400">
+                <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Unlock more features</h3>
+                <p className="mt-1 text-sm text-[var(--text-tertiary)]">
                   Upgrade to the Top package to add the features below to your CRM.
                 </p>
 
@@ -733,16 +780,16 @@ if (role !== 'client' && role !== 'admin') {
                       content={featureCopy[t.name] || ''}
                       position="top"
                     >
-                      <div className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#1E293B] border border-[#334155] text-gray-300 cursor-default">
-                        <t.icon className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                      <div className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)] cursor-default">
+                        <t.icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                         <span className="text-sm font-medium truncate">{t.name}</span>
-                        <Lock className="h-3 w-3 ml-auto shrink-0 text-[#64748B]" />
+                        <Lock className="h-3 w-3 ml-auto shrink-0 text-[var(--text-tertiary)]" />
                       </div>
                     </Tooltip>
                   ))}
                 </div>
 
-                <p className="mt-5 text-[11px] text-gray-500">
+                <p className="mt-5 text-[11px] text-[var(--text-tertiary)]">
                   Hover any badge for a quick description. Reach out to your account manager to upgrade.
                 </p>
               </div>

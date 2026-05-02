@@ -59,7 +59,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-[#2B79F7]" />
       </div>
     )
@@ -70,7 +70,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[var(--bg-tertiary)]">
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {children}

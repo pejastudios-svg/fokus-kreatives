@@ -139,7 +139,7 @@ export function UrlField({ value, displayType, hyperlinkText, onChange, readonly
         <button
           type="button"
           onClick={() => setIsEditing(false)}
-          className="px-3 py-1.5 text-xs text-theme-secondary hover:text-theme-primary"
+          className="px-3 py-1.5 text-xs text-theme-secondary hover:text-theme-primary hover:bg-[var(--bg-card-hover)] rounded-lg transition-colors"
         >
           Cancel
         </button>
@@ -149,7 +149,7 @@ export function UrlField({ value, displayType, hyperlinkText, onChange, readonly
             onChange(tempUrl, tempType, tempText)
             setIsEditing(false)
           }}
-          className="px-3 py-1.5 text-xs bg-[#2B79F7] text-white rounded-lg hover:bg-[#2B79F7]/90"
+          className="px-3 py-1.5 text-xs bg-[#2B79F7] text-white rounded-lg hover:bg-[#1E54B7] transition-colors"
         >
           Save
         </button>

@@ -90,20 +90,20 @@ export function SaveTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl bg-white shadow-xl border border-gray-100"
+        className="relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-primary)]">
           <div className="flex items-center gap-2">
             <Save className="h-4 w-4 text-[#2B79F7]" />
-            <h3 className="text-sm font-semibold text-gray-900">Save as template</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Save as template</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -111,7 +111,7 @@ export function SaveTemplateModal({
         </div>
         <div className="p-5 space-y-3">
           <div>
-            <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
+            <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">
               Template name
             </label>
             <input
@@ -120,11 +120,11 @@ export function SaveTemplateModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Monthly content package"
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </div>
           <div>
-            <label className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
+            <label className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">
               Description (optional)
             </label>
             <textarea
@@ -132,25 +132,25 @@ export function SaveTemplateModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="What's in this template?"
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+              className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
             <input
               type="checkbox"
               checked={isShared}
               onChange={(e) => setIsShared(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
+              className="h-4 w-4 rounded border-[var(--border-primary)] text-[#2B79F7] focus:ring-[#2B79F7]"
             />
             Share with the team
           </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-primary)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+            className="px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
           >
             Cancel
           </button>
@@ -248,20 +248,20 @@ export function ApplyTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100"
+        className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-primary)]">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-            <h3 className="text-sm font-semibold text-gray-900">Use a template</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Use a template</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -270,21 +270,21 @@ export function ApplyTemplateModal({
 
         <div className="max-h-[60vh] overflow-y-auto">
           {isLoading ? (
-            <p className="px-5 py-8 text-center text-xs text-gray-400">Loading templates…</p>
+            <p className="px-5 py-8 text-center text-xs text-[var(--text-tertiary)]">Loading templates…</p>
           ) : templates.length === 0 ? (
-            <p className="px-5 py-8 text-center text-xs text-gray-400">
+            <p className="px-5 py-8 text-center text-xs text-[var(--text-tertiary)]">
               No templates saved yet. Open a task and use &ldquo;Save as template&rdquo;.
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {templates.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 group">
+                <li key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--bg-tertiary)] group">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{t.name}</p>
                     {t.description && (
-                      <p className="text-xs text-gray-500 truncate">{t.description}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] truncate">{t.description}</p>
                     )}
-                    <p className="text-[10px] text-gray-400 mt-0.5">
+                    <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
                       {t.is_shared ? 'Shared' : 'Private'} · saved{' '}
                       {new Date(t.created_at).toLocaleDateString()}
                     </p>
@@ -292,7 +292,7 @@ export function ApplyTemplateModal({
                   <button
                     type="button"
                     onClick={() => void handleDelete(t.id)}
-                    className="p-1.5 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
+                    className="p-1.5 rounded text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
                     aria-label="Delete template"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

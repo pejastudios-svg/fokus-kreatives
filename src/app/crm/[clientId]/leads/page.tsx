@@ -598,28 +598,28 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
       <div className="flex justify-between mb-6">
         <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
-          <Skeleton className="h-4 w-24 bg-[#334155]" />
+          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
         </div>
         <div className="flex gap-3">
-          <Skeleton className="h-10 w-64 rounded-xl bg-[#334155]" />
-          <Skeleton className="h-10 w-32 rounded-xl bg-[#334155]" />
+          <Skeleton className="h-10 w-64 rounded-xl bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-10 w-32 rounded-xl bg-[var(--bg-card-hover)]" />
         </div>
       </div>
 
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
-        <div className="border-b border-[#334155] bg-[#0F172A] p-4 flex gap-4">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+        <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-4 w-32 bg-[#334155]" />
+            <Skeleton key={i} className="h-4 w-32 bg-[var(--bg-card-hover)]" />
           ))}
         </div>
-        <div className="divide-y divide-[#334155]">
+        <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="p-4 flex gap-4">
-              <Skeleton className="h-4 w-32 bg-[#334155]" />
-              <Skeleton className="h-4 w-48 bg-[#334155]" />
-              <Skeleton className="h-4 w-24 bg-[#334155]" />
-              <Skeleton className="h-6 w-20 rounded-full bg-[#334155]" />
+              <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-6 w-20 rounded-full bg-[var(--bg-card-hover)]" />
             </div>
           ))}
         </div>
@@ -632,35 +632,32 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     return <LeadsSkeleton />
   }
 
-  return <div className="p-6 lg:p-8 min-h-full">
+  return <div className="p-4 lg:p-6 min-h-full">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Leads</h1>
-            <p className="text-gray-400 mt-1">{leads.length} total leads</p>
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <p className="text-xs text-[var(--text-tertiary)]">{leads.length} total leads</p>
           
           <div className="flex items-center gap-3">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search leads..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 lg:w-64 pl-10 pr-4 py-2.5 bg-[#1E293B] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
+                className="w-48 lg:w-64 pl-10 pr-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
               />
             </div>
 
             {/* View Toggle */}
-            <div className="flex bg-[#1E293B] rounded-xl p-1 border border-[#334155]">
+            <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
               <button
                 onClick={() => setView('table')}
                 className={`p-2.5 rounded-lg transition-all ${
                   view === 'table' 
                     ? 'bg-[#2B79F7] text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-[#334155]'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Table View"
               >
@@ -671,7 +668,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 className={`p-2.5 rounded-lg transition-all ${
                   view === 'board' 
                     ? 'bg-[#2B79F7] text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-[#334155]'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Board View"
               >
@@ -682,7 +679,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 className={`p-2.5 rounded-lg transition-all ${
                   view === 'chart' 
                     ? 'bg-[#2B79F7] text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-[#334155]'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 title="Chart View"
               >
@@ -700,23 +697,23 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
         {/* Table View */}
         {view === 'table' && (
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden shadow-xl">
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[#334155] bg-[#0F172A]">
+                  <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
                     <th className="w-10 px-3 py-4" />
                     {fields.map((field) => (
                       <th 
                         key={field.id} 
-                        className={`text-left px-4 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider min-w-[150px] group ${
+                        className={`text-left px-4 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider min-w-[150px] group ${
                           pendingFields.has(field.id) ? 'opacity-50' : ''
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {fieldTypeConfig[field.field_type] && (
-                              <span className="text-gray-500">
+                              <span className="text-[var(--text-tertiary)]">
                                 {(() => {
                                   const Icon = fieldTypeConfig[field.field_type].icon
                                   return <Icon className="h-3.5 w-3.5" />
@@ -727,36 +724,36 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           </div>
                           <button
                             onClick={() => setShowFieldSettings(field)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#334155] rounded-lg transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
                           >
-                            <Settings2 className="h-3.5 w-3.5 text-gray-400" />
+                            <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
                           </button>
                         </div>
                       </th>
                     ))}
-                    <th className="w-12 px-3 py-4 bg-[#0F172A]">
+                    <th className="w-12 px-3 py-4 bg-[var(--bg-secondary)]">
                       <button
                         onClick={() => setShowAddField(true)}
-                        className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-all"
+                        className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
                         title="Add Property"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
                     </th>
-                    <th className="w-10 px-3 py-4 bg-[#0F172A]" />
+                    <th className="w-10 px-3 py-4 bg-[var(--bg-secondary)]" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#334155]">
+                <tbody className="divide-y divide-[var(--border-primary)]">
                   {filteredLeads.map((lead) => (
                     <tr 
                       key={lead.id} 
-                      className={`group hover:bg-[#334155]/50 transition-colors cursor-pointer ${
+                      className={`group hover:bg-[var(--bg-card-hover)]/50 transition-colors cursor-pointer ${
                         pendingLeads.has(lead.id) ? 'opacity-50' : ''
                       }`}
                       onClick={() => setShowLeadDetail(lead)}
                     >
-                      <td className="px-3 py-3 bg-[#1E293B]">
-                        <GripVertical className="h-4 w-4 text-gray-600 opacity-0 group-hover:opacity-100 cursor-grab" />
+                      <td className="px-3 py-3 bg-[var(--bg-card)]">
+                        <GripVertical className="h-4 w-4 text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 cursor-grab" />
                       </td>
                       {fields.map((field) => {
                         const value = (lead.data?.[field.field_key] as string) || ''
@@ -765,7 +762,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         return (
                           <td 
                             key={field.id} 
-                            className="px-4 py-3 bg-[#1E293B]"
+                            className="px-4 py-3 bg-[var(--bg-card)]"
                             onClick={(e) => handleCellClick(e, lead.id, field.field_key, value, field.field_type)}
                           >
                             {isEditing ? (
@@ -776,7 +773,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onBlur={handleCellBlur}
                                 onKeyDown={handleCellKeyDown}
-                                className="w-full px-3 py-1.5 bg-[#0F172A] border-2 border-[#2B79F7] rounded-lg text-white focus:outline-none text-sm"
+                                className="w-full px-3 py-1.5 bg-[var(--bg-secondary)] border-2 border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             ) : field.field_type === 'status' || field.field_type === 'select' ? (
@@ -788,15 +785,15 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 fieldName={field.field_name}
                             />
                           ) : (
-                            <span className="text-white block min-h-6 px-2 py-1 rounded hover:bg-[#334155] transition-colors">
-                              {(value as string) || <span className="text-gray-500">-</span>}
+                            <span className="text-[var(--text-primary)] block min-h-6 px-2 py-1 rounded hover:bg-[var(--bg-card-hover)] transition-colors">
+                              {(value as string) || <span className="text-[var(--text-tertiary)]">-</span>}
                             </span>
                             )}
                           </td>
                         )
                       })}
-                      <td className="bg-[#1E293B]" />
-                      <td className="px-3 py-3 bg-[#1E293B]">
+                      <td className="bg-[var(--bg-card)]" />
+                      <td className="px-3 py-3 bg-[var(--bg-card)]">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -810,12 +807,12 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     </tr>
                   ))}
                   {/* Add row */}
-                  <tr className="bg-[#0F172A]">
+                  <tr className="bg-[var(--bg-secondary)]">
                     <td />
                     <td colSpan={fields.length + 2} className="px-4 py-3">
                       <button
                         onClick={() => setShowAddLead(true)}
-                        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                        className="flex items-center gap-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="text-sm">Add a lead</span>
@@ -830,13 +827,13 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
         {/* Board View */}
         {view === 'board' && (
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex items-start gap-4 overflow-x-auto pb-4">
             {statusOptions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center py-12">
                 <div className="text-center">
-                  <Kanban className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No status options configured</p>
-                  <p className="text-gray-500 text-sm mt-1">Add a status field with options to use board view</p>
+                  <Kanban className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4" />
+                  <p className="text-[var(--text-tertiary)]">No status options configured</p>
+                  <p className="text-[var(--text-tertiary)] text-sm mt-1">Add a status field with options to use board view</p>
                 </div>
               </div>
             ) : (
@@ -852,20 +849,20 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     onDragLeave={() => setDragOverStatus(null)}
                     onDrop={(e) => handleDrop(e, status.value)}
                   >
-                    <div className={`bg-[#1E293B] rounded-2xl border transition-colors shadow-xl ${
-                      isDragOver ? 'border-[#2B79F7] bg-[#2B79F7]/10' : 'border-[#334155]'
+                    <div className={`bg-[var(--bg-card)] rounded-2xl border transition-colors shadow-xl ${
+                      isDragOver ? 'border-[#2B79F7] bg-[#2B79F7]/10' : 'border-[var(--border-primary)]'
                     }`}>
                       {/* Column Header */}
-                      <div className="p-4 border-b border-[#334155]">
+                      <div className="p-4 border-b border-[var(--border-primary)]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div 
                               className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: status.color }}
                             />
-                            <h3 className="font-semibold text-white">{status.label}</h3>
+                            <h3 className="font-semibold text-[var(--text-primary)]">{status.label}</h3>
                           </div>
-                          <span className="text-sm text-gray-400 bg-[#0F172A] px-2.5 py-0.5 rounded-full">
+                          <span className="text-sm text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-2.5 py-0.5 rounded-full">
                             {statusLeads.length}
                           </span>
                         </div>
@@ -876,7 +873,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         {statusLeads.map((lead) => (
                           <div
                             key={lead.id}
-                            className={`bg-[#0F172A] rounded-xl p-4 border border-[#334155] hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing hover:shadow-lg ${
+                            className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing hover:shadow-lg ${
                               draggedLead?.id === lead.id ? 'opacity-50 rotate-2 scale-105' : ''
                             } ${pendingLeads.has(lead.id) ? 'opacity-50' : ''}`}
                             draggable
@@ -884,7 +881,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             onClick={() => setShowLeadDetail(lead)}
                           >
                             <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-medium text-white">
+                              <h4 className="font-medium text-[var(--text-primary)]">
                                 {(lead.data?.name as string) || 'Unnamed Lead'}
                               </h4>
                               <button
@@ -898,19 +895,19 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                               </button>
                             </div>
                             {(lead.data?.email as string) && (
-                              <p className="text-sm text-gray-400 flex items-center gap-2">
+                              <p className="text-sm text-[var(--text-tertiary)] flex items-center gap-2">
                                 <Mail className="h-3.5 w-3.5" />
                                 {lead.data.email as string}
                               </p>
                             )}
                             {(lead.data?.phone as string) && (
-                              <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                              <p className="text-sm text-[var(--text-tertiary)] flex items-center gap-2 mt-1">
                                 <Phone className="h-3.5 w-3.5" />
                                 {lead.data.phone as string}
                               </p>
                             )}
                             {(lead.data?.date_added as string) && (
-                              <p className="text-xs text-gray-600 mt-2">
+                              <p className="text-xs text-[var(--text-secondary)] mt-2">
                                 Added {new Date(lead.data.date_added as string).toLocaleDateString()}
                               </p>
                             )}
@@ -925,7 +922,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             setNewLead({ status: status.value })
                             setShowAddLead(true)
                           }}
-                          className="w-full p-3 border-2 border-dashed border-[#334155] rounded-xl text-gray-400 hover:border-[#2B79F7] hover:text-[#2B79F7] transition-all flex items-center justify-center gap-2"
+                          className="w-full p-3 border-2 border-dashed border-[var(--border-primary)] rounded-xl text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-all flex items-center justify-center gap-2"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="text-sm">Add Lead</span>
@@ -943,10 +940,10 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         {view === 'chart' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Bar Chart */}
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-white mb-6">Leads by Status</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Leads by Status</h3>
               {chartData.length === 0 ? (
-                <p className="text-gray-400 text-center py-8">No status data available</p>
+                <p className="text-[var(--text-tertiary)] text-center py-8">No status data available</p>
               ) : (
                 <div className="space-y-4">
                   {chartData.map((item) => {
@@ -961,11 +958,11 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                               className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: item.color }}
                             />
-                            <span className="text-white font-medium">{item.label}</span>
+                            <span className="text-[var(--text-primary)] font-medium">{item.label}</span>
                           </div>
-                          <span className="text-gray-400">{item.count}</span>
+                          <span className="text-[var(--text-tertiary)]">{item.count}</span>
                         </div>
-                        <div className="h-3 bg-[#0F172A] rounded-full overflow-hidden">
+                        <div className="h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
                           <div 
                             className="h-full rounded-full transition-all duration-500"
                             style={{ width: `${percentage}%`, backgroundColor: item.color }}
@@ -979,15 +976,15 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
             </div>
 
             {/* Stats */}
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-white mb-6">Quick Stats</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Quick Stats</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#0F172A] rounded-xl p-4 border border-[#334155]">
-                  <p className="text-gray-400 text-sm">Total Leads</p>
-                  <p className="text-2xl font-bold text-white mt-1">{leads.length}</p>
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
+                  <p className="text-[var(--text-tertiary)] text-sm">Total Leads</p>
+                  <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{leads.length}</p>
                 </div>
-                <div className="bg-[#0F172A] rounded-xl p-4 border border-[#334155]">
-                  <p className="text-gray-400 text-sm">New This Week</p>
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
+                  <p className="text-[var(--text-tertiary)] text-sm">New This Week</p>
                   <p className="text-2xl font-bold text-[#3B82F6] mt-1">
                     {leads.filter(l => {
                       const date = new Date(l.created_at)
@@ -997,14 +994,14 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     }).length}
                   </p>
                 </div>
-                <div className="bg-[#0F172A] rounded-xl p-4 border border-[#334155]">
-                  <p className="text-gray-400 text-sm">Closed</p>
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
+                  <p className="text-[var(--text-tertiary)] text-sm">Closed</p>
                   <p className="text-2xl font-bold text-[#10B981] mt-1">
                     {leads.filter(l => l.data?.status === 'closed').length}
                   </p>
                 </div>
-                <div className="bg-[#0F172A] rounded-xl p-4 border border-[#334155]">
-                  <p className="text-gray-400 text-sm">Conversion Rate</p>
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
+                  <p className="text-[var(--text-tertiary)] text-sm">Conversion Rate</p>
                   <p className="text-2xl font-bold text-[#8B5CF6] mt-1">
                     {leads.length > 0 
                       ? `${Math.round((leads.filter(l => l.data?.status === 'closed').length / leads.length) * 100)}%`
@@ -1016,8 +1013,8 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
             </div>
 
             {/* Pie Chart */}
-            <div className="bg-[#1E293B] rounded-2xl border border-[#334155] p-6 lg:col-span-2 shadow-xl">
-              <h3 className="text-lg font-semibold text-white mb-6">Distribution</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 lg:col-span-2 shadow-xl">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Distribution</h3>
               <div className="flex flex-wrap items-center justify-center gap-8">
                 <div className="relative w-48 h-48">
                   <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
@@ -1047,8 +1044,8 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-white">{leads.length}</p>
-                      <p className="text-sm text-gray-400">Total</p>
+                      <p className="text-3xl font-bold text-[var(--text-primary)]">{leads.length}</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">Total</p>
                     </div>
                   </div>
                 </div>
@@ -1059,8 +1056,8 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-sm text-gray-400">
-                        {item.label}: <span className="font-semibold text-white">{item.count}</span>
+                      <span className="text-sm text-[var(--text-tertiary)]">
+                        {item.label}: <span className="font-semibold text-[var(--text-primary)]">{item.count}</span>
                       </span>
                     </div>
                   ))}
@@ -1079,7 +1076,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 
                 return (
                   <div key={field.id}>
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                       {field.field_name}
                       {field.is_required && <span className="text-red-400 ml-1">*</span>}
                     </label>
@@ -1087,7 +1084,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       <select
                         value={newLead[field.field_key] || ''}
                         onChange={(e) => setNewLead({ ...newLead, [field.field_key]: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       >
                         <option value="">Select...</option>
                         {options.map((opt, optIndex) => (
@@ -1100,14 +1097,14 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         value={newLead[field.field_key] || (field.field_type === 'date' ? new Date().toISOString().split('T')[0] : '')}
                         onChange={(e) => setNewLead({ ...newLead, [field.field_key]: e.target.value })}
                         placeholder={`Enter ${field.field_name.toLowerCase()}...`}
-                        className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       />
                     )}
                   </div>
                 )
               })}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#334155]">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
               <Button variant="outline" onClick={() => { setShowAddLead(false); setNewLead({}) }}>Cancel</Button>
               <Button onClick={handleAddLead}>Add Lead</Button>
             </div>
@@ -1119,21 +1116,21 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           <Modal onClose={() => setShowAddField(false)} title="Add Property">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Property Name</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Property Name</label>
                 <input
                   type="text"
                   value={newField.name}
                   onChange={(e) => setNewField({ ...newField, name: e.target.value })}
                   placeholder="e.g., Company, Budget, Source"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Property Type</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Property Type</label>
                 <select
                   value={newField.type}
                   onChange={(e) => setNewField({ ...newField, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   {Object.entries(fieldTypeConfig).map(([value, config]) => (
                     <option key={value} value={value}>{config.label}</option>
@@ -1142,7 +1139,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
               </div>
               {newField.type === 'url' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Display Style</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Display Style</label>
                   <div className="grid grid-cols-3 gap-2">
                     {(['hyperlink'] as const).map((type) => (
                       <button
@@ -1151,7 +1148,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         className={`p-3 rounded-xl border-2 transition-all capitalize text-sm ${
                           newField.urlDisplayType === type
                             ? 'border-[#2B79F7] bg-[#2B79F7]/10 text-[#2B79F7]'
-                            : 'border-[#334155] text-gray-400 hover:border-gray-500'
+                            : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[var(--border-secondary)]'
                         }`}
                       >
                         {type}
@@ -1161,7 +1158,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[#334155]">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
               <Button variant="outline" onClick={() => setShowAddField(false)}>Cancel</Button>
               <Button onClick={handleAddField}>Add Property</Button>
             </div>
@@ -1210,7 +1207,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 // Status Badge Component
 function StatusBadge({ value, options }: { value: string; options: StatusOption[] }) {
   const option = options.find(o => o.value === value)
-  if (!option) return <span className="text-gray-500">-</span>
+  if (!option) return <span className="text-[var(--text-tertiary)]">-</span>
 
   return (
     <span 
@@ -1232,7 +1229,7 @@ function StatusBadge({ value, options }: { value: string; options: StatusOption[
 
 // URL Display Component
 function UrlDisplay({ value, displayType, fieldName }: { value: string; displayType: 'button' | 'link' | 'hyperlink'; fieldName?: string }) {
-  if (!value) return <span className="text-gray-500">-</span>
+  if (!value) return <span className="text-[var(--text-tertiary)]">-</span>
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1289,14 +1286,14 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
       onClick={onClose}
     >
       <div 
-        className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-150"
+        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[#334155]">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)]">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
           <button 
             onClick={onClose}
-            className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1425,7 +1422,7 @@ function FieldSettingsModal({
       <div className="space-y-6">
         {/* Field Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">Property Name</label>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Property Name</label>
           <input
             type="text"
             value={fieldName}
@@ -1436,26 +1433,26 @@ function FieldSettingsModal({
               }
             }}
             disabled={field.is_default}
-            className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7] disabled:opacity-50"
+            className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] disabled:opacity-50"
           />
         </div>
 
         {/* Status/Select Options */}
         {(field.field_type === 'status' || field.field_type === 'select') && (
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
               Options (drag to reorder)
             </label>
             <div className="space-y-2 mb-4">
               {localOptions.map((opt, index) => (
                 <div 
                   key={opt.value} 
-                  className={`flex items-center gap-3 p-3 bg-[#0F172A] border rounded-xl group transition-all ${
+                  className={`flex items-center gap-3 p-3 bg-[var(--bg-secondary)] border rounded-xl group transition-all ${
                     draggedIndex === index 
                       ? 'opacity-50 scale-95 border-[#2B79F7]' 
                       : dragOverIndex === index 
                         ? 'border-[#2B79F7] bg-[#2B79F7]/10' 
-                        : 'border-[#334155]'
+                        : 'border-[var(--border-primary)]'
                   }`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
@@ -1464,7 +1461,7 @@ function FieldSettingsModal({
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                 >
-                  <GripVertical className="h-4 w-4 text-gray-600 group-hover:text-gray-400 cursor-grab active:cursor-grabbing" />
+                  <GripVertical className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing" />
                   <button
                     type="button"
                     onClick={() => setEditingOption(editingOption === opt.value ? null : opt.value)}
@@ -1479,11 +1476,11 @@ function FieldSettingsModal({
                       onBlur={() => setEditingOption(null)}
                       onKeyDown={(e) => e.key === 'Enter' && setEditingOption(null)}
                       autoFocus
-                      className="flex-1 px-2 py-1 bg-[#1E293B] border border-[#2B79F7] rounded-lg text-white focus:outline-none text-sm"
+                      className="flex-1 px-2 py-1 bg-[var(--bg-card)] border border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
                     />
                   ) : (
                     <span 
-                      className="text-white flex-1 cursor-pointer hover:text-gray-300"
+                      className="text-[var(--text-primary)] flex-1 cursor-pointer hover:text-[var(--text-secondary)]"
                       onClick={() => setEditingOption(opt.value)}
                     >
                       {opt.label}
@@ -1492,7 +1489,7 @@ function FieldSettingsModal({
                   <button
                     type="button"
                     onClick={() => handleDeleteOption(opt.value)}
-                    className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-500 hover:text-red-400 transition-all"
+                    className="p-1.5 hover:bg-red-500/20 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 transition-all"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -1502,8 +1499,8 @@ function FieldSettingsModal({
 
             {/* Color picker for editing */}
             {editingOption && (
-              <div className="mb-4 p-3 bg-[#0F172A] border border-[#334155] rounded-xl">
-                <p className="text-xs text-gray-400 mb-2">Choose color:</p>
+              <div className="mb-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl">
+                <p className="text-xs text-[var(--text-tertiary)] mb-2">Choose color:</p>
                 <div className="flex flex-wrap gap-2">
                   {colorPalette.map((color) => {
                     const currentOpt = localOptions.find(o => o.value === editingOption)
@@ -1514,7 +1511,7 @@ function FieldSettingsModal({
                         onClick={() => handleUpdateOption(editingOption, { color: color.value })}
                         className={`w-7 h-7 rounded-lg transition-all ${
                           currentOpt?.color === color.value 
-                            ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0F172A] scale-110' 
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-[var(--bg-input)] scale-110' 
                             : 'hover:scale-110'
                         }`}
                         style={{ backgroundColor: color.value }}
@@ -1534,7 +1531,7 @@ function FieldSettingsModal({
                   value={newOption.label}
                   onChange={(e) => setNewOption({ ...newOption, label: e.target.value })}
                   placeholder="New option..."
-                  className="flex-1 px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="flex-1 px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
                 />
                 <Button onClick={handleAddOption} disabled={!newOption.label.trim()}>
@@ -1551,7 +1548,7 @@ function FieldSettingsModal({
                     onClick={() => setNewOption({ ...newOption, color: color.value })}
                     className={`w-7 h-7 rounded-lg transition-all ${
                       newOption.color === color.value 
-                        ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1E293B] scale-110' 
+                        ? 'ring-2 ring-white ring-offset-2 ring-offset-[var(--bg-card)] scale-110' 
                         : 'hover:scale-110'
                     }`}
                     style={{ backgroundColor: color.value }}
@@ -1565,7 +1562,7 @@ function FieldSettingsModal({
 
         {/* Delete */}
         {!field.is_default && (
-          <div className="pt-4 border-t border-[#334155]">
+          <div className="pt-4 border-t border-[var(--border-primary)]">
             <button
               type="button"
               onClick={() => onDelete(field.id)}
@@ -1605,11 +1602,11 @@ function LeadDetailModal({
       onClick={onClose}
     >
       <div 
-        className={`bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-2xl max-h-[90vh] overflow-auto shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
+        className={`bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-2xl max-h-[90vh] overflow-auto shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[#334155] sticky top-0 bg-[#1E293B] z-10">
-          <h3 className="text-xl font-semibold text-white">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)] sticky top-0 bg-[var(--bg-card)] z-10">
+          <h3 className="text-xl font-semibold text-[var(--text-primary)]">
             {(lead.data?.name as string) || 'Lead Details'}
           </h3>
           <div className="flex items-center gap-2">
@@ -1624,7 +1621,7 @@ function LeadDetailModal({
             </button>
             <button 
               onClick={onClose}
-              className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+              className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -1637,14 +1634,14 @@ function LeadDetailModal({
             
             return (
               <div key={field.id}>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-2">
                   {field.field_name}
                 </label>
                 {(field.field_type === 'status' || field.field_type === 'select') ? (
                   <select
                     value={(lead.data?.[field.field_key] as string) || ''}
                     onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   >
                     <option value="">Select...</option>
                     {options.map((opt) => (
@@ -1656,7 +1653,7 @@ function LeadDetailModal({
                     type={field.field_type === 'email' ? 'email' : field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
                     value={(lead.data?.[field.field_key] as string) || ''}
                     onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 )}
               </div>
@@ -1664,8 +1661,8 @@ function LeadDetailModal({
           })}
         </div>
 
-        <div className="p-6 border-t border-[#334155] sticky bottom-0 bg-[#1E293B]">
-          <p className="text-xs text-gray-500">
+        <div className="p-6 border-t border-[var(--border-primary)] sticky bottom-0 bg-[var(--bg-card)]">
+          <p className="text-xs text-[var(--text-tertiary)]">
             Created: {new Date(lead.created_at).toLocaleString()}
           </p>
         </div>
@@ -1692,8 +1689,8 @@ function StatusDropdown({
         className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
         onClick={onClose}
       >
-        <div className="bg-[#1E293B] border border-[#334155] rounded-xl shadow-2xl p-4">
-          <p className="text-gray-400">No options available</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-4">
+          <p className="text-[var(--text-tertiary)]">No options available</p>
         </div>
       </div>
     )
@@ -1705,11 +1702,11 @@ function StatusDropdown({
       onClick={onClose}
     >
       <div 
-        className="bg-[#1E293B] border border-[#334155] rounded-xl shadow-2xl p-2 min-w-[250px] max-h-[400px] overflow-y-auto animate-in fade-in zoom-in duration-150"
+        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-h-[400px] overflow-y-auto animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-2 border-b border-[#334155] mb-2">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Select Status</p>
+        <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">
+          <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Select Status</p>
         </div>
         {options.map((opt) => (
           <button
@@ -1718,14 +1715,14 @@ function StatusDropdown({
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
               currentValue === opt.value 
                 ? 'bg-[#2B79F7]/20' 
-                : 'hover:bg-[#334155]'
+                : 'hover:bg-[var(--bg-card-hover)]'
             }`}
           >
             <div 
               className="w-4 h-4 rounded-full shrink-0"
               style={{ backgroundColor: opt.color }}
             />
-            <span className="text-white flex-1 text-left">{opt.label}</span>
+            <span className="text-[var(--text-primary)] flex-1 text-left">{opt.label}</span>
             {currentValue === opt.value && (
               <Check className="h-4 w-4 text-[#2B79F7] shrink-0" />
             )}

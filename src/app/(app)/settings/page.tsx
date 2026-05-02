@@ -199,7 +199,7 @@ function SettingsSkeleton() {
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center gap-2">
                 <User className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Profile</h3>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex justify-center">
@@ -237,7 +237,7 @@ function SettingsSkeleton() {
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center gap-2">
                 <Lock className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Change Password</h3>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="relative">
@@ -251,7 +251,7 @@ function SettingsSkeleton() {
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-9 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                   >
                     {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -268,7 +268,7 @@ function SettingsSkeleton() {
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-9 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                     >
                       {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -284,7 +284,7 @@ function SettingsSkeleton() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-9 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                     >
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>

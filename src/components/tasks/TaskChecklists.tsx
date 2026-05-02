@@ -140,7 +140,7 @@ export function TaskChecklists({ taskId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Checklists</p>
+        <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">Checklists</p>
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
@@ -166,7 +166,7 @@ export function TaskChecklists({ taskId }: Props) {
               }
             }}
             placeholder="Checklist name…"
-            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
           <button
             type="button"
@@ -179,17 +179,17 @@ export function TaskChecklists({ taskId }: Props) {
       )}
 
       {isLoading ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-[var(--text-tertiary)]">Loading…</p>
       ) : lists.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">No checklists yet.</p>
+        <p className="text-xs text-[var(--text-tertiary)] italic">No checklists yet.</p>
       ) : (
         lists.map((l) => {
           const total = l.items.length
           const done = l.items.filter((it) => it.done).length
           const isRenaming = renamingId === l.id
           return (
-            <div key={l.id} className="border border-gray-100 rounded-lg overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+            <div key={l.id} className="border border-[var(--border-primary)] rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
                 {isRenaming ? (
                   <input
                     autoFocus
@@ -201,7 +201,7 @@ export function TaskChecklists({ taskId }: Props) {
                       if (e.key === 'Enter') void handleRename(l.id)
                       if (e.key === 'Escape') setRenamingId(null)
                     }}
-                    className="flex-1 px-2 py-1 rounded border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="flex-1 px-2 py-1 rounded border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 ) : (
                   <button
@@ -210,13 +210,13 @@ export function TaskChecklists({ taskId }: Props) {
                       setRenamingId(l.id)
                       setRenameValue(l.name)
                     }}
-                    className="flex-1 text-sm font-medium text-gray-900 text-left truncate hover:text-[#2B79F7]"
+                    className="flex-1 text-sm font-medium text-[var(--text-primary)] text-left truncate hover:text-[#2B79F7]"
                     title="Click to rename"
                   >
                     {l.name}
                   </button>
                 )}
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[11px] text-[var(--text-tertiary)]">
                   {done}/{total}
                 </span>
                 <button
@@ -225,7 +225,7 @@ export function TaskChecklists({ taskId }: Props) {
                     setRenamingId(l.id)
                     setRenameValue(l.name)
                   }}
-                  className="p-1 rounded text-gray-300 hover:text-gray-700"
+                  className="p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                   aria-label="Rename"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -233,7 +233,7 @@ export function TaskChecklists({ taskId }: Props) {
                 <button
                   type="button"
                   onClick={() => void handleDeleteList(l.id)}
-                  className="p-1 rounded text-gray-300 hover:text-red-600 hover:bg-red-50"
+                  className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-600 hover:bg-red-50"
                   aria-label="Delete checklist"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -280,14 +280,14 @@ function ChecklistItemRow({
   }, [item.label])
 
   return (
-    <li className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 group">
+    <li className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-tertiary)] group">
       <button
         type="button"
         onClick={() => onToggle(!item.done)}
         className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition ${
           item.done
             ? 'bg-[#2B79F7] border-[#2B79F7] text-white'
-            : 'border-gray-300 hover:border-[#2B79F7]'
+            : 'border-[var(--border-primary)] hover:border-[#2B79F7]'
         }`}
         aria-label={item.done ? 'Mark incomplete' : 'Mark complete'}
       >
@@ -310,14 +310,14 @@ function ChecklistItemRow({
               setEditing(false)
             }
           }}
-          className="flex-1 px-2 py-0.5 rounded border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          className="flex-1 px-2 py-0.5 rounded border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditing(true)}
           className={`flex-1 text-left text-sm truncate ${
-            item.done ? 'line-through text-gray-400' : 'text-gray-800'
+            item.done ? 'line-through text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'
           }`}
         >
           {item.label}
@@ -326,7 +326,7 @@ function ChecklistItemRow({
       <button
         type="button"
         onClick={onDelete}
-        className="p-1 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
+        className="p-1 rounded text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition"
         aria-label="Delete item"
       >
         <Trash2 className="h-3.5 w-3.5" />
@@ -338,8 +338,8 @@ function ChecklistItemRow({
 function ChecklistAddItem({ onAdd }: { onAdd: (label: string) => void }) {
   const [draft, setDraft] = useState('')
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-gray-100">
-      <Plus className="h-3.5 w-3.5 text-gray-300" />
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--border-primary)]">
+      <Plus className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
       <input
         type="text"
         value={draft}
@@ -351,7 +351,7 @@ function ChecklistAddItem({ onAdd }: { onAdd: (label: string) => void }) {
           }
         }}
         placeholder="Add item…"
-        className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+        className="flex-1 bg-transparent text-sm text-[var(--text-secondary)] outline-none placeholder:text-[var(--text-tertiary)]"
       />
     </div>
   )

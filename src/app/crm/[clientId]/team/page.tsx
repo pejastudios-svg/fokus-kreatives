@@ -354,33 +354,33 @@ export default function CRMTeamPage() {
     <div className="p-6 lg:p-8 min-h-full animate-in fade-in">
       <div className="flex justify-between mb-6">
         <div>
-          <Skeleton className="h-8 w-32 mb-2 bg-[#334155]" />
-          <Skeleton className="h-4 w-48 bg-[#334155]" />
+          <Skeleton className="h-8 w-32 mb-2 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-48 bg-[var(--bg-card-hover)]" />
         </div>
-        <Skeleton className="h-10 w-32 rounded-lg bg-[#334155]" />
+        <Skeleton className="h-10 w-32 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
-      <Skeleton className="h-10 w-80 mb-4 rounded-xl bg-[#334155]" />
+      <Skeleton className="h-10 w-80 mb-4 rounded-xl bg-[var(--bg-card-hover)]" />
 
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
-        <div className="border-b border-[#334155] bg-[#0F172A] p-4 flex gap-4">
-          <Skeleton className="h-4 w-32 bg-[#334155]" />
-          <Skeleton className="h-4 w-32 bg-[#334155]" />
-          <Skeleton className="h-4 w-32 bg-[#334155]" />
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+        <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
+          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+          <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
         </div>
-        <div className="divide-y divide-[#334155]">
+        <div className="divide-y divide-[var(--border-primary)]">
           {[1, 2, 3].map((i) => (
             <div key={i} className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-9 rounded-full bg-[#334155]" />
+                <Skeleton className="h-9 w-9 rounded-full bg-[var(--bg-card-hover)]" />
                 <div className="space-y-1">
-                  <Skeleton className="h-4 w-32 bg-[#334155]" />
-                  <Skeleton className="h-3 w-48 bg-[#334155]" />
+                  <Skeleton className="h-4 w-32 bg-[var(--bg-card-hover)]" />
+                  <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
                 </div>
               </div>
-              <Skeleton className="h-6 w-24 rounded-full bg-[#334155]" />
-              <Skeleton className="h-6 w-20 rounded-full bg-[#334155]" />
-              <Skeleton className="h-4 w-24 bg-[#334155]" />
+              <Skeleton className="h-6 w-24 rounded-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-6 w-20 rounded-full bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-4 w-24 bg-[var(--bg-card-hover)]" />
             </div>
           ))}
         </div>
@@ -411,7 +411,7 @@ export default function CRMTeamPage() {
                     type="text"
                     value={notification.link}
                     readOnly
-                    className="flex-1 px-3 py-1.5 bg-white border border-green-200 rounded text-sm text-gray-700"
+                    className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-green-200 rounded text-sm text-[var(--text-secondary)]"
                   />
                   <Button size="sm" onClick={() => copyLink(notification.link!)}>
                     <Copy className="h-4 w-4 mr-1" />
@@ -421,26 +421,25 @@ export default function CRMTeamPage() {
               )}
             </div>
             <button onClick={() => setNotification(null)}>
-              <X className="h-4 w-4 text-gray-400" />
+              <X className="h-4 w-4 text-[var(--text-tertiary)]" />
             </button>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">CRM Team</h1>
-          <p className="text-gray-400 mt-1">Members who can access this client CRM</p>
-          <p className="text-gray-500 text-xs mt-1">
-            Your CRM role here: <span className="font-semibold">{currentCrmRole}</span>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-xs text-[var(--text-tertiary)]">Members who can access this client CRM</p>
+          <p className="text-[var(--text-tertiary)] text-[11px] mt-0.5">
+            CRM role: <span className="font-semibold text-[var(--text-secondary)]">{currentCrmRole}</span>
             {' · '}
-            Your agency role: <span className="font-semibold">{currentAppRole}</span>
+            Agency role: <span className="font-semibold text-[var(--text-secondary)]">{currentAppRole}</span>
           </p>
         </div>
 
         {canInvite && (
-          <Button onClick={() => setShowInviteModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={() => setShowInviteModal(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
             Invite Member
           </Button>
         )}
@@ -448,35 +447,35 @@ export default function CRMTeamPage() {
 
       <div className="mb-4">
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
           <input
             type="text"
             placeholder="Search members..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="w-full pl-9 pr-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
         </div>
       </div>
 
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
         {filteredMembers.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">
-            <Users className="h-10 w-10 mx-auto mb-3 text-gray-500" />
+          <div className="p-10 text-center text-[var(--text-tertiary)]">
+            <Users className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
             <p>No team members yet.</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#334155] bg-[#0F172A]">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Member</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">CRM Role</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Status</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Joined</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Actions</th>
+              <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Member</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">CRM Role</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Status</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Joined</th>
+                <th className="text-right px-6 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]">
+            <tbody className="divide-y divide-[var(--border-primary)]">
               {filteredMembers.map((member) => {
                 const avatarLetter = (member.name || member.email || 'U').charAt(0).toUpperCase()
 
@@ -494,13 +493,13 @@ export default function CRMTeamPage() {
                             unoptimized 
                           />
                         ) : (
-                          <div className="h-9 w-9 rounded-full bg-brand-gradient flex items-center justify-center text-white text-sm font-medium">
+                          <div className="h-9 w-9 rounded-full bg-brand-gradient flex items-center justify-center text-[var(--text-primary)] text-sm font-medium">
                             {avatarLetter}
                           </div>
                         )}
                         <div>
-                          <p className="text-sm font-medium text-white">{member.name || member.email}</p>
-                          <p className="text-xs text-gray-400">{member.email}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{member.name || member.email}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{member.email}</p>
                         </div>
                       </div>
                     </td>
@@ -530,13 +529,13 @@ export default function CRMTeamPage() {
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-xs text-gray-400">{new Date(member.created_at).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-xs text-[var(--text-tertiary)]">{new Date(member.created_at).toLocaleDateString()}</td>
 
                     <td className="px-6 py-4 text-right">
                       {canRemove && (
                         <button
                           onClick={() => setRemoveTarget(member)}
-                          className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Remove from this CRM"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -553,43 +552,43 @@ export default function CRMTeamPage() {
 
       {showInviteModal && canInvite && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]">
-              <h3 className="text-lg font-semibold text-white">Invite CRM Member</h3>
-              <button onClick={() => setShowInviteModal(false)} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#334155] transition-colors">
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Invite CRM Member</h3>
+              <button onClick={() => setShowInviteModal(false)} className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Name</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Name</label>
                 <input
                   type="text"
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
                   placeholder="John Smith"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Email</label>
                 <input
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="person@example.com"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">CRM Role</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">CRM Role</label>
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as CRMRole)}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
@@ -597,7 +596,7 @@ export default function CRMTeamPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#334155]">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
               <Button variant="outline" onClick={() => setShowInviteModal(false)}>
                 Cancel
               </Button>

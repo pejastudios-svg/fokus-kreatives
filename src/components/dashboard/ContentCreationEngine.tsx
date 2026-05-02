@@ -620,13 +620,13 @@ export function ContentCreationEngine() {
       {/* Client Selection */}
       <Card className="animate-in fade-in-up">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Select Client</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Select Client</h3>
         </CardHeader>
         <CardContent>
           <select
             value={selectedClientId}
             onChange={(e) => setSelectedClientId(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent"
+            className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent"
           >
             <option value="">Choose a client...</option>
             {clients.map((client) => (
@@ -650,7 +650,7 @@ export function ContentCreationEngine() {
       {/* Content Type */}
       <Card className="animate-in fade-in-up">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Content Type</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Content Type</h3>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -663,13 +663,13 @@ export function ContentCreationEngine() {
                   onClick={() => setSelectedType(type.id)}
                   className={`group flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center transition-all duration-200 active:scale-[0.97] ${
                     isSelected
-                      ? 'border-[#2B79F7] bg-[#E8F1FF] text-[#2B79F7] shadow-premium'
-                      : 'border-gray-200 hover:border-[#5A9AFF] text-gray-600 hover:shadow-sm'
+                      ? 'border-[#2B79F7] bg-white dark:bg-[#1E2A41] text-[#2B79F7] dark:text-white shadow-premium'
+                      : 'border-[var(--border-primary)] hover:border-[#5A9AFF] text-[var(--text-secondary)] dark:text-white hover:shadow-sm'
                   }`}
                 >
                   <type.icon className={`h-6 w-6 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`} />
                   <span className="text-sm font-semibold">{type.name}</span>
-                  <span className="text-xs text-gray-400">{type.description}</span>
+                  <span className="text-xs text-[var(--text-tertiary)]">{type.description}</span>
                 </button>
               )
             })}
@@ -680,8 +680,8 @@ export function ContentCreationEngine() {
       {/* Content Pillar */}
       <Card className="animate-in fade-in-up">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Content Pillar</h3>
-          <p className="text-xs text-gray-500 mt-1">Recommended pillars are highlighted based on client tier.</p>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Content Pillar</h3>
+          <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">Recommended pillars are highlighted based on client tier.</p>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -695,32 +695,32 @@ export function ContentCreationEngine() {
                   onClick={() => setSelectedPillar(pillar.id)}
                   className={`flex flex-col items-start text-left p-4 rounded-xl border-2 transition-all duration-200 active:scale-[0.97] ${
                     isSelected
-                      ? 'border-[#2B79F7] bg-[#E8F1FF] shadow-premium'
+                      ? 'border-[#2B79F7] bg-white dark:bg-[#1E2A41] shadow-premium'
                       : isRecommended
-                        ? 'border-[#5A9AFF] bg-[#E8F1FF]/40 hover:shadow-sm'
-                        : 'border-gray-200 hover:border-[#5A9AFF] hover:shadow-sm'
+                        ? 'border-[#5A9AFF] bg-[#E8F1FF]/40 dark:bg-transparent hover:shadow-sm'
+                        : 'border-[var(--border-primary)] hover:border-[#5A9AFF] hover:shadow-sm'
                   }`}
                 >
                   <div className="flex items-center gap-2 w-full">
-                    <span className={`text-sm font-semibold ${isSelected ? 'text-[#2B79F7]' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-semibold ${isSelected ? 'text-[#2B79F7] dark:text-white' : 'text-[var(--text-primary)]'}`}>
                       {pillar.name}
                     </span>
                     {isRecommended && !isSelected && (
-                      <span className="ml-auto text-[10px] font-medium text-[#2B79F7] bg-white px-1.5 py-0.5 rounded-full">
+                      <span className="ml-auto text-[10px] font-medium text-[#2B79F7] bg-[var(--bg-card)] px-1.5 py-0.5 rounded-full">
                         rec
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-500 mt-1">{pillar.description}</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)] mt-0.5">{pillar.description}</span>
                 </button>
               )
             })}
           </div>
 
           {needsReference && (
-            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl animate-in fade-in-up">
+            <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl animate-in fade-in-up">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <span className="text-sm font-medium text-gray-700">Select script to mimic</span>
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Select script to mimic</span>
                 <Button size="sm" variant="outline" onClick={() => setShowRefModal(true)}>
                   <History className="h-4 w-4 mr-2" />
                   Browse Content Bank
@@ -728,12 +728,12 @@ export function ContentCreationEngine() {
               </div>
 
               {referenceScript ? (
-                <div className="text-sm bg-white p-3 border border-gray-200 rounded-lg flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="text-sm bg-[var(--bg-card)] p-3 border border-[var(--border-primary)] rounded-lg flex items-center justify-between gap-3 animate-in fade-in">
                   <span className="truncate">{referenceScript.title || referenceScript.idea_input.slice(0, 60)}</span>
                   <button
                     type="button"
                     onClick={() => setReferenceScript(null)}
-                    className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                    className="p-1 hover:bg-red-500/10 rounded text-[var(--text-tertiary)] hover:text-red-500 transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -750,8 +750,8 @@ export function ContentCreationEngine() {
       {/* Topic */}
       <Card className="animate-in fade-in-up">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900">Topic / Idea</h3>
-          <p className="text-xs text-gray-500 mt-1">Optional - type an angle or paste a draft to polish.</p>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Topic / Idea</h3>
+          <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">Optional - type an angle or paste a draft to polish.</p>
         </CardHeader>
         <CardContent>
           <textarea
@@ -759,7 +759,7 @@ export function ContentCreationEngine() {
             onChange={(e) => setIdeaInput(e.target.value)}
             placeholder="Type the exact topic/angle you want... (Paste draft here to polish)"
             rows={4}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-gray-400 resize-none"
+            className="w-full px-4 py-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
           />
         </CardContent>
       </Card>
@@ -768,18 +768,18 @@ export function ContentCreationEngine() {
       <Card className="animate-in fade-in-up">
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
-            <h3 className="text-lg font-semibold text-gray-900">Call to Action</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Call to Action</h3>
             <Toggle checked={includeCta} onChange={setIncludeCta} label="Include CTA" />
           </div>
         </CardHeader>
         {includeCta && (
           <CardContent className="space-y-4 animate-in fade-in">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Saved CTA (keyword-controlled)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Saved CTA (keyword-controlled)</label>
               <select
                 value={selectedCtaId}
                 onChange={(e) => setSelectedCtaId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">No saved CTA</option>
                 {ctas.map((c) => (
@@ -790,11 +790,11 @@ export function ContentCreationEngine() {
               </select>
 
               {selectedCta && (
-                <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 animate-in fade-in">
-                  <p className="text-xs text-gray-500 mb-1">
-                    Keyword: <span className="font-semibold text-gray-700">{normalizeKeyword(selectedCta.keyword)}</span>
+                <div className="mt-2 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)] animate-in fade-in">
+                  <p className="text-xs text-[var(--text-tertiary)] mb-1">
+                    Keyword: <span className="font-semibold text-[var(--text-secondary)]">{normalizeKeyword(selectedCta.keyword)}</span>
                   </p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
                     {renderCtaText(selectedCta.keyword, selectedCta.cta_text)}
                   </p>
                   <Button
@@ -810,8 +810,8 @@ export function ContentCreationEngine() {
               )}
             </div>
 
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Or type a custom CTA (one-off)</p>
+            <div className="border-t border-[var(--border-primary)] pt-4 space-y-3">
+              <p className="text-sm font-medium text-[var(--text-secondary)]">Or type a custom CTA (one-off)</p>
 
               <Input
                 label="Keyword"
@@ -821,15 +821,15 @@ export function ContentCreationEngine() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CTA text</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">CTA text</label>
                 <textarea
                   value={customCtaText}
                   onChange={(e) => setCustomCtaText(e.target.value)}
                   rows={3}
                   placeholder='Example: Comment "{KEYWORD}" and I&rsquo;ll send you 10 open-loop scripts.'
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
                   Use <code>{'{KEYWORD}'}</code> to guarantee the keyword appears in the CTA.
                 </p>
               </div>
@@ -882,8 +882,8 @@ export function ContentCreationEngine() {
           <CardHeader>
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">External Prompt</h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">External Prompt</h3>
+                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
                   Paste this whole block into ChatGPT, Claude, or Gemini. The full client profile, voice rules, format structure, and reference script are baked in - one copy, one paste.
                 </p>
               </div>
@@ -911,9 +911,9 @@ export function ContentCreationEngine() {
               value={externalPrompt}
               readOnly
               rows={20}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 font-mono text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="w-full px-4 py-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-mono text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
-            <p className="mt-2 text-[11px] text-gray-400">
+            <p className="mt-2 text-[11px] text-[var(--text-tertiary)]">
               The reference script is embedded in full. The external AI will mirror its structure and rhythm on a fresh angle.
             </p>
           </CardContent>
@@ -925,7 +925,7 @@ export function ContentCreationEngine() {
         <Card className="animate-in fade-in-up">
           <CardHeader>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-gray-900">Generated Content</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Generated Content</h3>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={handleGenerate} disabled={isGenerating}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
@@ -947,11 +947,11 @@ export function ContentCreationEngine() {
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Title + Save */}
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-4 space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Save to content bank</p>
-                  <p className="text-xs text-gray-500">Pick a title - use our recommendation or write your own.</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">Save to content bank</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">Pick a title - use our recommendation or write your own.</p>
                 </div>
                 <Toggle
                   checked={useCustomTitle}
@@ -968,14 +968,14 @@ export function ContentCreationEngine() {
                   placeholder="Enter a custom title"
                 />
               ) : (
-                <div className="px-3 py-2.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-800 animate-in fade-in">
-                  <span className="text-[10px] uppercase tracking-wide text-gray-400 mr-2">Recommended</span>
+                <div className="px-3 py-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] animate-in fade-in">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mr-2">Recommended</span>
                   {recommendedTitle || 'Untitled'}
                 </div>
               )}
 
               <div className="flex items-center justify-between gap-3 pt-1">
-                <p className="text-xs text-gray-400">{new Date().toLocaleDateString()}</p>
+                <p className="text-xs text-[var(--text-tertiary)]">{new Date().toLocaleDateString()}</p>
                 <Button onClick={handleSaveScript} isLoading={isSaving} size="sm">
                   {savedOnce ? (
                     <>
@@ -1005,18 +1005,18 @@ export function ContentCreationEngine() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-gray-900">Content Bank</h3>
-                <span className="text-xs text-gray-400">({savedScripts.length})</span>
+                <BookOpen className="h-4 w-4 text-[#2B79F7]" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Content Bank</h3>
+                <span className="text-xs text-[var(--text-tertiary)]">({savedScripts.length})</span>
               </div>
               <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
                 <input
                   type="text"
                   value={bankSearch}
                   onChange={(e) => setBankSearch(e.target.value)}
                   placeholder="Search scripts..."
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
             </div>
@@ -1024,8 +1024,8 @@ export function ContentCreationEngine() {
           <CardContent>
             {filteredBankScripts.length === 0 ? (
               <div className="py-10 text-center">
-                <BookOpen className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">
+                <BookOpen className="h-10 w-10 text-[var(--text-tertiary)] mx-auto mb-3" />
+                <p className="text-sm text-[var(--text-tertiary)]">
                   {savedScripts.length === 0
                     ? 'No scripts saved yet. Generate and save one above.'
                     : 'No scripts match your search.'}
@@ -1036,13 +1036,13 @@ export function ContentCreationEngine() {
                 {filteredBankScripts.map((s) => (
                   <div
                     key={s.id}
-                    className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#5A9AFF] hover:bg-[#E8F1FF]/30 transition-all duration-200 animate-in fade-in"
+                    className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-[var(--border-primary)] hover:border-[#5A9AFF] hover:bg-[#E8F1FF]/30 transition-all duration-200 animate-in fade-in"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">
+                      <p className="font-medium text-[var(--text-primary)] truncate">
                         {s.title || s.idea_input?.slice(0, 60) || 'Untitled'}
                       </p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-500">
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-[var(--text-tertiary)]">
                         <span>
                           {new Date(s.created_at).toLocaleDateString(undefined, {
                             month: 'short',
@@ -1051,12 +1051,12 @@ export function ContentCreationEngine() {
                           })}
                         </span>
                         {s.content_pillar && (
-                          <span className="bg-[#E8F1FF] text-[#2B79F7] px-2 py-0.5 rounded-full capitalize">
+                          <span className="bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] px-2 py-0.5 rounded-full capitalize">
                             {s.content_pillar}
                           </span>
                         )}
                         {s.content_type && (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                          <span className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-full">
                             {s.content_type}
                           </span>
                         )}
@@ -1079,7 +1079,7 @@ export function ContentCreationEngine() {
                         size="sm"
                         onClick={() => setPendingScriptDeleteId(s.id)}
                         isLoading={deletingScriptId === s.id}
-                        className="text-red-500 hover:bg-red-50"
+                        className="text-red-500 hover:bg-red-500/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1098,12 +1098,12 @@ export function ContentCreationEngine() {
           <Card className="w-full max-w-lg animate-in zoom-in">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Save CTA to Library</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Save CTA to Library</h3>
                 <button
                   onClick={() => setShowCtaModal(false)}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-[var(--text-tertiary)]" />
                 </button>
               </div>
             </CardHeader>
@@ -1121,12 +1121,12 @@ export function ContentCreationEngine() {
                 placeholder="LOOP"
               />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CTA Text (required)</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">CTA Text (required)</label>
                 <textarea
                   value={ctaText}
                   onChange={(e) => setCtaText(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                   placeholder='Comment "{KEYWORD}" and I&rsquo;ll send you...'
                 />
               </div>
@@ -1148,17 +1148,17 @@ export function ContentCreationEngine() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
           <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in">
             <CardHeader className="flex justify-between flex-row items-center border-b">
-              <h3 className="font-bold text-gray-900">Select Reference Script</h3>
+              <h3 className="font-bold text-[var(--text-primary)]">Select Reference Script</h3>
               <button
                 onClick={() => setShowRefModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
               >
-                <X className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-[var(--text-tertiary)]" />
               </button>
             </CardHeader>
             <div className="overflow-y-auto p-4 space-y-2">
               {savedScripts.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">
+                <p className="text-sm text-[var(--text-tertiary)] text-center py-8">
                   No saved scripts yet. Generate and save one first.
                 </p>
               ) : (
@@ -1170,15 +1170,15 @@ export function ContentCreationEngine() {
                       setReferenceScript(s)
                       setShowRefModal(false)
                     }}
-                    className="w-full text-left p-3 hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-200 group hover:border-[#5A9AFF]"
+                    className="w-full text-left p-3 hover:bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg transition-all duration-200 group hover:border-[#5A9AFF]"
                   >
-                    <div className="font-medium text-gray-900 group-hover:text-[#2B79F7] truncate">
+                    <div className="font-medium text-[var(--text-primary)] group-hover:text-[#2B79F7] truncate">
                       {s.title || s.idea_input?.slice(0, 60) || 'Untitled'}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 flex gap-2 flex-wrap">
+                    <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5 flex gap-2 flex-wrap">
                       <span>{new Date(s.created_at).toLocaleDateString()}</span>
                       {s.content_pillar && (
-                        <span className="bg-gray-100 px-1.5 rounded capitalize">{s.content_pillar}</span>
+                        <span className="bg-[var(--bg-tertiary)] px-1.5 rounded capitalize">{s.content_pillar}</span>
                       )}
                     </div>
                   </button>

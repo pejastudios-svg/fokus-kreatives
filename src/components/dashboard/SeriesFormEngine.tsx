@@ -330,12 +330,12 @@ export function SeriesFormEngine() {
       <Card className="card-premium">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-[#2B79F7]" />
-            <h3 className="text-lg font-semibold text-theme-primary">Series Form Generator</h3>
+            <Layers className="h-4 w-4 text-[#2B79F7]" />
+            <h3 className="text-sm font-semibold text-theme-primary">Series Form Generator</h3>
           </div>
-          <p className="text-xs text-theme-secondary mt-1">
+          <p className="text-[11px] text-theme-tertiary mt-0.5">
             Build a per-entry intake form for a multi-day series. The client fills it out, then
-            you build one external prompt anchored to their actual answers - no AI invention.
+            you build one external prompt anchored to their actual answers — no AI invention.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -385,9 +385,9 @@ export function SeriesFormEngine() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-theme-primary mb-2">Framing</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="space-y-2">
+            <label className="block text-[11px] uppercase tracking-wide font-medium text-theme-tertiary">Framing</label>
+            <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-theme-primary bg-theme-card">
               {SERIES_FRAMINGS.map((f) => {
                 const active = framing === f.id
                 return (
@@ -395,18 +395,23 @@ export function SeriesFormEngine() {
                     key={f.id}
                     type="button"
                     onClick={() => setFraming(f.id)}
-                    className={`text-left p-3 rounded-lg border-2 transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                       active
-                        ? 'border-[#2B79F7] bg-[#E8F1FF]'
-                        : 'border-theme-primary hover:border-[#5A9AFF] bg-theme-card'
+                        ? 'bg-[#2B79F7] text-white shadow-sm'
+                        : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
                     }`}
                   >
-                    <p className="text-sm font-semibold text-theme-primary">{f.label}</p>
-                    <p className="text-[11px] text-theme-secondary mt-0.5">{f.description}</p>
+                    {f.label}
                   </button>
                 )
               })}
             </div>
+            {(() => {
+              const activeFraming = SERIES_FRAMINGS.find((f) => f.id === framing)
+              return activeFraming ? (
+                <p className="text-[11px] text-theme-tertiary px-1">{activeFraming.description}</p>
+              ) : null
+            })()}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -494,10 +499,10 @@ export function SeriesFormEngine() {
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-theme-primary">
+                <h3 className="text-sm font-semibold text-theme-primary">
                   Draft questions ({draft.length})
                 </h3>
-                <p className="text-xs text-theme-secondary mt-1">
+                <p className="text-[11px] text-theme-tertiary mt-0.5">
                   Edit anything that&rsquo;s off, drop weak ones, then save and share the link.
                 </p>
                 {shortfall > 0 && (
@@ -528,7 +533,7 @@ export function SeriesFormEngine() {
                 className="p-3 rounded-lg border border-theme-primary bg-theme-card space-y-2"
               >
                 <div className="flex items-start gap-3">
-                  <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] text-xs font-semibold flex items-center justify-center">
+                  <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
                     {idx + 1}
                   </span>
                   <div className="flex-1 space-y-2">
@@ -578,7 +583,7 @@ export function SeriesFormEngine() {
                   <button
                     type="button"
                     onClick={() => removeQuestion(q.id)}
-                    className="p-1.5 text-theme-tertiary hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                    className="p-1.5 text-theme-tertiary hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
                     aria-label="Remove question"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -594,10 +599,10 @@ export function SeriesFormEngine() {
         <Card className="card-premium">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-[#2B79F7]" />
-              <h3 className="text-lg font-semibold text-theme-primary">Past series forms</h3>
+              <ClipboardList className="h-4 w-4 text-[#2B79F7]" />
+              <h3 className="text-sm font-semibold text-theme-primary">Past series forms</h3>
               {pastForms.length > 0 && (
-                <span className="text-xs text-theme-secondary">({pastForms.length})</span>
+                <span className="text-[11px] text-theme-tertiary">({pastForms.length})</span>
               )}
             </div>
           </CardHeader>
@@ -624,14 +629,14 @@ export function SeriesFormEngine() {
                             {f.title}
                           </p>
                           <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-theme-secondary">
-                            <span className="px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7]">
+                            <span className="px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD]">
                               {f.series_length} {f.series_label.toLowerCase()}s
                             </span>
-                            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            <span className="px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                               {f.format}
                             </span>
                             {f.framing && (
-                              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                              <span className="px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                                 {f.framing}
                               </span>
                             )}
@@ -686,7 +691,7 @@ export function SeriesFormEngine() {
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(f.id)}
-                            className="p-1.5 text-theme-tertiary hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                            className="p-1.5 text-theme-tertiary hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
                             aria-label="Delete form"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -707,9 +712,9 @@ export function SeriesFormEngine() {
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-theme-primary">External Prompt</h3>
-                <p className="text-xs text-theme-secondary mt-1">
-                  One copy, one paste. The client&rsquo;s actual answers are baked in - the
+                <h3 className="text-sm font-semibold text-theme-primary">External Prompt</h3>
+                <p className="text-[11px] text-theme-tertiary mt-0.5">
+                  One copy, one paste. The client&rsquo;s actual answers are baked in — the
                   external AI builds each entry from their words, not from inference.
                 </p>
               </div>

@@ -344,7 +344,7 @@ export function ScriptPackageEngine() {
     <div className="space-y-6 animate-in fade-in-up">
       <Card className="card-premium">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-theme-primary">1. Pick a client</h3>
+          <h3 className="text-sm font-semibold text-theme-primary">1. Pick a client</h3>
         </CardHeader>
         <CardContent>
           <ClientPicker
@@ -360,10 +360,10 @@ export function ScriptPackageEngine() {
         <Card className="card-premium">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-[#2B79F7]" />
-              <h3 className="text-lg font-semibold text-theme-primary">2. Pick a topic from their bank</h3>
+              <Lightbulb className="h-4 w-4 text-[#2B79F7]" />
+              <h3 className="text-sm font-semibold text-theme-primary">2. Pick a topic from their bank</h3>
             </div>
-            <p className="text-xs text-theme-secondary mt-1">
+            <p className="text-[11px] text-theme-tertiary mt-0.5">
               Unused topics appear first. Used ones are greyed - you can still pick them manually.
             </p>
           </CardHeader>
@@ -386,20 +386,20 @@ export function ScriptPackageEngine() {
                       onClick={() => setSelectedTopicId(t.id)}
                       className={`w-full text-left p-3 rounded-lg border transition-all ${
                         selected
-                          ? 'border-[#2B79F7] bg-[#E8F1FF]'
+                          ? 'border-[#2B79F7] bg-white dark:bg-[#1E2A41]'
                           : 'border-theme-primary hover:border-[#5A9AFF] bg-theme-card'
                       } ${used ? 'opacity-60' : ''}`}
                     >
                       {t.question && (
-                        <p className="text-xs text-theme-secondary mb-1 truncate">Q: {t.question}</p>
+                        <p className={`text-xs mb-1 truncate ${selected ? 'text-theme-secondary dark:text-white/80' : 'text-theme-secondary dark:text-white/70'}`}>Q: {t.question}</p>
                       )}
-                      <p className="text-sm text-theme-primary line-clamp-2">{t.answer}</p>
+                      <p className={`text-sm line-clamp-2 ${selected ? 'text-theme-primary dark:text-white' : 'text-theme-primary'}`}>{t.answer}</p>
                       <div className="flex items-center gap-2 mt-1 text-[10px]">
-                        <span className="px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] capitalize">
+                        <span className="px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] capitalize">
                           {t.pillar}
                         </span>
                         {used && (
-                          <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Used</span>
+                          <span className="px-2 py-0.5 rounded-full bg-[var(--bg-card-hover)] text-[var(--text-secondary)]">Used</span>
                         )}
                       </div>
                     </button>
@@ -414,7 +414,7 @@ export function ScriptPackageEngine() {
       {selectedClient && selectedTopic && (
         <Card className="card-premium">
           <CardHeader>
-            <h3 className="text-lg font-semibold text-theme-primary">3. Optional CTA</h3>
+            <h3 className="text-sm font-semibold text-theme-primary">3. Optional CTA</h3>
           </CardHeader>
           <CardContent>
             <textarea
@@ -481,8 +481,8 @@ export function ScriptPackageEngine() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <LayoutGrid className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Carousel Repurpose (5)</h3>
+                <LayoutGrid className="h-4 w-4 text-[#2B79F7]" />
+                <h3 className="text-sm font-semibold text-theme-primary">Carousel Repurpose (5)</h3>
               </div>
               <Button
                 size="sm"
@@ -526,8 +526,8 @@ export function ScriptPackageEngine() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Engagement Reels (5)</h3>
+                <Zap className="h-4 w-4 text-[#2B79F7]" />
+                <h3 className="text-sm font-semibold text-theme-primary">Engagement Reels (5)</h3>
               </div>
               <Button
                 size="sm"
@@ -569,8 +569,8 @@ export function ScriptPackageEngine() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-[#2B79F7]" />
-                <h3 className="text-lg font-semibold text-theme-primary">Stories (5)</h3>
+                <MessageCircle className="h-4 w-4 text-[#2B79F7]" />
+                <h3 className="text-sm font-semibold text-theme-primary">Stories (5)</h3>
               </div>
               <Button
                 size="sm"
@@ -647,7 +647,7 @@ function ResultCard({
             className="flex items-center gap-2 min-w-0 text-left"
             disabled={!compact}
           >
-            {Icon && <Icon className="h-5 w-5 text-[#2B79F7] shrink-0" />}
+            {Icon && <Icon className="h-4 w-4 text-[#2B79F7] shrink-0" />}
             <h3 className="text-sm md:text-base font-semibold text-theme-primary truncate">{title}</h3>
             {compact && (
               <ChevronDown

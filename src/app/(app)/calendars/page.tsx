@@ -228,11 +228,11 @@ if (!data?.success) {
         <Card>
           <CardContent className="py-4 flex items-center justify-between gap-4">
             <div className="w-96">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Client</label>
               <select
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">Select a client…</option>
                 {clients.map((c) => (
@@ -252,11 +252,11 @@ if (!data?.success) {
 
         {isLoading ? (
           <Card>
-            <CardContent className="py-12 text-center text-gray-500">Loading calendars…</CardContent>
+            <CardContent className="py-12 text-center text-[var(--text-tertiary)]">Loading calendars…</CardContent>
           </Card>
         ) : calendars.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-gray-500">
+            <CardContent className="py-12 text-center text-[var(--text-tertiary)]">
               No calendars yet. Create your first one.
             </CardContent>
           </Card>
@@ -270,18 +270,18 @@ if (!data?.success) {
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">{c.name}</h3>
-                    <div className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">{c.name}</h3>
+                    <div className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)]">
                       <CalendarIcon className="h-4 w-4" />
                       {new Date(c.month_start).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-[var(--text-secondary)]">
                     Tier: <span className="font-medium">{c.tier}</span>
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">
                     Platforms: <span className="font-medium">{(c.platforms || []).join(', ') || '-'}</span>
                   </p>
                 </CardContent>
@@ -296,9 +296,9 @@ if (!data?.success) {
             <div className="min-h-full flex items-start justify-center p-4 py-8">
               <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Create Calendar</h3>
-                  <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-gray-100">
-                    <X className="h-5 w-5 text-gray-500" />
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">Create Calendar</h3>
+                  <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)]">
+                    <X className="h-5 w-5 text-[var(--text-tertiary)]" />
                   </button>
                 </CardHeader>
 
@@ -321,11 +321,11 @@ if (!data?.success) {
                       onChange={(e) => setMonthStart(e.target.value)}
                     />
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tier</label>
                       <select
                         value={tier}
                         onChange={(e) => setTier(e.target.value as Tier)}
-                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       >
                         <option value="beginner">Beginner</option>
                         <option value="mid">Mid</option>
@@ -335,17 +335,17 @@ if (!data?.success) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Platforms</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Platforms</label>
                     <div className="flex flex-wrap gap-2">
                       {['instagram', 'tiktok', 'youtube', 'linkedin', 'facebook'].map((p) => (
                         <button
                           key={p}
                           type="button"
                           onClick={() => togglePlatform(p)}
-                          className={`px-3 py-1.5 rounded-full text-xs border ${
+                          className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
                             platforms.includes(p)
-                              ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#2B79F7]'
-                              : 'bg-white border-gray-300 text-gray-600'
+                              ? 'bg-[#E8F1FF] dark:bg-[#1E3A6F] border-[#2B79F7] text-[#2B79F7] dark:text-[#93C5FD] hover:bg-[#5A9AFF]/20'
+                              : 'bg-[var(--bg-card)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#5A9AFF] hover:bg-[var(--bg-card-hover)]'
                           }`}
                         >
                           {p}
@@ -355,19 +355,19 @@ if (!data?.success) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Counts for this month <span className="text-gray-400">(total: {totalCount})</span>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Counts for this month <span className="text-[var(--text-tertiary)]">(total: {totalCount})</span>
                     </label>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       {CONTENT_TYPES.map((t) => (
                         <div key={t}>
-                          <label className="block text-xs text-gray-500 mb-1">{t}</label>
+                          <label className="block text-xs text-[var(--text-tertiary)] mb-1">{t}</label>
                           <input
                             value={String(counts[t] ?? 0)}
                             onChange={(e) => updateCount(t, e.target.value)}
                             type="number"
                             min={0}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                           />
                         </div>
                       ))}
@@ -376,41 +376,41 @@ if (!data?.success) {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                         Pain points research (required)
                       </label>
                       <textarea
                         value={painPoints}
                         onChange={(e) => setPainPoints(e.target.value)}
                         rows={7}
-                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                         placeholder="Paste real pain points you researched…"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                         Competitor insights (required)
                       </label>
                       <textarea
                         value={competitorInsights}
                         onChange={(e) => setCompetitorInsights(e.target.value)}
                         rows={7}
-                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                         placeholder="Auto-filled from client profile if available."
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                       Viral transcripts (optional)
                     </label>
                     <textarea
                       value={transcriptsText}
                       onChange={(e) => setTranscriptsText(e.target.value)}
                       rows={6}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                       placeholder={`Paste 1+ transcripts. Separate multiple transcripts with:\n---`}
                     />
                   </div>

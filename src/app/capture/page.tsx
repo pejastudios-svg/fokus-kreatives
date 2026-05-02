@@ -273,7 +273,7 @@ export default function CaptureForms() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Capture Forms</h1>
-            <p className="text-gray-400 mt-1">Create custom forms to capture leads and book meetings</p>
+            <p className="text-[var(--text-tertiary)] mt-1">Create custom forms to capture leads and book meetings</p>
           </div>
           <Button onClick={createNewForm}>
             <Plus className="h-4 w-4 mr-2" />
@@ -292,11 +292,11 @@ export default function CaptureForms() {
 
         {/* Forms Grid */}
         {forms.length === 0 ? (
-          <Card className="border-dashed border-gray-600">
+          <Card className="border-dashed border-[var(--border-secondary)]">
             <CardContent className="py-12 text-center">
-              <Zap className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+              <Zap className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No forms yet</h3>
-              <p className="text-gray-400 mb-4">Create your first capture form to start collecting leads</p>
+              <p className="text-[var(--text-tertiary)] mb-4">Create your first capture form to start collecting leads</p>
               <Button onClick={createNewForm}>Create Your First Form</Button>
             </CardContent>
           </Card>
@@ -304,11 +304,11 @@ export default function CaptureForms() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {forms.map((form) => (
               <Card key={form.id} className="overflow-hidden">
-                <div className="p-4 border-b border-[#334155] bg-[#1E293B]">
+                <div className="p-4 border-b border-[var(--border-primary)] bg-[var(--bg-card)]">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-white truncate">{form.name}</h3>
-                      <p className="text-sm text-gray-400 mt-1">{form.fields.length} fields</p>
+                      <p className="text-sm text-[var(--text-tertiary)] mt-1">{form.fields.length} fields</p>
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                       <button
@@ -316,7 +316,7 @@ export default function CaptureForms() {
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           form.is_active 
                             ? 'bg-green-500/20 text-green-400' 
-                            : 'bg-gray-500/20 text-gray-400'
+                            : 'bg-gray-500/20 text-[var(--text-tertiary)]'
                         }`}
                       >
                         {form.is_active ? 'Active' : 'Inactive'}
@@ -326,7 +326,7 @@ export default function CaptureForms() {
                 </div>
                 <CardContent className="p-4">
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
                       <LinkIcon className="h-4 w-4" />
                       <span className="truncate">{window.location.origin}/capture/{form.slug}</span>
                     </div>
@@ -346,18 +346,18 @@ export default function CaptureForms() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-[#334155]">
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--border-primary)]">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => previewForm(form.slug)}
-                          className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+                          className="p-2 hover:bg-[var(--border-primary)] rounded-lg text-[var(--text-tertiary)] hover:text-white transition-colors"
                           title="Preview"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => copyFormUrl(form.slug)}
-                          className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+                          className="p-2 hover:bg-[var(--border-primary)] rounded-lg text-[var(--text-tertiary)] hover:text-white transition-colors"
                           title="Copy URL"
                         >
                           <Copy className="h-4 w-4" />
@@ -366,21 +366,21 @@ export default function CaptureForms() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => duplicateForm(form)}
-                          className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+                          className="p-2 hover:bg-[var(--border-primary)] rounded-lg text-[var(--text-tertiary)] hover:text-white transition-colors"
                           title="Duplicate"
                         >
                           <Copy className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => editForm(form)}
-                          className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white transition-colors"
+                          className="p-2 hover:bg-[var(--border-primary)] rounded-lg text-[var(--text-tertiary)] hover:text-white transition-colors"
                           title="Edit"
                         >
                           <Settings className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setPendingDeleteFormId(form.id)}
-                          className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
+                          className="p-2 hover:bg-red-500/20 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -480,26 +480,26 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1E293B] rounded-2xl border border-[#334155] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-150">
+      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#334155]">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)]">
           <div>
             <h3 className="text-lg font-semibold text-white">Form Builder</h3>
-            <p className="text-sm text-gray-400">Customize your capture form</p>
+            <p className="text-sm text-[var(--text-tertiary)]">Customize your capture form</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#334155] rounded-lg text-gray-400 hover:text-white">
+          <button onClick={onClose} className="p-2 hover:bg-[var(--border-primary)] rounded-lg text-[var(--text-tertiary)] hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[#334155]">
+        <div className="flex border-b border-[var(--border-primary)]">
           <button
             onClick={() => setActiveTab('fields')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'fields' 
                 ? 'text-[#2B79F7] border-b-2 border-[#2B79F7]' 
-                : 'text-gray-400 hover:text-white'
+                : 'text-[var(--text-tertiary)] hover:text-white'
             }`}
           >
             Fields
@@ -509,7 +509,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'settings' 
                 ? 'text-[#2B79F7] border-b-2 border-[#2B79F7]' 
-                : 'text-gray-400 hover:text-white'
+                : 'text-[var(--text-tertiary)] hover:text-white'
             }`}
           >
             Settings
@@ -519,7 +519,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'integrations' 
                 ? 'text-[#2B79F7] border-b-2 border-[#2B79F7]' 
-                : 'text-gray-400 hover:text-white'
+                : 'text-[var(--text-tertiary)] hover:text-white'
             }`}
           >
             Integrations
@@ -532,11 +532,11 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
             <div className="space-y-6">
               <div>
                 <h4 className="font-medium text-white mb-3">Form Fields</h4>
-                <p className="text-sm text-gray-400 mb-4">Drag and drop to reorder fields</p>
+                <p className="text-sm text-[var(--text-tertiary)] mb-4">Drag and drop to reorder fields</p>
                 
                 <div className="space-y-4">
                   {formData.fields.map((field) => (
-                    <div key={field.id} className="bg-[#0F172A] border border-[#334155] rounded-xl p-4">
+                    <div key={field.id} className="bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="p-2 bg-[#2B79F7]/20 rounded-lg">
@@ -558,18 +558,18 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           />
                         </div>
                         <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1 text-sm text-gray-400">
+                          <label className="flex items-center gap-1 text-sm text-[var(--text-tertiary)]">
                             <input
                               type="checkbox"
                               checked={field.required}
                               onChange={(e) => updateField(field.id, { required: e.target.checked })}
-                              className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7]"
+                              className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7]"
                             />
                             Required
                           </label>
                           <button
                             onClick={() => removeField(field.id)}
-                            className="p-1 hover:bg-red-500/20 rounded text-gray-400 hover:text-red-400"
+                            className="p-1 hover:bg-red-500/20 rounded text-[var(--text-tertiary)] hover:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -578,7 +578,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       
                       {field.type === 'select' || field.type === 'radio' || field.type === 'checkbox' ? (
                         <div className="space-y-2">
-                          <label className="block text-sm text-gray-400 mb-1">Options</label>
+                          <label className="block text-sm text-[var(--text-tertiary)] mb-1">Options</label>
                           {field.options?.map((option, optIndex) => (
                             <div key={optIndex} className="flex items-center gap-2">
                               <input
@@ -589,7 +589,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                                   newOptions[optIndex] = e.target.value
                                   updateField(field.id, { options: newOptions })
                                 }}
-                                className="flex-1 px-3 py-1.5 bg-[#0F172A] border border-[#334155] rounded text-white text-sm"
+                                className="flex-1 px-3 py-1.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded text-white text-sm"
                                 placeholder="Option"
                               />
                               <button
@@ -597,7 +597,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                                   const newOptions = field.options?.filter((_, i) => i !== optIndex) || []
                                   updateField(field.id, { options: newOptions })
                                 }}
-                                className="p-1 hover:bg-red-500/20 rounded text-gray-400 hover:text-red-400"
+                                className="p-1 hover:bg-red-500/20 rounded text-[var(--text-tertiary)] hover:text-red-400"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -614,7 +614,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           </button>
                         </div>
                       ) : field.type === 'meeting' ? (
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-[var(--text-tertiary)]">
                           Meeting booking field with integrated calendar
                         </div>
                       ) : (
@@ -622,7 +622,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           type="text"
                           value={field.placeholder || ''}
                           onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
-                          className="w-full px-3 py-1.5 bg-[#0F172A] border border-[#334155] rounded text-white text-sm placeholder:text-gray-500"
+                          className="w-full px-3 py-1.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded text-white text-sm placeholder:text-[var(--text-tertiary)]"
                           placeholder="Placeholder text"
                         />
                       )}
@@ -637,9 +637,9 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       <button
                         key={fieldType.id}
                         onClick={() => addField(fieldType.id as FormField['type'])}
-                        className="flex flex-col items-center gap-2 p-3 bg-[#0F172A] border border-[#334155] rounded-lg hover:bg-[#334155] transition-colors"
+                        className="flex flex-col items-center gap-2 p-3 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-lg hover:bg-[var(--border-primary)] transition-colors"
                       >
-                        <fieldType.icon className="h-5 w-5 text-gray-400" />
+                        <fieldType.icon className="h-5 w-5 text-[var(--text-tertiary)]" />
                         <span className="text-xs text-white">{fieldType.name}</span>
                       </button>
                     ))}
@@ -652,72 +652,72 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
           {activeTab === 'settings' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Form Title</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Form Title</label>
                 <input
                   type="text"
                   value={formData.settings.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, title: e.target.value } }))}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Form Description</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Form Description</label>
                 <textarea
                   value={formData.settings.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, description: e.target.value } }))}
                   rows={3}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Submit Button Text</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Submit Button Text</label>
                 <input
                   type="text"
                   value={formData.settings.submitButtonText}
                   onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, submitButtonText: e.target.value } }))}
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Redirect URL (after submit)</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Redirect URL (after submit)</label>
                 <input
                   type="url"
                   value={formData.settings.redirectUrl}
                   onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, redirectUrl: e.target.value } }))}
                   placeholder="https://example.com/thank-you"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Theme Color</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Theme Color</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={formData.settings.themeColor}
                     onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, themeColor: e.target.value } }))}
-                    className="w-10 h-10 rounded border border-[#334155] cursor-pointer"
+                    className="w-10 h-10 rounded border border-[var(--border-primary)] cursor-pointer"
                   />
                   <input
                     type="text"
                     value={formData.settings.themeColor}
                     onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, themeColor: e.target.value } }))}
-                    className="flex-1 px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="flex-1 px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Logo URL</label>
+                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Logo URL</label>
                 <input
                   type="url"
                   value={formData.settings.logoUrl}
                   onChange={(e) => setFormData(prev => ({ ...prev, settings: { ...prev.settings, logoUrl: e.target.value } }))}
                   placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               
@@ -734,7 +734,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                         notifications: { ...prev.settings.notifications, email: e.target.checked } 
                       } 
                     }))}
-                    className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7]"
+                    className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7]"
                   />
                   <span className="text-white">Send email notifications when form is submitted</span>
                 </label>
@@ -749,7 +749,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                         notifications: { ...prev.settings.notifications, webhook: e.target.checked } 
                       } 
                     }))}
-                    className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7]"
+                    className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7]"
                   />
                   <span className="text-white">Enable webhook notifications</span>
                 </label>
@@ -765,7 +765,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       } 
                     }))}
                     placeholder="https://your-webhook-url.com"
-                    className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
                 )}
               </div>
@@ -776,10 +776,10 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
             <div className="space-y-6">
               <div>
                 <h4 className="font-medium text-white mb-3">Video Meeting Platforms</h4>
-                <p className="text-sm text-gray-400 mb-4">Enable meeting booking in your forms</p>
+                <p className="text-sm text-[var(--text-tertiary)] mb-4">Enable meeting booking in your forms</p>
                 
                 <div className="space-y-4">
-                  <label className="flex items-center gap-3 p-4 bg-[#0F172A] border border-[#334155] rounded-xl cursor-pointer">
+                  <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.settings.integrations.zoom}
@@ -790,7 +790,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           integrations: { ...prev.settings.integrations, zoom: e.target.checked } 
                         } 
                       }))}
-                      className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7] h-5 w-5"
+                      className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7] h-5 w-5"
                     />
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -798,12 +798,12 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       </div>
                       <div>
                         <span className="text-white font-medium">Zoom</span>
-                        <p className="text-sm text-gray-400">Schedule Zoom meetings directly from forms</p>
+                        <p className="text-sm text-[var(--text-tertiary)]">Schedule Zoom meetings directly from forms</p>
                       </div>
                     </div>
                   </label>
                   
-                  <label className="flex items-center gap-3 p-4 bg-[#0F172A] border border-[#334155] rounded-xl cursor-pointer">
+                  <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.settings.integrations.googleMeet}
@@ -814,7 +814,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           integrations: { ...prev.settings.integrations, googleMeet: e.target.checked } 
                         } 
                       }))}
-                      className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7] h-5 w-5"
+                      className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7] h-5 w-5"
                     />
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-red-500/20 rounded-lg">
@@ -822,12 +822,12 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       </div>
                       <div>
                         <span className="text-white font-medium">Google Meet</span>
-                        <p className="text-sm text-gray-400">Create Google Meet links automatically</p>
+                        <p className="text-sm text-[var(--text-tertiary)]">Create Google Meet links automatically</p>
                       </div>
                     </div>
                   </label>
                   
-                  <label className="flex items-center gap-3 p-4 bg-[#0F172A] border border-[#334155] rounded-xl cursor-pointer">
+                  <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.settings.integrations.jitsi}
@@ -838,7 +838,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                           integrations: { ...prev.settings.integrations, jitsi: e.target.checked } 
                         } 
                       }))}
-                      className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7] h-5 w-5"
+                      className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7] h-5 w-5"
                     />
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -846,13 +846,13 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                       </div>
                       <div>
                         <span className="text-white font-medium">Jitsi</span>
-                        <p className="text-sm text-gray-400">Free, open-source video conferencing</p>
+                        <p className="text-sm text-[var(--text-tertiary)]">Free, open-source video conferencing</p>
                       </div>
                     </div>
                   </label>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Other Platforms</label>
+                    <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-2">Other Platforms</label>
                     <input
                       type="text"
                       value={formData.settings.integrations.otherPlatforms.join(', ')}
@@ -864,18 +864,18 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                         } 
                       }))}
                       placeholder="Platform1, Platform2, Platform3"
-                      className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
-                    <p className="text-xs text-gray-400 mt-1">Comma-separated list of other platforms</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">Comma-separated list of other platforms</p>
                   </div>
                 </div>
               </div>
               
               <div>
                 <h4 className="font-medium text-white mb-3">Calendly Integration</h4>
-                <p className="text-sm text-gray-400 mb-4">Connect your Calendly account for advanced scheduling</p>
+                <p className="text-sm text-[var(--text-tertiary)] mb-4">Connect your Calendly account for advanced scheduling</p>
                 
-                <label className="flex items-center gap-3 p-4 bg-[#0F172A] border border-[#334155] rounded-xl cursor-pointer">
+                <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.settings.integrations.calendly}
@@ -886,7 +886,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                         integrations: { ...prev.settings.integrations, calendly: e.target.checked } 
                       } 
                     }))}
-                    className="rounded bg-[#0F172A] border-[#334155] text-[#2B79F7] h-5 w-5"
+                    className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7] h-5 w-5"
                   />
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-orange-500/20 rounded-lg">
@@ -894,14 +894,14 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                     </div>
                     <div>
                       <span className="text-white font-medium">Calendly</span>
-                      <p className="text-sm text-gray-400">Use your Calendly scheduling link</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">Use your Calendly scheduling link</p>
                     </div>
                   </div>
                 </label>
                 
                 {formData.settings.integrations.calendly && (
                   <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">Calendly URL</label>
+                    <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-1.5">Calendly URL</label>
                     <input
                       type="url"
                       value={formData.settings.integrations.calendlyUrl}
@@ -913,7 +913,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                         } 
                       }))}
                       placeholder="https://calendly.com/your-username"
-                      className="w-full px-4 py-2.5 bg-[#0F172A] border border-[#334155] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-white placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                 )}
@@ -923,7 +923,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[#334155] flex justify-end gap-3">
+        <div className="p-6 border-t border-[var(--border-primary)] flex justify-end gap-3">
           <Button variant="outline" onClick={onClose} size="sm">
             Cancel
           </Button>

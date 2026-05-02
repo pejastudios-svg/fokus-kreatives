@@ -52,7 +52,7 @@ const ROLE_BADGE: Record<FieldRole, string> = {
   captions:         'bg-amber-50 text-amber-700',
   thumbnail:        'bg-purple-50 text-purple-700',
   cover:            'bg-cyan-50 text-cyan-700',
-  generic:          'bg-gray-100 text-gray-600',
+  generic:          'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
 }
 
 interface Props {
@@ -135,7 +135,7 @@ export function TaskCustomFields({ taskId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Custom fields</p>
+        <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">Custom fields</p>
         <button
           type="button"
           onClick={() => setShowCreate((v) => !v)}
@@ -147,20 +147,20 @@ export function TaskCustomFields({ taskId }: Props) {
       </div>
 
       {showCreate && (
-        <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+        <div className="border border-[var(--border-primary)] rounded-lg p-3 space-y-3 bg-[var(--bg-tertiary)]">
           <input
             autoFocus
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             placeholder="Field name (e.g. Long form 1)"
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
           <div className="grid grid-cols-2 gap-2">
             <select
               value={draftType}
               onChange={(e) => setDraftType(e.target.value as FieldType)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {TYPE_OPTIONS.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -171,7 +171,7 @@ export function TaskCustomFields({ taskId }: Props) {
             <select
               value={draftRole}
               onChange={(e) => setDraftRole(e.target.value as FieldRole)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -187,7 +187,7 @@ export function TaskCustomFields({ taskId }: Props) {
                 setShowCreate(false)
                 setDraftName('')
               }}
-              className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100"
+              className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
             >
               Cancel
             </button>
@@ -204,9 +204,9 @@ export function TaskCustomFields({ taskId }: Props) {
       )}
 
       {isLoading ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-[var(--text-tertiary)]">Loading…</p>
       ) : fields.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">
+        <p className="text-xs text-[var(--text-tertiary)] italic">
           No custom fields. Add one to start tracking deliverables.
         </p>
       ) : (
@@ -255,7 +255,7 @@ function FieldRow({
   }
 
   return (
-    <li className="border border-gray-200 rounded-lg p-3 space-y-2 group">
+    <li className="border border-[var(--border-primary)] rounded-lg p-3 space-y-2 group">
       <div className="flex items-center gap-2 flex-wrap">
         <input
           type="text"
@@ -265,10 +265,10 @@ function FieldRow({
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
-          className="flex-1 min-w-[160px] text-sm font-medium text-gray-900 bg-transparent border-0 outline-none focus:ring-0 p-0"
+          className="flex-1 min-w-[160px] text-sm font-medium text-[var(--text-primary)] bg-transparent border-0 outline-none focus:ring-0 p-0"
           placeholder="Field name"
         />
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase bg-gray-100 text-gray-500">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
           {field.type}
         </span>
         <select
@@ -278,7 +278,7 @@ function FieldRow({
           aria-label="Field role"
         >
           {ROLE_OPTIONS.map((r) => (
-            <option key={r.id} value={r.id} className="text-gray-900">
+            <option key={r.id} value={r.id} className="text-[var(--text-primary)]">
               {r.label}
             </option>
           ))}
@@ -286,7 +286,7 @@ function FieldRow({
         <button
           type="button"
           onClick={onDelete}
-          className="p-1 rounded text-gray-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition"
+          className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition"
           aria-label="Delete field"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -301,7 +301,7 @@ function FieldRow({
           onBlur={() => commitValue(value)}
           rows={2}
           placeholder="Enter text…"
-          className="w-full text-sm text-gray-700 px-2 py-1.5 rounded border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-gray-400"
+          className="w-full text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
         />
       )}
       {(field.type === 'url' || field.type === 'folder') && (
@@ -312,14 +312,14 @@ function FieldRow({
             onChange={(e) => setValue(e.target.value)}
             onBlur={() => commitValue(value || null)}
             placeholder={field.type === 'folder' ? 'Drive / folder link…' : 'https://…'}
-            className="flex-1 text-sm text-gray-700 px-2 py-1.5 rounded border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-gray-400"
+            className="flex-1 text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
           />
           {value && (
             <a
               href={value}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded text-gray-400 hover:text-[#2B79F7] hover:bg-blue-50"
+              className="p-1.5 rounded text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-blue-50"
               aria-label="Open link"
             >
               <ExternalLink className="h-3.5 w-3.5" />
@@ -365,14 +365,14 @@ function FieldRow({
       {/* Pairing — only available when role is captions/thumbnail/cover. */}
       {canPair && (
         <div className="flex items-center gap-2 pt-1">
-          <Link2 className="h-3.5 w-3.5 text-gray-400" />
-          <span className="text-[11px] text-gray-400">Pair with</span>
+          <Link2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+          <span className="text-[11px] text-[var(--text-tertiary)]">Pair with</span>
           <select
             value={field.parent_field_id || ''}
             onChange={(e) =>
               onUpdate({ parent_field_id: e.target.value || null })
             }
-            className="flex-1 pl-2 pr-7 py-1 rounded border border-gray-200 bg-white text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="flex-1 pl-2 pr-7 py-1 rounded border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           >
             <option value="">Not paired</option>
             {pairTargets.map((t) => (

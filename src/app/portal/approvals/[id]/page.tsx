@@ -878,7 +878,7 @@ await loadApproval()
             <div className="p-8 max-w-4xl mx-auto space-y-6 overflow-x-hidden">
 
           <Card>
-            <CardContent className="py-10 text-center text-gray-500">
+            <CardContent className="py-10 text-center text-[var(--text-tertiary)]">
               <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
               Loading approval...
             </CardContent>
@@ -914,11 +914,11 @@ await loadApproval()
   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
   <div className="flex-1 min-w-0">
       {approval.description && (
-        <p className="text-sm text-gray-700 mb-1 whitespace-pre-wrap break-all">
+        <p className="text-sm text-[var(--text-secondary)] mb-1 whitespace-pre-wrap break-all">
           {approval.description}
         </p>
       )}
-              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-tertiary)]">
                 <span>
                   Status:{' '}
                   {approval.status === 'approved'
@@ -959,11 +959,11 @@ await loadApproval()
               <Card key={item.id}>
                 <CardHeader className="flex flex-row items-start justify-between gap-3 break-all">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 break-all">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)] break-all">
                       {item.title || 'Untitled asset'}
                     </h3>
                     {item.initial_comment && (
-                      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all">
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1 whitespace-pre-wrap break-all">
                         {item.initial_comment}
                       </p>
                     )}
@@ -988,7 +988,7 @@ await loadApproval()
                         disabled={editingItemId === item.id}
                         className="h-8 w-8 p-0"
                       >
-                        <Pencil className="h-4 w-4 text-gray-500" />
+                        <Pencil className="h-4 w-4 text-[var(--text-tertiary)]" />
                       </Button>
                     )}
 
@@ -1003,9 +1003,9 @@ await loadApproval()
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Video/Image embed */}
-                  <div className="w-full rounded-lg overflow-hidden border border-gray-200 bg-black">
+                  <div className="w-full rounded-lg overflow-hidden border border-[var(--border-primary)] bg-black">
                     {editingItemId === item.id ? (
-                      <div className="space-y-3 p-3 bg-white">
+                      <div className="space-y-3 p-3 bg-[var(--bg-card)]">
                         <Input
                           label="Title"
                           value={editItemTitle}
@@ -1019,7 +1019,7 @@ await loadApproval()
                           placeholder="https://drive.google.com/..."
                         />
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             Comment
                           </label>
                           <textarea
@@ -1028,7 +1028,7 @@ await loadApproval()
                               setEditItemComment(e.target.value)
                             }
                             rows={3}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
                         {/* SAVE / CANCEL BUTTONS (Fixes setEditingItemId unused error) */}
@@ -1071,10 +1071,10 @@ await loadApproval()
                   </div>
 
                   {/* Comments */}
-                  <div className="border-t border-gray-200 pt-3 space-y-3">
+                  <div className="border-t border-[var(--border-primary)] pt-3 space-y-3">
                     <div className="flex items-center gap-2">
-                      <MessageCircle className="h-4 w-4 text-gray-500" />
-                      <span className="text-xs font-semibold text-gray-700">
+                      <MessageCircle className="h-4 w-4 text-[var(--text-tertiary)]" />
+                      <span className="text-xs font-semibold text-[var(--text-secondary)]">
                         Comments ({itemComments.length})
                       </span>
                     </div>
@@ -1087,7 +1087,7 @@ await loadApproval()
                       className="relative space-y-3 max-h-64 overflow-y-auto overscroll-contain touch-pan-y"
                     >
                       {itemComments.length === 0 ? (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-[var(--text-tertiary)]">
                           No comments yet.
                         </p>
                       ) : (
@@ -1096,8 +1096,8 @@ await loadApproval()
                           return (
                             <div
                               key={c.id}
-                              className={`flex items-start gap-2 text-xs border border-gray-100 rounded-lg p-2 ${
-                                c.resolved ? 'bg-green-50' : 'bg-gray-50'
+                              className={`flex items-start gap-2 text-xs border border-[var(--border-primary)] rounded-lg p-2 ${
+                                c.resolved ? 'bg-green-50' : 'bg-[var(--bg-tertiary)]'
                               }`}
                             >
                               <div className="mt-0.5">
@@ -1117,10 +1117,10 @@ await loadApproval()
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <p className="font-semibold text-gray-800 truncate">
+                                  <p className="font-semibold text-[var(--text-primary)] truncate">
                                     {c.users?.name || c.users?.email || 'User'}
                                   </p>
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[10px] text-[var(--text-tertiary)]">
                                     {new Date(
                                       c.created_at
                                     ).toLocaleString(undefined, {
@@ -1139,7 +1139,7 @@ await loadApproval()
                                         setEditingCommentText(e.target.value)
                                       }
                                       rows={2}
-                                      className="w-full px-2 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
+                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
                                     />
                                     <div className="flex justify-end gap-1">
                                       <Button
@@ -1166,7 +1166,7 @@ await loadApproval()
                                         : parent.content
 
                                       return (
-                                        <div className="mb-1 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
+                                        <div className="mb-1 px-2 py-1 bg-[var(--bg-tertiary)] rounded text-[10px] text-[var(--text-tertiary)]">
                                           Replying to <span className="font-semibold">{parentAuthor}</span>:
                                           {' '}
                                           <span className="italic">&quot;{snippet}&quot;</span>
@@ -1214,7 +1214,7 @@ await loadApproval()
                                         )}
                                       </div>
                                     )}
-                                    <p className="mt-0.5 text-gray-700 break-all">
+                                    <p className="mt-0.5 text-[var(--text-secondary)] break-all">
                                       {formatComment(c.content)}
                                     </p>
                                     {c.file_url && (
@@ -1229,7 +1229,7 @@ await loadApproval()
                                                 <img
                                                   src={c.file_url || ''}
                                                   alt={c.file_name || 'Image'}
-                                                  className="max-h-40 rounded-lg border border-gray-200 cursor-pointer"
+                                                  className="max-h-40 rounded-lg border border-[var(--border-primary)] cursor-pointer"
                                                   onClick={() => {
                                                     setPreviewImageUrl(c.file_url!)
                                                     setPreviewImageName(c.file_name || 'Image')
@@ -1264,14 +1264,14 @@ await loadApproval()
                                         })()}
                                       </div>
                                     )}
-                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-tertiary)]">
                                       <button
                                         type="button"
                                         onClick={() => toggleResolveComment(c)}
                                         className={`px-2 py-0.5 rounded-full border ${
                                           c.resolved
                                             ? 'border-green-500 text-green-600 bg-green-50'
-                                            : 'border-gray-300 text-gray-500 hover:border-[#2B79F7]'
+                                            : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7]'
                                         }`}
                                         disabled={resolvingCommentId === c.id}
                                       >
@@ -1328,7 +1328,7 @@ await loadApproval()
                           setUnreadPreview((prev) => ({ ...prev, [item.id]: null }))
                         }}
                         aria-label={`Jump to new comment from ${unreadPreview[item.id]!.name}`}
-                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-white border border-gray-200 shadow-md text-[11px] text-gray-700 hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-md text-[11px] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
                       >
                         {unreadPreview[item.id]!.avatar ? (
                           <img
@@ -1344,16 +1344,16 @@ await loadApproval()
                         <span className="font-semibold truncate max-w-[80px]">
                           {unreadPreview[item.id]!.name.split(' ')[0]}
                         </span>
-                        <span className="text-gray-500 truncate max-w-[180px]">
+                        <span className="text-[var(--text-tertiary)] truncate max-w-[180px]">
                           {unreadPreview[item.id]!.preview || 'sent an attachment'}
                         </span>
                       </button>
                     )}
 
                     {/* New comment input */}
-                    <div className="border border-gray-200 rounded-lg p-2 space-y-2">
+                    <div className="border border-[var(--border-primary)] rounded-lg p-2 space-y-2">
                       {replyTarget && replyTarget.itemId === item.id && (
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[10px] text-[var(--text-tertiary)]">
                           Replying to <span className="font-semibold">{replyTarget.userName}</span>
                           {' '}
                           <button
@@ -1386,11 +1386,11 @@ await loadApproval()
                               })
                             }, 300)
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                          className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           placeholder="Leave a comment... use @name to tag someone."
                         />
                         {mentionTargetItemId === item.id && mentionQuery && (
-                          <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-gray-200 rounded-lg bg-white shadow-lg text-[11px] max-h-40 overflow-y-auto">
+                          <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-[var(--border-primary)] rounded-lg bg-[var(--bg-card)] shadow-lg text-[11px] max-h-40 overflow-y-auto">
                             {mentionUsers
                               .filter((u) =>
                                 u.name.toLowerCase().includes(mentionQuery)
@@ -1412,7 +1412,7 @@ await loadApproval()
                                     setMentionTargetItemId(null)
                                     setMentionQuery('')
                                   }}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 text-left"
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--bg-tertiary)] text-left"
                                 >
                                   {u.profile_picture_url ? (
                                     <img
@@ -1421,7 +1421,7 @@ await loadApproval()
                                       className="h-4 w-4 rounded-full object-cover"
                                     />
                                   ) : (
-                                    <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center text-[9px] text-gray-700">
+                                    <div className="h-4 w-4 rounded-full bg-[var(--bg-card-hover)] flex items-center justify-center text-[9px] text-[var(--text-secondary)]">
                                       {u.name.charAt(0).toUpperCase()}
                                     </div>
                                   )}
@@ -1431,7 +1431,7 @@ await loadApproval()
                             {mentionUsers.filter((u) =>
                               u.name.toLowerCase().includes(mentionQuery)
                             ).length === 0 && (
-                              <p className="px-2 py-1 text-gray-400">
+                              <p className="px-2 py-1 text-[var(--text-tertiary)]">
                                 No matches
                               </p>
                             )}
@@ -1439,7 +1439,7 @@ await loadApproval()
                         )}
                       </div>
                       {commentFile && (
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[10px] text-[var(--text-tertiary)]">
                           Attached: {commentFile.name}{' '}
                           <button
                             type="button"
@@ -1451,7 +1451,7 @@ await loadApproval()
                         </p>
                       )}
                       {pendingAnnotation[item.id] && (pendingAnnotation[item.id].timestampSeconds || pendingAnnotation[item.id].region) && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-600 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] flex-wrap">
                           <span>Tagged:</span>
                           {pendingAnnotation[item.id].timestampSeconds != null && (
                             <button
@@ -1481,7 +1481,7 @@ await loadApproval()
                       )}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+                          <label className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] cursor-pointer">
                             <Paperclip className="h-3 w-3" />
                             <span>Attach file</span>
                             <input
@@ -1499,7 +1499,7 @@ await loadApproval()
                                 type="button"
                                 onClick={() => handleGrabTime(item.id)}
                                 title="Grab the current playback time"
-                                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
                               >
                                 <ClockIcon className="h-3 w-3" />
                                 <span>Grab time</span>
@@ -1508,7 +1508,7 @@ await loadApproval()
                                 type="button"
                                 onClick={() => handleAnnotate(item.id, 'circle')}
                                 title="Draw a region on the asset"
-                                className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#2B79F7] transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
                               >
                                 <PenIcon className="h-3 w-3" />
                                 <span>Annotate</span>

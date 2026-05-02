@@ -214,8 +214,8 @@ export default function InvitePage() {
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid Invitation</h2>
-            <p className="text-gray-500">{error}</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Invalid Invitation</h2>
+            <p className="text-[var(--text-tertiary)]">{error}</p>
             <Button className="mt-6" onClick={() => router.push('/login')}>
               Go to Login
             </Button>
@@ -231,8 +231,8 @@ export default function InvitePage() {
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Account Activated!</h2>
-            <p className="text-gray-500">Redirecting...</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Account Activated!</h2>
+            <p className="text-[var(--text-tertiary)]">Redirecting...</p>
           </CardContent>
         </Card>
       </div>
@@ -253,10 +253,10 @@ export default function InvitePage() {
             />
           </div>
 
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-center text-[var(--text-primary)] mb-2">
             Welcome, {userData?.name || userData?.email}!
           </h2>
-          <p className="text-center text-gray-500 mb-6">Set your password to activate your account</p>
+          <p className="text-center text-[var(--text-tertiary)] mb-6">Set your password to activate your account</p>
 
           <div className="bg-[#E8F1FF] text-[#2B79F7] px-4 py-2 rounded-lg text-center text-sm mb-6">
             {crmInviteInfo ? (

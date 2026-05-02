@@ -871,26 +871,26 @@ function ClientFilterCombobox({
           setOpen((v) => !v)
           setQuery('')
         }}
-        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-left"
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-left"
       >
         <span className="truncate text-sm">{label}</span>
         <ChevronDown
-          className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 text-[var(--text-tertiary)] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-2 bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden">
-          <div className="p-2 border-b border-gray-100">
+        <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-[var(--border-primary)]">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search clients…"
                 autoFocus
-                className="w-full pl-8 pr-2 py-1.5 rounded-md border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
           </div>
@@ -903,15 +903,17 @@ function ClientFilterCombobox({
                   onChange('')
                   setOpen(false)
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                  value === '' ? 'bg-[#E8F1FF] text-[#2B79F7] font-medium' : 'text-gray-700'
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  value === ''
+                    ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] font-medium'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 All clients
               </button>
             </li>
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-gray-400">No matches</li>
+              <li className="px-3 py-2 text-sm text-[var(--text-tertiary)]">No matches</li>
             ) : (
               filtered.map((c) => {
                 const active = c.id === value
@@ -923,13 +925,15 @@ function ClientFilterCombobox({
                         onChange(c.id)
                         setOpen(false)
                       }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                        active ? 'bg-[#E8F1FF] text-[#2B79F7] font-medium' : 'text-gray-700'
+                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                        active
+                          ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       <div className="truncate">{c.name}</div>
                       {c.business_name && (
-                        <div className="text-xs text-gray-400 truncate">{c.business_name}</div>
+                        <div className="text-xs text-[var(--text-tertiary)] truncate">{c.business_name}</div>
                       )}
                     </button>
                   </li>
@@ -979,8 +983,8 @@ function ApprovalsBoardSkeleton() {
           <div
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
               toast.kind === 'success'
-                ? 'bg-white border-green-200 text-green-700'
-                : 'bg-white border-red-200 text-red-700'
+                ? 'bg-[var(--bg-card)] border-green-200 text-green-700'
+                : 'bg-[var(--bg-card)] border-red-200 text-red-700'
             }`}
           >
             {toast.kind === 'success' ? (
@@ -1009,26 +1013,26 @@ function ApprovalsBoardSkeleton() {
 
             {/* Search */}
             <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search approvals..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center bg-white rounded-xl p-1 border border-gray-200">
+            <div className="inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
               <button
                 type="button"
                 onClick={() => setView('board')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'board'
                     ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="Board view"
                 title="Board view"
@@ -1041,7 +1045,7 @@ function ApprovalsBoardSkeleton() {
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'list'
                     ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="List view"
                 title="List view"
@@ -1062,7 +1066,7 @@ function ApprovalsBoardSkeleton() {
         </div>
 
         {/* Status tabs — All / Pending / Approved with live counts. */}
-        <div className="mb-4 inline-flex items-center bg-white rounded-xl p-1 border border-gray-200">
+        <div className="mb-4 inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
           {([
             { id: 'all', label: 'All', count: counts.all },
             { id: 'pending', label: 'Pending', count: counts.pending },
@@ -1077,13 +1081,13 @@ function ApprovalsBoardSkeleton() {
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   active
                     ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm font-medium'
-                    : 'text-gray-600 hover:text-gray-900'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
               >
                 {tab.label}
                 <span
                   className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-medium ${
-                    active ? 'bg-[#2B79F7] text-white' : 'bg-gray-100 text-gray-500'
+                    active ? 'bg-[#2B79F7] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
                   }`}
                 >
                   {tab.count}
@@ -1104,7 +1108,7 @@ function ApprovalsBoardSkeleton() {
           <ApprovalsBoardSkeleton />
         ) : filteredApprovals.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-gray-500">
+            <CardContent className="py-12 text-center text-[var(--text-tertiary)]">
               {statusTab === 'all'
                 ? 'No approvals yet. Create your first one.'
                 : statusTab === 'pending'
@@ -1160,20 +1164,20 @@ function ApprovalsBoardSkeleton() {
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
       {/* Indeterminate progress bar — shows while we POST the approval. */}
-      <div className="relative h-1 bg-gray-100 overflow-hidden">
+      <div className="relative h-1 bg-[var(--bg-tertiary)] overflow-hidden">
         {isCreating && (
           <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#2B79F7] to-transparent animate-[approval-progress_1.2s_ease-in-out_infinite]" />
         )}
       </div>
       <CardHeader>
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
           New Approval
         </h3>
       </CardHeader>
       <CardContent className="space-y-4 overflow-y-auto">
                 {/* Client */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     Client
                   </label>
                   <ClientPicker
@@ -1192,21 +1196,21 @@ function ApprovalsBoardSkeleton() {
                   placeholder="March content batch, Week 1"
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     Description (optional)
                   </label>
                   <textarea
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                     placeholder="Anything the client should know about this batch..."
                   />
                 </div>
 
                 {/* ClickUp Task ID — auto-resolves task name on input. */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     ClickUp Task ID
                   </label>
                   <div className="relative">
@@ -1214,11 +1218,11 @@ function ApprovalsBoardSkeleton() {
                       type="text"
                       value={clickupTaskId}
                       onChange={(e) => setClickupTaskId(e.target.value)}
-                      className="w-full px-4 py-2.5 pr-9 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-4 py-2.5 pr-9 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       placeholder="e.g. 9h3d5k…"
                     />
                     {isFetchingClickup && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] animate-spin" />
                     )}
                     {!isFetchingClickup && clickupTaskName && (
                       <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
@@ -1232,7 +1236,7 @@ function ApprovalsBoardSkeleton() {
                   {clickupLookupError && !isFetchingClickup && clickupTaskId.trim() && (
                     <p className="mt-1 text-xs text-amber-600">{clickupLookupError}</p>
                   )}
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                     Leave empty if this approval isn&rsquo;t tied to a ClickUp task. When set,
                     the task will auto-flip to &ldquo;waiting for feedback&rdquo; on create and
                     &ldquo;approved&rdquo; once every asset is approved.
@@ -1241,7 +1245,7 @@ function ApprovalsBoardSkeleton() {
 
                 {/* Auto-approve preset */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     Auto-approval
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -1250,17 +1254,17 @@ function ApprovalsBoardSkeleton() {
                         key={p.label}
                         type="button"
                         onClick={() => setAutoApproveMinutes(p.valueMinutes)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                           autoApproveMinutes === p.valueMinutes
-                            ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-[#2B79F7]'
+                            ? 'bg-[#2B79F7] text-white border-[#2B79F7] hover:bg-[#1E54B7]'
+                            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[#2B79F7] hover:bg-[var(--bg-card-hover)]'
                         }`}
                       >
                         {p.label}
                       </button>
                     ))}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                     Clients cannot change this. Any unapproved assets will auto-approve after
                     this time.
                   </p>
@@ -1268,17 +1272,17 @@ function ApprovalsBoardSkeleton() {
 
                 {/* Assets */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                     Assets for approval
                   </label>
                   <div className="space-y-3">
                     {items.map((item, index) => (
                       <div
                         key={index}
-                        className="border border-gray-200 rounded-lg p-3 space-y-2"
+                        className="border border-[var(--border-primary)] rounded-lg p-3 space-y-2"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-500">
+                          <span className="text-xs font-medium text-[var(--text-tertiary)]">
                             Asset #{index + 1}
                           </span>
                           {items.length > 1 && (
@@ -1310,12 +1314,12 @@ function ApprovalsBoardSkeleton() {
 
                         {/* Upload area */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             Or upload images / videos
                           </label>
                           <label
                             htmlFor={`asset-upload-${index}`}
-                            className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
+                            className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
                           >
                             <UploadIcon className="h-4 w-4" />
                             <span>Click to pick files (multi-select supported)</span>
@@ -1341,7 +1345,7 @@ function ApprovalsBoardSkeleton() {
                           <div className="space-y-1.5">
                             {item.uploads.map((u) => (
                               <div key={u.id} className="text-[11px]">
-                                <div className="flex items-center justify-between text-gray-600">
+                                <div className="flex items-center justify-between text-[var(--text-secondary)]">
                                   <span className="truncate pr-2">{u.name}</span>
                                   <span>
                                     {u.error ? (
@@ -1352,7 +1356,7 @@ function ApprovalsBoardSkeleton() {
                                   </span>
                                 </div>
                                 {!u.error && (
-                                  <div className="h-1 bg-gray-200 rounded overflow-hidden mt-0.5">
+                                  <div className="h-1 bg-[var(--bg-card-hover)] rounded overflow-hidden mt-0.5">
                                     <div
                                       className="h-full bg-[#2B79F7] transition-all duration-150"
                                       style={{ width: `${u.pct}%` }}
@@ -1375,7 +1379,7 @@ function ApprovalsBoardSkeleton() {
                                 return (
                                 <div
                                   key={`${a.public_id}-${j}`}
-                                  className="relative group aspect-square rounded-lg border border-gray-200 bg-gray-50 overflow-hidden"
+                                  className="relative group aspect-square rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
@@ -1411,14 +1415,14 @@ function ApprovalsBoardSkeleton() {
                               })}
                             </div>
                             {item.attachments.length > 1 && (
-                              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer select-none">
                                 <input
                                   type="checkbox"
                                   checked={item.isCarousel}
                                   onChange={(e) =>
                                     handleItemFlag(index, 'isCarousel', e.target.checked)
                                   }
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2B79F7] focus:ring-[#2B79F7]"
+                                  className="h-3.5 w-3.5 rounded border-[var(--border-primary)] text-[#2B79F7] focus:ring-[#2B79F7]"
                                 />
                                 View as a carousel
                               </label>
@@ -1427,7 +1431,7 @@ function ApprovalsBoardSkeleton() {
                         )}
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                             Comment (optional)
                           </label>
                           <textarea
@@ -1440,7 +1444,7 @@ function ApprovalsBoardSkeleton() {
                               )
                             }
                             rows={2}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                             placeholder="Context for this asset, CTA, platform, etc."
                           />
                         </div>
@@ -1462,7 +1466,7 @@ function ApprovalsBoardSkeleton() {
                 {/* Assignees */}
 <div>
   <div className="flex items-center justify-between mb-1">
-    <label className="block text-sm font-medium text-gray-700">
+    <label className="block text-sm font-medium text-[var(--text-secondary)]">
       Assign internal team
     </label>
 
@@ -1472,7 +1476,7 @@ function ApprovalsBoardSkeleton() {
         setAssigneeSearchOpen((v) => !v)
         setAssigneeSearch('')
       }}
-      className="p-2 rounded-lg border border-gray-200 hover:border-[#2B79F7] text-gray-500 hover:text-[#2B79F7] transition-colors"
+      className="p-2 rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors"
       title="Search team"
       aria-label="Search team"
     >
@@ -1521,7 +1525,7 @@ function ApprovalsBoardSkeleton() {
   )}
 
   {/* Top 3 users */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border border-gray-200 rounded-lg p-2">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border border-[var(--border-primary)] rounded-lg p-2">
     {topAssignees.map((u) => {
       const selected = selectedAssigneeIds.includes(u.id)
       return (
@@ -1531,8 +1535,8 @@ function ApprovalsBoardSkeleton() {
           onClick={() => toggleAssignee(u.id)}
           className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-left border ${
             selected
-              ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#1E293B]'
-              : 'bg-white border-gray-200 text-gray-700 hover:border-[#2B79F7]'
+              ? 'bg-[#E8F1FF] dark:bg-[#1E3A6F] border-[#2B79F7] text-[#2B79F7] dark:text-[#93C5FD]'
+              : 'bg-[var(--bg-card)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:bg-[var(--bg-card-hover)]'
           }`}
         >
           {u.profile_picture_url ? (
@@ -1543,7 +1547,7 @@ function ApprovalsBoardSkeleton() {
               className="h-5 w-5 rounded-full object-cover"
             />
           ) : (
-            <div className="h-5 w-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-700">
+            <div className="h-5 w-5 rounded-full bg-[var(--bg-card-hover)] flex items-center justify-center text-[10px] text-[var(--text-secondary)]">
               {(u.name || u.email || 'U').charAt(0).toUpperCase()}
             </div>
           )}
@@ -1555,21 +1559,21 @@ function ApprovalsBoardSkeleton() {
 
   {/* Fold-out search */}
   {assigneeSearchOpen && (
-    <div className="mt-2 border border-gray-200 rounded-lg p-2">
+    <div className="mt-2 border border-[var(--border-primary)] rounded-lg p-2">
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
         <input
           value={assigneeSearch}
           onChange={(e) => setAssigneeSearch(e.target.value)}
           placeholder="Search team members..."
-          className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
         />
       </div>
 
       {assigneeSearch.trim() && (
         <div className="mt-2 space-y-1">
           {searchResults.length === 0 ? (
-            <p className="text-xs text-gray-400 px-2 py-1">No matches</p>
+            <p className="text-xs text-[var(--text-tertiary)] px-2 py-1">No matches</p>
           ) : (
             searchResults.map((u) => {
               const selected = selectedAssigneeIds.includes(u.id)
@@ -1580,12 +1584,12 @@ function ApprovalsBoardSkeleton() {
                   onClick={() => toggleAssignee(u.id)}
                   className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-left border ${
                     selected
-                      ? 'bg-[#E8F1FF] border-[#2B79F7] text-[#1E293B]'
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-[#2B79F7]'
+                      ? 'bg-[#E8F1FF] dark:bg-[#1E3A6F] border-[#2B79F7] text-[#2B79F7] dark:text-[#93C5FD]'
+                      : 'bg-[var(--bg-card)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:bg-[var(--bg-card-hover)]'
                   }`}
                 >
                   <span className="truncate flex-1">
-                    {u.name || u.email} <span className="text-gray-400">· {u.role}</span>
+                    {u.name || u.email} <span className="text-[var(--text-tertiary)]">· {u.role}</span>
                   </span>
                   {selected && <span className="text-[#2B79F7] font-semibold">Selected</span>}
                 </button>
@@ -1622,16 +1626,16 @@ function ApprovalsBoardSkeleton() {
       </div>
       {confirmAction && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm shadow-2xl">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm shadow-2xl">
+      <div className="px-4 py-3 border-b border-[var(--border-primary)]">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
           {confirmAction.mode === 'approve'
             ? 'Approve all assets?'
             : 'Revert approval?'}
         </h3>
       </div>
 
-      <div className="px-4 py-3 text-sm text-gray-600">
+      <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">
         {confirmAction.mode === 'approve' ? (
           <p>
             This will mark all assets as <span className="font-semibold">Approved</span> and update
@@ -1644,7 +1648,7 @@ function ApprovalsBoardSkeleton() {
         )}
       </div>
 
-      <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+      <div className="px-4 py-3 border-t border-[var(--border-primary)] flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
           Cancel
         </Button>
@@ -1667,19 +1671,19 @@ function ApprovalsBoardSkeleton() {
 
 {deleteConfirm && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
-    <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm shadow-2xl">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">Delete Approval?</h3>
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm shadow-2xl">
+      <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete Approval?</h3>
         <button
           type="button"
           onClick={() => setDeleteConfirm(null)}
-          className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
+          className="p-1 rounded-full hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="px-4 py-3 text-sm text-gray-600">
+      <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">
         <p>
           This will permanently delete{' '}
           <span className="font-semibold">“{deleteConfirm.title}”</span> and all attached assets and
@@ -1687,7 +1691,7 @@ function ApprovalsBoardSkeleton() {
         </p>
       </div>
 
-      <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+      <div className="px-4 py-3 border-t border-[var(--border-primary)] flex justify-end gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -1749,11 +1753,11 @@ function ApprovalBoardCard({
       className="overflow-hidden cursor-pointer transition-shadow hover:shadow-md"
     >
       <CardContent className="p-0">
-        <div className="aspect-video bg-gray-100 relative overflow-hidden">
+        <div className="aspect-video bg-[var(--bg-tertiary)] relative overflow-hidden">
           {preview ? (
             <AssetPreview url={preview.url} title={preview.title || approval.title} />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+            <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)]">
               <FileText className="h-10 w-10" />
             </div>
           )}
@@ -1768,12 +1772,12 @@ function ApprovalBoardCard({
         </div>
 
         <div className="p-3">
-          <h3 className="text-sm font-semibold text-gray-900 truncate">{approval.title}</h3>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">{approval.title}</h3>
+          <p className="text-xs text-[var(--text-tertiary)] mt-0.5 truncate">
             {clientName} · {createdDate}
           </p>
           {approval.clickup_task_id && (
-            <p className="text-[11px] text-gray-400 mt-1 inline-flex items-center gap-1 truncate">
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1 truncate">
               <LinkIcon className="h-3 w-3 shrink-0" />
               <span className="truncate">
                 {approval.clickup_task_name || approval.clickup_task_id}
@@ -1792,7 +1796,7 @@ function ApprovalBoardCard({
                 e.stopPropagation()
                 onCopy()
               }}
-              className="p-2 rounded-md text-gray-400 hover:text-[#2B79F7] hover:bg-blue-50 transition-colors"
+              className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-blue-50 dark:hover:bg-[#1E3A6F]/40 transition-colors"
               aria-label="Copy approval link"
               title={isCopied ? 'Copied' : 'Copy link'}
             >
@@ -1815,7 +1819,7 @@ function ApprovalBoardCard({
                 e.stopPropagation()
                 onDelete()
               }}
-              className="p-2 rounded-md text-red-500 hover:bg-red-50 transition-colors"
+              className="p-2 rounded-md text-red-500 hover:bg-red-500/10 transition-colors"
               aria-label="Delete approval"
               title="Delete"
             >
@@ -1857,13 +1861,13 @@ function ApprovalListRow({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-gray-900 truncate">{approval.title}</h3>
-            <p className="text-xs text-gray-500 truncate">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">{approval.title}</h3>
+            <p className="text-xs text-[var(--text-tertiary)] truncate">
               {clientName} · {createdDate}
               {approval.clickup_task_id && (
                 <>
                   {' · '}
-                  <span className="text-gray-400">
+                  <span className="text-[var(--text-tertiary)]">
                     {approval.clickup_task_name || approval.clickup_task_id}
                   </span>
                 </>
@@ -1883,7 +1887,7 @@ function ApprovalListRow({
               e.stopPropagation()
               onCopy()
             }}
-            className="p-2 rounded-md text-gray-400 hover:text-[#2B79F7] hover:bg-blue-50 transition-colors"
+            className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-blue-50 dark:hover:bg-[#1E3A6F]/40 transition-colors"
             aria-label="Copy approval link"
             title={isCopied ? 'Copied' : 'Copy link'}
           >
@@ -1906,7 +1910,7 @@ function ApprovalListRow({
               e.stopPropagation()
               onDelete()
             }}
-            className="p-2 rounded-md text-red-500 hover:bg-red-50 transition-colors"
+            className="p-2 rounded-md text-red-500 hover:bg-red-500/10 transition-colors"
             aria-label="Delete approval"
             title="Delete"
           >
@@ -1980,7 +1984,7 @@ function AssetPreview({ url, title }: { url: string; title: string }) {
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/15">
-          <div className="h-12 w-12 rounded-full bg-white/85 flex items-center justify-center text-gray-900">
+          <div className="h-12 w-12 rounded-full bg-white/85 flex items-center justify-center text-[var(--text-primary)]">
             <svg className="h-5 w-5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z" />
             </svg>
@@ -2041,7 +2045,7 @@ function AssetPreview({ url, title }: { url: string; title: string }) {
     )
   }
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+    <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--text-tertiary)]">
       <FileText className="h-10 w-10" />
       <span className="mt-2 text-[11px] truncate max-w-[80%] text-center">{title}</span>
     </div>

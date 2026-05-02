@@ -141,7 +141,7 @@ export default function TeamPage() {
       case 'admin': return 'bg-red-100 text-red-700'
       case 'manager': return 'bg-blue-100 text-blue-700'
       case 'employee': return 'bg-green-100 text-green-700'
-      default: return 'bg-gray-100 text-gray-700'
+      default: return 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
     }
   }
 
@@ -368,7 +368,7 @@ function TeamSkeleton() {
                 <p className={notification.type === 'success' ? 'text-green-700' : 'text-red-700'}>{notification.message}</p>
                 {notification.link && (
                   <div className="mt-2 flex items-center gap-2">
-                    <input type="text" value={notification.link} readOnly className="flex-1 px-3 py-1.5 bg-white border border-green-200 rounded text-sm text-gray-700" />
+                    <input type="text" value={notification.link} readOnly className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-green-200 rounded text-sm text-[var(--text-secondary)]" />
                     <Button size="sm" onClick={() => copyLink(notification.link!)}>
                       <Copy className="h-4 w-4 mr-1" />
                       Copy
@@ -377,7 +377,7 @@ function TeamSkeleton() {
                 )}
               </div>
               <button onClick={() => setNotification(null)}>
-                <X className="h-4 w-4 text-gray-400" />
+                <X className="h-4 w-4 text-[var(--text-tertiary)]" />
               </button>
             </div>
           </div>
@@ -385,25 +385,25 @@ function TeamSkeleton() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
           <div className="relative md:w-80 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--text-tertiary)]" />
             <input
               type="text"
               placeholder="Search team members..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center bg-white rounded-xl p-1 border border-gray-200">
+            <div className="inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
               <button
                 type="button"
                 onClick={() => setView('grid')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'grid'
                     ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="Grid view"
                 title="Grid view"
@@ -416,7 +416,7 @@ function TeamSkeleton() {
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'list'
                     ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="List view"
                 title="List view"
@@ -437,7 +437,7 @@ function TeamSkeleton() {
         {filteredTeam.length === 0 ? (
           <Card>
             <CardContent>
-              <div className="p-8 text-center text-gray-500">No team members found</div>
+              <div className="p-8 text-center text-[var(--text-tertiary)]">No team members found</div>
             </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
@@ -475,7 +475,7 @@ function TeamSkeleton() {
                           <button
                             onClick={() => handleResendInvite(member)}
                             disabled={resendingId === member.id}
-                            className="p-1.5 hover:bg-[#E8F1FF] rounded-lg text-gray-400 hover:text-[#2B79F7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="p-1.5 hover:bg-[#E8F1FF] rounded-lg text-[var(--text-tertiary)] hover:text-[#2B79F7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             title={resendingId === member.id ? 'Resending invite…' : 'Resend invite'}
                           >
                             <RefreshCw
@@ -486,7 +486,7 @@ function TeamSkeleton() {
                         {canRemove && (
                           <button
                             onClick={() => setRemoveTarget(member)}
-                            className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                            className="p-1.5 hover:bg-red-500/10 rounded-lg text-[var(--text-tertiary)] hover:text-red-500 transition-colors"
                             title="Remove from agency"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -508,11 +508,11 @@ function TeamSkeleton() {
                           {(member.name || member.email || 'U').charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <p className="font-medium text-gray-900 truncate w-full">{member.name || 'Unnamed'}</p>
-                      <p className="text-xs text-gray-500 truncate w-full">{member.email}</p>
+                      <p className="font-medium text-[var(--text-primary)] truncate w-full">{member.name || 'Unnamed'}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] truncate w-full">{member.email}</p>
                     </div>
 
-                    <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                    <div className="mt-auto pt-3 border-t border-[var(--border-primary)] flex items-center justify-between text-xs">
                       {member.invitation_accepted ? (
                         <span className="text-green-600 flex items-center gap-1">
                           <CheckCircle className="h-3.5 w-3.5" />
@@ -522,13 +522,13 @@ function TeamSkeleton() {
                         <span className={expired ? 'text-red-600' : 'text-yellow-600'}>
                           {expired ? 'Expired' : 'Pending'}
                           {expiresAt && (
-                            <span className="text-gray-400 ml-1">
+                            <span className="text-[var(--text-tertiary)] ml-1">
                               · {expiresAt.toLocaleDateString()}
                             </span>
                           )}
                         </span>
                       )}
-                      <span className="text-gray-400">
+                      <span className="text-[var(--text-tertiary)]">
                         Joined {new Date(member.created_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -550,7 +550,7 @@ function TeamSkeleton() {
                   return (
                     <li
                       key={member.id}
-                      className="flex items-center gap-3 px-4 sm:px-6 py-4 hover:bg-gray-50"
+                      className="flex items-center gap-3 px-4 sm:px-6 py-4 hover:bg-[var(--bg-tertiary)]"
                     >
                       {member.profile_picture_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -566,15 +566,15 @@ function TeamSkeleton() {
                       )}
 
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{member.name || 'Unnamed'}</p>
-                        <p className="text-sm text-gray-500 truncate">{member.email}</p>
+                        <p className="font-medium text-[var(--text-primary)] truncate">{member.name || 'Unnamed'}</p>
+                        <p className="text-sm text-[var(--text-tertiary)] truncate">{member.email}</p>
                       </div>
 
                       <div className="relative shrink-0" data-row-menu>
                         <button
                           type="button"
                           onClick={() => setOpenMenuId(isMenuOpen ? null : member.id)}
-                          className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                           aria-label="Open member menu"
                           aria-expanded={isMenuOpen}
                         >
@@ -582,10 +582,10 @@ function TeamSkeleton() {
                         </button>
 
                         {isMenuOpen && (
-                          <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                            <div className="px-4 py-3 space-y-2 border-b border-gray-100">
+                          <div className="absolute right-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                            <div className="px-4 py-3 space-y-2 border-b border-[var(--border-primary)]">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-gray-500">Role</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">Role</span>
                                 {currentUserRole === 'admin' ? (
                                   <button
                                     type="button"
@@ -609,7 +609,7 @@ function TeamSkeleton() {
                               </div>
 
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-gray-500">Status</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">Status</span>
                                 {member.invitation_accepted ? (
                                   <span className="text-green-600 text-xs flex items-center gap-1">
                                     <CheckCircle className="h-3.5 w-3.5" />
@@ -621,7 +621,7 @@ function TeamSkeleton() {
                                       {expired ? 'Expired' : 'Pending'}
                                     </div>
                                     {expiresAt && (
-                                      <div className="text-[10px] text-gray-400">
+                                      <div className="text-[10px] text-[var(--text-tertiary)]">
                                         {expired ? 'Expired ' : 'Expires '}
                                         {expiresAt.toLocaleDateString()}
                                       </div>
@@ -631,8 +631,8 @@ function TeamSkeleton() {
                               </div>
 
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-gray-500">Joined</span>
-                                <span className="text-xs text-gray-700">
+                                <span className="text-xs text-[var(--text-tertiary)]">Joined</span>
+                                <span className="text-xs text-[var(--text-secondary)]">
                                   {new Date(member.created_at).toLocaleDateString()}
                                 </span>
                               </div>
@@ -647,7 +647,7 @@ function TeamSkeleton() {
                                     setOpenMenuId(null)
                                   }}
                                   disabled={resendingId === member.id}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-[#E8F1FF] hover:text-[#2B79F7] disabled:opacity-60 disabled:cursor-not-allowed"
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[#E8F1FF] hover:text-[#2B79F7] disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                   <RefreshCw
                                     className={`h-4 w-4 ${resendingId === member.id ? 'animate-spin' : ''}`}
@@ -662,14 +662,14 @@ function TeamSkeleton() {
                                     setRemoveTarget(member)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-500/10"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                   Remove from agency
                                 </button>
                               )}
                               {!canInvite && !canRemove && (
-                                <p className="px-4 py-2 text-xs text-gray-400">No actions available</p>
+                                <p className="px-4 py-2 text-xs text-[var(--text-tertiary)]">No actions available</p>
                               )}
                             </div>
                           </div>
@@ -685,11 +685,11 @@ function TeamSkeleton() {
 
         {showInviteModal && canInvite && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Invite Team Member</h3>
-                <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                  <X className="h-5 w-5 text-gray-400" />
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Invite Team Member</h3>
+                <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-[var(--bg-tertiary)] rounded">
+                  <X className="h-5 w-5 text-[var(--text-tertiary)]" />
                 </button>
               </div>
 
@@ -698,23 +698,23 @@ function TeamSkeleton() {
                 <Input label="Email" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="john@example.com" />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Role</label>
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as AgencyRole)}
-                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   >
                     <option value="employee">Employee</option>
                     <option value="manager">Manager</option>
                     {currentUserRole === 'admin' && <option value="admin">Admin</option>}
                   </select>
                   {currentUserRole !== 'admin' && (
-                    <p className="text-xs text-gray-400 mt-1">Only admins can invite admins.</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">Only admins can invite admins.</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
                 <Button variant="outline" onClick={() => setShowInviteModal(false)}>
                   Cancel
                 </Button>
@@ -759,7 +759,7 @@ function TeamSkeleton() {
               <select
                 value={pendingNewRole}
                 onChange={(e) => setPendingNewRole(e.target.value as AgencyRole)}
-                className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="employee">Employee</option>
                 <option value="manager">Manager</option>

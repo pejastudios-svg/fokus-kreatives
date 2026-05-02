@@ -65,7 +65,7 @@ export function FileUpload({ onUpload, folder = 'general', accept = '*', label =
           <span className="text-green-700 text-sm flex-1 truncate">{uploadedUrl.split('/').pop()}</span>
           <button 
             onClick={() => { setUploadedUrl(null); onUpload('') }}
-            className="p-1 hover:bg-green-100 rounded"
+            className="p-1 hover:bg-green-500/10 rounded"
           >
             <X className="h-4 w-4 text-green-600" />
           </button>
@@ -73,15 +73,15 @@ export function FileUpload({ onUpload, folder = 'general', accept = '*', label =
       ) : (
         <div 
           onClick={() => inputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#2B79F7] transition-colors cursor-pointer"
+          className="border-2 border-dashed border-[var(--border-primary)] rounded-lg p-8 text-center hover:border-[#2B79F7] transition-colors cursor-pointer"
         >
           {isUploading ? (
             <Loader2 className="h-10 w-10 text-[#2B79F7] mx-auto mb-4 animate-spin" />
           ) : (
-            <Upload className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+            <Upload className="h-10 w-10 text-[var(--text-tertiary)] mx-auto mb-4" />
           )}
-          <p className="text-gray-600 mb-2">{label}</p>
-          <p className="text-sm text-gray-400">Click to browse</p>
+          <p className="text-[var(--text-secondary)] mb-2">{label}</p>
+          <p className="text-sm text-[var(--text-tertiary)]">Click to browse</p>
         </div>
       )}
       

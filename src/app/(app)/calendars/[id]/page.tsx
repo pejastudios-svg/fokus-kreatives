@@ -114,34 +114,34 @@ export default function CalendarDetailPage() {
       <Header title="Calendar" subtitle="Click any item to edit/copy/paste script" />
       <div className="p-4 md:p-8 space-y-4">
         {isLoading ? (
-          <Card><CardContent className="py-10 text-center text-gray-500">Loading…</CardContent></Card>
+          <Card><CardContent className="py-10 text-center text-[var(--text-tertiary)]">Loading…</CardContent></Card>
         ) : items.length === 0 ? (
-          <Card><CardContent className="py-10 text-center text-gray-500">No items found.</CardContent></Card>
+          <Card><CardContent className="py-10 text-center text-[var(--text-tertiary)]">No items found.</CardContent></Card>
         ) : (
           <div className="space-y-4">
             {grouped.map(([day, list]) => (
               <Card key={day}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                       {new Date(day).toLocaleDateString()}
                     </h3>
-                    <span className="text-xs text-gray-500">{list.length} item(s)</span>
+                    <span className="text-xs text-[var(--text-tertiary)]">{list.length} item(s)</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {list.map((it) => (
                     <div
                       key={it.id}
-                      className="p-3 rounded-lg border border-gray-200 hover:border-[#2B79F7] cursor-pointer transition-colors"
+                      className="p-3 rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] cursor-pointer transition-colors"
                       onClick={() => open(it)}
                     >
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-[var(--text-tertiary)]">
                         {it.platform} · {it.content_type} · {it.pillar}
                       </div>
-                      <div className="mt-1 font-semibold text-gray-900">{it.hook}</div>
-                      <div className="text-sm text-gray-700 mt-1">{it.topic}</div>
-                      <div className="text-xs text-gray-500 mt-2">
+                      <div className="mt-1 font-semibold text-[var(--text-primary)]">{it.hook}</div>
+                      <div className="text-sm text-[var(--text-secondary)] mt-1">{it.topic}</div>
+                      <div className="text-xs text-[var(--text-tertiary)] mt-2">
                         Evidence: <span className="font-medium">{it.evidence_source}</span>
                       </div>
                     </div>
@@ -159,13 +159,13 @@ export default function CalendarDetailPage() {
               <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-[var(--text-tertiary)]">
                       {new Date(openItem.day).toLocaleDateString()} · {openItem.platform} · {openItem.content_type} · {openItem.pillar}
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mt-1">Edit item</h3>
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-1">Edit item</h3>
                   </div>
-                  <button onClick={() => setOpenItem(null)} className="p-2 rounded-lg hover:bg-gray-100">
-                    <X className="h-5 w-5 text-gray-600" />
+                  <button onClick={() => setOpenItem(null)} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)]">
+                    <X className="h-5 w-5 text-[var(--text-secondary)]" />
                   </button>
                 </CardHeader>
 
@@ -183,60 +183,60 @@ export default function CalendarDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hook</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Hook</label>
                     <textarea
                       value={String(edit.hook || '')}
                       onChange={(e) => setEdit((p) => ({ ...p, hook: e.target.value }))}
                       rows={2}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Topic</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Topic</label>
                     <textarea
                       value={String(edit.topic || '')}
                       onChange={(e) => setEdit((p) => ({ ...p, topic: e.target.value }))}
                       rows={2}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">CTA</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">CTA</label>
                     <textarea
                       value={String(edit.cta || '')}
                       onChange={(e) => setEdit((p) => ({ ...p, cta: e.target.value }))}
                       rows={2}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                     />
                   </div>
 
-                  <Card className="bg-gray-50">
+                  <Card className="bg-[var(--bg-tertiary)]">
                     <CardContent className="py-3">
-                      <p className="text-xs text-gray-600 font-semibold">Evidence (verbatim)</p>
-                      <p className="text-xs text-gray-600 mt-1">
+                      <p className="text-xs text-[var(--text-secondary)] font-semibold">Evidence (verbatim)</p>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1">
                         Source: <span className="font-medium">{openItem.evidence_source}</span>
                       </p>
-                      <p className="text-sm text-gray-800 mt-2 whitespace-pre-wrap">
+                      <p className="text-sm text-[var(--text-primary)] mt-2 whitespace-pre-wrap">
                         “{openItem.evidence_snippet}”
                       </p>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
                         Research basis: {openItem.research_basis}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">
                         Rationale: {openItem.rationale}
                       </p>
                     </CardContent>
                   </Card>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Script</label>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Script</label>
                     <textarea
                       value={String(edit.script || '')}
                       onChange={(e) => setEdit((p) => ({ ...p, script: e.target.value }))}
                       rows={10}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 font-sans"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] font-sans"
                       placeholder="Paste the script here (or generate it from your dashboard later)."
                     />
                   </div>
