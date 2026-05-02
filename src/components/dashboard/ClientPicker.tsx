@@ -22,7 +22,12 @@ interface Props {
 
 export function ClientPicker({ clients, value, onChange, loading, placeholder = 'Choose a client…' }: Props) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [pos, setPos] = useState<{
+    top: number
+    left: number
+    width: number
+    maxHeight: number
+  } | null>(null)
   const [query, setQuery] = useState('')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -32,11 +37,12 @@ export function ClientPicker({ clients, value, onChange, loading, placeholder = 
   const openMenu = () => {
     if (!triggerRef.current) return
     const r = triggerRef.current.getBoundingClientRect()
-    const maxHeight = 360
     const viewportH = window.innerHeight
-    let top = r.bottom + 6
-    if (top + maxHeight > viewportH - 8) top = Math.max(8, r.top - maxHeight - 6)
-    setPos({ top, left: r.left, width: r.width })
+    const top = r.bottom + 6
+    // Always open below the trigger; clamp maxHeight to whatever fits between
+    // the trigger and the viewport bottom (with an 8px gutter), capped at 360.
+    const maxHeight = Math.max(160, Math.min(360, viewportH - top - 8))
+    setPos({ top, left: r.left, width: r.width, maxHeight })
     setOpen(true)
     setQuery('')
   }
@@ -114,8 +120,8 @@ export function ClientPicker({ clients, value, onChange, loading, placeholder = 
         createPortal(
           <div
             ref={menuRef}
-            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className="z-[100] bg-theme-card rounded-xl shadow-lg border border-theme-primary animate-in zoom-in-95 fade-in duration-150 overflow-hidden flex flex-col max-h-[360px]"
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
+            className="z-[100] bg-theme-card rounded-xl shadow-lg border border-theme-primary animate-in zoom-in-95 fade-in duration-150 overflow-hidden flex flex-col"
           >
             <div className="p-2 border-b border-theme-primary">
               <div className="relative">

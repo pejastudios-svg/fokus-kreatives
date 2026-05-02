@@ -387,7 +387,7 @@ export function SeriesFormEngine() {
 
           <div className="space-y-2">
             <label className="block text-[11px] uppercase tracking-wide font-medium text-theme-tertiary">Framing</label>
-            <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-theme-primary bg-theme-card">
+            <div className="flex flex-wrap items-center gap-1.5">
               {SERIES_FRAMINGS.map((f) => {
                 const active = framing === f.id
                 return (
@@ -395,10 +395,10 @@ export function SeriesFormEngine() {
                     key={f.id}
                     type="button"
                     onClick={() => setFraming(f.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       active
-                        ? 'bg-[#2B79F7] text-white shadow-sm'
-                        : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+                        ? 'bg-[#2B79F7] text-white border-[#2B79F7] shadow-sm hover:bg-[#1E54B7]'
+                        : 'bg-theme-card text-theme-secondary border-theme-primary hover:text-theme-primary hover:border-[#5A9AFF] hover:bg-theme-card-hover'
                     }`}
                   >
                     {f.label}

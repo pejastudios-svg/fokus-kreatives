@@ -28,6 +28,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BrandProfile, defaultBrandProfile } from '../clients/brandProfile'
 import { Skeleton } from '@/components/ui/Loading'
 import { ScriptReviewer, type ScriptKind } from '@/components/ui/ScriptReviewer'
+import { ClientPicker } from './ClientPicker'
 import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import {
@@ -39,6 +40,7 @@ interface Client {
   id: string
   name: string
   business_name: string
+  profile_picture_url?: string | null
   industry: string
   target_audience: string
   brand_doc_text: string
@@ -623,22 +625,22 @@ export function ContentCreationEngine() {
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Select Client</h3>
         </CardHeader>
         <CardContent>
-          <select
+          <ClientPicker
+            clients={clients.map((c) => ({
+              id: c.id,
+              name: c.name,
+              business_name: c.business_name,
+              profile_picture_url: c.profile_picture_url,
+            }))}
             value={selectedClientId}
-            onChange={(e) => setSelectedClientId(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent"
-          >
-            <option value="">Choose a client...</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name} - {client.business_name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedClientId}
+            loading={isLoading}
+            placeholder="Choose a client…"
+          />
 
           {selectedClient && (
-            <div className="mt-4 p-4 bg-[#E8F1FF] rounded-lg animate-in fade-in">
-              <p className="text-sm text-[#2B79F7]">
+            <div className="mt-4 p-3 rounded-lg bg-[#E8F1FF] dark:bg-[#1E3A6F] animate-in fade-in">
+              <p className="text-sm text-[#2B79F7] dark:text-[#93C5FD]">
                 <strong className="capitalize">{selectedClient.content_tier || 'beginner'}</strong> tier
                 {selectedClient.industry && <> · {selectedClient.industry}</>}
               </p>
