@@ -38,7 +38,7 @@ async function callLLM(
   user: string,
   maxTokens: number,
   temperature: number,
-  // Default to 'standard' (Flash) here — this legacy route generates ad-hoc
+  // Default to 'standard' (Flash) here - this legacy route generates ad-hoc
   // scripts and supporting micro-completions where Pro isn't needed. The
   // dedicated longform package route is what pays for Pro.
   quality: 'high' | 'standard' | 'cheap' = 'standard',
@@ -60,7 +60,7 @@ HASHTAGS: (12–18 tags)
 
 SCRIPT:
 """${script}"""`
-  // Auxiliary description/CTA stub — short, mechanical, doesn't need Pro.
+  // Auxiliary description/CTA stub - short, mechanical, doesn't need Pro.
   const raw = await callLLM(system, user, 700, 0.4, 'cheap')
   return `${script.trim()}\n\n${sanitize(raw).trim()}\n`
 }
@@ -85,7 +85,7 @@ Rewrite: ${offender}
 After: ${after}`
 
   try {
-    // One-sentence micro-repair — cheap tier is plenty for swapping a banned phrase.
+    // One-sentence micro-repair - cheap tier is plenty for swapping a banned phrase.
     const raw = await callLLM(system, user, 200, 0.4, 'cheap')
     const fixed = raw.trim().replace(/^["']|["']$/g, '')
     if (!fixed || fixed.toLowerCase().includes(phrase.toLowerCase())) {

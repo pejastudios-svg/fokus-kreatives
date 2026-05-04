@@ -1028,7 +1028,7 @@ await loadApproval()
                               setEditItemComment(e.target.value)
                             }
                             rows={3}
-                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
                         {/* SAVE / CANCEL BUTTONS (Fixes setEditingItemId unused error) */}
@@ -1139,7 +1139,7 @@ await loadApproval()
                                         setEditingCommentText(e.target.value)
                                       }
                                       rows={2}
-                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
+                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
                                     />
                                     <div className="flex justify-end gap-1">
                                       <Button
@@ -1386,7 +1386,7 @@ await loadApproval()
                               })
                             }, 300)
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                          className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           placeholder="Leave a comment... use @name to tag someone."
                         />
                         {mentionTargetItemId === item.id && mentionQuery && (

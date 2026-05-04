@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Authed — load items + comments + the team assignees the reviewer can
+    // Authed - load items + comments + the team assignees the reviewer can
     // @-mention. Clients themselves are excluded so the picker doesn't show
     // the reviewer their own row.
     const [itemsRes, commentsRes, assigneesRes] = await Promise.all([
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
           }[]
     }
 
-    // Dedupe by user_id — a single user can have multiple `approval_assignees`
+    // Dedupe by user_id - a single user can have multiple `approval_assignees`
     // rows (e.g. assigned in two roles), and React doesn't tolerate duplicate
     // keys in the mention picker.
     const assigneesById = new Map<

@@ -145,7 +145,7 @@ export default function ReviewPage() {
     void loadState()
   }, [loadState])
 
-  // Soft polling — the review session is anonymous (cookie-only), so we
+  // Soft polling - the review session is anonymous (cookie-only), so we
   // can't subscribe to Supabase realtime. Re-fetch every 5s while the tab is
   // visible. We *only* swap state when content actually changed, otherwise
   // React re-renders and iframe-based asset embeds briefly flash empty,
@@ -176,7 +176,7 @@ export default function ReviewPage() {
           { cache: 'no-store' },
         )
         const data = await res.json().catch(() => null)
-        // Don't disturb the page on a transient failure — the user will keep
+        // Don't disturb the page on a transient failure - the user will keep
         // seeing the last good state until the next tick succeeds.
         if (!data?.success || !data.authed) return
         if (cancelled) return
@@ -233,7 +233,7 @@ export default function ReviewPage() {
         )
         return
       }
-      // Authed — pull the assets.
+      // Authed - pull the assets.
       await loadState()
     } catch (err) {
       console.error('review start error:', err)
@@ -274,14 +274,14 @@ export default function ReviewPage() {
       const data = await res.json().catch(() => ({}))
       if (!data.success) {
         setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: item.status } : i)))
-        flash('error', data.error || "Couldn't update — please try again.")
+        flash('error', data.error || "Couldn't update - please try again.")
       } else {
         flash('success', next === 'approved' ? 'Asset approved' : 'Marked as pending')
       }
     } catch (err) {
       console.error('review approve error:', err)
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: item.status } : i)))
-      flash('error', 'Network hiccup — please try again.')
+      flash('error', 'Network hiccup - please try again.')
     } finally {
       setTogglingIds((prev) => {
         const n = new Set(prev)
@@ -1048,7 +1048,7 @@ function ReviewItemCard({
       })
       const data = await res.json().catch(() => ({}))
       if (!data.success) {
-        onError(data.error || "Couldn't post — please try again.")
+        onError(data.error || "Couldn't post - please try again.")
         return
       }
       onCommentPosted({
@@ -1758,7 +1758,7 @@ function stripEmailPrefix(content: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// AssetEmbed — full-size inline player / image / preview iframe.
+// AssetEmbed - full-size inline player / image / preview iframe.
 // ---------------------------------------------------------------------------
 
 function AssetEmbed({ url, title }: { url: string; title: string }) {
@@ -1849,7 +1849,7 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
     )
   }
 
-  // Anything else (Notion docs, Figma, raw zip files, etc.) — fall back to
+  // Anything else (Notion docs, Figma, raw zip files, etc.) - fall back to
   // a clickable card. We deliberately don't try to iframe arbitrary URLs;
   // most of them break with X-Frame-Options anyway.
   return (

@@ -232,7 +232,7 @@ if (!data?.success) {
               <select
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">Select a client…</option>
                 {clients.map((c) => (
@@ -325,7 +325,7 @@ if (!data?.success) {
                       <select
                         value={tier}
                         onChange={(e) => setTier(e.target.value as Tier)}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       >
                         <option value="beginner">Beginner</option>
                         <option value="mid">Mid</option>
@@ -383,7 +383,7 @@ if (!data?.success) {
                         value={painPoints}
                         onChange={(e) => setPainPoints(e.target.value)}
                         rows={7}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                         placeholder="Paste real pain points you researched…"
                       />
                     </div>
@@ -396,7 +396,7 @@ if (!data?.success) {
                         value={competitorInsights}
                         onChange={(e) => setCompetitorInsights(e.target.value)}
                         rows={7}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                         placeholder="Auto-filled from client profile if available."
                       />
                     </div>
@@ -410,7 +410,7 @@ if (!data?.success) {
                       value={transcriptsText}
                       onChange={(e) => setTranscriptsText(e.target.value)}
                       rows={6}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                       placeholder={`Paste 1+ transcripts. Separate multiple transcripts with:\n---`}
                     />
                   </div>

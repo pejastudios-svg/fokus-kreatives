@@ -406,7 +406,7 @@ return (
                           value={values[f.id] || ''}
                           onChange={(e) => setValue(f.id, e.target.value)}
                           rows={3}
-                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none text-sm"
+                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none text-sm"
                           placeholder={f.placeholder || ''}
                         />
                         {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
@@ -423,7 +423,7 @@ return (
                         <select
                           value={values[f.id] || ''}
                           onChange={(e) => setValue(f.id, e.target.value)}
-                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                         >
                           <option value="">Select…</option>
                           {(f.options || []).map((opt) => (
@@ -470,7 +470,7 @@ return (
                         value={values[f.id] || ''}
                         onChange={(e) => setValue(f.id, e.target.value)}
                         placeholder={f.placeholder || ''}
-                        className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       />
                       {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
                     </div>

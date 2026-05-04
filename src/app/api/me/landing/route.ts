@@ -22,10 +22,18 @@ const admin = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
+interface UserContext {
+  id: string
+  email: string | null
+  role: 'admin' | 'manager' | 'employee' | 'client' | null
+  isAgencyUser: boolean
+  clientId: string | null
+}
+
 type LandingResponse =
   | { authed: false }
   | { authed: true; signOut: true; reason: string }
-  | { authed: true; destination: string }
+  | { authed: true; destination: string; user: UserContext }
 
 export async function GET() {
   const supabase = await createServerClient()
@@ -38,7 +46,7 @@ export async function GET() {
 
   const { data: userRow } = await admin
     .from('users')
-    .select('id, role, client_id, is_agency_user')
+    .select('id, email, role, client_id, is_agency_user')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -50,11 +58,24 @@ export async function GET() {
     })
   }
 
+  // Caller-friendly bundle. Used by AuthGuard / CRMLayout so child
+  // pages can read the user's role from context instead of doing
+  // their own duplicate fetch (which caused the loading flicker on
+  // role-gated buttons like Add / Delete / Archive).
+  const userCtx: UserContext = {
+    id: userRow.id,
+    email: userRow.email,
+    role: (userRow.role as UserContext['role']) ?? null,
+    isAgencyUser: !!userRow.is_agency_user,
+    clientId: userRow.client_id ?? null,
+  }
+
   // Agency staff land on the main agency dashboard.
   if (userRow.is_agency_user) {
     return NextResponse.json<LandingResponse>({
       authed: true,
       destination: '/dashboard',
+      user: userCtx,
     })
   }
 
@@ -70,11 +91,13 @@ export async function GET() {
       return NextResponse.json<LandingResponse>({
         authed: true,
         destination: '/portal/approvals',
+        user: userCtx,
       })
     }
     return NextResponse.json<LandingResponse>({
       authed: true,
       destination: `/crm/${userRow.client_id}/dashboard`,
+      user: userCtx,
     })
   }
 
@@ -92,6 +115,7 @@ export async function GET() {
     return NextResponse.json<LandingResponse>({
       authed: true,
       destination: `/crm/${mem.client_id}/dashboard`,
+      user: userCtx,
     })
   }
 

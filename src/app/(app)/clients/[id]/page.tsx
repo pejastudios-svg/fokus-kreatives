@@ -29,6 +29,7 @@ import {
   X as XIcon,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
+import { useAgencyUser } from '@/components/auth/AgencyUserContext'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -88,9 +89,10 @@ export default function ClientProfilePage() {
 
   const supabase = useMemo(() => createClient(), [])
 
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const canArchive = userRole === 'admin' || userRole === 'manager'
-  const canDelete = userRole === 'admin'
+  // Role-derived capabilities come from AuthGuard's context. No
+  // per-page fetch = no loading flicker on Archive / Delete buttons.
+  const { canArchiveClients: canArchive, canDeleteClients: canDelete } =
+    useAgencyUser()
 
   const [client, setClient] = useState<ClientRow | null>(null)
   const [clientEmails, setClientEmails] = useState<
@@ -132,17 +134,6 @@ export default function ClientProfilePage() {
       document.removeEventListener('keydown', onKey)
     }
   }, [menuOpen])
-
-  useEffect(() => {
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
-      setUserRole((data?.role as string) ?? null)
-    })()
-  }, [supabase])
 
   const refresh = useCallback(async () => {
     if (!clientId) return

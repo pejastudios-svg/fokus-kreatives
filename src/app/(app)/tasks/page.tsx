@@ -118,7 +118,7 @@ const NAV_KEY = 'fk:tasks:navOpen'
 
 type ViewMode = 'list' | 'board'
 
-// Drag payload helpers — we serialize {kind, id} into the dataTransfer 'text/plain'.
+// Drag payload helpers - we serialize {kind, id} into the dataTransfer 'text/plain'.
 type DragKind = 'task' | 'folder'
 function encodeDrag(kind: DragKind, id: string): string {
   return `${kind}:${id}`
@@ -519,7 +519,7 @@ export default function TasksPage() {
     }
   }
 
-  // Drag a task card onto a folder (or the breadcrumb root) — moves the task.
+  // Drag a task card onto a folder (or the breadcrumb root) - moves the task.
   const handleDropTaskOnFolder = async (taskId: string, folderId: string | null) => {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
@@ -569,7 +569,7 @@ export default function TasksPage() {
         {/* Left navigator. `sticky top-0` keeps it pinned as the user scrolls
             the main column; the height reaches the bottom of the viewport.
             On mobile the (app) layout has a 56px hamburger header above us, on
-            desktop it doesn't — so we subtract that on mobile only. */}
+            desktop it doesn't - so we subtract that on mobile only. */}
         <aside
           className={`shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-card)] transition-[width] duration-200 ease-out overflow-hidden sticky top-0 self-start h-[calc(100dvh-3.5rem)] md:h-dvh ${
             navOpen ? 'w-64' : 'w-12'
@@ -609,7 +609,7 @@ export default function TasksPage() {
                       value={navQuery}
                       onChange={(e) => setNavQuery(e.target.value)}
                       placeholder="Search clients…"
-                      className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   </div>
                 </div>
@@ -946,7 +946,7 @@ export default function TasksPage() {
                 </Card>
               )}
 
-              {/* Folders strip — drop targets for tasks. */}
+              {/* Folders strip - drop targets for tasks. */}
               {childFolders.length > 0 && (
                 <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                   {childFolders.map((f) => {
@@ -1134,10 +1134,10 @@ export default function TasksPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-sm text-[var(--text-tertiary)]">
-                                {t.start_at ? new Date(t.start_at).toLocaleDateString() : '—'}
+                                {t.start_at ? new Date(t.start_at).toLocaleDateString() : '-'}
                               </td>
                               <td className="px-4 py-3 text-sm text-[var(--text-tertiary)]">
-                                {t.due_at ? new Date(t.due_at).toLocaleDateString() : '—'}
+                                {t.due_at ? new Date(t.due_at).toLocaleDateString() : '-'}
                               </td>
                               <td className="px-4 py-3 text-right" data-row-menu>
                                 <div className="relative inline-block">
@@ -1370,7 +1370,7 @@ export default function TasksPage() {
 
 /**
  * Compact folder tree shown under each expanded client in the left navigator.
- * Top-level folders only — clicking drills into the folder, which in turn
+ * Top-level folders only - clicking drills into the folder, which in turn
  * loads tasks for that folder in the main pane and (if it wasn't already)
  * makes that client the active one.
  */
@@ -1441,7 +1441,7 @@ function AvatarStack({
   lookup: (id: string) => AgencyMember | null
   max?: number
 }) {
-  if (ids.length === 0) return <span className="text-xs text-[var(--text-tertiary)]">—</span>
+  if (ids.length === 0) return <span className="text-xs text-[var(--text-tertiary)]">-</span>
   const visible = ids.slice(0, max)
   const overflow = ids.length - visible.length
   return (

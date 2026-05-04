@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 // Activate an invite. Two flavors:
-//   1. CRM team invite (crm_invites row) — provision auth user, ensure
+//   1. CRM team invite (crm_invites row) - provision auth user, ensure
 //      a public.users row matches, insert client_memberships, stamp
 //      crm_invites.accepted_at.
-//   2. Legacy portal client invite (users.invitation_token) — provision
+//   2. Legacy portal client invite (users.invitation_token) - provision
 //      auth user, align placeholder users row to new auth uid, mark
 //      accepted, clear token.
 //

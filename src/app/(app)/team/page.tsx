@@ -365,18 +365,37 @@ function TeamSkeleton() {
       <Header title="Team" subtitle="Manage agency team members and permissions" />
       <div className="p-4 md:p-8">
         {notification && (
-          <div className={`mb-6 p-4 rounded-lg ${notification.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+          <div
+            className={`mb-6 p-4 rounded-lg border ${
+              notification.type === 'success'
+                ? 'bg-[#2B79F7]/10 border-[#2B79F7]/30 dark:bg-[#1E3A6F]/40'
+                : 'bg-red-500/10 border-red-500/30'
+            }`}
+          >
             <div className="flex items-start gap-3">
               {notification.type === 'success' ? (
-                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                <CheckCircle className="h-5 w-5 text-[#2B79F7] mt-0.5" />
               ) : (
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
               )}
               <div className="flex-1">
-                <p className={notification.type === 'success' ? 'text-green-700' : 'text-red-700'}>{notification.message}</p>
+                <p
+                  className={
+                    notification.type === 'success'
+                      ? 'text-[#2B79F7] dark:text-[#93C5FD]'
+                      : 'text-red-500'
+                  }
+                >
+                  {notification.message}
+                </p>
                 {notification.link && (
                   <div className="mt-2 flex items-center gap-2">
-                    <input type="text" value={notification.link} readOnly className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-green-200 rounded text-sm text-[var(--text-secondary)]" />
+                    <input
+                      type="text"
+                      value={notification.link}
+                      readOnly
+                      className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-[#2B79F7]/30 rounded text-sm text-[var(--text-secondary)]"
+                    />
                     <Button size="sm" onClick={() => copyLink(notification.link!)}>
                       <Copy className="h-4 w-4 mr-1" />
                       Copy
@@ -399,7 +418,7 @@ function TeamSkeleton() {
               placeholder="Search team members..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </div>
 
@@ -710,7 +729,7 @@ function TeamSkeleton() {
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as AgencyRole)}
-                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   >
                     <option value="employee">Employee</option>
                     <option value="manager">Manager</option>
@@ -767,7 +786,7 @@ function TeamSkeleton() {
               <select
                 value={pendingNewRole}
                 onChange={(e) => setPendingNewRole(e.target.value as AgencyRole)}
-                className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="employee">Employee</option>
                 <option value="manager">Manager</option>

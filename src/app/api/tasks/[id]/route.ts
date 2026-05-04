@@ -138,7 +138,7 @@ export async function PATCH(
         changed_by: auth.user.id,
       })
 
-      // Notify all assignees (in-app + email). Skip the actor — they made the change.
+      // Notify all assignees (in-app + email). Skip the actor - they made the change.
       void notifyStatusChange({
         req,
         taskId: id,

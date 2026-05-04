@@ -3,7 +3,7 @@ import { adminClient, authorizeForClient } from '@/lib/crm/teamAuth'
 import type { CrmRole } from '@/lib/crm/teamAuth'
 
 // Create (or refresh) a pending CRM invite. If an invite already exists
-// for the same (client_id, email), update it in place — generate a new
+// for the same (client_id, email), update it in place - generate a new
 // token, bump expires_at, swap role/name. The team page expects this
 // idempotent behavior so re-inviting an email never fails on a stale
 // row.

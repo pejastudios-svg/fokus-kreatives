@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const questions = (Array.isArray(form.questions) ? form.questions : []) as FormQuestionRow[]
 
   // Submission inserts one `topics` row per answered question with
-  // `source='form'`. We re-join by matching question text — the schema
+  // `source='form'`. We re-join by matching question text - the schema
   // doesn't carry a form_id reference yet. A small risk if the same
   // question text repeats across forms for the same client; acceptable
   // for now since we filter by submission window.

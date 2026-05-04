@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { Header } from '@/components/layout/Header'
+import { useAgencyUser } from '@/components/auth/AgencyUserContext'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -81,9 +82,12 @@ export default function ClientDetailPage() {
   // keep stable across renders
   const supabase = useMemo(() => createClient(), [])
 
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const canArchiveClient = userRole === 'admin' || userRole === 'manager'
-  const canDeleteClient = userRole === 'admin'
+  // Role-derived capabilities come from the agency context. No
+  // per-page fetch = no loading flicker on Archive / Delete buttons.
+  const {
+    canArchiveClients: canArchiveClient,
+    canDeleteClients: canDeleteClient,
+  } = useAgencyUser()
 
   const [client, setClient] = useState<ClientRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -230,25 +234,6 @@ export default function ClientDetailPage() {
     // every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchClient, fetchPortalLink, mapClientToForm, draftRestored, setFormData])
-
-  useEffect(() => {
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) return
-
-      const { data, error } = await supabase.from('users').select('role').eq('id', user.id).single()
-
-      if (error) {
-        console.error('fetch user role error:', error)
-        return
-      }
-
-      setUserRole((data?.role as string) ?? null)
-    })()
-  }, [supabase])
 
   // Auto-dismiss the toast after a few seconds so it doesn't linger.
   useEffect(() => {
@@ -658,10 +643,10 @@ export default function ClientDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.brand_doc_url ? (
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                  <FileText className="h-5 w-5 text-green-600 shrink-0" />
+                <div className="flex items-center gap-3 p-4 bg-[#2B79F7]/10 dark:bg-[#2B79F7]/15 rounded-lg">
+                  <FileText className="h-5 w-5 text-[#2B79F7] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-green-800 truncate">
+                    <p className="text-sm font-medium text-[#1E54B7] dark:text-[#93C5FD] truncate">
                       {(() => {
                         try {
                           const u = new URL(formData.brand_doc_url)
@@ -672,13 +657,15 @@ export default function ClientDetailPage() {
                         }
                       })()}
                     </p>
-                    <p className="text-xs text-green-700/80 truncate">{formData.brand_doc_url}</p>
+                    <p className="text-xs text-[#2B79F7]/80 dark:text-[#93C5FD]/80 truncate">
+                      {formData.brand_doc_url}
+                    </p>
                   </div>
                   <a
                     href={formData.brand_doc_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-green-500/30 text-green-700 text-xs font-medium hover:bg-green-500/10 transition"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[#2B79F7]/30 text-[#2B79F7] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#2B79F7]/10 transition"
                     title="Preview"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -689,7 +676,7 @@ export default function ClientDetailPage() {
                     download
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-green-500/30 text-green-700 text-xs font-medium hover:bg-green-500/10 transition"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[#2B79F7]/30 text-[#2B79F7] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#2B79F7]/10 transition"
                     title="Download"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -701,7 +688,7 @@ export default function ClientDetailPage() {
                       setFormData((prev) => ({ ...prev, brand_doc_url: '' }))
                       setShowBrandUrlInput(false)
                     }}
-                    className="text-red-600 text-xs hover:underline px-2"
+                    className="text-red-500 text-xs hover:underline px-2"
                   >
                     Remove
                   </button>

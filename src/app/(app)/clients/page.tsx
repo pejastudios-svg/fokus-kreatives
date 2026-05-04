@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { useAgencyUser } from '@/components/auth/AgencyUserContext'
 import { Skeleton } from '@/components/ui/Loading'
 import Image from 'next/image'
 import {
@@ -53,7 +54,6 @@ export default function ClientsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [notification, setNotification] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set())
   const [activeCount, setActiveCount] = useState<number>(0)
   const [archivedCount, setArchivedCount] = useState<number>(0)
@@ -64,35 +64,77 @@ export default function ClientsPage() {
 
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const canCreateClients = userRole === 'admin' || userRole === 'manager'
-  const canArchiveClients = userRole === 'admin' || userRole === 'manager'
-  const canDeleteClients = userRole === 'admin'
+  // Role + capability flags come from the agency context, populated
+  // by AuthGuard on first render. No per-page fetch = no flicker on
+  // role-gated buttons (Add / Archive / Delete).
+  const {
+    role: userRole,
+    id: userId,
+    canCreateClients,
+    canArchiveClients,
+    canDeleteClients,
+  } = useAgencyUser()
 
   useEffect(() => {
-    const loadUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('users').select('role').eq('id', user.id).single()
-      setUserRole(data?.role || null)
-    }
-    loadUserRole()
-
-    const savedView = typeof window !== 'undefined' ? localStorage.getItem('clientsViewMode') : null
+    const savedView =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('clientsViewMode')
+        : null
     if (savedView === 'grid' || savedView === 'list') setViewMode(savedView)
-  }, [supabase])
+  }, [])
 
   const refreshCounts = useCallback(async () => {
+    // Match the same access scope as fetchClients - non-admins see
+    // counts for only the CRMs they're a member of.
+    let allowedIds: string[] | null = null
+    if (userRole && userRole !== 'admin' && userId) {
+      const { data: mems } = await supabase
+        .from('client_memberships')
+        .select('client_id')
+        .eq('user_id', userId)
+      allowedIds = (mems || []).map((m) => m.client_id as string)
+      if (allowedIds.length === 0) {
+        setActiveCount(0)
+        setArchivedCount(0)
+        return
+      }
+    }
+    const buildBase = () =>
+      supabase.from('clients').select('*', { count: 'exact', head: true })
+    const activeQ = buildBase().is('archived_at', null)
+    const archivedQ = buildBase().not('archived_at', 'is', null)
+    if (allowedIds) {
+      activeQ.in('id', allowedIds)
+      archivedQ.in('id', allowedIds)
+    }
     const [{ count: active }, { count: archived }] = await Promise.all([
-      supabase.from('clients').select('*', { count: 'exact', head: true }).is('archived_at', null),
-      supabase.from('clients').select('*', { count: 'exact', head: true }).not('archived_at', 'is', null),
+      activeQ,
+      archivedQ,
     ])
     setActiveCount(active || 0)
     setArchivedCount(archived || 0)
-  }, [supabase])
+  }, [supabase, userRole, userId])
 
   const fetchClients = useCallback(
     async (archived = false) => {
       setIsLoading(true)
+
+      // Admins see every client. Managers + employees only see the
+      // CRMs they have an explicit client_memberships row for - no
+      // surprise 403s when they click a client they can't open.
+      let allowedIds: string[] | null = null
+      if (userRole && userRole !== 'admin' && userId) {
+        const { data: mems } = await supabase
+          .from('client_memberships')
+          .select('client_id')
+          .eq('user_id', userId)
+        allowedIds = (mems || []).map((m) => m.client_id as string)
+        if (allowedIds.length === 0) {
+          setClients([])
+          setIsLoading(false)
+          return
+        }
+      }
 
       const query = supabase
         .from('clients')
@@ -104,12 +146,15 @@ export default function ClientsPage() {
       } else {
         query.is('archived_at', null)
       }
+      if (allowedIds) {
+        query.in('id', allowedIds)
+      }
 
       const { data } = await query
       if (data) setClients(data)
       setIsLoading(false)
     },
-    [supabase],
+    [supabase, userRole, userId],
   )
 
   useEffect(() => {
@@ -393,11 +438,12 @@ export default function ClientsPage() {
     <>
       <Header title="Clients" subtitle="Manage your client accounts" />
       <div className="p-4 md:p-8 animate-in fade-in">
-        {/* Notification Toast */}
+        {/* Notification toast - bottom-right so the top nav doesn't
+            clip it. Blue icon matches the rest of the agency UI. */}
         {notification && (
-          <div className="fixed top-4 right-4 z-50 animate-in fade-in-up duration-300">
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in-up duration-300">
             <div className="bg-theme-tertiary text-theme-primary px-4 py-3 rounded-xl shadow-lg border border-theme-primary flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <CheckCircle className="h-5 w-5 text-[#2B79F7]" />
               <span>{notification}</span>
             </div>
           </div>

@@ -92,7 +92,7 @@ export default function ApprovalsPage() {
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  // Create modal state — separate from the filter `selectedClientId` so picking
+  // Create modal state - separate from the filter `selectedClientId` so picking
   // a client for a NEW approval doesn't filter the underlying list.
   const [showModal, setShowModal] = useState(false)
   const [formClientId, setFormClientId] = useState('')
@@ -115,7 +115,7 @@ export default function ApprovalsPage() {
   // Read the user's saved view mode synchronously during initial state so the
   // first paint already matches their preference. If we let a useEffect flip
   // it post-mount the user sees the wrong-shape skeleton flash, then snap to
-  // the correct shape — which reads as "the skeleton is glitching."
+  // the correct shape - which reads as "the skeleton is glitching."
   const [viewMode, setViewMode] = useState<'board' | 'list'>(() => {
     if (typeof window === 'undefined') return 'board'
     try {
@@ -382,14 +382,14 @@ const searchResults = assigneeSearchOpen
     // that case.
     let { data, error } = await buildQuery(true)
     if (error && /42703|PGRST204|share_token/i.test(`${(error as { message?: string }).message || ''} ${(error as { code?: string }).code || ''}`)) {
-      console.warn('approvals.share_token missing — falling back. Run the latest migration to enable public review links.')
+      console.warn('approvals.share_token missing - falling back. Run the latest migration to enable public review links.')
       const retry = await buildQuery(false)
       data = retry.data
       error = retry.error
     }
     if (error) {
       // supabase-js sometimes returns an error whose enumerable props print
-      // as {} in DevTools — pull the named ones AND a stringified fallback so
+      // as {} in DevTools - pull the named ones AND a stringified fallback so
       // we can actually see what's wrong.
       const props = Object.getOwnPropertyNames(error || {})
       console.error('Load approvals error:', {
@@ -665,7 +665,7 @@ const searchResults = assigneeSearchOpen
       })
 
       // The route returns JSON on every code path, but if it 500s with an HTML
-      // error page, json() throws — make sure the user sees what happened
+      // error page, json() throws - make sure the user sees what happened
       // instead of a silent close.
       let data: { success?: boolean; error?: string; approvalId?: string } | null = null
       try {
@@ -689,7 +689,7 @@ const searchResults = assigneeSearchOpen
       // Server-side insert uses the service-role key (bypasses RLS), but the
       // list page reads via cookie auth (RLS-enforced). If the row exists but
       // the policies don't allow this user to SELECT it, that's why "the new
-      // approval doesn't show up" — surface that explicitly here.
+      // approval doesn't show up" - surface that explicitly here.
       const newId = data.approvalId
       if (newId) {
         const { data: visibilityCheck, error: visibilityErr } = await supabase
@@ -708,7 +708,7 @@ const searchResults = assigneeSearchOpen
           })
         } else if (!visibilityCheck) {
           console.warn(
-            'Approval was created server-side but the current user cannot SELECT it back — likely an RLS policy issue on the `approvals` table.',
+            'Approval was created server-side but the current user cannot SELECT it back - likely an RLS policy issue on the `approvals` table.',
             { approvalId: newId },
           )
           showToast(
@@ -787,7 +787,7 @@ const searchResults = assigneeSearchOpen
 }
 
 const handleDeleteApproval = async (approvalId: string) => {
-  // Optimistic removal — restore on failure.
+  // Optimistic removal - restore on failure.
   const previous = approvals
   setApprovals((prev) => prev.filter((a) => a.id !== approvalId))
   setIsDeleting(true)
@@ -871,7 +871,7 @@ function ClientFilterCombobox({
           setOpen((v) => !v)
           setQuery('')
         }}
-        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-left"
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-left"
       >
         <span className="truncate text-sm">{label}</span>
         <ChevronDown
@@ -890,7 +890,7 @@ function ClientFilterCombobox({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search clients…"
                 autoFocus
-                className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
           </div>
@@ -948,8 +948,12 @@ function ClientFilterCombobox({
 }
 
 function ApprovalsBoardSkeleton() {
+  // No `animate-in fade-in` here on purpose - that mount-time animation
+  // re-triggers on React's Strict Mode dev double-mount, which the user
+  // perceives as the skeleton flickering on/off. The Skeleton blocks
+  // already have their own animate-pulse shimmer for "loading" feel.
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <Card key={i} className="overflow-hidden">
           <Skeleton className="aspect-video w-full rounded-none" />
@@ -979,12 +983,12 @@ function ApprovalsBoardSkeleton() {
       />
 
       {toast && (
-        <div className="fixed top-4 right-4 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
           <div
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
               toast.kind === 'success'
-                ? 'bg-[var(--bg-card)] border-green-200 text-green-700'
-                : 'bg-[var(--bg-card)] border-red-200 text-red-700'
+                ? 'bg-[var(--bg-card)] border-[#2B79F7]/30 text-[#2B79F7] dark:text-[#93C5FD]'
+                : 'bg-[var(--bg-card)] border-red-500/30 text-red-500'
             }`}
           >
             {toast.kind === 'success' ? (
@@ -1019,7 +1023,7 @@ function ApprovalsBoardSkeleton() {
                 placeholder="Search approvals..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
           </div>
@@ -1065,7 +1069,7 @@ function ApprovalsBoardSkeleton() {
           </div>
         </div>
 
-        {/* Status tabs — All / Pending / Approved with live counts. */}
+        {/* Status tabs - All / Pending / Approved with live counts. */}
         <div className="mb-4 inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
           {([
             { id: 'all', label: 'All', count: counts.all },
@@ -1112,7 +1116,7 @@ function ApprovalsBoardSkeleton() {
               {statusTab === 'all'
                 ? 'No approvals yet. Create your first one.'
                 : statusTab === 'pending'
-                  ? 'No pending approvals — every asset has been signed off.'
+                  ? 'No pending approvals - every asset has been signed off.'
                   : 'Nothing approved yet.'}
             </CardContent>
           </Card>
@@ -1163,7 +1167,7 @@ function ApprovalsBoardSkeleton() {
         {showModal && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-      {/* Indeterminate progress bar — shows while we POST the approval. */}
+      {/* Indeterminate progress bar - shows while we POST the approval. */}
       <div className="relative h-1 bg-[var(--bg-tertiary)] overflow-hidden">
         {isCreating && (
           <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-[#2B79F7] to-transparent animate-[approval-progress_1.2s_ease-in-out_infinite]" />
@@ -1203,12 +1207,12 @@ function ApprovalsBoardSkeleton() {
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                     placeholder="Anything the client should know about this batch..."
                   />
                 </div>
 
-                {/* ClickUp Task ID — auto-resolves task name on input. */}
+                {/* ClickUp Task ID - auto-resolves task name on input. */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     ClickUp Task ID
@@ -1218,7 +1222,7 @@ function ApprovalsBoardSkeleton() {
                       type="text"
                       value={clickupTaskId}
                       onChange={(e) => setClickupTaskId(e.target.value)}
-                      className="w-full px-4 py-2.5 pr-9 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      className="w-full px-4 py-2.5 pr-9 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       placeholder="e.g. 9h3d5k…"
                     />
                     {isFetchingClickup && (
@@ -1444,7 +1448,7 @@ function ApprovalsBoardSkeleton() {
                               )
                             }
                             rows={2}
-                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-xs focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                             placeholder="Context for this asset, CTA, platform, etc."
                           />
                         </div>
@@ -1566,7 +1570,7 @@ function ApprovalsBoardSkeleton() {
           value={assigneeSearch}
           onChange={(e) => setAssigneeSearch(e.target.value)}
           placeholder="Search team members..."
-          className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
         />
       </div>
 
@@ -1945,7 +1949,7 @@ function StatusPill({ approved }: { approved: boolean }) {
  *   - Vimeo / Drive / Dropbox / etc. → branded play card
  *   - Anything else → generic file icon
  *
- * No network probing — pure URL inspection — so this is cheap to render for
+ * No network probing - pure URL inspection - so this is cheap to render for
  * a list of cards.
  */
 function AssetPreview({ url, title }: { url: string; title: string }) {
@@ -2054,7 +2058,7 @@ function AssetPreview({ url, title }: { url: string; title: string }) {
 
 /**
  * Pull a YouTube video id out of a watch / shorts / youtu.be URL. Returns
- * null when the URL isn't recognisable as YouTube — used by the board card
+ * null when the URL isn't recognisable as YouTube - used by the board card
  * to render a real thumbnail.
  */
 function extractYouTubeId(url: string): string | null {

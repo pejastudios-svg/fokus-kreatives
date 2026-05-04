@@ -40,7 +40,7 @@ function extractMentions(text: string): string[] {
   return Array.from(new Set(out))
 }
 
-// 10-minute email cooldown per approval — keeps a burst of comments from
+// 10-minute email cooldown per approval - keeps a burst of comments from
 // turning into a flood of inbox pings while still letting in-app notifs fire
 // every time. Mentions bypass this (a direct @ is high-signal).
 const EMAIL_COOLDOWN_MS = 10 * 60 * 1000

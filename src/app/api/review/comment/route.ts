@@ -41,7 +41,7 @@ function normalizeMentionKey(s: string) {
 
 // 10-minute email cooldown per approval. The agency still gets a popup +
 // in-app notification for every comment, but we only fire an email when the
-// last one is older than this — so a chatty client doesn't generate 20
+// last one is older than this - so a chatty client doesn't generate 20
 // emails in 5 minutes.
 const EMAIL_COOLDOWN_MS = 10 * 60 * 1000
 
@@ -73,7 +73,7 @@ async function tryClaimEmailSlot(approvalId: string): Promise<boolean> {
 
   if (!stalePath.error && (stalePath.data?.length || 0) > 0) return true
 
-  // Column missing in older DBs — fall through and just send. Once the
+  // Column missing in older DBs - fall through and just send. Once the
   // migration is applied this branch stops being hit.
   if (
     nullPath.error &&
@@ -454,7 +454,7 @@ export async function POST(req: NextRequest) {
       approvalItemId = item.id as string
     }
 
-    // Sanitize attachments — every entry must have a string url, and a size
+    // Sanitize attachments - every entry must have a string url, and a size
     // under our cap. Drop anything malformed silently rather than refusing
     // the whole comment.
     const attachments = incoming

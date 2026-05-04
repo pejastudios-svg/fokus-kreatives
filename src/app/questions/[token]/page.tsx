@@ -209,7 +209,7 @@ export default function QuestionFormPage() {
                 onChange={(e) => handleChange(q.id, e.target.value)}
                 placeholder={q.placeholder || 'Type your answer - 2 to 6 sentences is perfect.'}
                 rows={4}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </CardContent>
           </Card>

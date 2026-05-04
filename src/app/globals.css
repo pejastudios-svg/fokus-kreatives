@@ -139,7 +139,7 @@ h1, h2, h3, h4, h5, h6 {
    page picks up the same surface treatment.
    - Dark mode: cards are #0A0F18 (a hair lighter than the pure-black page),
      inputs stay at #0F1929 so they're tappable, and Card outlines are
-     stripped — surfaces are defined by their fill alone.
+     stripped - surfaces are defined by their fill alone.
    - Light mode: page bg gets a touch of warmth (#f1f5f9 vs the global
      near-white #f8fafc) so cards have a hint more contrast. */
 .dark .agency-scope {
@@ -171,14 +171,14 @@ h1, h2, h3, h4, h5, h6 {
 /* Pillar / category badges (light blue fill + brand-blue text) read as
    washed-out on the dark surfaces. Swap to a saturated dark-blue chip with
    bright blue text in dark mode. Targets only elements that carry BOTH
-   the bg-[#E8F1FF] and text-[#2B79F7] classes — i.e. badges, not stray
+   the bg-[#E8F1FF] and text-[#2B79F7] classes - i.e. badges, not stray
    icons that happen to use the brand-blue text color. */
 .dark .agency-scope [class*="bg-[#E8F1FF]"][class*="text-[#2B79F7]"] {
   background-color: #1E3A6F;
   color: #93C5FD;
 }
 
-/* Theme color transition — opt-in via class, so it doesn't fight Tailwind's
+/* Theme color transition - opt-in via class, so it doesn't fight Tailwind's
    `transition-transform` / `transition-[width]` utilities on every element. */
 .theme-transition {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;

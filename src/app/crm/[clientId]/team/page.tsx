@@ -448,7 +448,7 @@ export default function CRMTeamPage() {
       if (!emailRes.ok) {
         setNotification({
           type: 'success',
-          message: 'Invite created. Email failed to send — share the link manually.',
+          message: 'Invite created. Email failed to send - share the link manually.',
           link: acceptUrl,
         })
       } else {

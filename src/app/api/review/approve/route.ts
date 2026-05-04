@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Reuse the existing recompute path (rolls up approval status + ClickUp +
-    // notifications). Not awaiting — fire-and-forget keeps the response fast.
+    // notifications). Not awaiting - fire-and-forget keeps the response fast.
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
       void fetch(`${appUrl}/api/approvals/recompute`, {

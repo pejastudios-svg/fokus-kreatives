@@ -1071,7 +1071,7 @@ function RevenueSkeleton() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search lead, invoice #, notes..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-full text-xs bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="w-full pl-8 pr-3 py-1.5 rounded-full text-xs bg-[var(--bg-input)] text-[var(--text-primary)] border border-[var(--border-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </div>
 
@@ -1079,7 +1079,7 @@ function RevenueSkeleton() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className="px-2.5 py-1.5 rounded-full text-xs font-medium bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] hover:text-[var(--text-primary)]"
+            className="px-2.5 py-1.5 rounded-full text-xs font-medium bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] hover:text-[var(--text-primary)]"
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>

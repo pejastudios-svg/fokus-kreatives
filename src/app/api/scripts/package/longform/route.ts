@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         user: userPrompt,
         temperature: prompt.temperature,
         maxTokens: prompt.maxTokens,
-        // Longform is the user-facing money output — pay for Pro.
+        // Longform is the user-facing money output - pay for Pro.
         quality: 'high',
       })
       let sanitized = sanitize(content)

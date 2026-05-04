@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     } else if (folderId) {
       query = query.eq('folder_id', folderId).is('parent_task_id', null)
     } else {
-      // No folder filter — only return top-level tasks (no subtasks) by default.
+      // No folder filter - only return top-level tasks (no subtasks) by default.
       query = query.is('parent_task_id', null)
     }
 
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to create task' }, { status: 500 })
     }
 
-    // Initial status log entry — keeps the audit trail consistent with status flips.
+    // Initial status log entry - keeps the audit trail consistent with status flips.
     await taskAdmin.from('task_status_log').insert({
       task_id: created.id,
       from_status: null,

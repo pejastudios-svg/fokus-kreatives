@@ -604,7 +604,7 @@ export default function ApprovalDetailPage() {
       .eq('id', approvalId)
       .maybeSingle()
 
-    // Older DBs don't have share_token yet — fall back so the page still loads.
+    // Older DBs don't have share_token yet - fall back so the page still loads.
     if (
       error &&
       ((error as { code?: string }).code === '42703' ||
@@ -624,7 +624,7 @@ export default function ApprovalDetailPage() {
     }
 
     if (error) {
-      // Supabase errors don't expose enumerable fields by default — pluck the
+      // Supabase errors don't expose enumerable fields by default - pluck the
       // useful ones explicitly so we can see what's actually wrong instead of
       // an empty `{}` in the console.
       console.error('Load approval detail error:', {
@@ -1132,7 +1132,7 @@ export default function ApprovalDetailPage() {
     setReplyTarget((prev) => (prev && prev.itemId === itemId ? null : prev))
     handleClearPending(key)
 
-    // Optimistic comment — gets replaced once realtime/loadComments brings in
+    // Optimistic comment - gets replaced once realtime/loadComments brings in
     // the real one (it'll have a real uuid and our temp- one drops out).
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const optimisticPreviewUrl = fileToUpload
@@ -1411,7 +1411,7 @@ export default function ApprovalDetailPage() {
     })
   }
 
-  // Resolved mentions in the *current draft* text — used to show a "Tagging:"
+  // Resolved mentions in the *current draft* text - used to show a "Tagging:"
   // preview row under the input so the author sees who'll be notified.
   const resolveDraftMentions = (text: string) => {
     const seen = new Set<string>()
@@ -1562,7 +1562,7 @@ export default function ApprovalDetailPage() {
             return (
               <Card key={item.id}>
                 <CardHeader className="flex flex-col gap-3">
-                  {/* Action row — pulled above the title so the captions get
+                  {/* Action row - pulled above the title so the captions get
                       full width and aren't squeezed by the button cluster. */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span
@@ -1663,11 +1663,11 @@ export default function ApprovalDetailPage() {
                               setEditItemComment(e.target.value)
                             }
                             rows={3}
-                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                           />
                         </div>
 
-                        {/* Existing attachments — each is removable and replaceable. */}
+                        {/* Existing attachments - each is removable and replaceable. */}
                         {editItemAttachments.length > 0 && (
                           <div>
                             <div className="flex items-center justify-between mb-2">
@@ -1882,7 +1882,14 @@ export default function ApprovalDetailPage() {
                             <div
                               key={c.id}
                               className={`flex items-start gap-2 text-xs border border-[var(--border-primary)] rounded-lg p-2 ${
-                                c.resolved ? 'bg-green-50' : 'bg-[var(--bg-tertiary)]'
+                                c.resolved
+                                  ? // bg-green-50 alone becomes a
+                                    // near-white wash in dark mode and
+                                    // hides the comment text. The dark
+                                    // variant uses a subtle 10% green
+                                    // tint so text stays legible.
+                                    'bg-green-50 dark:bg-emerald-500/10'
+                                  : 'bg-[var(--bg-tertiary)]'
                               }`}
                             >
                               <div className="mt-0.5">
@@ -1933,7 +1940,7 @@ export default function ApprovalDetailPage() {
                                         setEditingCommentText(e.target.value)
                                       }
                                       rows={2}
-                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
+                                      className="w-full px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] resize-none"
                                     />
                                     <div className="flex justify-end gap-1">
                                       <Button
@@ -2170,7 +2177,7 @@ export default function ApprovalDetailPage() {
                       )}
                     </div>
 
-                    {/* New-comment preview bubble — appears when a comment from
+                    {/* New-comment preview bubble - appears when a comment from
                         someone else arrives while the user is scrolled away.
                         Animates in (avatar pops, preview slides out as a pill),
                         click jumps the comments list to the bottom. */}
@@ -2240,7 +2247,7 @@ export default function ApprovalDetailPage() {
           })
         }, 300)
       }}
-      className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+      className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
       placeholder="Leave a comment... use @name to tag someone."
     />
     {mentionTargetItemId === item.id && (() => {

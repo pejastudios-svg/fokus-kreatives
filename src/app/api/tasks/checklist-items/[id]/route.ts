@@ -10,7 +10,7 @@ async function loadItemContext(itemId: string) {
     .eq('id', itemId)
     .maybeSingle()
   if (!data) return null
-  // The nested join shape varies by Supabase output — defensively unwrap.
+  // The nested join shape varies by Supabase output - defensively unwrap.
   const cl = (data as unknown as { task_checklists: unknown }).task_checklists
   const checklist = Array.isArray(cl) ? cl[0] : cl
   const tField = (checklist as { tasks?: unknown } | null)?.tasks

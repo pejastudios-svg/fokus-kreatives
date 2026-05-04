@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { Header } from '@/components/layout/Header'
+import { useAgencyUser } from '@/components/auth/AgencyUserContext'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -54,7 +55,7 @@ export default function NewClientPage() {
 
   const [isLoading, setIsLoading] = useState(false)
   const [roleLoading, setRoleLoading] = useState(true)
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const { role: userRole } = useAgencyUser()
   const [currentUserName, setCurrentUserName] = useState('')
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null)
 
@@ -93,6 +94,9 @@ export default function NewClientPage() {
   }, [notification])
 
   useEffect(() => {
+    // Role is sourced from the agency context (no fetch). We still
+    // fetch the user's name + avatar here for the inviter-display
+    // fields shown elsewhere on the form.
     let cancelled = false
 
     ;(async () => {
@@ -100,28 +104,19 @@ export default function NewClientPage() {
         const {
           data: { user },
         } = await supabase.auth.getUser()
-
-        if (!user) {
-          if (!cancelled) setUserRole(null)
-          return
-        }
-
-        const { data, error } = await supabase
+        if (!user) return
+        const { data } = await supabase
           .from('users')
-          .select('role, name, profile_picture_url')
+          .select('name, profile_picture_url')
           .eq('id', user.id)
           .maybeSingle()
-
-        if (error) {
-          console.error('Role lookup failed:', error.code, error.message, error)
-          if (!cancelled) setUserRole(null)
-          return
-        }
-
         if (!cancelled) {
-          setUserRole(data?.role || null)
           setCurrentUserName(data?.name || user.email || '')
-          setCurrentUserAvatar(data?.profile_picture_url || user.user_metadata?.avatar_url || null)
+          setCurrentUserAvatar(
+            data?.profile_picture_url ||
+              user.user_metadata?.avatar_url ||
+              null,
+          )
         }
       } finally {
         if (!cancelled) setRoleLoading(false)
@@ -438,7 +433,7 @@ export default function NewClientPage() {
                   onChange={handleChange}
                   placeholder="Who is their ideal client? Age, profession, pain points, desires..."
                   rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
@@ -511,20 +506,20 @@ export default function NewClientPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.brand_doc_url ? (
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                <div className="flex items-center gap-3 p-4 bg-[#2B79F7]/10 dark:bg-[#2B79F7]/15 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-[#2B79F7]" />
                   <a
                     href={formData.brand_doc_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-green-700 text-sm flex-1 truncate hover:underline"
+                    className="text-[#2B79F7] dark:text-[#93C5FD] text-sm flex-1 truncate hover:underline"
                   >
                     {formData.brand_doc_url}
                   </a>
                   <button
                     type="button"
                     onClick={() => setFormData((prev) => ({ ...prev, brand_doc_url: '' }))}
-                    className="text-green-700 text-xs hover:underline"
+                    className="text-[#2B79F7] dark:text-[#93C5FD] text-xs hover:underline"
                   >
                     Remove
                   </button>
@@ -567,7 +562,7 @@ export default function NewClientPage() {
                   placeholder="DO: Use casual, confident tone. Use specific numbers. Tell stories.
 DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
@@ -579,7 +574,7 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   onChange={handleChange}
                   placeholder="List topics this client should cover. One per line."
                   rows={6}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
             </CardContent>
@@ -598,7 +593,7 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   value={formData.key_stories}
                   onChange={handleChange}
                   rows={6}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
@@ -609,7 +604,7 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   value={formData.unique_mechanisms}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
 
@@ -620,7 +615,7 @@ DON'T: Mention competitors by name. Use corporate jargon. Be generic."
                   value={formData.social_proof}
                   onChange={handleChange}
                   rows={5}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
                 />
               </div>
             </CardContent>

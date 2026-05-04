@@ -628,7 +628,7 @@ const deleteSubmission = async () => {
       const reportSubs: CaptureReportSubmission[] = sortedSubs
         .slice(0, 50)
         .map((s) => ({
-          pageName: pageNameById.get(s.capture_page_id) || '—',
+          pageName: pageNameById.get(s.capture_page_id) || '-',
           name: s.name,
           email: s.email,
           phone: s.phone,

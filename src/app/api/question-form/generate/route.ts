@@ -130,7 +130,7 @@ Generate exactly ${count} questions.`
       temperature: 0.7,
       maxTokens: 2200,
       jsonObject: true,
-      // Question-form generation is mechanical structured-JSON — Flash-Lite
+      // Question-form generation is mechanical structured-JSON - Flash-Lite
       // is plenty here and ~30x cheaper than Pro on the same input.
       quality: 'cheap',
     })

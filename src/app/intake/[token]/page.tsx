@@ -290,7 +290,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder="Who is your ideal client? Age, profession, pain points, desires…"
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -361,7 +361,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder={`DO: Use casual, confident tone. Use specific numbers. Tell stories.\nDON'T: Mention competitors by name. Use corporate jargon. Be generic.`}
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
@@ -372,7 +372,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder="Topics we should cover - one per line."
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -392,7 +392,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder="Personal origin, transformation, client wins, moments that shaped the brand…"
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
@@ -403,7 +403,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder="Your proprietary methods, frameworks, step-by-step systems."
                 rows={4}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
             <div>
@@ -414,7 +414,7 @@ export default function BrandIntakePage() {
                 onChange={handleChange}
                 placeholder="Specific client wins, testimonials, numbers, press mentions, awards."
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
           </CardContent>
@@ -435,7 +435,7 @@ export default function BrandIntakePage() {
               onChange={handleChange}
               placeholder={`https://instagram.com/competitor-1\nhttps://tiktok.com/@competitor-2\nNotes: what you like / don't like about each…`}
               rows={6}
-              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
             />
           </CardContent>
         </Card>

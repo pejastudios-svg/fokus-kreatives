@@ -129,7 +129,7 @@ export default function TaskDetailPage() {
   const [assigneeQuery, setAssigneeQuery] = useState('')
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Local edit buffers — committed on blur / button click.
+  // Local edit buffers - committed on blur / button click.
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<TaskStatus>('new')
@@ -216,7 +216,7 @@ export default function TaskDetailPage() {
   }, [showLog, loadStatusLog])
 
   // Live updates: someone else moves the task on a board, edits a field, or
-  // a status flip happens — we surface it without a page refresh.
+  // a status flip happens - we surface it without a page refresh.
   useEffect(() => {
     if (!taskId) return
     const channel = supabase
@@ -586,7 +586,7 @@ export default function TaskDetailPage() {
                           value={assigneeQuery}
                           onChange={(e) => setAssigneeQuery(e.target.value)}
                           placeholder="Search team…"
-                          className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          className="w-full pl-8 pr-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                         />
                       </div>
                     </div>
@@ -636,7 +636,7 @@ export default function TaskDetailPage() {
               <select
                 value={priority}
                 onChange={(e) => onPriorityChange(e.target.value as TaskPriority)}
-                className="w-full pl-4 pr-10 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full pl-4 pr-10 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -655,7 +655,7 @@ export default function TaskDetailPage() {
                 value={startAt}
                 onChange={(e) => setStartAt(e.target.value)}
                 onBlur={() => onDateBlur('start')}
-                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
@@ -668,7 +668,7 @@ export default function TaskDetailPage() {
                 value={dueAt}
                 onChange={(e) => setDueAt(e.target.value)}
                 onBlur={() => onDateBlur('due')}
-                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
 
@@ -774,7 +774,7 @@ export default function TaskDetailPage() {
         )}
       </div>
 
-      {/* Floating chat — scoped to this task only. */}
+      {/* Floating chat - scoped to this task only. */}
       <TaskChat taskId={taskId} members={members} />
 
       <SaveTemplateModal

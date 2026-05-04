@@ -256,7 +256,7 @@ export default function SeriesFormPage() {
                   'Tell the actual story - 3 to 8 sentences. Specific moments beat polished summaries.'
                 }
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-y"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-y"
               />
             </CardContent>
           </Card>
