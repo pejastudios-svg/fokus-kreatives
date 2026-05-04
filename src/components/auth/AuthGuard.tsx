@@ -19,63 +19,46 @@ export function AuthGuard({ children }: AuthGuardProps) {
   
 
   useEffect(() => {
-  const supabase = createClient()
-  const checkAuth = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const supabase = createClient()
+    const checkAuth = async () => {
+      // Routing decisions go through /api/me/landing so they use the
+      // service role - browser-side queries against `users` and
+      // `client_memberships` are RLS-blocked for CRM team members and
+      // would silently return null, which used to bounce them back to
+      // /login in a redirect loop.
+      const res = await fetch('/api/me/landing', { cache: 'no-store' })
+      if (res.status === 401) {
+        router.push('/login')
+        return
+      }
+      const json = (await res.json()) as
+        | { authed: false }
+        | { authed: true; signOut: true; reason: string }
+        | { authed: true; destination: string }
+      if (!('authed' in json) || !json.authed) {
+        router.push('/login')
+        return
+      }
+      if ('signOut' in json && json.signOut) {
+        await supabase.auth.signOut()
+        router.push('/login')
+        return
+      }
+      if (!('destination' in json)) {
+        router.push('/login')
+        return
+      }
+      // AuthGuard wraps the AGENCY app. If the user's actual landing
+      // is somewhere else (a CRM, the portal), bounce them there.
+      if (json.destination !== '/dashboard') {
+        router.push(json.destination)
+        return
+      }
+      setIsAuthenticated(true)
+      setIsLoading(false)
+    }
 
-  if (!user) {
-    router.push('/login')
-    return
-  }
-
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('id, role, client_id, is_agency_user')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (!userRow) {
-    await supabase.auth.signOut()
-    router.push('/login')
-    return
-  }
-
-if (userRow.role === 'client') {
-  setIsLoading(false)
-  router.push('/portal/approvals')
-  return
-}
-
-// ✅ Agency users stay in agency app
-if (userRow.is_agency_user) {
-  setIsAuthenticated(true)
-  setIsLoading(false)
-  return
-}
-
-// not agency user: send to first CRM
-const { data: mem } = await supabase
-  .from('client_memberships')
-  .select('client_id')
-  .eq('user_id', user.id)
-  .limit(1)
-  .maybeSingle()
-
-setIsLoading(false)
-
-if (mem?.client_id) {
-  router.push(`/crm/${mem.client_id}/dashboard`)
-  return
-}
-
-await supabase.auth.signOut()
-router.push('/login')
-return
-}
-
-  checkAuth()
+    checkAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {

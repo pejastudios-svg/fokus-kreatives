@@ -16,16 +16,16 @@ import {
   UserCircleIcon,
   Sparkles,
   X,
-  Lock,
   Menu,
   ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Loading } from '@/components/ui/Loading'
-import { Tooltip } from '@/components/ui/Tooltip'
 import { PageTransition } from '@/components/ui/PageTransition'
+import { CrmRoleProvider } from '@/components/crm/CrmRoleContext'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { useIdleTimeout } from '@/hooks/useIdleTimeout'
+import { UpgradeFeaturesModal } from '@/components/crm/UpgradeFeaturesModal'
 
 interface CRMLayoutProps {
   children: React.ReactNode
@@ -154,142 +154,80 @@ useEffect(() => {
     }
   }
 
-  const loadClientInfo = useCallback(async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, business_name, archived_at, package_tier')
-      .eq('id', clientId)
-      .single()
-
-    if (data) setClientInfo(data as ClientInfo)
-  }, [clientId, supabase])
-
   const checkAccess = useCallback(async () => {
-  setIsLoading(true)
-  setIsAuthorized(false)
+    setIsLoading(true)
+    setIsAuthorized(false)
 
-  try {
-if (!clientId) {
-  console.error('CRMLayout: missing clientId from params', params)
-  router.push('/clients')
-  return
-}
+    try {
+      if (!clientId) {
+        console.error('CRMLayout: missing clientId from params', params)
+        router.push('/clients')
+        return
+      }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+      // The whole auth check runs server-side. Doing it in the browser
+      // was unreliable for new CRM team members because RLS on
+      // client_memberships hides their own row, so the membership
+      // lookup returned null and we'd fall through to /login.
+      const res = await fetch(
+        `/api/crm/auth?clientId=${encodeURIComponent(clientId)}`,
+        { cache: 'no-store' },
+      )
 
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('role, email, name, profile_picture_url, client_id, is_agency_user')
-      .eq('id', user.id)
-      .single()
-
-    if (!userRow) {
-      router.push('/login')
-      return
-    }
-
-    const email = (userRow.email || user.email || '').toLowerCase()
-    const role = (userRow.role as Role) || 'employee'
-    const userClientId = userRow.client_id as string | null
-
-    setUserName(userRow.name || email || 'User')
-    setUserEmail(email || '')
-    // FIX: Fallback to Google/Auth picture if the database field is empty
-    setUserPicture(userRow.profile_picture_url || user.user_metadata?.avatar_url || null)
-
-    // ✅ Allow managers/employees to access this CRM if they have membership
-if (role !== 'client' && role !== 'admin') {
-  const { data: mem } = await supabase
-    .from('client_memberships')
-    .select('role')
-    .eq('client_id', clientId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (mem) {
-    setUserRole(mem.role as Role)
-    await loadClientInfo()
-    setIsAuthorized(true)
-    return
-  }
-}
-    // ✅ IMPORTANT FIX:
-    // Agency admins (client_id is null) can access ANY client CRM
-    if (role === 'admin' && !userClientId) {
-      setUserRole('admin')
-      await loadClientInfo()
-      setIsAuthorized(true)
-      return
-    }
-
-    // Client: can only access their own CRM, and only if their package_tier
-    // includes CRM at all (Lower has no CRM access, Middle is gated to a
-    // subset via the navigation filter below).
-    if (role === 'client') {
-      if (!userClientId || userClientId !== clientId) {
+      if (res.status === 401) {
         router.push('/login')
         return
       }
 
-      const { data: clientRow } = await supabase
-        .from('clients')
-        .select('package_tier')
-        .eq('id', clientId)
-        .single()
-      const tier = (clientRow?.package_tier ?? null) as PackageTier | null
+      const json = (await res.json()) as {
+        authorized: boolean
+        crmRole?: Role
+        isClientUser?: boolean
+        user?: {
+          id: string
+          email: string | null
+          name: string | null
+          profilePictureUrl: string | null
+        }
+        client?: ClientInfo
+        error?: string
+      }
 
-      // Only block when the tier is *explicitly* 'lower'. Null tiers stay
-      // backwards-compatible with existing clients (full access) until you
-      // assign them a tier on the client edit page.
-      if (tier === 'lower') {
+      if (!res.ok || !json.authorized) {
+        console.warn('CRM auth denied:', json.error)
+        router.push('/login')
+        return
+      }
+
+      // Client portal users on the Lower tier shouldn't reach the CRM
+      // at all - bounce to the slim portal experience instead.
+      const tier = (json.client?.package_tier ?? null) as PackageTier | null
+      if (json.isClientUser && tier === 'lower') {
         router.push('/portal')
         return
       }
 
-      setIsClientUser(true)
-      setUserRole('admin') // client acts as admin in their CRM
-      await loadClientInfo()
+      // Hydrate state from the route's response.
+      setUserRole((json.crmRole as Role) || 'employee')
+      setIsClientUser(!!json.isClientUser)
+      setUserName(json.user?.name || json.user?.email || 'User')
+      setUserEmail(json.user?.email || '')
+      // Auth metadata avatar still wins for users who connected via OAuth.
+      const { data: { user: sessionUser } } = await supabase.auth.getUser()
+      setUserPicture(
+        json.user?.profilePictureUrl ||
+          sessionUser?.user_metadata?.avatar_url ||
+          null,
+      )
+      if (json.client) setClientInfo(json.client)
       setIsAuthorized(true)
-      return
-    }
-
-    // If not agency admin and not client, allow membership-based access
-    // (Clients are handled in the block above, so we don't need to check role !== 'client')
-    if (!(role === 'admin' && !userClientId && userRow.is_agency_user)) {
-      const { data: mem } = await supabase
-        .from('client_memberships')
-        .select('role')
-        .eq('client_id', clientId)
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (mem?.role) {
-        setUserRole(mem.role as Role)
-        await loadClientInfo()
-        setIsAuthorized(true)
-        setIsLoading(false)
-        return
-      }
-    }
-
-    // Non-client (manager/employee) must match client_id for now
-    if (!userClientId || userClientId !== clientId) {
+    } catch (err) {
+      console.error('CRM checkAccess error:', err)
       router.push('/login')
-      return
+    } finally {
+      setIsLoading(false)
     }
-    
-
-  } catch (err) {
-    console.error('CRM checkAccess error:', err)
-    router.push('/login')
-  } finally {
-    setIsLoading(false)
-  }
-}, [clientId, router, supabase, loadClientInfo, params])
+  }, [clientId, router, supabase, params])
 
 // FIX: Keep track of the last successfully loaded client ID
   useEffect(() => {
@@ -402,28 +340,20 @@ if (role !== 'client' && role !== 'admin') {
     return map[name] || name.toLowerCase()
   }
 
-  // Short copy that explains each tab in the upgrade modal. Keep these tight
-  // - they show in a tooltip-style popover, not as marketing copy.
-  // Settings is no longer a nav tab (lives in the profile dropdown), so it's
-  // omitted from this map.
-  const featureCopy: Record<string, string> = {
-    Dashboard:
-      'At-a-glance KPIs for your CRM - leads, meetings, revenue trends in one view.',
-    Leads: 'Capture, track, and manage every lead that comes through your business.',
-    Revenue:
-      'Track invoices, payments, and revenue forecasts for your client work.',
-    Meetings: 'Schedule meetings, send reminders, and keep a log of every call.',
-    Team: 'Manage who on your side has access to this CRM workspace.',
-    'Capture Pages':
-      'Build embeddable lead-capture pages tied to this CRM in minutes.',
-  }
+  // Tab definitions drive the nav, the locked-tab calculation, and the
+  // upgrade modal (which carries its own per-feature marketing copy).
+  // Every CRM role sees every tab. Per-role write gating happens INSIDE
+  // each page (e.g. employees can view leads but can't add custom fields,
+  // can view team but can't invite). Hiding tabs entirely from employees
+  // would leave them with just "Dashboard", which defeats the point of
+  // having an employee role at all.
   const allTabs = [
     { name: 'Dashboard', icon: LayoutDashboard, roles: ['admin','manager','employee','guest'] as Role[] },
-    { name: 'Leads', icon: Users, roles: ['admin','manager'] as Role[] },
-    { name: 'Revenue', icon: DollarSign, roles: ['admin','manager'] as Role[] },
-    { name: 'Meetings', icon: Calendar, roles: ['admin','manager'] as Role[] },
-    { name: 'Team', icon: UserCircleIcon, roles: ['admin', 'manager'] as Role[] },
-    { name: 'Capture Pages', icon: FileInput, roles: ['admin','manager'] as Role[] },
+    { name: 'Leads', icon: Users, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Revenue', icon: DollarSign, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Meetings', icon: Calendar, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Team', icon: UserCircleIcon, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Capture Pages', icon: FileInput, roles: ['admin','manager','employee'] as Role[] },
   ]
 
   const navigation = allTabs
@@ -485,7 +415,7 @@ if (role !== 'client' && role !== 'admin') {
   const badgeValue = (count: number) => (count > 9 ? '9+' : String(count))
 
   return (
-    <div className="flex flex-col h-screen min-h-0 bg-[var(--bg-secondary)]">
+    <div className="agency-scope flex flex-col h-screen min-h-0 bg-[var(--bg-secondary)] dark:bg-black">
       {/* Top nav - three-zone layout: left = brand, center = nav, right = actions.
           The center zone uses `flex-1 justify-center` so the nav stays
           visually centered regardless of how much space the side groups take. */}
@@ -716,10 +646,31 @@ if (role !== 'client' && role !== 'admin') {
         </div>
       )}
 
-      {/* Main */}
-      <main className="flex-1 min-h-0 overflow-auto">
+      {/* Main - `scrollbar-gutter: stable` reserves the scrollbar lane at
+          the very right edge so the content never shifts when the bar
+          appears, and the bar sits at the screen edge rather than next to
+          the cards. */}
+      <main
+        className="flex-1 min-h-0 overflow-auto"
+        style={{ scrollbarGutter: 'stable' }}
+      >
         <PageTransition>
-          <div className="min-h-full">{children}</div>
+          <CrmRoleProvider
+            role={
+              // The auth route can return 'guest' / 'client', but pages
+              // only need the three real CRM roles. Anything outside the
+              // trio gets the safest interpretation (employee).
+              userRole === 'admin' || userRole === 'manager'
+                ? userRole
+                : 'employee'
+            }
+            isClientUser={isClientUser}
+            workspaceName={
+              clientInfo?.business_name || clientInfo?.name || 'Workspace'
+            }
+          >
+            <div className="min-h-full">{children}</div>
+          </CrmRoleProvider>
         </PageTransition>
 
         {/* Local CRM popup (leads/meetings) */}
@@ -740,61 +691,14 @@ if (role !== 'client' && role !== 'admin') {
         {/* Global notifications popup (approvals + mentions etc) */}
         <NotificationPopupListener />
 
-        {/* Upgrade-tier modal: shows the locked features as badges with a
-            hover tooltip per badge. Backdrop click closes. Only renders for
-            middle-tier client portal users (button is hidden otherwise). */}
+        {/* Upgrade-tier modal: shows locked features with blurred previews
+            and a "See more" expand for each. Only renders for middle-tier
+            client portal users (button is hidden otherwise). */}
         {showUpgradeModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowUpgradeModal(false)}
-          >
-            <div
-              className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-            >
-              <button
-                type="button"
-                onClick={() => setShowUpgradeModal(false)}
-                className="absolute top-3 right-3 p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="p-6">
-                <div className="flex items-center gap-2 text-[#2B79F7]">
-                  <Sparkles className="h-5 w-5" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Available on the Top tier</span>
-                </div>
-                <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Unlock more features</h3>
-                <p className="mt-1 text-sm text-[var(--text-tertiary)]">
-                  Upgrade to the Top package to add the features below to your CRM.
-                </p>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  {lockedTabs.map((t) => (
-                    <Tooltip
-                      key={t.name}
-                      content={featureCopy[t.name] || ''}
-                      position="top"
-                    >
-                      <div className="relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)] cursor-default">
-                        <t.icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
-                        <span className="text-sm font-medium truncate">{t.name}</span>
-                        <Lock className="h-3 w-3 ml-auto shrink-0 text-[var(--text-tertiary)]" />
-                      </div>
-                    </Tooltip>
-                  ))}
-                </div>
-
-                <p className="mt-5 text-[11px] text-[var(--text-tertiary)]">
-                  Hover any badge for a quick description. Reach out to your account manager to upgrade.
-                </p>
-              </div>
-            </div>
-          </div>
+          <UpgradeFeaturesModal
+            lockedTabs={lockedTabs}
+            onClose={() => setShowUpgradeModal(false)}
+          />
         )}
       </main>
     </div>

@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { ChevronDown, Search, Check, UserCircle } from 'lucide-react'
+import { ChevronDown, Search, UserCircle } from 'lucide-react'
 
 interface ClientLite {
   id: string
@@ -20,168 +19,162 @@ interface Props {
   placeholder?: string
 }
 
-export function ClientPicker({ clients, value, onChange, loading, placeholder = 'Choose a client…' }: Props) {
+// Mirrors the campaigns-page ClientCombobox so every picker behaves and looks
+// the same: no portal, in-flow absolute dropdown, single mousedown-outside
+// listener. Avoids the scroll/resize auto-close that was firing on mobile the
+// instant the on-screen keyboard popped, making the menu close itself.
+export function ClientPicker({
+  clients,
+  value,
+  onChange,
+  loading,
+  placeholder = 'Choose a client…',
+}: Props) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{
-    top: number
-    left: number
-    width: number
-    maxHeight: number
-  } | null>(null)
   const [query, setQuery] = useState('')
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  const selected = clients.find((c) => c.id === value) || null
-
-  const openMenu = () => {
-    if (!triggerRef.current) return
-    const r = triggerRef.current.getBoundingClientRect()
-    const viewportH = window.innerHeight
-    const top = r.bottom + 6
-    // Always open below the trigger; clamp maxHeight to whatever fits between
-    // the trigger and the viewport bottom (with an 8px gutter), capped at 360.
-    const maxHeight = Math.max(160, Math.min(360, viewportH - top - 8))
-    setPos({ top, left: r.left, width: r.width, maxHeight })
-    setOpen(true)
-    setQuery('')
-  }
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (menuRef.current?.contains(target)) return
-      if (triggerRef.current?.contains(target)) return
-      setOpen(false)
+    const onDoc = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false)
     }
-    const onReposition = () => setOpen(false)
-    document.addEventListener('mousedown', onDown)
-    window.addEventListener('scroll', onReposition, true)
-    window.addEventListener('resize', onReposition)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      window.removeEventListener('scroll', onReposition, true)
-      window.removeEventListener('resize', onReposition)
-    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const filtered = query.trim()
-    ? clients.filter((c) =>
-        (`${c.name} ${c.business_name}`).toLowerCase().includes(query.toLowerCase()),
-      )
-    : clients
+  const selected = clients.find((c) => c.id === value) || null
+  const selectedLabel = selected
+    ? selected.name || selected.business_name || 'Untitled'
+    : loading
+      ? 'Loading clients…'
+      : placeholder
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return clients
+    return clients.filter((c) =>
+      [c.name, c.business_name].some((v) => (v || '').toLowerCase().includes(q)),
+    )
+  }, [clients, query])
 
   return (
-    <>
+    <div ref={containerRef} className="relative">
       <button
-        ref={triggerRef}
         type="button"
-        onClick={() => (open ? setOpen(false) : openMenu())}
-        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border border-theme-primary bg-theme-card text-left hover:border-[#5A9AFF] transition-colors"
+        onClick={() => setOpen((v) => !v)}
         disabled={loading}
+        className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-left text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] flex items-center gap-2.5 disabled:opacity-50"
       >
-        {selected?.profile_picture_url ? (
-          <Image
-            src={selected.profile_picture_url}
-            alt={selected.name}
-            width={28}
-            height={28}
-            unoptimized
-            className="rounded-full object-cover"
-          />
-        ) : selected ? (
-          <div className="h-7 w-7 rounded-full bg-brand-gradient text-white text-xs font-semibold flex items-center justify-center">
-            {selected.name.charAt(0).toUpperCase()}
-          </div>
+        {selected ? (
+          selected.profile_picture_url ? (
+            <Image
+              src={selected.profile_picture_url}
+              alt={selectedLabel}
+              width={24}
+              height={24}
+              unoptimized
+              className="rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="h-6 w-6 rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+              {selectedLabel.charAt(0).toUpperCase()}
+            </div>
+          )
         ) : (
-          <div className="h-7 w-7 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
-            <UserCircle className="h-5 w-5" />
+          <div className="h-6 w-6 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)] shrink-0">
+            <UserCircle className="h-4 w-4" />
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          {selected ? (
-            <>
-              <p className="text-sm font-medium text-theme-primary truncate">{selected.name}</p>
-              <p className="text-xs text-theme-secondary truncate">{selected.business_name}</p>
-            </>
-          ) : (
-            <p className="text-sm text-theme-secondary">
-              {loading ? 'Loading clients…' : placeholder}
-            </p>
-          )}
-        </div>
+        <span className={`flex-1 truncate ${selected ? '' : 'text-[var(--text-tertiary)]'}`}>
+          {selectedLabel}
+        </span>
+        {selected && selected.business_name && (
+          <span className="hidden sm:inline text-xs text-[var(--text-tertiary)] truncate">
+            {selected.business_name}
+          </span>
+        )}
         <ChevronDown
-          className={`h-5 w-5 text-theme-tertiary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 text-[var(--text-tertiary)] shrink-0 ml-2 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
         />
       </button>
 
-      {open && pos && typeof window !== 'undefined' &&
-        createPortal(
-          <div
-            ref={menuRef}
-            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
-            className="z-[100] bg-theme-card rounded-xl shadow-lg border border-theme-primary animate-in zoom-in-95 fade-in duration-150 overflow-hidden flex flex-col"
-          >
-            <div className="p-2 border-b border-theme-primary">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-tertiary" />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search clients…"
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-theme-primary bg-theme-tertiary/30 text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                />
-              </div>
+      {open && (
+        <div className="absolute z-30 mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg">
+          <div className="sticky top-0 bg-[var(--bg-card)] border-b border-[var(--border-primary)] p-2">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-tertiary)]">
+              <Search className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search clients…"
+                className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
+              />
             </div>
-            <div className="overflow-y-auto">
-              {filtered.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-theme-secondary text-center">No clients match.</p>
-              ) : (
-                filtered.map((c) => {
-                  const isSelected = c.id === value
-                  return (
+          </div>
+          {filtered.length === 0 ? (
+            <p className="py-6 text-center text-xs text-[var(--text-tertiary)]">
+              No matching clients.
+            </p>
+          ) : (
+            <ul>
+              {filtered.map((c) => {
+                const active = c.id === value
+                const label = c.name || c.business_name || 'Untitled'
+                return (
+                  <li key={c.id}>
                     <button
-                      key={c.id}
                       type="button"
                       onClick={() => {
                         onChange(c.id)
                         setOpen(false)
+                        setQuery('')
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                        isSelected
+                      className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 transition-colors ${
+                        active
                           ? 'bg-blue-100 text-[#1E54B7] dark:bg-[#1E3A6F] dark:text-[#93C5FD]'
-                          : 'hover:bg-theme-tertiary/50 hover:text-theme-primary'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       {c.profile_picture_url ? (
                         <Image
                           src={c.profile_picture_url}
-                          alt={c.name}
-                          width={28}
-                          height={28}
+                          alt={label}
+                          width={22}
+                          height={22}
                           unoptimized
-                          className="rounded-full object-cover"
+                          className="rounded-full object-cover shrink-0"
                         />
                       ) : (
-                        <div className="h-7 w-7 rounded-full bg-brand-gradient text-white text-xs font-semibold flex items-center justify-center">
-                          {c.name.charAt(0).toUpperCase()}
+                        <div className="h-[22px] w-[22px] rounded-full bg-brand-gradient text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+                          {label.charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-theme-primary truncate">{c.name}</p>
-                        <p className="text-xs text-theme-secondary truncate">{c.business_name}</p>
-                      </div>
-                      {isSelected && <Check className="h-4 w-4 text-[#2B79F7] shrink-0" />}
+                      <span className="flex-1 truncate">{label}</span>
+                      {c.business_name && c.business_name !== label && (
+                        <span
+                          className={`text-[10px] shrink-0 truncate max-w-[100px] ${
+                            active
+                              ? 'text-[#1E54B7]/70 dark:text-[#93C5FD]/70'
+                              : 'text-[var(--text-tertiary)]'
+                          }`}
+                        >
+                          {c.business_name}
+                        </span>
+                      )}
                     </button>
-                  )
-                })
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
