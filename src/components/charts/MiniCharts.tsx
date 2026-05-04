@@ -248,7 +248,7 @@ export function DonutChart({
 
   // Skip zero-value slices and pre-compute exact start/end angles per
   // slice. Drawing real arc paths (instead of stroke-dashed circles)
-  // gives us pixel-perfect adjacency between segments — no more visible
+  // gives us pixel-perfect adjacency between segments - no more visible
   // gaps where two slices butt up against each other.
   // Pre-compute exact start/end angles per slice. Reduce keeps the
   // accumulator immutable per step (lint flags reassigned `let` bindings

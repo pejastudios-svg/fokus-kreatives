@@ -160,7 +160,7 @@ function fmtDateTime(iso: string): string {
       minute: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -258,7 +258,7 @@ export function MeetingsReportBody({
                   {r.durationMinutes} min
                 </Text>
                 <Text style={[styles.tableCell, styles.colLocation]}>
-                  {LOCATION_LABEL[r.locationType] || r.locationType || '—'}
+                  {LOCATION_LABEL[r.locationType] || r.locationType || '-'}
                 </Text>
                 <View style={styles.colStatus}>
                   <Text

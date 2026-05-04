@@ -155,7 +155,7 @@ const FORMAT_LABEL: Record<ExternalFormat, string> = {
 
 const CRITICAL_BANS_TOP = `CRITICAL HARD RULES - obey on EVERY line, EVERY entry, EVERY beat. These five are the most-violated rules. Do not violate them, even once.
 
-1. NO em-dashes (—) or en-dashes (–). If you need a pause, use a comma or a period.
+1. NO em-dashes (-) or en-dashes (–). If you need a pause, use a comma or a period.
 
 2. NO "it's not X, it's Y" / "this isn't X, it's Y" / "that's not X, it's Y" pivot in any form (semicolon variants and period variants too). State the positive claim directly. "X is Y." Not "It's not A, it's Y."
 
@@ -210,7 +210,7 @@ const VOICE_RULES = `VOICE & HARD BANS (apply to every output, every time):
 CONTRACTIONS: Always use contractions when speaking naturally would (it's, don't, that's, you're, we're, I'm, won't, can't, didn't, here's, there's, what's, that'll, you'll). Uncontracted forms read like a robot.
 
 PUNCTUATION:
-- NEVER use em-dashes (—) or en-dashes (–) anywhere. If you need a pause, use a comma or period.
+- NEVER use em-dashes (-) or en-dashes (–) anywhere. If you need a pause, use a comma or period.
 - NEVER use the "this isn't X, it's Y" construction in any form ("this isn't just X, it's Y", "that's not X, it's Y", "it's not X, it's Y", semicolon or period variants). State the positive claim directly.
 - NEVER stack two adjectives separated by a comma in praise/diagnosis ("consistent, engaging" → "consistent"). Pick one.
 

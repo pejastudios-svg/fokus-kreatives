@@ -145,7 +145,7 @@ function fmtDate(iso: string): string {
       year: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -250,7 +250,7 @@ export function TeamReportBody({
             return (
               <View key={idx} style={styles.tableRow} wrap={false}>
                 <Text style={[styles.tableCell, styles.colInvName]}>
-                  {inv.name || '—'}
+                  {inv.name || '-'}
                 </Text>
                 <Text style={[styles.tableCell, styles.colInvEmail]}>
                   {inv.email}

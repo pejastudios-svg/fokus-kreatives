@@ -761,7 +761,7 @@ export function ContentCreationEngine() {
             onChange={(e) => setIdeaInput(e.target.value)}
             placeholder="Type the exact topic/angle you want... (Paste draft here to polish)"
             rows={4}
-            className="w-full px-4 py-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
+            className="w-full px-4 py-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
           />
         </CardContent>
       </Card>
@@ -781,7 +781,7 @@ export function ContentCreationEngine() {
               <select
                 value={selectedCtaId}
                 onChange={(e) => setSelectedCtaId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">No saved CTA</option>
                 {ctas.map((c) => (
@@ -829,7 +829,7 @@ export function ContentCreationEngine() {
                   onChange={(e) => setCustomCtaText(e.target.value)}
                   rows={3}
                   placeholder='Example: Comment "{KEYWORD}" and I&rsquo;ll send you 10 open-loop scripts.'
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                 />
                 <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
                   Use <code>{'{KEYWORD}'}</code> to guarantee the keyword appears in the CTA.
@@ -1018,7 +1018,7 @@ export function ContentCreationEngine() {
                   value={bankSearch}
                   onChange={(e) => setBankSearch(e.target.value)}
                   placeholder="Search scripts..."
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
             </div>
@@ -1128,7 +1128,7 @@ export function ContentCreationEngine() {
                   value={ctaText}
                   onChange={(e) => setCtaText(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                   placeholder='Comment "{KEYWORD}" and I&rsquo;ll send you...'
                 />
               </div>

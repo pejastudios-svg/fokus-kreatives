@@ -133,7 +133,7 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   // All notification mutations go through `/api/notifications/mutate`. The
   // direct supabase.client.delete() approach was silently rejected by RLS for
-  // some users — rows came back on reload because the DELETE never happened.
+  // some users - rows came back on reload because the DELETE never happened.
   // The server route uses the service-role key + auth.uid() gate so writes
   // always succeed for the caller's own rows.
   const callMutate = async (body: Record<string, unknown>): Promise<boolean> => {
@@ -360,7 +360,12 @@ function NotificationRowItem({
   return (
     <div
       className={`group relative flex items-start gap-2 border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] ${
-        !n.read_at ? 'bg-blue-50/60' : ''
+        !n.read_at
+          ? // Subtle blue tint that reads as "unread" in BOTH light and
+            // dark modes - was bg-blue-50/60 which became a glaring
+            // near-white wash on dark surfaces.
+            'bg-[#2B79F7]/10 dark:bg-[#2B79F7]/15'
+          : ''
       }`}
     >
       <button

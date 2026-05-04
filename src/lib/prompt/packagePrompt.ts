@@ -46,12 +46,12 @@ function clientLine(profile: BrandProfile | null): string {
 }
 
 const SHARED_GUARDRAILS = `GUARDRAILS:
-- No em dashes (—) or en dashes (–) anywhere. Use commas or periods instead. Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple, RE-HOOK, 2-1-3-4) ARE allowed and required — never replace them with commas.
+- No em dashes (-) or en dashes (–) anywhere. Use commas or periods instead. Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple, RE-HOOK, 2-1-3-4) ARE allowed and required - never replace them with commas.
 - ABSOLUTELY no "<subject> isn't X, it's Y" construction in any form. Applies to ANY subject, not just "this/that/it" - "your intro isn't just a greeting, it's a...", "the end isn't a goodbye, it's...", "this isn't just X, it's Y" are ALL banned. Any variant (comma, semicolon, period between the clauses; with or without "just", "simply", "merely"). State the positive claim directly. This is the single most common AI tell and is banned outright.
 - No "here's the truth" / "here's the wild truth" / "here's the hard truth" / "here's the real truth" / "the wild truth" in any form. Just state the claim.
 - No rhetorical fragment-questions used as transitions: "The result?", "The kicker?", "The catch?", "The truth?", "The secret?", "Plot twist?", "Spoiler:", "Here's the thing,". Banned outright. They read as fake-conversational because every AI uses them. Just state the next sentence.
 - No "Honestly?" or "Look," as standalone transitions. ("I was honestly surprised" inside a sentence is fine; "Honestly?" as a sentence opener is not.)
-- Voice rule: speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, a textbook, or a polished blog intro, rewrite it. Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because. Vary length violently — a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
+- Voice rule: speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, a textbook, or a polished blog intro, rewrite it. Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because. Vary length violently - a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
 - No paired or tripled adjectives. "Consistent, engaging content" → "consistent content". "Clear, actionable, relevant advice" → "clear advice". Pick ONE adjective. Stacked adjectives are an AI tell.
 - Don't justify every claim. Real people make a point and move on; they don't add "and that's why this matters" after every sentence.
 - Don't bridge paragraphs with "Now," / "So," / "Moving on," / "Let's break it down,". Just start the next idea.
@@ -69,8 +69,8 @@ const SHARED_GUARDRAILS = `GUARDRAILS:
 - CTA appears a maximum of THREE times total across the entire script: once inside the relevant body point, once inside the outro fortune cookie, and once in the [CTA] section. Do not parrot it in multiple outro sentences.
 - OUTRO must include the fortune-cookie tool/tip beat, not a vanilla recap. Outro is 3 beats maximum, no filler.
 - LENGTH IS EARNED: target the per-section word counts by going DEEPER on braindump beats (more concrete examples, more specific language). Never pad by restating the same idea in different words.
-- FORMATTING / SPACING: every bracket section sits on its own line with blank lines before and after. Every POINT N: header sits on its own line. Every CONTEXT:/APPLICATION:/FRAMING:/RE-HOOK: label sits on its own line with a blank line before it. Slide N: / Frame N: headers also sit on their own line — the slide content goes on the NEXT line, never glued to the header. Copy-paste of the output must read cleanly in a Google Doc with no manual reformatting.
-- TAG-AS-HEADER (non-negotiable): bracket tags are headers, not punctuation. NEVER append a tag to the end of a paragraph (e.g. "...understood. [CTA]"). Each tag appears EXACTLY ONCE in the script — no writing [CTA] inside [PAYOFF] and again at the bottom.
+- FORMATTING / SPACING: every bracket section sits on its own line with blank lines before and after. Every POINT N: header sits on its own line. Every CONTEXT:/APPLICATION:/FRAMING:/RE-HOOK: label sits on its own line with a blank line before it. Slide N: / Frame N: headers also sit on their own line - the slide content goes on the NEXT line, never glued to the header. Copy-paste of the output must read cleanly in a Google Doc with no manual reformatting.
+- TAG-AS-HEADER (non-negotiable): bracket tags are headers, not punctuation. NEVER append a tag to the end of a paragraph (e.g. "...understood. [CTA]"). Each tag appears EXACTLY ONCE in the script - no writing [CTA] inside [PAYOFF] and again at the bottom.
 - For long-form (YouTube), use [DESCRIPTION] not [CAPTION], and NO hashtags in the output.
 - For carousel/reel/story (Instagram), keep [CAPTION] + [HASHTAGS].
 
@@ -122,7 +122,7 @@ export function buildLongformPackagePrompt(input: LongformPromptInput) {
 
   const systemParts = [
     `You are a ghostwriter. Real human voice. Short sentences. Specific words. No AI filler. You expand the client's braindump into a full script; you do not replace it with generic advice.`,
-    `HUMAN-VOICE EXAMPLE — match this rhythm and tone, never the polished-blog tone of typical AI output:
+    `HUMAN-VOICE EXAMPLE - match this rhythm and tone, never the polished-blog tone of typical AI output:
 
 """
 Most people overthink content. They sit down, stare at the doc, and try to write something smart. That's the trap. Smart sounds like school. School doesn't sell.

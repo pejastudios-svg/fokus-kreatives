@@ -160,7 +160,7 @@ export function TaskCustomFields({ taskId }: Props) {
             <select
               value={draftType}
               onChange={(e) => setDraftType(e.target.value as FieldType)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {TYPE_OPTIONS.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -171,7 +171,7 @@ export function TaskCustomFields({ taskId }: Props) {
             <select
               value={draftRole}
               onChange={(e) => setDraftRole(e.target.value as FieldRole)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -362,7 +362,7 @@ function FieldRow({
         </div>
       )}
 
-      {/* Pairing — only available when role is captions/thumbnail/cover. */}
+      {/* Pairing - only available when role is captions/thumbnail/cover. */}
       {canPair && (
         <div className="flex items-center gap-2 pt-1">
           <Link2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
@@ -372,7 +372,7 @@ function FieldRow({
             onChange={(e) =>
               onUpdate({ parent_field_id: e.target.value || null })
             }
-            className="flex-1 pl-2 pr-7 py-1 rounded border border-[var(--border-primary)] bg-[var(--bg-card)] text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="flex-1 pl-2 pr-7 py-1 rounded border border-[var(--border-primary)] bg-[var(--bg-input)] text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           >
             <option value="">Not paired</option>
             {pairTargets.map((t) => (

@@ -19,7 +19,7 @@ export type TaskAuthErr = { ok: false; status: number; error: string }
 
 /**
  * Verifies the current session and resolves the role + accessible client IDs.
- * Use this at the top of every /api/tasks/* route — it returns either an
+ * Use this at the top of every /api/tasks/* route - it returns either an
  * authorized context to use with `taskAdmin`, or an error to return directly.
  */
 export async function authorizeTaskRequest(): Promise<TaskAuthOk | TaskAuthErr> {

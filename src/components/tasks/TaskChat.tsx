@@ -186,7 +186,7 @@ export function TaskChat({ taskId, members }: Props) {
         setDraft('')
         setMentionState(null)
         // Realtime subscription will push the new message in; if it's already
-        // there from the optimistic side, that's fine — we dedupe by id.
+        // there from the optimistic side, that's fine - we dedupe by id.
         setMessages((prev) =>
           prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message],
         )

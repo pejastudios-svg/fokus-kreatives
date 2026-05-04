@@ -163,7 +163,7 @@ export interface LeadsReportProps extends LeadsReportBodyProps {
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleDateString(undefined, {
       month: 'short',
@@ -171,7 +171,7 @@ function fmtDate(iso: string | null): string {
       year: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -310,7 +310,7 @@ export function LeadsReportBody({
               <View key={idx} style={styles.tableRow} wrap={false}>
                 <Text style={[styles.tableCell, styles.colName]}>{r.name}</Text>
                 <Text style={[styles.tableCell, styles.colEmail]}>
-                  {r.email || '—'}
+                  {r.email || '-'}
                 </Text>
                 <View style={styles.colStatus}>
                   {s ? (

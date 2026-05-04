@@ -158,7 +158,9 @@ export function ClientAssignees({ clientId }: Props) {
         {notice && (
           <div
             className={`mb-3 p-2 rounded-md text-sm ${
-              notice.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              notice.type === 'success'
+                ? 'bg-[#2B79F7]/10 text-[#2B79F7] dark:text-[#93C5FD]'
+                : 'bg-red-500/10 text-red-500'
             }`}
           >
             {notice.message}
@@ -199,7 +201,11 @@ export function ClientAssignees({ clientId }: Props) {
                     disabled={!canEdit}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left ${
                       isSelected
-                        ? 'border-[#2B79F7] bg-[#E8F1FF]'
+                        ? // Light = pale blue tint with blue border.
+                          // Dark = subtle 15% blue tint - readable text
+                          // instead of the near-white wash that made the
+                          // selected rows unreadable on dark surfaces.
+                          'border-[#2B79F7] bg-[#E8F1FF] dark:bg-[#2B79F7]/15'
                         : 'border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]'
                     } ${canEdit ? '' : 'cursor-default opacity-90'}`}
                   >

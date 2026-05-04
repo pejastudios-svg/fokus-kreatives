@@ -7,7 +7,7 @@ export const reviewAdmin = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-// 30 days — long enough that a returning client doesn't need to re-enter
+// 30 days - long enough that a returning client doesn't need to re-enter
 // their email on every visit. Cookie is HttpOnly so it can't be exfiltrated
 // from JS, and the row in `review_sessions` is the source of truth (we can
 // expire it server-side at any time).

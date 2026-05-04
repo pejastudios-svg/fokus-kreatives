@@ -8,7 +8,7 @@ type Phase = 'idle' | 'saving' | 'saved'
 /**
  * Tiny inline save status. Shows the Save icon while `isSaving` is true,
  * cross-fades to a Check icon for ~1.2s after a save completes, then
- * fades away. Pure visual feedback — no layout cost when idle.
+ * fades away. Pure visual feedback - no layout cost when idle.
  */
 export function SaveIndicator({ isSaving }: { isSaving: boolean }) {
   const [phase, setPhase] = useState<Phase>('idle')

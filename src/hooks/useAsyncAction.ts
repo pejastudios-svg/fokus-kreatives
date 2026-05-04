@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 
 /**
  * Wrap an async handler so it can't run concurrently. While the previous call
- * is still in flight, subsequent invocations are dropped — no double-submits,
+ * is still in flight, subsequent invocations are dropped - no double-submits,
  * no double-charges, no popping the same modal twice.
  *
  *   const { run: handleCreate, isRunning: isCreating } = useAsyncAction(
@@ -26,7 +26,7 @@ export function useAsyncAction<TArgs extends unknown[], TResult>(
   isRunning: boolean
 } {
   const [isRunning, setIsRunning] = useState(false)
-  // Ref + state. The ref is the source of truth used by the guard below — state
+  // Ref + state. The ref is the source of truth used by the guard below - state
   // updates are async and would let two near-simultaneous calls slip through.
   const inFlightRef = useRef(false)
 

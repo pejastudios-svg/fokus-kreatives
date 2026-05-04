@@ -137,7 +137,7 @@ function fmtDateTime(iso: string): string {
       minute: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -149,7 +149,7 @@ function fmtDate(iso: string): string {
       year: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -250,13 +250,13 @@ export function CaptureReportBody({
           {submissions.map((s, idx) => (
             <View key={idx} style={styles.tableRow} wrap={false}>
               <Text style={[styles.tableCell, styles.colSubName]}>
-                {s.name || '—'}
+                {s.name || '-'}
               </Text>
               <Text style={[styles.tableCell, styles.colSubEmail]}>
-                {s.email || '—'}
+                {s.email || '-'}
               </Text>
               <Text style={[styles.tableCell, styles.colSubPhone]}>
-                {s.phone || '—'}
+                {s.phone || '-'}
               </Text>
               <Text
                 style={[

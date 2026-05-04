@@ -335,7 +335,7 @@ export function SeriesFormEngine() {
           </div>
           <p className="text-[11px] text-theme-tertiary mt-0.5">
             Build a per-entry intake form for a multi-day series. The client fills it out, then
-            you build one external prompt anchored to their actual answers — no AI invention.
+            you build one external prompt anchored to their actual answers - no AI invention.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -714,7 +714,7 @@ export function SeriesFormEngine() {
               <div>
                 <h3 className="text-sm font-semibold text-theme-primary">External Prompt</h3>
                 <p className="text-[11px] text-theme-tertiary mt-0.5">
-                  One copy, one paste. The client&rsquo;s actual answers are baked in — the
+                  One copy, one paste. The client&rsquo;s actual answers are baked in - the
                   external AI builds each entry from their words, not from inference.
                 </p>
               </div>

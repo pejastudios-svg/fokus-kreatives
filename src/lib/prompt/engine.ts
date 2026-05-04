@@ -25,15 +25,15 @@ export interface BuiltPrompt {
 }
 
 const HARD_BANS = [
-  // Em-dash and en-dash — convert to commas via the repair regex; if any
+  // Em-dash and en-dash - convert to commas via the repair regex; if any
   // survive the repair pass we want them surgically stripped. NOTE: this
   // entry MUST NOT be a plain hyphen ("-"), or surgicalBanRemoval will
   // delete every sentence that uses a compound modifier ("5-part intro",
   // "lead-generating machine", etc.).
-  '—',
+  '-',
   '–',
   // Rhetorical-fragment-question transitions. These read as conversational
-  // but every AI uses them now — they're the new "Here's the thing".
+  // but every AI uses them now - they're the new "Here's the thing".
   'and the result?',
   'the result?',
   'the kicker?',
@@ -51,7 +51,7 @@ const HARD_BANS = [
   'and here\'s the best part',
   "here's the best part",
   // Standalone "honestly?" / "honestly," as a vocal-tic transition (the word
-  // inside a real sentence — "I was honestly surprised" — is fine).
+  // inside a real sentence - "I was honestly surprised" - is fine).
   'honestly?',
   'honestly,',
   'look,',
@@ -96,17 +96,17 @@ const HARD_BANS = [
   'here is what actually works',
   "here's what really works",
   'here is what really works',
-  // "Here's the thing" — the OG of this whole family.
+  // "Here's the thing" - the OG of this whole family.
   "here's the thing",
   'here is the thing',
 ]
 
 const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   // Em dash / en dash (spaced or unspaced) becomes a comma break. The regex
-  // MUST NOT match plain hyphens — earlier versions did and corrupted every
+  // MUST NOT match plain hyphens - earlier versions did and corrupted every
   // compound modifier in the output ("5-part" → "5, part", "lead-generating"
   // → "lead, generating", "RE-HOOK" → "RE, HOOK", etc.).
-  { re: /\s*[—–]\s*/g, replace: ', ' },
+  { re: /\s*[-–]\s*/g, replace: ', ' },
   // "X is not Y. It's Z." / "X isn't Y. It's Z." → drop the negation clause, keep the positive claim
   { re: /\b(\w[\w\s]{0,30})\s+is\s+not\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
   { re: /\b(\w[\w\s]{0,30})\s+isn['’]t\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
@@ -194,7 +194,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\b(stare|staring)\s+at\s+(a\s+)?blank\s+(page|screen)\b/gi, replace: 'stuck on the first line' },
   { re: /\b(blank)\s+(page|screen)\b/gi, replace: 'empty draft' },
 
-  // "you're not (just) X; you're Y" / "I'm not X, I'm Y" — contracted-be
+  // "you're not (just) X; you're Y" / "I'm not X, I'm Y" - contracted-be
   // negation pivot. Not covered by the do/does/don't catcher above.
   { re: /\b(I|we|you|they|he|she|it)['’]?(?:m|re|s)?\s+not(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:I|we|you|they|he|she|it)['’]?(?:m|re|s)?\s+/gi, replace: '$1 ' },
 
@@ -203,7 +203,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\s*[""]\s*[""]\s*/g, replace: ' ' },
   { re: /\s*"\s*"\s*/g, replace: ' ' },
 
-  // Declarative sentence accidentally ending with a question mark — model
+  // Declarative sentence accidentally ending with a question mark - model
   // tic where it ends statements like "...without the burnout?" or
   // "...cuts through the noise?". The allowlist below covers anything that
   // could legitimately start a question, including imperative-style verbs
@@ -211,7 +211,7 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   // "feel"). If the sentence opens with one of those, leave the '?' alone.
   { re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so|want|need|got|ready|tell|let|try|think|ever|feel|been|fancy|wanna|gonna|sure|guess|wonder|see|know|remember|notice|imagine)\b)([A-Z][^?.!]{8,200}?)\?/gi, replace: '$1$2.' },
 
-  // Common paired-adjective AI stacks — strip the redundant adjective.
+  // Common paired-adjective AI stacks - strip the redundant adjective.
   // Conservative: only the highest-frequency offenders so we don't eat
   // legitimate phrasing.
   { re: /\bconsistent,\s+engaging\b/gi, replace: 'consistent' },
@@ -464,13 +464,13 @@ Beat order - HOOK → REHOOK → CONNECT → COMMON ENEMY (shown, not labeled) �
 This is a SILENT video format. NO voiceover, NO narration, NO spoken script. Every line you write is overlay text the viewer READS on the screen. The visual is the creator on camera (or B-roll) with text overlays appearing/disappearing in sync with their movement.
 - Every beat is a TEXT OVERLAY, not a spoken line. Write punchy, screen-readable lines, not sentences a creator would speak aloud. Think Instagram caption length, not voiceover script.
 - No "voiceover:" labels, no "(narration)" notes, no "say this:" prefixes. The output IS the text overlays, period.
-Beat order — TRIGGER → CONTEXT (1 short overlay) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT (the answer/teaser they'll see if they engage) → CTA.
+Beat order - TRIGGER → CONTEXT (1 short overlay) → BAIT (yes/no, A/B, or ranked opinion) → ON-SCREEN TEXT (the answer/teaser they'll see if they engage) → CTA.
 - TRIGGER: 5–10 words, pattern interrupt that makes them stop scrolling.
 - CONTEXT: 1 short overlay, 8–14 words. Sets up the bait.
 - BAIT: a question answerable in the comments in under 5 words. Take a clear, slightly polarizing stance grounded in the client context.
 - ON-SCREEN TEXT: the framework name, payoff line, or hidden answer that ties it all together. 3–8 words.
 - CTA: the comment-bait or follow line. 4–10 words.
-- COHERENCE RULE: TRIGGER, CONTEXT, and BAIT must all be about the SAME specific thing. The trigger introduces the angle, the context narrows it, and the bait asks a question that resolves the same tension. Never pivot from one topic in TRIGGER to a different question in BAIT — readers feel the disconnect immediately.
+- COHERENCE RULE: TRIGGER, CONTEXT, and BAIT must all be about the SAME specific thing. The trigger introduces the angle, the context narrows it, and the bait asks a question that resolves the same tension. Never pivot from one topic in TRIGGER to a different question in BAIT - readers feel the disconnect immediately.
 - Bad: TRIGGER = "I used to make content the dumbest way" → BAIT = "Do you give your best tip first or second?" The trigger is about content failure, the bait is about tip ordering. Disconnected.
 - Good: TRIGGER = "Best tip first kills your retention" → CONTEXT = "Order matters more than the tips themselves" → BAIT = "Best tip first or second?" Same thread the whole way through.`
     case 'carousel':
@@ -655,20 +655,20 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
 - NEVER place a [SECTION_TAG] inline at the end of a paragraph (e.g. "...understood. [CTA]"). Tags are headers, not punctuation.
 - Each tag appears EXACTLY ONCE per script. Do not write [CTA] inside [PAYOFF] and again at the bottom.`,
     `VOICE RULES (non-negotiable):
-- No em-dashes (—) or en-dashes (–). Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple) ARE allowed.
+- No em-dashes (-) or en-dashes (–). Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple) ARE allowed.
 - ABSOLUTELY no "<subject> isn't X, it's Y" / "you're not just X, you're Y" / "it's not about X, but Y" pivots. State the positive claim directly. Single biggest AI tell.
 - No rhetorical fragment-questions used as transitions: "The result?", "The kicker?", "The catch?", "The truth?", "Plot twist?", "Spoiler:", "Here's the thing,", "Honestly?", "Look,". Just say the next sentence.
 - No "here's the truth" / "here's the wild truth" / "here's the secret" / "here's what actually works" family.
 - No "and the result?", "and the best part?", "what if I told you", "you read that right", "in this video".
 - Speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, kill it.
 - Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because.
-- Vary length violently — a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
+- Vary length violently - a 3-word sentence next to a 22-word one. Never write three sentences in a row of the same length.
 - No paired or tripled adjectives. "consistent, engaging content" → "consistent content". Pick ONE.
 - Don't justify every claim. Make the point and move on; don't add "and that's why this matters".
 - Don't bridge paragraphs with "Now," / "So," / "Moving on," / "Let's break it down,". Just start the next idea.
 - No choppy fragment stacking ("Hours back. Energy saved. Freedom unlocked."). One fragment is fine; three in a row reads as AI.
 - Don't reuse the same transitional phrase twice in one script.`,
-    `HUMAN-VOICE EXAMPLE — match this rhythm. Never the polished-blog tone of typical AI output:
+    `HUMAN-VOICE EXAMPLE - match this rhythm. Never the polished-blog tone of typical AI output:
 
 """
 Most people overthink this. They sit down, stare at the doc, and try to sound smart. That's the trap. Smart sounds like school. School doesn't sell.
@@ -902,8 +902,8 @@ export function ensureCtaVerbatim(output: string, cta?: string): string {
 
 /**
  * Collapse repeated `[CTA]\n<text>\n` blocks down to a single occurrence.
- * Pro sometimes writes the [CTA] section twice — once inline at the end of
- * the body and once as a standalone label — and we don't want both in the
+ * Pro sometimes writes the [CTA] section twice - once inline at the end of
+ * the body and once as a standalone label - and we don't want both in the
  * final output.
  */
 function dedupeCtaSection(text: string): string {

@@ -188,7 +188,7 @@ function fmtMoney(n: number, currency: string): string {
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleDateString(undefined, {
       month: 'short',
@@ -196,7 +196,7 @@ function fmtDate(iso: string | null): string {
       year: '2-digit',
     })
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -352,7 +352,7 @@ export function RevenueReportBody({
             return (
               <View key={idx} style={styles.tableRow} wrap={false}>
                 <Text style={[styles.tableCell, styles.colInv]}>
-                  {r.invoiceNumber || '—'}
+                  {r.invoiceNumber || '-'}
                 </Text>
                 <Text style={[styles.tableCell, styles.colCust]}>
                   {r.customer}

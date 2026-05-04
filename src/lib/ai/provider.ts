@@ -46,7 +46,7 @@ function resolveProvider(): ScriptProvider {
 
 function resolveGeminiModel(quality: Quality): string {
   if (quality === 'high') {
-    // Longform — quality matters. Pro by default, but allow override and a
+    // Longform - quality matters. Pro by default, but allow override and a
     // safe fall-back to whatever GEMINI_MODEL_MAIN is set to (so a user who
     // only configured one model still works).
     return (

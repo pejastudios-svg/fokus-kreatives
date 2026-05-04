@@ -231,7 +231,7 @@ OUTPUT FORMAT:
 [LENGTH]  - approx seconds
 [PACING]  - slow-build | fast-cut | reflective | punchy
 [SCENES]  - 1–4 scenes
-  Scene 1 (0–X sec): On-screen text only. Write only the overlay line(s) — no voiceover, no narration.
+  Scene 1 (0–X sec): On-screen text only. Write only the overlay line(s) - no voiceover, no narration.
   Scene 2 (X–Y sec): ...
   ...
 [CAPTION]  - 60–120 words, TEACHES the takeaway (does not describe the reel), ends with a question
