@@ -14,7 +14,12 @@ import {
   CheckCircle,
   XCircle,
   X,
+  Trash2,
+  FileDown,
 } from 'lucide-react'
+import { KebabMenu } from '@/components/ui/KebabMenu'
+import { useCrmRole } from '@/components/crm/CrmRoleContext'
+import type { MeetingsReportRow } from '@/components/reports/MeetingsReport'
 
 type Status = 'scheduled' | 'completed' | 'cancelled'
 type LocationType = 'zoom' | 'google_meet' | 'jitsi' | 'custom'
@@ -126,6 +131,90 @@ export default function CRMMeetingsPage() {
     }
     return true
   })
+
+  // ---- PDF export -------------------------------------------------------
+
+  const { workspaceName } = useCrmRole()
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportPdf = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const [{ pdf }, { MeetingsReport }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reports/MeetingsReport'),
+      ])
+
+      const now = Date.now()
+      const weekMs = 7 * 24 * 60 * 60 * 1000
+      let upcoming = 0
+      let past = 0
+      let thisWeek = 0
+      const byStatus = { scheduled: 0, completed: 0, cancelled: 0 }
+      for (const m of filteredMeetings) {
+        const t = new Date(m.date_time).getTime()
+        if (t >= now) upcoming++
+        else past++
+        if (Math.abs(t - now) <= weekMs) thisWeek++
+        byStatus[m.status]++
+      }
+
+      // Sort chronologically (most recent / soonest first depending on tab).
+      const sorted = [...filteredMeetings].sort((a, b) => {
+        if (statusFilter === 'past') {
+          return new Date(b.date_time).getTime() - new Date(a.date_time).getTime()
+        }
+        return new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
+      })
+
+      const rows: MeetingsReportRow[] = sorted.map((m) => ({
+        title: m.title,
+        dateIso: m.date_time,
+        durationMinutes: m.duration_minutes,
+        locationType: m.location_type,
+        status: m.status,
+      }))
+
+      const filters: string[] = [
+        statusFilter === 'all'
+          ? 'All meetings'
+          : statusFilter === 'upcoming'
+            ? 'Upcoming only'
+            : 'Past only',
+      ]
+
+      const blob = await pdf(
+        <MeetingsReport
+          workspaceName={workspaceName}
+          filters={filters}
+          metrics={{
+            total: filteredMeetings.length,
+            upcoming,
+            past,
+            thisWeek,
+          }}
+          byStatus={byStatus}
+          rows={rows}
+        />,
+      ).toBlob()
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const stamp = new Date().toISOString().slice(0, 10)
+      a.download = `${workspaceName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-meetings-${stamp}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      console.error('Meetings PDF export failed:', err)
+      alert('Could not generate PDF. Check the console for details.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const handleAddMeeting = async () => {
   if (!title) return
@@ -336,80 +425,97 @@ export default function CRMMeetingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 gap-2">
           <p className="text-xs text-[var(--text-tertiary)] truncate">See and schedule meetings for this client</p>
-          <Button size="sm" onClick={() => setShowAddModal(true)} className="shrink-0">
-            <Plus className="h-4 w-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Add Meeting</span>
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Add Meeting</span>
+            </Button>
+            <KebabMenu
+              items={[
+                {
+                  label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+                  icon: <FileDown className="h-4 w-4" />,
+                  disabled: isExporting,
+                  onClick: handleExportPdf,
+                },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => setStatusFilter('upcoming')}
-            className={`px-3 py-1.5 text-xs rounded-full ${
-              statusFilter === 'upcoming'
-                ? 'bg-[#2B79F7] text-white'
-                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            Upcoming
-          </button>
-          <button
-            onClick={() => setStatusFilter('past')}
-            className={`px-3 py-1.5 text-xs rounded-full ${
-              statusFilter === 'past'
-                ? 'bg-[#2B79F7] text-white'
-                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            Past
-          </button>
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 text-xs rounded-full ${
-              statusFilter === 'all'
-                ? 'bg-[#2B79F7] text-white'
-                : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            All
-          </button>
+        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
+          {(['upcoming', 'past', 'all'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors shrink-0 ${
+                statusFilter === f
+                  ? 'bg-[#2B79F7] text-white'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-primary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
         </div>
-        
 
-        {/* Meetings List */}
+        {/* Meetings List - single card with row dividers (no stack of giant
+            cards). Each row keeps title + meta on the left, status + actions
+            on the right, and collapses cleanly on mobile. */}
         {filteredMeetings.length === 0 ? (
           <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
             <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
-            <p>No meetings found.</p>
+            <p className="text-sm">No meetings found.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden divide-y divide-[var(--border-primary)]">
             {filteredMeetings.map((m) => {
               const dt = new Date(m.date_time)
-              const dateStr = dt.toLocaleDateString()
+              const dateStr = dt.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })
               const timeStr = dt.toLocaleTimeString([], {
-                hour: '2-digit',
+                hour: 'numeric',
                 minute: '2-digit',
               })
 
+              const statusChip =
+                m.status === 'completed' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-500">
+                    <CheckCircle className="h-2.5 w-2.5" />
+                    Done
+                  </span>
+                ) : m.status === 'cancelled' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500">
+                    <XCircle className="h-2.5 w-2.5" />
+                    Cancelled
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#2B79F7]/15 text-[#2B79F7]">
+                    <Clock className="h-2.5 w-2.5" />
+                    Scheduled
+                  </span>
+                )
+
               return (
-                <div
-                  key={m.id}
-                  className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex items-start justify-between gap-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[#2B79F7]">
+                <div key={m.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="p-2 rounded-lg bg-[var(--bg-tertiary)] text-[#2B79F7] shrink-0">
                       <Calendar className="h-4 w-4" />
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                        {m.title}
-                      </h3>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                        <span className="inline-flex items-center gap-1 mr-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                          {m.title}
+                        </h3>
+                        {statusChip}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {dateStr} at {timeStr} ({m.duration_minutes} min)
+                          {dateStr} · {timeStr} · {m.duration_minutes}m
                         </span>
                         {m.location_type !== 'custom' && (
                           <span className="inline-flex items-center gap-1">
@@ -423,90 +529,71 @@ export default function CRMMeetingsPage() {
                         )}
                       </p>
                       {m.description && (
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-2">
                           {m.description}
                         </p>
                       )}
-                      {m.location_url && (
-                        <a
-                          href={m.location_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-[#2B79F7] hover:underline mt-1"
-                        >
-                          <LinkIcon className="h-3 w-3" />
-                          Join link
-                        </a>
-                      )}
-                      {m.creator && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          {m.creator.profile_picture_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={m.creator.profile_picture_url}
-                              alt={m.creator.name || m.creator.email || ''}
-                              className="h-5 w-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="h-5 w-5 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] text-white flex items-center justify-center text-[9px] font-semibold">
-                              {(m.creator.name || m.creator.email || 'U').charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <span className="text-[11px] text-[var(--text-tertiary)]">
-                            Scheduled by {m.creator.name || m.creator.email}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-3 flex-wrap mt-1.5">
+                        {m.location_url && (
+                          <a
+                            href={m.location_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-[#2B79F7] hover:underline"
+                          >
+                            <LinkIcon className="h-3 w-3" />
+                            Join link
+                          </a>
+                        )}
+                        {m.creator && (
+                          <div className="inline-flex items-center gap-1.5">
+                            {m.creator.profile_picture_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={m.creator.profile_picture_url}
+                                alt={m.creator.name || m.creator.email || ''}
+                                className="h-4 w-4 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-4 w-4 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] text-white flex items-center justify-center text-[8px] font-semibold">
+                                {(m.creator.name || m.creator.email || 'U').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="text-[10px] text-[var(--text-tertiary)] truncate">
+                              {m.creator.name || m.creator.email}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    {/* Status */}
-                    {m.status === 'scheduled' && (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-400">
-                        <Clock className="h-3 w-3" />
-                        Scheduled
-                      </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {m.status !== 'completed' && (
+                      <button
+                        onClick={() => handleStatusChange(m.id, 'completed')}
+                        title="Mark done"
+                        className="hidden sm:inline-flex p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-green-500 hover:bg-green-500/10 transition-colors"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
                     )}
-                    {m.status === 'completed' && (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
-                        <CheckCircle className="h-3 w-3" />
-                        Completed
-                      </span>
+                    {m.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleStatusChange(m.id, 'cancelled')}
+                        title="Cancel"
+                        className="hidden sm:inline-flex p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
                     )}
-                    {m.status === 'cancelled' && (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400">
-                        <XCircle className="h-3 w-3" />
-                        Cancelled
-                      </span>
-                    )}
-
-                    {/* Status change buttons */}
-                    <div className="flex items-center gap-1 mt-1">
-                      {m.status !== 'completed' && (
-                        <button
-                          onClick={() => handleStatusChange(m.id, 'completed')}
-                          className="text-xs text-green-400 hover:text-green-300"
-                        >
-                          Mark done
-                        </button>
-                      )}
-                      {m.status !== 'cancelled' && (
-                        <button
-                          onClick={() => handleStatusChange(m.id, 'cancelled')}
-                          className="text-xs text-red-400 hover:text-red-300"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                    {/* NEW: Delete button */}
-<button
-  onClick={() => setMeetingToDelete(m)}
-  className="mt-1 text-xs text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
->
-  Delete
-</button>
+                    <button
+                      onClick={() => setMeetingToDelete(m)}
+                      title="Delete"
+                      className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               )

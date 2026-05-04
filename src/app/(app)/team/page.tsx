@@ -179,6 +179,12 @@ export default function TeamPage() {
       const finalRole: AgencyRole = (currentUserRole === 'admin') ? inviteRole : (inviteRole === 'admin' ? 'employee' : inviteRole)
 
       let token = existingUser?.invitation_token || null
+      // Stamp every fresh agency invite with a 7-day expiration so the
+      // accept route can reject stale links. Without this, invites
+      // never time out and admins can't tell which are still valid.
+      const expiresAt = new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString()
 
       if (existingUser?.id) {
         // Existing user: make them agency user
@@ -193,6 +199,7 @@ export default function TeamPage() {
             role: finalRole,
             is_agency_user: true,
             invitation_token: token,
+            invitation_expires_at: expiresAt,
           })
           .eq('id', existingUser.id)
 
@@ -212,6 +219,7 @@ export default function TeamPage() {
             is_agency_user: true,
             invitation_token: token,
             invitation_accepted: false,
+            invitation_expires_at: expiresAt,
             client_id: null,
           })
 

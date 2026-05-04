@@ -24,8 +24,28 @@ import {
   Settings2,
   Check,
   ExternalLink,
+  FileDown,
+  CheckSquare,
+  ChevronDown,
+  CheckCircle2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Tooltip } from '@/components/ui/Tooltip'
+import { KebabMenu } from '@/components/ui/KebabMenu'
+import { DonutChart, ChartLegend } from '@/components/charts/MiniCharts'
+import {
+  StatusStackedBar,
+  type SeriesDef,
+} from '@/components/charts/StatusCharts'
+import { BucketToggle } from '@/components/charts/BucketToggle'
+import { LeadFilter, type LeadOption } from '@/components/crm/LeadFilter'
+import { useCrmRole } from '@/components/crm/CrmRoleContext'
+import type { LeadsReportRow, LeadsReportStatus } from '@/components/reports/LeadsReport'
+import {
+  bucketize,
+  type BucketMode,
+  type ChartEvent,
+} from '@/lib/charts/bucketize'
 
 // Types
 interface CustomField {
@@ -105,21 +125,26 @@ const fieldTypeConfig: Record<string, { icon: React.ElementType; label: string }
   date: { icon: Calendar, label: 'Date' },
   select: { icon: List, label: 'Select' },
   status: { icon: Tag, label: 'Status' },
+  checkbox: { icon: CheckSquare, label: 'Checkbox' },
 }
 
-// Helper function to safely get options from a field and remove duplicates
+// Helper function to safely get options from a field and remove duplicates.
+// Filters out the URL-label sentinel entry so URL field metadata never
+// shows up as if it were a status option.
 const getFieldOptions = (field: CustomField): StatusOption[] => {
   if (!field.options) return []
-  
-  const validOptions = field.options.filter((opt): opt is StatusOption => 
-    opt !== null && 
-    opt !== undefined && 
+
+  const validOptions = field.options.filter((opt): opt is StatusOption =>
+    opt !== null &&
+    opt !== undefined &&
     typeof opt === 'object' &&
-    'value' in opt && 
-    'label' in opt && 
-    'color' in opt
+    'value' in opt &&
+    'label' in opt &&
+    'color' in opt &&
+    opt.value !== '__url_display_text__' &&
+    opt.value !== '__url_default_url__',
   )
-  
+
   // Remove duplicates by value
   const seen = new Set<string>()
   return validOptions.filter(opt => {
@@ -129,10 +154,69 @@ const getFieldOptions = (field: CustomField): StatusOption[] => {
   })
 }
 
+// Field-level metadata for URL fields - both the display text and a
+// default URL. Stored inside the `options` JSON (otherwise unused for
+// URL fields) using two sentinel entries so we don't need new DB
+// columns. Each lead's per-cell value can still override these.
+//
+// Display fallback chain:
+//   per-cell text → field-level text → field name → generic
+//   per-cell url  → field-level url  → "-" (empty state)
+const URL_LABEL_SENTINEL = '__url_display_text__'
+const URL_DEFAULT_SENTINEL = '__url_default_url__'
+function getFieldUrlLabel(field: CustomField): string {
+  const entry = (field.options || []).find(
+    (o) => o.value === URL_LABEL_SENTINEL,
+  )
+  return entry?.label || ''
+}
+function getFieldUrlDefault(field: CustomField): string {
+  const entry = (field.options || []).find(
+    (o) => o.value === URL_DEFAULT_SENTINEL,
+  )
+  return entry?.label || ''
+}
+function buildUrlMetaOptions(label: string, url: string): StatusOption[] {
+  const out: StatusOption[] = []
+  if (label) out.push({ value: URL_LABEL_SENTINEL, label, color: '' })
+  if (url) out.push({ value: URL_DEFAULT_SENTINEL, label: url, color: '' })
+  return out
+}
+
+// URL field values can be either a plain URL string (legacy / new
+// fields where no display text is set) or a JSON object of the form
+// { url: string, text?: string }. We always serialize to a string so
+// the per-row update path stays unchanged.
+function parseUrlValue(raw: string): { url: string; text: string } {
+  if (!raw) return { url: '', text: '' }
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && typeof parsed.url === 'string') {
+        return {
+          url: parsed.url,
+          text: typeof parsed.text === 'string' ? parsed.text : '',
+        }
+      }
+    } catch {
+      // Not JSON - treat the whole thing as a URL.
+    }
+  }
+  return { url: raw, text: '' }
+}
+function serializeUrlValue(url: string, text: string): string {
+  if (!url) return ''
+  return text ? JSON.stringify({ url, text }) : url
+}
+
 export default function CRMLeads() {
   const params = useParams()
   const clientId = (params?.clientId || params?.clientid) as string
   const supabase = createClient()
+  // Workspace-structure edits (custom fields, status options) are
+  // manager+ only. Employees can still update field VALUES on a lead.
+  const { canEditWorkspace, workspaceName } = useCrmRole()
+  const [isExporting, setIsExporting] = useState(false)
 
   // Data state
   const [fields, setFields] = useState<CustomField[]>([])
@@ -142,17 +226,40 @@ export default function CRMLeads() {
   // View state
   const [view, setView] = useState<'table' | 'board' | 'chart'>('table')
   const [searchQuery, setSearchQuery] = useState('')
+  // Sort + status filter (driven from the kebab menu).
+  const [sortBy, setSortBy] = useState<
+    'manual' | 'newest' | 'oldest' | 'updated' | 'az' | 'za'
+  >('manual')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   
   // Modal state
   const [showAddLead, setShowAddLead] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
-  const [showFieldSettings, setShowFieldSettings] = useState<CustomField | null>(null)
+  // Hold the field ID, not the snapshot - this way the modal always
+  // re-derives `field` from the current fields array, so optimistic
+  // updates (e.g. toggling Display Style) reflect immediately instead
+  // of waiting for the user to close + reopen.
+  const [fieldSettingsId, setFieldSettingsId] = useState<string | null>(null)
+  const showFieldSettings = fieldSettingsId
+    ? fields.find((f) => f.id === fieldSettingsId) || null
+    : null
+  const setShowFieldSettings = (f: CustomField | null) =>
+    setFieldSettingsId(f ? f.id : null)
   const [showLeadDetail, setShowLeadDetail] = useState<Lead | null>(null)
   const [statusDropdown, setStatusDropdown] = useState<{ leadId: string; fieldKey: string } | null>(null)
   
   // Edit state
   const [editingCell, setEditingCell] = useState<{ leadId: string; fieldKey: string } | null>(null)
   const [editValue, setEditValue] = useState('')
+  // Inline-add state: when non-null, the table renders an editable
+  // empty row at the bottom that the user types into directly (no
+  // modal). Null = placeholder "+ Add a lead" row instead.
+  const [inlineDraft, setInlineDraft] = useState<Record<string, string> | null>(null)
+  const inlineFirstInputRef = useRef<HTMLInputElement>(null)
+  // URL fields store a serialized "{url,text}" pair. While editing we
+  // split them into two separate inputs so the user can pick the
+  // display text alongside the URL.
+  const [editUrlText, setEditUrlText] = useState('')
   
   // Pending state for optimistic updates
   const [pendingLeads, setPendingLeads] = useState<Set<string>>(new Set())
@@ -160,14 +267,35 @@ export default function CRMLeads() {
   
   // Form state
     const [newLead, setNewLead] = useState<Record<string, string>>({})
-  const [newField, setNewField] = useState({ name: '', type: 'text', urlDisplayType: 'link' as 'button' | 'link' | 'hyperlink' })
+  const [newField, setNewField] = useState({
+    name: '',
+    type: 'text',
+    urlDisplayType: 'link' as 'button' | 'link' | 'hyperlink',
+    // Field-level display text - used when display style is hyperlink
+    // or button. Empty = fall back to the field name at render time.
+    urlLabel: '',
+    // Field-level default URL - the link every cell points to unless
+    // a per-cell override is set. Empty = no default; cells start blank.
+    urlDefault: '',
+  })
   
   // Drag state
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
+  // Table-view drag-to-reorder state. Separate from the board's
+  // status drag so the two modes don't interfere.
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null)
+  const [dragOverRowId, setDragOverRowId] = useState<string | null>(null)
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
+
+  // Chart-only controls (chart view in this page).
+  const [bucketMode, setBucketMode] = useState<BucketMode>('day')
+  const [chartLeadIds, setChartLeadIds] = useState<string[]>([])
   
   // Refs
   const editInputRef = useRef<HTMLInputElement>(null)
+  const boardScrollRef = useRef<HTMLDivElement | null>(null)
 
   // Define loading functions with useCallback to fix dependency issues
   const createDefaultFields = useCallback(async () => {
@@ -253,12 +381,15 @@ export default function CRMLeads() {
   }, [editingCell])
 
   // Optimistic add lead
-  const handleAddLead = async () => {
+  // Shared lead-insert path. Used by both the modal flow and the
+  // inline-add row. Optimistically prepends a temp row, then swaps in
+  // the persisted one (or rolls back on failure).
+  const createLead = async (rawData: Record<string, string>) => {
     const tempId = `temp-${Date.now()}`
     const leadData = {
-      ...newLead,
-      date_added: newLead.date_added || new Date().toISOString().split('T')[0],
-      status: newLead.status || 'new',
+      ...rawData,
+      date_added: rawData.date_added || new Date().toISOString().split('T')[0],
+      status: rawData.status || 'new',
     }
 
     const tempLead: Lead = {
@@ -268,36 +399,51 @@ export default function CRMLeads() {
       created_at: new Date().toISOString(),
     }
 
-    // Optimistic update
-    setLeads(prev => [...prev, tempLead])
-    setPendingLeads(prev => new Set(prev).add(tempId))
-    setShowAddLead(false)
-    setNewLead({})
+    setLeads((prev) => [...prev, tempLead])
+    setPendingLeads((prev) => new Set(prev).add(tempId))
 
     try {
       const { data, error } = await supabase
         .from('leads')
-        .insert({ 
-          client_id: clientId, 
-          data: leadData, 
-          position: leads.length 
+        .insert({
+          client_id: clientId,
+          data: leadData,
+          position: leads.length,
         })
         .select()
         .single()
 
       if (error) throw error
-
-      setLeads(prev => prev.map(l => l.id === tempId ? data : l))
+      setLeads((prev) => prev.map((l) => (l.id === tempId ? data : l)))
     } catch (err) {
-      console.error('Failed to add field:', err instanceof Error ? err.message : err)
-      setFields(prev => prev.filter(f => f.id !== tempId))
+      console.error('Failed to create lead:', err instanceof Error ? err.message : err)
+      setLeads((prev) => prev.filter((l) => l.id !== tempId))
     } finally {
-      setPendingLeads(prev => {
+      setPendingLeads((prev) => {
         const next = new Set(prev)
         next.delete(tempId)
         return next
       })
     }
+  }
+
+  const handleAddLead = async () => {
+    setShowAddLead(false)
+    const draft = { ...newLead }
+    setNewLead({})
+    await createLead(draft)
+  }
+
+  // Save the inline draft if it has any user input. Called when the
+  // user blurs the row or hits Enter. Empty drafts are dropped silently.
+  const commitInlineDraft = async () => {
+    if (!inlineDraft) return
+    const hasContent = Object.values(inlineDraft).some(
+      (v) => typeof v === 'string' && v.trim().length > 0,
+    )
+    const draft = inlineDraft
+    setInlineDraft(null)
+    if (hasContent) await createLead(draft)
   }
 
   // Optimistic update lead
@@ -352,14 +498,25 @@ export default function CRMLeads() {
 
   // Add field
   const handleAddField = async () => {
+    if (!canEditWorkspace) return
     if (!newField.name.trim()) return
 
     const fieldKey = newField.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     const tempId = `temp-${Date.now()}`
 
-    const defaultOptions = newField.type === 'status' || newField.type === 'select' 
-      ? [{ value: 'option1', label: 'Option 1', color: '#3B82F6' }]
-      : []
+    const defaultOptions =
+      newField.type === 'status' || newField.type === 'select'
+        ? [{ value: 'option1', label: 'Option 1', color: '#3B82F6' }]
+        : newField.type === 'url'
+          ? buildUrlMetaOptions(
+              // Only persist the label when the display style needs it.
+              newField.urlDisplayType === 'hyperlink' ||
+                newField.urlDisplayType === 'button'
+                ? newField.urlLabel.trim()
+                : '',
+              newField.urlDefault.trim(),
+            )
+          : []
 
     const tempField: CustomField = {
       id: tempId,
@@ -376,7 +533,13 @@ export default function CRMLeads() {
     setFields(prev => [...prev, tempField])
     setPendingFields(prev => new Set(prev).add(tempId))
     setShowAddField(false)
-    setNewField({ name: '', type: 'text', urlDisplayType: 'link' })
+    setNewField({
+      name: '',
+      type: 'text',
+      urlDisplayType: 'link',
+      urlLabel: '',
+      urlDefault: '',
+    })
 
     try {
       const { data, error } = await supabase
@@ -386,9 +549,14 @@ export default function CRMLeads() {
           field_name: newField.name,
           field_key: fieldKey,
           field_type: newField.type,
+          // Insert uses the SAME options that the optimistic temp row
+          // had (which already encodes the url label sentinel for
+          // hyperlink/button URL fields).
           options: defaultOptions,
           position: fields.length,
           is_default: false,
+          url_display_type:
+            newField.type === 'url' ? newField.urlDisplayType : null,
         })
         .select()
         .single()
@@ -472,6 +640,7 @@ const handleUpdateField = async (fieldId: string, updates: Partial<CustomField>)
 
   // Delete field
   const handleDeleteField = async (fieldId: string) => {
+    if (!canEditWorkspace) return
     const field = fields.find(f => f.id === fieldId)
     if (!field || field.is_default) return
 
@@ -534,16 +703,30 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     e.stopPropagation()
     if (fieldType === 'status' || fieldType === 'select') {
       setStatusDropdown({ leadId, fieldKey })
+    } else if (fieldType === 'checkbox') {
+      // Checkbox is its own input - the click on the cell shouldn't
+      // open an edit input. The checkbox itself handles the toggle.
+      return
+    } else if (fieldType === 'url') {
+      const parsed = parseUrlValue(value || '')
+      setEditingCell({ leadId, fieldKey })
+      setEditValue(parsed.url)
+      setEditUrlText(parsed.text)
     } else {
       setEditingCell({ leadId, fieldKey })
       setEditValue(value || '')
+      setEditUrlText('')
     }
   }
 
   const handleCellBlur = () => {
-    if (editingCell) {
-      handleUpdateLead(editingCell.leadId, editingCell.fieldKey, editValue)
-    }
+    if (!editingCell) return
+    const field = fields.find((f) => f.field_key === editingCell.fieldKey)
+    const next =
+      field?.field_type === 'url'
+        ? serializeUrlValue(editValue.trim(), editUrlText.trim())
+        : editValue
+    handleUpdateLead(editingCell.leadId, editingCell.fieldKey, next)
   }
 
   const handleCellKeyDown = (e: React.KeyboardEvent) => {
@@ -551,6 +734,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     else if (e.key === 'Escape') {
       setEditingCell(null)
       setEditValue('')
+      setEditUrlText('')
     }
   }
 
@@ -574,14 +758,217 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     setDragOverStatus(null)
   }
 
+  // ---- Table row reorder ------------------------------------------------
+
+  const handleRowDragStart = (e: React.DragEvent, leadId: string) => {
+    setDraggedRowId(leadId)
+    e.dataTransfer.effectAllowed = 'move'
+    // Drag-reorder only takes effect under manual sort - flip to it
+    // automatically so the user's drop sticks instead of being
+    // immediately overridden by date / name sorting.
+    if (sortBy !== 'manual') setSortBy('manual')
+  }
+  const handleRowDragOver = (e: React.DragEvent, leadId: string) => {
+    if (!draggedRowId || draggedRowId === leadId) return
+    e.preventDefault()
+    setDragOverRowId(leadId)
+  }
+  const handleRowDrop = async (e: React.DragEvent, targetLeadId: string) => {
+    e.preventDefault()
+    if (!draggedRowId || draggedRowId === targetLeadId) {
+      setDraggedRowId(null)
+      setDragOverRowId(null)
+      return
+    }
+    // Reorder the in-memory array and recompute positions. We send
+    // updates only for the rows whose position changed (the contiguous
+    // range between source and target) - the rest stay put.
+    const ordered = [...leads].sort((a, b) => a.position - b.position)
+    const fromIdx = ordered.findIndex((l) => l.id === draggedRowId)
+    const toIdx = ordered.findIndex((l) => l.id === targetLeadId)
+    if (fromIdx < 0 || toIdx < 0) {
+      setDraggedRowId(null)
+      setDragOverRowId(null)
+      return
+    }
+    const [moved] = ordered.splice(fromIdx, 1)
+    ordered.splice(toIdx, 0, moved)
+    const reindexed = ordered.map((l, i) => ({ ...l, position: i }))
+    setLeads(reindexed)
+    setDraggedRowId(null)
+    setDragOverRowId(null)
+    // Persist only the ones whose position actually changed.
+    const changed = reindexed.filter((l) => {
+      const prior = leads.find((p) => p.id === l.id)
+      return prior && prior.position !== l.position
+    })
+    try {
+      await Promise.all(
+        changed.map((l) =>
+          supabase
+            .from('leads')
+            .update({ position: l.position })
+            .eq('id', l.id),
+        ),
+      )
+    } catch (err) {
+      console.error('Reorder leads failed:', err)
+    }
+  }
+
+  // ---- Table column reorder ---------------------------------------------
+
+  const handleColumnDragStart = (e: React.DragEvent, fieldId: string) => {
+    if (!canEditWorkspace) return
+    setDraggedColumnId(fieldId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const handleColumnDragOver = (e: React.DragEvent, fieldId: string) => {
+    if (!draggedColumnId || draggedColumnId === fieldId) return
+    e.preventDefault()
+    setDragOverColumnId(fieldId)
+  }
+  const handleColumnDrop = async (e: React.DragEvent, targetFieldId: string) => {
+    e.preventDefault()
+    if (!draggedColumnId || draggedColumnId === targetFieldId) {
+      setDraggedColumnId(null)
+      setDragOverColumnId(null)
+      return
+    }
+    const ordered = [...fields].sort((a, b) => a.position - b.position)
+    const fromIdx = ordered.findIndex((f) => f.id === draggedColumnId)
+    const toIdx = ordered.findIndex((f) => f.id === targetFieldId)
+    if (fromIdx < 0 || toIdx < 0) {
+      setDraggedColumnId(null)
+      setDragOverColumnId(null)
+      return
+    }
+    const [moved] = ordered.splice(fromIdx, 1)
+    ordered.splice(toIdx, 0, moved)
+    const reindexed = ordered.map((f, i) => ({ ...f, position: i }))
+    setFields(reindexed)
+    setDraggedColumnId(null)
+    setDragOverColumnId(null)
+    const changed = reindexed.filter((f) => {
+      const prior = fields.find((p) => p.id === f.id)
+      return prior && prior.position !== f.position
+    })
+    try {
+      await Promise.all(
+        changed.map((f) =>
+          supabase
+            .from('custom_fields')
+            .update({ position: f.position })
+            .eq('id', f.id),
+        ),
+      )
+    } catch (err) {
+      console.error('Reorder columns failed:', err)
+    }
+  }
+
+  // While a lead is being dragged across the board, auto-scroll the
+  // horizontal container when the cursor approaches its left/right
+  // edge. Without this, dropping past the visible columns would
+  // require manual scrolling first - which breaks the drag.
+  useEffect(() => {
+    if (!draggedLead) return
+    const container = boardScrollRef.current
+    if (!container) return
+
+    const EDGE_PX = 80
+    const MAX_SPEED = 18 // px per frame at the very edge
+    let dir = 0
+    let intensity = 0 // 0 to 1, ramps up as cursor gets closer to edge
+    let raf = 0
+
+    const onDragOver = (e: DragEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX
+      const leftDist = x - rect.left
+      const rightDist = rect.right - x
+      if (leftDist < EDGE_PX && leftDist >= 0) {
+        dir = -1
+        intensity = 1 - leftDist / EDGE_PX
+      } else if (rightDist < EDGE_PX && rightDist >= 0) {
+        dir = 1
+        intensity = 1 - rightDist / EDGE_PX
+      } else {
+        dir = 0
+      }
+    }
+
+    const tick = () => {
+      if (dir !== 0) {
+        container.scrollLeft += dir * MAX_SPEED * intensity
+      }
+      raf = requestAnimationFrame(tick)
+    }
+
+    document.addEventListener('dragover', onDragOver)
+    raf = requestAnimationFrame(tick)
+    return () => {
+      document.removeEventListener('dragover', onDragOver)
+      cancelAnimationFrame(raf)
+    }
+  }, [draggedLead])
+
   // Filter leads by search query
-  const filteredLeads = leads.filter(lead => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return Object.values(lead.data || {}).some(v => 
-      v !== null && v !== undefined && String(v).toLowerCase().includes(query)
-    )
-  })
+  const filteredLeads = (() => {
+    const query = searchQuery.toLowerCase().trim()
+    const base = leads.filter((lead) => {
+      if (statusFilter !== 'all') {
+        const status = (lead.data as { status?: unknown } | null)?.status
+        if (typeof status !== 'string' || status !== statusFilter) return false
+      }
+      if (query) {
+        const matches = Object.values(lead.data || {}).some(
+          (v) =>
+            v !== null &&
+            v !== undefined &&
+            String(v).toLowerCase().includes(query),
+        )
+        if (!matches) return false
+      }
+      return true
+    })
+
+    const nameOf = (l: Lead) => {
+      const d = (l.data || {}) as Record<string, unknown>
+      const n =
+        (typeof d.name === 'string' && d.name) ||
+        (typeof d.email === 'string' && d.email) ||
+        ''
+      return n.toLowerCase()
+    }
+    const created = (l: Lead) => new Date(l.created_at).getTime()
+    const updated = (l: Lead) =>
+      new Date(l.updated_at || l.created_at).getTime()
+
+    const sorted = [...base]
+    switch (sortBy) {
+      case 'manual':
+        // Manual order = whatever the user dragged the rows into.
+        sorted.sort((a, b) => a.position - b.position)
+        break
+      case 'newest':
+        sorted.sort((a, b) => created(b) - created(a))
+        break
+      case 'oldest':
+        sorted.sort((a, b) => created(a) - created(b))
+        break
+      case 'updated':
+        sorted.sort((a, b) => updated(b) - updated(a))
+        break
+      case 'az':
+        sorted.sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
+        break
+      case 'za':
+        sorted.sort((a, b) => nameOf(b).localeCompare(nameOf(a)))
+        break
+    }
+    return sorted
+  })()
 
   // Get status field and its options safely
   const statusField = fields.find(f => f.field_type === 'status')
@@ -592,6 +979,134 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
     ...status,
     count: filteredLeads.filter(l => l.data?.status === status.value).length,
   }))
+
+  // ---- PDF export -------------------------------------------------------
+
+  const handleExportPdf = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const [{ pdf }, { LeadsReport }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reports/LeadsReport'),
+      ])
+
+      const knownStatuses = new Set(statusOptions.map((s) => s.value))
+      const closedKeys = statusOptions
+        .filter((s) =>
+          ['closed', 'won', 'paid'].some((c) =>
+            s.value.toLowerCase().includes(c),
+          ),
+        )
+        .map((s) => s.value)
+      const closedSet = new Set(closedKeys)
+
+      // Per-status counts within the current filtered view.
+      const counts = new Map<string, number>()
+      let unsetCount = 0
+      let closed = 0
+      for (const l of filteredLeads) {
+        const raw = (l.data as { status?: unknown } | null)?.status
+        const sk =
+          typeof raw === 'string' && raw && knownStatuses.has(raw)
+            ? raw
+            : null
+        if (sk == null) {
+          unsetCount++
+        } else {
+          counts.set(sk, (counts.get(sk) || 0) + 1)
+          if (closedSet.has(sk)) closed++
+        }
+      }
+
+      const byStatus: LeadsReportStatus[] = statusOptions
+        .map((s) => ({
+          value: s.value,
+          label: s.label,
+          color: s.color,
+          count: counts.get(s.value) || 0,
+        }))
+        .filter((s) => s.count > 0)
+
+      const total = filteredLeads.length
+      const conversionPct = total === 0 ? 0 : Math.round((closed / total) * 100)
+
+      // Period split for the week-over-week delta - uses the unfiltered
+      // leads list so the trend reflects the workspace, not the
+      // currently-typed search.
+      const weekMs = 7 * 24 * 60 * 60 * 1000
+      const now = Date.now()
+      const newThisWeek = leads.filter(
+        (l) => new Date(l.created_at).getTime() >= now - weekMs,
+      ).length
+      const newPriorWeek = leads.filter((l) => {
+        const t = new Date(l.created_at).getTime()
+        return t < now - weekMs && t >= now - 2 * weekMs
+      }).length
+      const weekDelta =
+        newPriorWeek === 0
+          ? newThisWeek === 0
+            ? 0
+            : 100
+          : Math.round(((newThisWeek - newPriorWeek) / newPriorWeek) * 100)
+
+      const rows: LeadsReportRow[] = filteredLeads.map((l) => {
+        const data = (l.data || {}) as Record<string, unknown>
+        const name =
+          (typeof data.name === 'string' && data.name) ||
+          (typeof data.email === 'string' && data.email) ||
+          'Unnamed lead'
+        const email = typeof data.email === 'string' ? data.email : null
+        const raw = data.status
+        const sk =
+          typeof raw === 'string' && raw && knownStatuses.has(raw)
+            ? raw
+            : null
+        return {
+          name,
+          email,
+          statusValue: sk,
+          createdDate: l.created_at,
+          updatedDate: l.updated_at || null,
+        }
+      })
+
+      const filters: string[] = []
+      if (searchQuery.trim()) filters.push(`Search: "${searchQuery.trim()}"`)
+
+      const blob = await pdf(
+        <LeadsReport
+          workspaceName={workspaceName}
+          filters={filters}
+          metrics={{
+            total,
+            thisWeek: newThisWeek,
+            weekDelta,
+            closed,
+            conversionPct,
+          }}
+          byStatus={byStatus}
+          unsetCount={unsetCount}
+          rows={rows}
+        />,
+      ).toBlob()
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const stamp = new Date().toISOString().slice(0, 10)
+      a.download = `${workspaceName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-leads-${stamp}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      console.error('Leads PDF export failed:', err)
+      alert('Could not generate PDF. Check the console for details.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   function LeadsSkeleton() {
   return (
@@ -638,10 +1153,6 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         <div className="mb-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-[var(--text-tertiary)]">{leads.length} total leads</p>
-            <Button size="sm" onClick={() => setShowAddLead(true)} className="bg-[#2B79F7] hover:bg-[#1E54B7] sm:hidden">
-              <Plus className="h-4 w-4" />
-              <span className="ml-1.5">Add</span>
-            </Button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -653,52 +1164,116 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 placeholder="Search leads..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 sm:py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
+                className="w-full pl-10 pr-3 py-2 sm:py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent transition-all"
               />
             </div>
 
-            {/* View Toggle */}
+            {/* View Toggle - icons with on-hover tooltip labels */}
             <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)] shrink-0">
-              <button
-                onClick={() => setView('table')}
-                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
-                  view === 'table'
-                    ? 'bg-[#2B79F7] text-white shadow-lg'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
-                }`}
-                title="Table View"
-              >
-                <Table2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setView('board')}
-                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
-                  view === 'board'
-                    ? 'bg-[#2B79F7] text-white shadow-lg'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
-                }`}
-                title="Board View"
-              >
-                <Kanban className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setView('chart')}
-                className={`p-2 sm:p-2.5 rounded-lg transition-all ${
-                  view === 'chart'
-                    ? 'bg-[#2B79F7] text-white shadow-lg'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
-                }`}
-                title="Chart View"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </button>
+              <Tooltip content="Table view" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setView('table')}
+                  aria-label="Table view"
+                  className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                    view === 'table'
+                      ? 'bg-[#2B79F7] text-white shadow-lg'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                  }`}
+                >
+                  <Table2 className="h-4 w-4" />
+                </button>
+              </Tooltip>
+              <Tooltip content="Board view" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setView('board')}
+                  aria-label="Board view"
+                  className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                    view === 'board'
+                      ? 'bg-[#2B79F7] text-white shadow-lg'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                  }`}
+                >
+                  <Kanban className="h-4 w-4" />
+                </button>
+              </Tooltip>
+              <Tooltip content="Chart view" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setView('chart')}
+                  aria-label="Chart view"
+                  className={`p-2 sm:p-2.5 rounded-lg transition-all ${
+                    view === 'chart'
+                      ? 'bg-[#2B79F7] text-white shadow-lg'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                  }`}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </button>
+              </Tooltip>
             </div>
 
-            {/* Add Lead - desktop */}
-            <Button size="sm" onClick={() => setShowAddLead(true)} className="hidden sm:inline-flex bg-[#2B79F7] hover:bg-[#1E54B7] shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" />
-              Add Lead
-            </Button>
+            <KebabMenu
+              items={[
+                { type: 'section', label: 'Actions' },
+                {
+                  label: 'Add lead…',
+                  icon: <Plus className="h-4 w-4" />,
+                  hint: 'Open the form modal',
+                  onClick: () => setShowAddLead(true),
+                },
+                {
+                  label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+                  icon: <FileDown className="h-4 w-4" />,
+                  disabled: isExporting,
+                  onClick: handleExportPdf,
+                },
+                { type: 'section', label: 'Sort by' },
+                {
+                  label: 'Manual order',
+                  hint: 'Drag rows to reorder',
+                  active: sortBy === 'manual',
+                  onClick: () => setSortBy('manual'),
+                },
+                {
+                  label: 'Newest first',
+                  active: sortBy === 'newest',
+                  onClick: () => setSortBy('newest'),
+                },
+                {
+                  label: 'Oldest first',
+                  active: sortBy === 'oldest',
+                  onClick: () => setSortBy('oldest'),
+                },
+                {
+                  label: 'Recently updated',
+                  active: sortBy === 'updated',
+                  onClick: () => setSortBy('updated'),
+                },
+                {
+                  label: 'Name A → Z',
+                  active: sortBy === 'az',
+                  onClick: () => setSortBy('az'),
+                },
+                {
+                  label: 'Name Z → A',
+                  active: sortBy === 'za',
+                  onClick: () => setSortBy('za'),
+                },
+                { type: 'section', label: 'Filter by status' },
+                {
+                  label: 'All statuses',
+                  active: statusFilter === 'all',
+                  onClick: () => setStatusFilter('all'),
+                },
+                ...statusOptions.map((s) => ({
+                  label: s.label,
+                  active: statusFilter === s.value,
+                  onClick: () => setStatusFilter(s.value),
+                })),
+              ]}
+            />
           </div>
         </div>
 
@@ -710,57 +1285,140 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 <thead>
                   <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
                     <th className="w-10 px-3 py-4" />
-                    {fields.map((field) => (
-                      <th 
-                        key={field.id} 
-                        className={`text-left px-4 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider min-w-[150px] group ${
-                          pendingFields.has(field.id) ? 'opacity-50' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {fieldTypeConfig[field.field_type] && (
-                              <span className="text-[var(--text-tertiary)]">
-                                {(() => {
-                                  const Icon = fieldTypeConfig[field.field_type].icon
-                                  return <Icon className="h-3.5 w-3.5" />
-                                })()}
-                              </span>
-                            )}
-                            <span>{field.field_name}</span>
-                          </div>
-                          <button
-                            onClick={() => setShowFieldSettings(field)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
-                          >
-                            <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
-                          </button>
-                        </div>
-                      </th>
-                    ))}
+                    {fields.map((field) => {
+                      // Center checkbox column headers so the property
+                      // name + icon align directly above the centered
+                      // checkboxes in the cells below. The settings cog
+                      // is absolutely positioned so its (invisible)
+                      // flex space doesn't pull the centered content off
+                      // to one side.
+                      const isCheckbox = field.field_type === 'checkbox'
+                      const isDragging = draggedColumnId === field.id
+                      const isDragOver = dragOverColumnId === field.id
+                      return (
+                        <th
+                          key={field.id}
+                          draggable={canEditWorkspace}
+                          onDragStart={(e) =>
+                            handleColumnDragStart(e, field.id)
+                          }
+                          onDragOver={(e) =>
+                            handleColumnDragOver(e, field.id)
+                          }
+                          onDragLeave={() => {
+                            if (dragOverColumnId === field.id)
+                              setDragOverColumnId(null)
+                          }}
+                          onDrop={(e) => handleColumnDrop(e, field.id)}
+                          onDragEnd={() => {
+                            setDraggedColumnId(null)
+                            setDragOverColumnId(null)
+                          }}
+                          className={`relative px-4 py-4 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider min-w-[150px] group transition-colors ${
+                            isCheckbox ? 'text-center' : 'text-left'
+                          } ${pendingFields.has(field.id) ? 'opacity-50' : ''} ${
+                            isDragging
+                              ? 'opacity-40'
+                              : isDragOver
+                                ? 'bg-[#2B79F7]/15'
+                                : ''
+                          } ${canEditWorkspace ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                        >
+                          {isCheckbox ? (
+                            <div className="flex items-center justify-center gap-2">
+                              {fieldTypeConfig[field.field_type] && (
+                                <span className="text-[var(--text-tertiary)]">
+                                  {(() => {
+                                    const Icon =
+                                      fieldTypeConfig[field.field_type].icon
+                                    return <Icon className="h-3.5 w-3.5" />
+                                  })()}
+                                </span>
+                              )}
+                              <span>{field.field_name}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {fieldTypeConfig[field.field_type] && (
+                                  <span className="text-[var(--text-tertiary)]">
+                                    {(() => {
+                                      const Icon =
+                                        fieldTypeConfig[field.field_type].icon
+                                      return <Icon className="h-3.5 w-3.5" />
+                                    })()}
+                                  </span>
+                                )}
+                                <span>{field.field_name}</span>
+                              </div>
+                              {canEditWorkspace && (
+                                <button
+                                  onClick={() =>
+                                    setShowFieldSettings(field)
+                                  }
+                                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
+                                >
+                                  <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {isCheckbox && canEditWorkspace && (
+                            <button
+                              onClick={() => setShowFieldSettings(field)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
+                            >
+                              <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                            </button>
+                          )}
+                        </th>
+                      )
+                    })}
                     <th className="w-12 px-3 py-4 bg-[var(--bg-secondary)]">
-                      <button
-                        onClick={() => setShowAddField(true)}
-                        className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
-                        title="Add Property"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
+                      {canEditWorkspace && (
+                        <button
+                          onClick={() => setShowAddField(true)}
+                          className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
+                          title="Add Property"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
                     </th>
                     <th className="w-10 px-3 py-4 bg-[var(--bg-secondary)]" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-primary)]">
                   {filteredLeads.map((lead) => (
-                    <tr 
-                      key={lead.id} 
-                      className={`group hover:bg-[var(--bg-card-hover)]/50 transition-colors cursor-pointer ${
+                    <tr
+                      key={lead.id}
+                      className={`group transition-colors cursor-pointer ${
                         pendingLeads.has(lead.id) ? 'opacity-50' : ''
+                      } ${
+                        draggedRowId === lead.id
+                          ? 'opacity-40'
+                          : dragOverRowId === lead.id
+                            ? 'bg-[#2B79F7]/10'
+                            : 'hover:bg-[var(--bg-card-hover)]/50'
                       }`}
                       onClick={() => setShowLeadDetail(lead)}
+                      onDragOver={(e) => handleRowDragOver(e, lead.id)}
+                      onDragLeave={() => {
+                        if (dragOverRowId === lead.id) setDragOverRowId(null)
+                      }}
+                      onDrop={(e) => handleRowDrop(e, lead.id)}
                     >
-                      <td className="px-3 py-3 bg-[var(--bg-card)]">
-                        <GripVertical className="h-4 w-4 text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 cursor-grab" />
+                      <td
+                        className="px-3 py-3 bg-[var(--bg-card)]"
+                        draggable
+                        onDragStart={(e) => handleRowDragStart(e, lead.id)}
+                        onDragEnd={() => {
+                          setDraggedRowId(null)
+                          setDragOverRowId(null)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <GripVertical className="h-4 w-4 text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing" />
                       </td>
                       {fields.map((field) => {
                         const value = (lead.data?.[field.field_key] as string) || ''
@@ -772,7 +1430,62 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             className="px-4 py-3 bg-[var(--bg-card)]"
                             onClick={(e) => handleCellClick(e, lead.id, field.field_key, value, field.field_type)}
                           >
-                            {isEditing ? (
+                            {isEditing && field.field_type === 'url' ? (
+                              // Wrapper handles the focus boundary so we
+                              // only save when the user leaves BOTH inputs
+                              // (tabbing between URL and Text doesn't fire
+                              // a save). Same blur-to-save UX as before -
+                              // no Save / Cancel buttons.
+                              <div
+                                className="space-y-1.5 min-w-[220px]"
+                                onClick={(e) => e.stopPropagation()}
+                                onBlur={(e) => {
+                                  const next = e.relatedTarget as Node | null
+                                  if (!e.currentTarget.contains(next)) {
+                                    handleCellBlur()
+                                  }
+                                }}
+                              >
+                                {(field.url_display_type === 'hyperlink' ||
+                                  field.url_display_type === 'button') && (
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={editUrlText}
+                                    onChange={(e) =>
+                                      setEditUrlText(e.target.value)
+                                    }
+                                    onKeyDown={handleCellKeyDown}
+                                    placeholder="Display text (e.g. Click here)"
+                                    className="w-full px-3 py-1.5 bg-[var(--bg-input)] border-2 border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
+                                  />
+                                )}
+                                <input
+                                  ref={editInputRef}
+                                  type="url"
+                                  // Only autofocus the URL input when
+                                  // there's no text input above it (raw
+                                  // link mode).
+                                  autoFocus={
+                                    field.url_display_type !== 'hyperlink' &&
+                                    field.url_display_type !== 'button'
+                                  }
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onKeyDown={handleCellKeyDown}
+                                  placeholder={
+                                    getFieldUrlDefault(field) ||
+                                    'https://...'
+                                  }
+                                  className={`w-full px-3 py-1.5 bg-[var(--bg-input)] border-2 ${
+                                    field.url_display_type === 'hyperlink' ||
+                                    field.url_display_type === 'button'
+                                      ? 'border-[var(--border-primary)]'
+                                      : 'border-[#2B79F7]'
+                                  } rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[#2B79F7] text-sm`}
+                                />
+                              </div>
+                            ) : isEditing ? (
                               <input
                                 ref={editInputRef}
                                 type={field.field_type === 'email' ? 'email' : field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
@@ -780,17 +1493,36 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onBlur={handleCellBlur}
                                 onKeyDown={handleCellKeyDown}
-                                className="w-full px-3 py-1.5 bg-[var(--bg-secondary)] border-2 border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
+                                className="w-full px-3 py-1.5 bg-[var(--bg-input)] border-2 border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             ) : field.field_type === 'status' || field.field_type === 'select' ? (
                               <StatusBadge value={value} options={getFieldOptions(field)} />
-                            ) : field.field_type === 'url' && value ? (
-                              <UrlDisplay 
-                                value={value} 
-                                displayType={field.url_display_type || 'link'} 
+                            ) : field.field_type === 'url' &&
+                              (value || getFieldUrlDefault(field)) ? (
+                              <UrlDisplay
+                                value={value}
+                                displayType={field.url_display_type || 'link'}
                                 fieldName={field.field_name}
-                            />
+                                fieldLabel={getFieldUrlLabel(field)}
+                                fieldDefaultUrl={getFieldUrlDefault(field)}
+                              />
+                            ) : field.field_type === 'checkbox' ? (
+                            <div className="text-center w-full">
+                              <input
+                                type="checkbox"
+                                checked={value === 'true'}
+                                onChange={(e) =>
+                                  handleUpdateLead(
+                                    lead.id,
+                                    field.field_key,
+                                    e.target.checked ? 'true' : '',
+                                  )
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-4 w-4 accent-[#2B79F7] cursor-pointer align-middle"
+                              />
+                            </div>
                           ) : (
                             <span className="text-[var(--text-primary)] block min-h-6 px-2 py-1 rounded hover:bg-[var(--bg-card-hover)] transition-colors">
                               {(value as string) || <span className="text-[var(--text-tertiary)]">-</span>}
@@ -813,12 +1545,116 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       </td>
                     </tr>
                   ))}
-                  {/* Add row */}
+                  {/* Inline draft row - editable cells, no modal. */}
+                  {inlineDraft && (
+                    <tr
+                      className="bg-[var(--bg-secondary)]"
+                      onBlur={(e) => {
+                        const next = e.relatedTarget as Node | null
+                        if (!e.currentTarget.contains(next)) {
+                          void commitInlineDraft()
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          void commitInlineDraft()
+                        } else if (e.key === 'Escape') {
+                          setInlineDraft(null)
+                        }
+                      }}
+                    >
+                      <td />
+                      {fields.map((field, idx) => {
+                        const draftValue = inlineDraft[field.field_key] || ''
+                        const isStatusLike =
+                          field.field_type === 'status' ||
+                          field.field_type === 'select'
+                        return (
+                          <td
+                            key={field.id}
+                            className="px-4 py-3 bg-[var(--bg-secondary)]"
+                          >
+                            {isStatusLike ? (
+                              <select
+                                value={draftValue}
+                                onChange={(e) =>
+                                  setInlineDraft((prev) => ({
+                                    ...(prev || {}),
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                className="w-full px-2 py-1 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-sm"
+                              >
+                                <option value="">Select…</option>
+                                {getFieldOptions(field).map((opt, i) => (
+                                  <option
+                                    key={`${opt.value}-${i}`}
+                                    value={opt.value}
+                                  >
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : field.field_type === 'checkbox' ? (
+                              <div className="text-center w-full">
+                                <input
+                                  type="checkbox"
+                                  checked={draftValue === 'true'}
+                                  onChange={(e) =>
+                                    setInlineDraft((prev) => ({
+                                      ...(prev || {}),
+                                      [field.field_key]: e.target.checked
+                                        ? 'true'
+                                        : '',
+                                    }))
+                                  }
+                                  className="h-4 w-4 accent-[#2B79F7] cursor-pointer align-middle"
+                                />
+                              </div>
+                            ) : (
+                              <input
+                                ref={
+                                  idx === 0 ? inlineFirstInputRef : undefined
+                                }
+                                type={
+                                  field.field_type === 'email'
+                                    ? 'email'
+                                    : field.field_type === 'date'
+                                      ? 'date'
+                                      : field.field_type === 'number'
+                                        ? 'number'
+                                        : 'text'
+                                }
+                                value={draftValue}
+                                onChange={(e) =>
+                                  setInlineDraft((prev) => ({
+                                    ...(prev || {}),
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={field.field_name}
+                                className="w-full px-2 py-1 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] text-sm"
+                              />
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td colSpan={2} />
+                    </tr>
+                  )}
+                  {/* "+ Add a lead" placeholder - always visible. */}
                   <tr className="bg-[var(--bg-secondary)]">
                     <td />
                     <td colSpan={fields.length + 2} className="px-4 py-3">
                       <button
-                        onClick={() => setShowAddLead(true)}
+                        onClick={() => {
+                          // Open inline draft + focus first cell on next tick.
+                          setInlineDraft({})
+                          setTimeout(() => {
+                            inlineFirstInputRef.current?.focus()
+                          }, 0)
+                        }}
                         className="flex items-center gap-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <Plus className="h-4 w-4" />
@@ -834,7 +1670,10 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
         {/* Board View */}
         {view === 'board' && (
-          <div className="flex items-start gap-4 overflow-x-auto pb-4">
+          <div
+            ref={boardScrollRef}
+            className="flex items-start gap-4 overflow-x-auto pb-4"
+          >
             {statusOptions.length === 0 ? (
               <div className="flex-1 flex items-center justify-center py-12">
                 <div className="text-center">
@@ -860,79 +1699,94 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       isDragOver ? 'border-[#2B79F7] bg-[#2B79F7]/10' : 'border-[var(--border-primary)]'
                     }`}>
                       {/* Column Header */}
-                      <div className="p-4 border-b border-[var(--border-primary)]">
+                      <div className="px-3 py-2.5 border-b border-[var(--border-primary)]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full"
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="h-2 w-2 rounded-full shrink-0"
                               style={{ backgroundColor: status.color }}
                             />
-                            <h3 className="font-semibold text-[var(--text-primary)]">{status.label}</h3>
+                            <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">{status.label}</h3>
                           </div>
-                          <span className="text-sm text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-2.5 py-0.5 rounded-full">
+                          <span className="text-[10px] font-medium text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-2 py-0.5 rounded-full tabular-nums shrink-0">
                             {statusLeads.length}
                           </span>
                         </div>
                       </div>
-                      
+
                       {/* Cards */}
-                      <div className="p-3 space-y-3 min-h-[200px]">
-                        {statusLeads.map((lead) => (
-                          <div
-                            key={lead.id}
-                            className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing hover:shadow-lg ${
-                              draggedLead?.id === lead.id ? 'opacity-50 rotate-2 scale-105' : ''
-                            } ${pendingLeads.has(lead.id) ? 'opacity-50' : ''}`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, lead)}
-                            onClick={() => setShowLeadDetail(lead)}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-medium text-[var(--text-primary)]">
-                                {(lead.data?.name as string) || 'Unnamed Lead'}
-                              </h4>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteLead(lead.id)
-                                }}
-                                className="p-1 hover:bg-red-500/20 rounded text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                      <div className="p-2 space-y-2 min-h-[80px]">
+                        {statusLeads.map((lead) => {
+                          const leadName = (lead.data?.name as string) || 'Unnamed Lead'
+                          const leadEmail = (lead.data?.email as string) || ''
+                          const leadPhone = (lead.data?.phone as string) || ''
+                          const dateAdded = (lead.data?.date_added as string) || ''
+                          const initial = leadName.charAt(0).toUpperCase()
+                          return (
+                            <div
+                              key={lead.id}
+                              className={`group bg-[var(--bg-secondary)] rounded-lg p-2.5 border border-[var(--border-primary)] hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing ${
+                                draggedLead?.id === lead.id ? 'opacity-50 rotate-2 scale-105' : ''
+                              } ${pendingLeads.has(lead.id) ? 'opacity-50' : ''}`}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, lead)}
+                              onClick={() => setShowLeadDetail(lead)}
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#2B79F7] to-[#1E54B7] text-white text-[10px] font-semibold flex items-center justify-center shrink-0">
+                                  {initial}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                                    {leadName}
+                                  </p>
+                                  {leadEmail && (
+                                    <p className="text-[11px] text-[var(--text-tertiary)] truncate flex items-center gap-1 mt-0.5">
+                                      <Mail className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{leadEmail}</span>
+                                    </p>
+                                  )}
+                                  {leadPhone && (
+                                    <p className="text-[11px] text-[var(--text-tertiary)] truncate flex items-center gap-1 mt-0.5">
+                                      <Phone className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">{leadPhone}</span>
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteLead(lead.id)
+                                  }}
+                                  className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                              {dateAdded && (
+                                <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 ml-9">
+                                  {new Date(dateAdded).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </p>
+                              )}
                             </div>
-                            {(lead.data?.email as string) && (
-                              <p className="text-sm text-[var(--text-tertiary)] flex items-center gap-2">
-                                <Mail className="h-3.5 w-3.5" />
-                                {lead.data.email as string}
-                              </p>
-                            )}
-                            {(lead.data?.phone as string) && (
-                              <p className="text-sm text-[var(--text-tertiary)] flex items-center gap-2 mt-1">
-                                <Phone className="h-3.5 w-3.5" />
-                                {lead.data.phone as string}
-                              </p>
-                            )}
-                            {(lead.data?.date_added as string) && (
-                              <p className="text-xs text-[var(--text-secondary)] mt-2">
-                                Added {new Date(lead.data.date_added as string).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
 
                       {/* Add Lead */}
-                      <div className="p-3 pt-0">
+                      <div className="p-2 pt-0">
                         <button
                           onClick={() => {
                             setNewLead({ status: status.value })
                             setShowAddLead(true)
                           }}
-                          className="w-full p-3 border-2 border-dashed border-[var(--border-primary)] rounded-xl text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-all flex items-center justify-center gap-2"
+                          className="w-full px-3 py-2 border border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] hover:bg-[var(--bg-card-hover)] transition-all flex items-center justify-center gap-1.5"
                         >
-                          <Plus className="h-4 w-4" />
-                          <span className="text-sm">Add Lead</span>
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Add Lead</span>
                         </button>
                       </div>
                     </div>
@@ -943,141 +1797,273 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           </div>
         )}
 
-        {/* Chart View */}
-        {view === 'chart' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Bar Chart */}
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Leads by Status</h3>
-              {chartData.length === 0 ? (
-                <p className="text-[var(--text-tertiary)] text-center py-8">No status data available</p>
-              ) : (
-                <div className="space-y-4">
-                  {chartData.map((item) => {
-                    const maxCount = Math.max(...chartData.map(d => d.count), 1)
-                    const percentage = (item.count / maxCount) * 100
+        {/* Chart View - one focused dashboard: hero stat with sparkline,
+            pipeline funnel as the main visual, and a tight delta strip. */}
+        {view === 'chart' && (() => {
+          const totalLeads = leads.length
+          const closedLabels = ['closed', 'won', 'paid']
+          const closed = leads.filter((l) =>
+            closedLabels.some((c) => String(l.data?.status || '').toLowerCase().includes(c)),
+          ).length
+          const conversion = totalLeads === 0 ? 0 : Math.round((closed / totalLeads) * 100)
 
-                    return (
-                      <div key={item.value} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <span className="text-[var(--text-primary)] font-medium">{item.label}</span>
-                          </div>
-                          <span className="text-[var(--text-tertiary)]">{item.count}</span>
-                        </div>
-                        <div className="h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${percentage}%`, backgroundColor: item.color }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+          // Inflow chart: stacked bars per status, bucketed Day/Week/
+          // Month/All. The 3-metric strip above the chart (Total leads /
+          // This week / Closed) carries the headline numbers - no rate
+          // line, no second axis, just the bars.
+          const inflowSeries: SeriesDef[] = [
+            ...statusOptions.map((s) => ({
+              key: s.value,
+              label: s.label,
+              color: s.color,
+            })),
+            { key: '__unset', label: 'Unset', color: '#64748B' },
+          ]
+          const knownStatuses = new Set(statusOptions.map((s) => s.value))
+          const chartLeadSet = new Set(chartLeadIds)
+          const inflowEvents: ChartEvent[] = []
+          for (const l of leads) {
+            if (chartLeadSet.size > 0 && !chartLeadSet.has(l.id)) continue
+            // Bucket by updated_at so a status change registers on the
+            // day it was made, not on the day the lead was first added.
+            const ref = l.updated_at || l.created_at
+            const raw = (l.data as { status?: unknown } | null)?.status
+            const sKey =
+              typeof raw === 'string' && raw && knownStatuses.has(raw)
+                ? raw
+                : '__unset'
+            const values: Record<string, number> = {}
+            for (const s of inflowSeries) values[s.key] = 0
+            values[sKey] = 1
+            inflowEvents.push({ date: new Date(ref), values })
+          }
+          const { rows: inflow, effectiveMode: inflowMode } = bucketize(
+            inflowEvents,
+            {
+              mode: bucketMode,
+              seriesKeys: inflowSeries.map((s) => s.key),
+              windowDays: 30,
+              windowWeeks: 12,
+              windowMonths: 12,
+            },
+          )
+          const inflowBucketLabel = (
+            { day: 'day', week: 'week', month: 'month' } as Record<
+              string,
+              string
+            >
+          )[inflowMode]
 
-            {/* Stats */}
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Quick Stats</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
-                  <p className="text-[var(--text-tertiary)] text-sm">Total Leads</p>
-                  <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{leads.length}</p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
-                  <p className="text-[var(--text-tertiary)] text-sm">New This Week</p>
-                  <p className="text-2xl font-bold text-[#3B82F6] mt-1">
-                    {leads.filter(l => {
-                      const date = new Date(l.created_at)
-                      const weekAgo = new Date()
-                      weekAgo.setDate(weekAgo.getDate() - 7)
-                      return date > weekAgo
-                    }).length}
-                  </p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
-                  <p className="text-[var(--text-tertiary)] text-sm">Closed</p>
-                  <p className="text-2xl font-bold text-[#10B981] mt-1">
-                    {leads.filter(l => l.data?.status === 'closed').length}
-                  </p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
-                  <p className="text-[var(--text-tertiary)] text-sm">Conversion Rate</p>
-                  <p className="text-2xl font-bold text-[#8B5CF6] mt-1">
-                    {leads.length > 0 
-                      ? `${Math.round((leads.filter(l => l.data?.status === 'closed').length / leads.length) * 100)}%`
-                      : '0%'
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
+          // Period split for the trend chip.
+          const newThisWeek = leads.filter((l) => {
+            const t = new Date(l.created_at).getTime()
+            return t >= Date.now() - 7 * 24 * 60 * 60 * 1000
+          }).length
+          const newPriorWeek = leads.filter((l) => {
+            const t = new Date(l.created_at).getTime()
+            return (
+              t < Date.now() - 7 * 24 * 60 * 60 * 1000 &&
+              t >= Date.now() - 14 * 24 * 60 * 60 * 1000
+            )
+          }).length
+          const weekChange =
+            newPriorWeek === 0
+              ? newThisWeek === 0
+                ? 0
+                : 100
+              : Math.round(((newThisWeek - newPriorWeek) / newPriorWeek) * 100)
 
-            {/* Pie Chart */}
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-6 lg:col-span-2 shadow-xl">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Distribution</h3>
-              <div className="flex flex-wrap items-center justify-center gap-8">
-                <div className="relative w-48 h-48">
-                  <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-                    {(() => {
-                      let accumulated = 0
-                      const total = chartData.reduce((sum, d) => sum + d.count, 0) || 1
-                      return chartData.map((item) => {
-                        const percentage = (item.count / total) * 100
-                        const offset = accumulated
-                        accumulated += percentage
-                        return (
-                          <circle
-                            key={item.value}
-                            cx="50"
-                            cy="50"
-                            r="40"
-                            fill="transparent"
-                            stroke={item.color}
-                            strokeWidth="20"
-                            strokeDasharray={`${percentage * 2.51} ${251 - percentage * 2.51}`}
-                            strokeDashoffset={`${-offset * 2.51}`}
-                            className="transition-all duration-500"
-                          />
-                        )
-                      })
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-[var(--text-primary)]">{leads.length}</p>
-                      <p className="text-sm text-[var(--text-tertiary)]">Total</p>
-                    </div>
+          // Funnel - sort statuses by count descending. Reads as a pipeline
+          // because each row is narrower than the one above it.
+          const funnel = chartData
+            .filter((d) => d.count > 0)
+            .sort((a, b) => b.count - a.count)
+          const funnelMax = funnel[0]?.count || 1
+
+          // Donut data uses the chartData colors (defined per-status).
+          const donutData = chartData
+            .filter((d) => d.count > 0)
+            .map((d) => ({ label: d.label, value: d.count, color: d.color }))
+
+          return (
+            <div className="space-y-4">
+              {/* Hero card: stat strip on top, big inflow chart below.
+                  The chart is full-width so the trend is actually
+                  legible - the previous side-by-side layout squeezed it
+                  into a 420px slot. */}
+              <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+                {/* Stat strip - 3 quick metrics in one row */}
+                <div className="flex items-end justify-between gap-6 flex-wrap mb-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+                      Total leads
+                    </p>
+                    <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tabular-nums mt-1">
+                      {totalLeads.toLocaleString()}
+                    </p>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {chartData.map((item) => (
-                    <div key={item.value} className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-sm text-[var(--text-tertiary)]">
-                        {item.label}: <span className="font-semibold text-[var(--text-primary)]">{item.count}</span>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+                      This week
+                    </p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] tabular-nums">
+                        {newThisWeek}
+                      </p>
+                      <span
+                        className={`text-xs tabular-nums ${
+                          weekChange > 0
+                            ? 'text-emerald-500'
+                            : weekChange < 0
+                              ? 'text-red-500'
+                              : 'text-[var(--text-tertiary)]'
+                        }`}
+                      >
+                        {weekChange > 0 ? '↗' : weekChange < 0 ? '↘' : ''}
+                        {weekChange > 0 ? '+' : ''}
+                        {weekChange}%
                       </span>
                     </div>
-                  ))}
+                    <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                      vs prior week
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+                      Closed
+                    </p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] tabular-nums">
+                        {closed}
+                      </p>
+                      <span className="text-xs tabular-nums text-[var(--text-tertiary)]">
+                        {conversion}%
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                      conversion rate
+                    </p>
+                  </div>
+                </div>
+
+                {/* Full-width inflow chart: stacked bars by status +
+                    conversion rate line on the secondary axis. */}
+                <div className="border-t border-[var(--border-primary)] pt-4">
+                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+                      Lead inflow by status · per {inflowBucketLabel}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <LeadFilter
+                        options={leads.map((l) => {
+                          const d = (l.data || {}) as Record<string, unknown>
+                          const name =
+                            (typeof d.name === 'string' && d.name) ||
+                            (typeof d.email === 'string' && d.email) ||
+                            'Unnamed'
+                          const email =
+                            typeof d.email === 'string' ? d.email : null
+                          return { id: l.id, name, email } as LeadOption
+                        })}
+                        value={chartLeadIds}
+                        onChange={setChartLeadIds}
+                      />
+                      <BucketToggle
+                        value={bucketMode}
+                        onChange={setBucketMode}
+                      />
+                    </div>
+                  </div>
+                  <StatusStackedBar
+                    data={inflow}
+                    series={inflowSeries}
+                    height={280}
+                  />
+                </div>
+              </div>
+
+              {/* Pipeline funnel + status donut */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Pipeline</h3>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
+                      {conversion}% closed
+                    </span>
+                  </div>
+                  {funnel.length === 0 ? (
+                    <p className="text-xs text-[var(--text-tertiary)] py-10 text-center">
+                      No leads with a status yet.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2.5">
+                      {funnel.map((f) => {
+                        const pct = Math.round((f.count / funnelMax) * 100)
+                        return (
+                          <li key={f.value}>
+                            <div className="flex items-center justify-between text-xs mb-1.5">
+                              <span className="text-[var(--text-secondary)] font-medium">
+                                {f.label}
+                              </span>
+                              <span className="text-[var(--text-tertiary)] tabular-nums">
+                                {f.count} ·{' '}
+                                {totalLeads === 0
+                                  ? 0
+                                  : Math.round((f.count / totalLeads) * 100)}
+                                %
+                              </span>
+                            </div>
+                            <div className="h-2.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.max(pct, 4)}%`,
+                                  background: f.color,
+                                }}
+                              />
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+                    By status
+                  </h3>
+                  {donutData.length === 0 ? (
+                    <p className="text-xs text-[var(--text-tertiary)] py-10 text-center">
+                      No status data.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex justify-center mb-3">
+                        <DonutChart
+                          data={donutData}
+                          size={140}
+                          thickness={16}
+                          centerLabel={String(totalLeads)}
+                          centerSubLabel="leads"
+                        />
+                      </div>
+                      <ChartLegend items={donutData} />
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Add Lead Modal */}
         {showAddLead && (
           <Modal onClose={() => { setShowAddLead(false); setNewLead({}) }} title="Add New Lead">
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div
+              className="space-y-4 max-h-[60vh] overflow-y-auto pl-1 -ml-1 pr-3 -mr-3 py-1"
+              style={{ scrollbarGutter: 'stable' }}
+            >
               {fields.map((field) => {
                 const options = getFieldOptions(field)
                 
@@ -1091,20 +2077,37 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       <select
                         value={newLead[field.field_key] || ''}
                         onChange={(e) => setNewLead({ ...newLead, [field.field_key]: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       >
                         <option value="">Select...</option>
                         {options.map((opt, optIndex) => (
                           <option key={`${opt.value}-${optIndex}`} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
+                    ) : field.field_type === 'checkbox' ? (
+                      <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={newLead[field.field_key] === 'true'}
+                          onChange={(e) =>
+                            setNewLead({
+                              ...newLead,
+                              [field.field_key]: e.target.checked ? 'true' : '',
+                            })
+                          }
+                          className="h-4 w-4 accent-[#2B79F7]"
+                        />
+                        <span className="text-sm text-[var(--text-secondary)]">
+                          {newLead[field.field_key] === 'true' ? 'Yes' : 'No'}
+                        </span>
+                      </label>
                     ) : (
                       <input
                         type={field.field_type === 'email' ? 'email' : field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
                         value={newLead[field.field_key] || (field.field_type === 'date' ? new Date().toISOString().split('T')[0] : '')}
                         onChange={(e) => setNewLead({ ...newLead, [field.field_key]: e.target.value })}
                         placeholder={`Enter ${field.field_name.toLowerCase()}...`}
-                        className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                       />
                     )}
                   </div>
@@ -1129,7 +2132,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   value={newField.name}
                   onChange={(e) => setNewField({ ...newField, name: e.target.value })}
                   placeholder="e.g., Company, Budget, Source"
-                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 />
               </div>
               <div>
@@ -1137,7 +2140,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 <select
                   value={newField.type}
                   onChange={(e) => setNewField({ ...newField, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   {Object.entries(fieldTypeConfig).map(([value, config]) => (
                     <option key={value} value={value}>{config.label}</option>
@@ -1148,20 +2151,91 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Display Style</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['hyperlink'] as const).map((type) => (
+                    {(['link', 'hyperlink', 'button'] as const).map((type) => (
                       <button
                         key={type}
-                        onClick={() => setNewField({ ...newField, urlDisplayType: type })}
+                        onClick={() =>
+                          setNewField({ ...newField, urlDisplayType: type })
+                        }
                         className={`p-3 rounded-xl border-2 transition-all capitalize text-sm ${
                           newField.urlDisplayType === type
                             ? 'border-[#2B79F7] bg-[#2B79F7]/10 text-[#2B79F7]'
                             : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[var(--border-secondary)]'
                         }`}
                       >
-                        {type}
+                        {type === 'link'
+                          ? 'Raw URL'
+                          : type === 'hyperlink'
+                            ? 'Hyperlink'
+                            : 'Button'}
                       </button>
                     ))}
                   </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+                    Raw URL shows the link itself. Hyperlink + Button let you
+                    set a display text per lead.
+                  </p>
+                </div>
+              )}
+              {newField.type === 'url' &&
+                (newField.urlDisplayType === 'hyperlink' ||
+                  newField.urlDisplayType === 'button') && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                      {newField.urlDisplayType === 'button'
+                        ? 'Button label'
+                        : 'Hyperlink text'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newField.urlLabel}
+                      onChange={(e) =>
+                        setNewField({
+                          ...newField,
+                          urlLabel: e.target.value,
+                        })
+                      }
+                      placeholder={
+                        newField.urlDisplayType === 'button'
+                          ? 'e.g. Visit website'
+                          : 'e.g. Click here'
+                      }
+                      className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                    <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+                      Default text for every lead. You can still override
+                      it per cell when editing a lead&rsquo;s value.
+                    </p>
+                  </div>
+                )}
+              {newField.type === 'url' && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Default URL
+                    <span className="text-[var(--text-tertiary)] font-normal ml-1">
+                      (optional)
+                    </span>
+                  </label>
+                  <input
+                    type="url"
+                    value={newField.urlDefault}
+                    onChange={(e) =>
+                      setNewField({
+                        ...newField,
+                        urlDefault: e.target.value,
+                      })
+                    }
+                    placeholder="https://..."
+                    className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  />
+                  <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+                    Where every lead&rsquo;s {newField.urlDisplayType === 'button'
+                      ? 'button'
+                      : newField.urlDisplayType === 'hyperlink'
+                        ? 'link'
+                        : 'URL'}{' '}
+                    points by default. Leave blank to set per cell.
+                  </p>
                 </div>
               )}
             </div>
@@ -1234,24 +2308,41 @@ function StatusBadge({ value, options }: { value: string; options: StatusOption[
   )
 }
 
-// URL Display Component
-function UrlDisplay({ value, displayType, fieldName }: { value: string; displayType: 'button' | 'link' | 'hyperlink'; fieldName?: string }) {
-  if (!value) return <span className="text-[var(--text-tertiary)]">-</span>
+// URL Display Component. Reads either a plain URL string or the JSON
+// {url,text} shape (see parseUrlValue). Fallback chains:
+//   text:  per-cell text → field-level label → field name → generic
+//   url:   per-cell url  → field-level default URL → empty state
+function UrlDisplay({
+  value,
+  displayType,
+  fieldName,
+  fieldLabel,
+  fieldDefaultUrl,
+}: {
+  value: string
+  displayType: 'button' | 'link' | 'hyperlink'
+  fieldName?: string
+  fieldLabel?: string
+  fieldDefaultUrl?: string
+}) {
+  const { url: cellUrl, text } = parseUrlValue(value)
+  const url = cellUrl || fieldDefaultUrl || ''
+  if (!url) return <span className="text-[var(--text-tertiary)]">-</span>
 
+  const href = url.startsWith('http') ? url : `https://${url}`
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const url = value.startsWith('http') ? value : `https://${value}`
-    window.open(url, '_blank')
+    window.open(href, '_blank')
   }
 
   if (displayType === 'button') {
     return (
       <button
         onClick={handleClick}
-        className="px-4 py-2 bg-[#2B79F7] text-white text-sm font-medium rounded-lg hover:bg-[#1E54B7] transition-colors flex items-center gap-2 shadow-lg"
+        className="px-4 py-2 bg-[#2B79F7] text-white text-sm font-medium rounded-lg hover:bg-[#1E54B7] transition-colors inline-flex items-center gap-2 shadow-lg"
       >
         <ExternalLink className="h-4 w-4" />
-        {fieldName || 'Open Link'}
+        {text || fieldLabel || fieldName || 'Open Link'}
       </button>
     )
   }
@@ -1259,28 +2350,28 @@ function UrlDisplay({ value, displayType, fieldName }: { value: string; displayT
   if (displayType === 'hyperlink') {
     return (
       <a
-        href={value.startsWith('http') ? value : `https://${value}`}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className="text-[#2B79F7] hover:underline flex items-center gap-1.5 text-sm font-medium"
+        className="text-[#2B79F7] hover:underline inline-flex items-center gap-1.5 text-sm font-medium"
       >
         <LinkIcon className="h-4 w-4" />
-        <span>{fieldName || 'Click here'}</span>
+        <span>{text || fieldLabel || fieldName || 'Click here'}</span>
       </a>
     )
   }
 
-  // Default: raw link
+  // Default: raw link - shows the URL itself as the link text.
   return (
     <a
-      href={value.startsWith('http') ? value : `https://${value}`}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
       className="text-[#2B79F7] hover:underline text-sm truncate block max-w-[250px]"
     >
-      {value}
+      {url}
     </a>
   )
 }
@@ -1313,6 +2404,84 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
 
 // Field Settings Modal
 // Field Settings Modal
+// Field-level URL metadata editor (display label + default URL). Used
+// inside FieldSettingsModal so users can change these post-creation.
+// Persists both fields together via buildUrlMetaOptions so neither
+// half gets dropped on save.
+function UrlMetaEditor({
+  field,
+  onUpdate,
+}: {
+  field: CustomField
+  onUpdate: (id: string, updates: Partial<CustomField>) => void
+}) {
+  const [label, setLabel] = useState(getFieldUrlLabel(field))
+  const [url, setUrl] = useState(getFieldUrlDefault(field))
+  // Sync from prop on optimistic refresh.
+  useEffect(() => {
+    setLabel(getFieldUrlLabel(field))
+    setUrl(getFieldUrlDefault(field))
+  }, [field])
+
+  const persist = (nextLabel: string, nextUrl: string) => {
+    if (
+      nextLabel === getFieldUrlLabel(field) &&
+      nextUrl === getFieldUrlDefault(field)
+    ) {
+      return
+    }
+    onUpdate(field.id, {
+      options: buildUrlMetaOptions(nextLabel, nextUrl),
+    })
+  }
+
+  const isButton = field.url_display_type === 'button'
+  const isHyperlink = field.url_display_type === 'hyperlink'
+  return (
+    <div className="space-y-3">
+      {(isButton || isHyperlink) && (
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+            {isButton ? 'Button label' : 'Hyperlink text'}
+          </label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onBlur={() => persist(label.trim(), url.trim())}
+            placeholder={isButton ? 'e.g. Visit website' : 'e.g. Click here'}
+            className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          />
+          <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+            Default text for every {isButton ? 'button' : 'link'} in this
+            column. Leave blank to fall back to the column name.
+          </p>
+        </div>
+      )}
+      <div>
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+          Default URL
+          <span className="text-[var(--text-tertiary)] font-normal ml-1">
+            (optional)
+          </span>
+        </label>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onBlur={() => persist(label.trim(), url.trim())}
+          placeholder="https://..."
+          className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+        />
+        <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+          Where every lead&rsquo;s {isButton ? 'button' : isHyperlink ? 'link' : 'URL'} points by default. Cells can still
+          override per lead.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function FieldSettingsModal({
   field,
   onClose,
@@ -1440,9 +2609,58 @@ function FieldSettingsModal({
               }
             }}
             disabled={field.is_default}
-            className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] disabled:opacity-50"
+            className="w-full px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] disabled:opacity-50"
           />
         </div>
+
+        {/* URL Display Style - only for URL fields. Lets you switch a
+            field between raw URL / hyperlinked text / button after the
+            fact (the Add Property modal sets it once at creation, but
+            people change their minds). */}
+        {field.field_type === 'url' && (
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+              Display Style
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['link', 'hyperlink', 'button'] as const).map((type) => {
+                const active = (field.url_display_type || 'link') === type
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => onUpdate(field.id, { url_display_type: type })}
+                    className={`p-3 rounded-xl border-2 transition-all text-sm ${
+                      active
+                        ? 'border-[#2B79F7] bg-[#2B79F7]/10 text-[#2B79F7]'
+                        : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[var(--border-secondary)]'
+                    }`}
+                  >
+                    {type === 'link'
+                      ? 'Raw URL'
+                      : type === 'hyperlink'
+                        ? 'Hyperlink'
+                        : 'Button'}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+              {field.url_display_type === 'button'
+                ? 'Renders as a button. Set a default button label below; you can still override per cell.'
+                : field.url_display_type === 'hyperlink'
+                  ? 'Renders as hyperlinked text. Set a default text below; you can still override per cell.'
+                  : 'Renders the URL itself as a clickable link. No display text needed.'}
+            </p>
+          </div>
+        )}
+
+        {/* Field-level URL metadata: default URL + (for hyperlink /
+            button) display label. Available for every URL field so the
+            user can set a default link without per-cell editing. */}
+        {field.field_type === 'url' && (
+          <UrlMetaEditor field={field} onUpdate={onUpdate} />
+        )}
 
         {/* Status/Select Options */}
         {(field.field_type === 'status' || field.field_type === 'select') && (
@@ -1483,7 +2701,7 @@ function FieldSettingsModal({
                       onBlur={() => setEditingOption(null)}
                       onKeyDown={(e) => e.key === 'Enter' && setEditingOption(null)}
                       autoFocus
-                      className="flex-1 px-2 py-1 bg-[var(--bg-card)] border border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
+                      className="flex-1 px-2 py-1 bg-[var(--bg-input)] border border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
                     />
                   ) : (
                     <span 
@@ -1538,7 +2756,7 @@ function FieldSettingsModal({
                   value={newOption.label}
                   onChange={(e) => setNewOption({ ...newOption, label: e.target.value })}
                   placeholder="New option..."
-                  className="flex-1 px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  className="flex-1 px-4 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
                 />
                 <Button onClick={handleAddOption} disabled={!newOption.label.trim()}>
@@ -1599,80 +2817,417 @@ function LeadDetailModal({
   fields: CustomField[]
   isPending: boolean
   onClose: () => void
-    onUpdate: (leadId: string, fieldKey: string, value: string) => void
+  onUpdate: (leadId: string, fieldKey: string, value: string) => void
   onDelete: (leadId: string) => void
   getFieldOptions: (field: CustomField) => StatusOption[]
 }) {
+  const name = (lead.data?.name as string) || 'Unnamed lead'
+  const email = (lead.data?.email as string) || ''
+  const phone = (lead.data?.phone as string) || ''
+  const initial = (name || '?').charAt(0).toUpperCase()
+
+  // Status field gets pulled out of the property list and shown as a
+  // pill in the header for quick scanning + one-click editing.
+  const statusField = fields.find((f) => f.field_type === 'status')
+  const statusValue = statusField
+    ? ((lead.data?.[statusField.field_key] as string) || '')
+    : ''
+  const statusOpt = statusField
+    ? getFieldOptions(statusField).find((o) => o.value === statusValue)
+    : null
+  // Everything else lives in the properties rail (name + status hidden
+  // since they're already in the header).
+  const propertyFields = fields.filter(
+    (f) => f.field_key !== 'name' && f.field_type !== 'status',
+  )
+
+  // Notes are stored under a dedicated `__notes` key on the lead's data
+  // record, separate from any user-defined "notes" custom field. Keeps
+  // the right rail useful even when the workspace has no notes column.
+  const notes = (lead.data?.__notes as string) || ''
+
+  // Local state for status dropdown popover.
+  const [statusOpen, setStatusOpen] = useState(false)
+
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
-        className={`bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-2xl max-h-[90vh] overflow-auto shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
+      <div
+        className={`bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)] sticky top-0 bg-[var(--bg-card)] z-10">
-          <h3 className="text-xl font-semibold text-[var(--text-primary)]">
-            {(lead.data?.name as string) || 'Lead Details'}
-          </h3>
-          <div className="flex items-center gap-2">
+        {/* HEADER STRIP - avatar + name + contact subline + status pill + actions */}
+        <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-[var(--border-primary)]">
+          <div className="flex items-start gap-4 min-w-0 flex-1">
+            <div className="h-12 w-12 rounded-full bg-[#2B79F7]/15 text-[#2B79F7] flex items-center justify-center text-lg font-semibold shrink-0">
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] truncate">
+                {name}
+              </h2>
+              {(email || phone) && (
+                <p className="text-xs sm:text-sm text-[var(--text-tertiary)] truncate mt-0.5">
+                  {[email, phone].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {statusField && statusOpt && (
+                <div className="mt-2 relative inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setStatusOpen((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-opacity hover:opacity-80"
+                    style={{
+                      backgroundColor: `${statusOpt.color}20`,
+                      color: statusOpt.color,
+                      border: `1px solid ${statusOpt.color}40`,
+                    }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: statusOpt.color }}
+                    />
+                    {statusOpt.label}
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                  </button>
+                  {statusOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setStatusOpen(false)}
+                      />
+                      <div className="absolute z-20 left-0 mt-1 w-56 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1 max-h-64 overflow-y-auto">
+                        {getFieldOptions(statusField).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              onUpdate(lead.id, statusField.field_key, opt.value)
+                              setStatusOpen(false)
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-[var(--bg-card-hover)] transition-colors"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: opt.color }}
+                            />
+                            <span className="text-[var(--text-primary)]">
+                              {opt.label}
+                            </span>
+                            {opt.value === statusValue && (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-[#2B79F7] ml-auto" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
                 onDelete(lead.id)
                 onClose()
               }}
-              className="p-2 hover:bg-red-500/20 rounded-lg text-red-400"
+              className="p-2 hover:bg-red-500/10 rounded-lg text-[var(--text-tertiary)] hover:text-red-500 transition-colors"
+              title="Delete lead"
             >
-              <Trash2 className="h-5 w-5" />
+              <Trash2 className="h-4 w-4" />
             </button>
-            <button 
+            <button
               onClick={onClose}
               className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              title="Close"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
-          {fields.map((field) => {
-            const options = getFieldOptions(field)
-            
-            return (
-              <div key={field.id}>
-                <label className="block text-sm font-medium text-[var(--text-tertiary)] mb-2">
-                  {field.field_name}
-                </label>
-                {(field.field_type === 'status' || field.field_type === 'select') ? (
-                  <select
-                    value={(lead.data?.[field.field_key] as string) || ''}
-                    onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-                    className="w-full px-4 py-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  >
-                    <option value="">Select...</option>
-                    {options.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type={field.field_type === 'email' ? 'email' : field.field_type === 'date' ? 'date' : field.field_type === 'number' ? 'number' : 'text'}
-                    value={(lead.data?.[field.field_key] as string) || ''}
-                    onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-                    className="w-full px-4 py-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+        {/* BODY - 2-col on desktop: properties rail + notes/activity */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr]">
+            {/* LEFT: Properties rail */}
+            <div className="p-5 sm:p-6 md:border-r border-b md:border-b-0 border-[var(--border-primary)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-3">
+                Properties
+              </p>
+              <div className="space-y-2.5">
+                {propertyFields.map((field) => (
+                  <LeadPropertyRow
+                    key={field.id}
+                    field={field}
+                    lead={lead}
+                    options={getFieldOptions(field)}
+                    onUpdate={onUpdate}
                   />
-                )}
+                ))}
               </div>
-            )
-          })}
-        </div>
+            </div>
 
-        <div className="p-6 border-t border-[var(--border-primary)] sticky bottom-0 bg-[var(--bg-card)]">
-          <p className="text-xs text-[var(--text-tertiary)]">
-            Created: {new Date(lead.created_at).toLocaleString()}
-          </p>
+            {/* RIGHT: Notes / activity */}
+            <div className="p-5 sm:p-6 space-y-5">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-2">
+                  Notes
+                </p>
+                <textarea
+                  defaultValue={notes}
+                  onBlur={(e) => {
+                    if (e.target.value !== notes) {
+                      onUpdate(lead.id, '__notes', e.target.value)
+                    }
+                  }}
+                  placeholder="Click to add notes about this lead…"
+                  rows={6}
+                  className="w-full px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-y"
+                />
+                <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5">
+                  Saved automatically when you click outside.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-2">
+                  Activity
+                </p>
+                <div className="space-y-1.5 text-xs text-[var(--text-secondary)]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                    <span>
+                      Created{' '}
+                      {new Date(lead.created_at).toLocaleString(undefined, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </span>
+                  </div>
+                  {lead.updated_at &&
+                    lead.updated_at !== lead.created_at && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2B79F7]" />
+                        <span>
+                          Last updated{' '}
+                          {new Date(lead.updated_at).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Property row in the lead detail modal's left rail. Shows a label
+// (icon + name) on the left and an inline-editable value on the right.
+// Click to edit; Enter / blur saves; Escape cancels.
+function LeadPropertyRow({
+  field,
+  lead,
+  options,
+  onUpdate,
+}: {
+  field: CustomField
+  lead: Lead
+  options: StatusOption[]
+  onUpdate: (leadId: string, fieldKey: string, value: string) => void
+}) {
+  const value = (lead.data?.[field.field_key] as string) || ''
+  const Icon = fieldTypeConfig[field.field_type]?.icon
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  // For URL fields the per-cell display text is encoded into the value.
+  const [draftUrlText, setDraftUrlText] = useState('')
+
+  // No effect-based sync needed: startEdit always seeds draft from
+  // the latest value when the user clicks to edit, and the read-only
+  // path always renders straight from value.
+
+  const startEdit = () => {
+    if (field.field_type === 'url') {
+      const parsed = parseUrlValue(value)
+      setDraft(parsed.url)
+      setDraftUrlText(parsed.text)
+    } else {
+      setDraft(value)
+    }
+    setEditing(true)
+  }
+  const commit = () => {
+    setEditing(false)
+    if (field.field_type === 'url') {
+      const next = serializeUrlValue(draft.trim(), draftUrlText.trim())
+      if (next !== value) onUpdate(lead.id, field.field_key, next)
+    } else if (draft !== value) {
+      onUpdate(lead.id, field.field_key, draft)
+    }
+  }
+  const cancel = () => {
+    setEditing(false)
+    setDraft(value)
+    setDraftUrlText('')
+  }
+
+  // Status / select renders as a select-style row that opens inline.
+  if (field.field_type === 'status' || field.field_type === 'select') {
+    const opt = options.find((o) => o.value === value)
+    return (
+      <div className="flex items-start gap-3 py-1">
+        <div className="flex items-center gap-1.5 w-24 shrink-0 mt-1">
+          {Icon && <Icon className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />}
+          <span className="text-xs text-[var(--text-tertiary)] truncate">
+            {field.field_name}
+          </span>
+        </div>
+        <select
+          value={value}
+          onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
+          className="flex-1 px-2 py-1 bg-transparent border-0 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2B79F7] cursor-pointer"
+        >
+          <option value="">Empty</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {opt && (
+          <span
+            className="w-2 h-2 rounded-full mt-2 shrink-0"
+            style={{ backgroundColor: opt.color }}
+          />
+        )}
+      </div>
+    )
+  }
+
+  if (field.field_type === 'checkbox') {
+    return (
+      <div className="flex items-center gap-3 py-1">
+        <div className="flex items-center gap-1.5 w-24 shrink-0">
+          {Icon && <Icon className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />}
+          <span className="text-xs text-[var(--text-tertiary)] truncate">
+            {field.field_name}
+          </span>
+        </div>
+        <input
+          type="checkbox"
+          checked={value === 'true'}
+          onChange={(e) =>
+            onUpdate(lead.id, field.field_key, e.target.checked ? 'true' : '')
+          }
+          className="h-4 w-4 accent-[#2B79F7] cursor-pointer"
+        />
+      </div>
+    )
+  }
+
+  // Text-like + URL fields
+  return (
+    <div className="flex items-start gap-3 py-1 min-h-[28px]">
+      <div className="flex items-center gap-1.5 w-24 shrink-0 mt-1">
+        {Icon && <Icon className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />}
+        <span className="text-xs text-[var(--text-tertiary)] truncate">
+          {field.field_name}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        {editing ? (
+          field.field_type === 'url' ? (
+            <div
+              className="space-y-1.5"
+              onBlur={(e) => {
+                const next = e.relatedTarget as Node | null
+                if (!e.currentTarget.contains(next)) commit()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                else if (e.key === 'Escape') cancel()
+              }}
+            >
+              {(field.url_display_type === 'hyperlink' ||
+                field.url_display_type === 'button') && (
+                <input
+                  autoFocus
+                  type="text"
+                  value={draftUrlText}
+                  onChange={(e) => setDraftUrlText(e.target.value)}
+                  placeholder="Display text…"
+                  className="w-full px-2 py-1 bg-[var(--bg-input)] border-2 border-[#2B79F7] rounded-md text-sm focus:outline-none"
+                />
+              )}
+              <input
+                autoFocus={
+                  field.url_display_type !== 'hyperlink' &&
+                  field.url_display_type !== 'button'
+                }
+                type="url"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="https://…"
+                className="w-full px-2 py-1 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-md text-sm focus:outline-none focus:border-[#2B79F7]"
+              />
+            </div>
+          ) : (
+            <input
+              autoFocus
+              type={
+                field.field_type === 'email'
+                  ? 'email'
+                  : field.field_type === 'date'
+                    ? 'date'
+                    : field.field_type === 'number'
+                      ? 'number'
+                      : 'text'
+              }
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                else if (e.key === 'Escape') cancel()
+              }}
+              className="w-full px-2 py-1 bg-[var(--bg-input)] border-2 border-[#2B79F7] rounded-md text-sm text-[var(--text-primary)] focus:outline-none"
+            />
+          )
+        ) : (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="w-full text-left px-2 py-1 -mx-2 rounded-md hover:bg-[var(--bg-card-hover)] transition-colors"
+          >
+            {field.field_type === 'url' &&
+            (value || getFieldUrlDefault(field)) ? (
+              <UrlDisplay
+                value={value}
+                displayType={field.url_display_type || 'link'}
+                fieldName={field.field_name}
+                fieldLabel={getFieldUrlLabel(field)}
+                fieldDefaultUrl={getFieldUrlDefault(field)}
+              />
+            ) : value ? (
+              <span className="text-sm text-[var(--text-primary)]">
+                {value}
+              </span>
+            ) : (
+              <span className="text-sm text-[var(--text-tertiary)] italic">
+                Empty
+              </span>
+            )}
+          </button>
+        )}
       </div>
     </div>
   )

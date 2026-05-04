@@ -94,7 +94,13 @@ export default function ClientProfilePage() {
 
   const [client, setClient] = useState<ClientRow | null>(null)
   const [clientEmails, setClientEmails] = useState<
-    { id: string; email: string; name: string | null; invitation_accepted: boolean | null }[]
+    {
+      id: string
+      email: string
+      name: string | null
+      role?: string | null
+      invitation_accepted: boolean | null
+    }[]
   >([])
   const [isLoading, setIsLoading] = useState(true)
   const [tab, setTab] = useState<TabKey>('overview')
@@ -141,29 +147,64 @@ export default function ClientProfilePage() {
   const refresh = useCallback(async () => {
     if (!clientId) return
     setIsLoading(true)
-    const [{ data, error }, { data: users }] = await Promise.all([
-      supabase.from('clients').select('*').eq('id', clientId).single(),
-      supabase
-        .from('users')
-        .select('id, email, name, invitation_accepted')
-        .eq('client_id', clientId)
-        .eq('role', 'client')
-        .order('created_at', { ascending: true }),
-    ])
+    const [{ data, error }, { data: directUsers }, { data: members }] =
+      await Promise.all([
+        supabase.from('clients').select('*').eq('id', clientId).single(),
+        // Portal user(s) for this client (role='client') + any user whose
+        // client_id points here for legacy reasons. Don't gate on role - if a
+        // client was created without a portal email, this returns nothing and
+        // we fall back to CRM team membership emails below.
+        supabase
+          .from('users')
+          .select('id, email, name, role, invitation_accepted, created_at')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: true }),
+        // CRM team members assigned to this client (managers/employees whose
+        // client_id may be null but who have a row in client_memberships).
+        supabase
+          .from('client_memberships')
+          .select('users:user_id (id, email, name, role)')
+          .eq('client_id', clientId),
+      ])
     if (error) {
       console.error('load client error:', error)
       setClient(null)
     } else {
       setClient(data as ClientRow)
     }
-    setClientEmails(
-      (users || []) as {
-        id: string
-        email: string
-        name: string | null
-        invitation_accepted: boolean | null
-      }[],
-    )
+    type EmailRow = {
+      id: string
+      email: string
+      name: string | null
+      role?: string | null
+      invitation_accepted: boolean | null
+    }
+    const seen = new Set<string>()
+    const merged: EmailRow[] = []
+    for (const u of (directUsers || []) as EmailRow[]) {
+      if (!u?.email || seen.has(u.id)) continue
+      seen.add(u.id)
+      merged.push(u)
+    }
+    type MemberRow = {
+      users:
+        | { id: string; email: string; name: string | null; role: string | null }
+        | { id: string; email: string; name: string | null; role: string | null }[]
+        | null
+    }
+    for (const m of (members || []) as MemberRow[]) {
+      const u = Array.isArray(m.users) ? m.users[0] : m.users
+      if (!u?.email || seen.has(u.id)) continue
+      seen.add(u.id)
+      merged.push({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        invitation_accepted: null,
+      })
+    }
+    setClientEmails(merged)
     setIsLoading(false)
   }, [supabase, clientId])
 
@@ -369,24 +410,36 @@ export default function ClientProfilePage() {
 
               {clientEmails.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                  {clientEmails.map((u) => (
-                    <a
-                      key={u.id}
-                      href={`mailto:${u.email}`}
-                      title={
-                        u.invitation_accepted === false
-                          ? 'Invitation pending'
-                          : u.name || u.email
-                      }
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#5A9AFF]/20 transition-colors"
-                    >
-                      <Mail className="h-3 w-3" />
-                      <span className="truncate max-w-[220px]">{u.email}</span>
-                      {u.invitation_accepted === false && (
-                        <span className="text-[10px] opacity-70">(pending)</span>
-                      )}
-                    </a>
-                  ))}
+                  {clientEmails.map((u) => {
+                    const isClient = !u.role || u.role === 'client'
+                    const tag = isClient
+                      ? null
+                      : u.role === 'admin' || u.role === 'manager'
+                        ? 'manager'
+                        : 'team'
+                    const titleText = u.invitation_accepted === false
+                      ? 'Invitation pending'
+                      : tag
+                        ? `${u.name || u.email} · ${tag}`
+                        : u.name || u.email
+                    return (
+                      <a
+                        key={u.id}
+                        href={`mailto:${u.email}`}
+                        title={titleText}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#5A9AFF]/20 transition-colors"
+                      >
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate max-w-[220px]">{u.email}</span>
+                        {u.invitation_accepted === false && (
+                          <span className="text-[10px] opacity-70">(pending)</span>
+                        )}
+                        {tag && (
+                          <span className="text-[10px] opacity-70">· {tag}</span>
+                        )}
+                      </a>
+                    )
+                  })}
                 </div>
               )}
 

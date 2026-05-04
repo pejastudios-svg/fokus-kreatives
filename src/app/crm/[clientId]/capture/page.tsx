@@ -9,6 +9,7 @@ import { FileUpload } from '@/components/ui/FileUpload'
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
 import { Toggle } from '@/components/ui/Toggle'
+import { useCrmRole } from '@/components/crm/CrmRoleContext'
 import {
   Plus,
   Link as LinkIcon,
@@ -26,7 +27,13 @@ import {
   CircleDot,
   Calendar,
   ListChecks,
+  FileDown,
 } from 'lucide-react'
+import { KebabMenu } from '@/components/ui/KebabMenu'
+import type {
+  CaptureReportPage,
+  CaptureReportSubmission,
+} from '@/components/reports/CaptureReport'
 
 type FieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'date' | 'time' | 'embed'
 
@@ -148,67 +155,14 @@ export default function CRMCapturePages() {
 
   const [tab, setTab] = useState<'pages' | 'submissions'>('pages')
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRow | null>(null)
-  const [crmRole, setCrmRole] = useState<'admin' | 'manager'>('manager')
-  const [isClientUser, setIsClientUser] = useState(false)
-
-  // ✅ This controls Create/Edit/Delete in Capture Pages
-  const canEditCapture = crmRole === 'admin' || isClientUser
-
-  useEffect(() => {
-    let cancelled = false
-
-    ;(async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user || !clientId) return
-
-        const { data: userRow, error: userErr } = await supabase
-          .from('users')
-          .select('role, is_agency_user, client_id')
-          .eq('id', user.id)
-          .single()
-
-        if (userErr) {
-          console.error('Capture role load user error:', userErr)
-          return
-        }
-
-        const isClient = userRow?.role === 'client'
-        if (!cancelled) setIsClientUser(isClient)
-
-        // ✅ Clients are full admins in their own CRM
-        if (isClient) {
-          if (!cancelled) setCrmRole('admin')
-          return
-        }
-
-        // ✅ Agency admins are admins everywhere
-        if (userRow?.role === 'admin' && userRow?.is_agency_user) {
-          if (!cancelled) setCrmRole('admin')
-          return
-        }
-
-        // ✅ Everyone else: membership role
-        const { data: mem, error: memErr } = await supabase
-          .from('client_memberships')
-          .select('role')
-          .eq('client_id', clientId)
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (memErr) console.error('Capture role load membership error:', memErr)
-
-        if (!cancelled) setCrmRole(mem?.role === 'admin' ? 'admin' : 'manager')
-      } catch (e) {
-        console.error('Capture role load exception:', e)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId])
+  // Capture pages are workspace structure (they shape lead intake), so
+  // editing is manager+ - matches the leads custom-fields gate.
+  // Employees see pages + submissions but can't create / edit / delete.
+  // Role comes from the CrmRoleProvider in CRMLayout (sourced from the
+  // service-role auth route, so it's correct even for users whose
+  // membership row is RLS-hidden from a browser query).
+  const { canEditWorkspace: canEditCapture, workspaceName } = useCrmRole()
+  const [isExporting, setIsExporting] = useState(false)
 
   // pages
   const [pages, setPages] = useState<CapturePage[]>([])
@@ -637,6 +591,87 @@ const deleteSubmission = async () => {
   }
 }
 
+  // ---- PDF export -----------------------------------------------------
+
+  const handleExportPdf = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      const [{ pdf }, { CaptureReport }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reports/CaptureReport'),
+      ])
+
+      const subsByPage = new Map<string, number>()
+      for (const s of submissions) {
+        subsByPage.set(
+          s.capture_page_id,
+          (subsByPage.get(s.capture_page_id) || 0) + 1,
+        )
+      }
+
+      const reportPages: CaptureReportPage[] = pages.map((p) => ({
+        name: p.name,
+        slug: p.slug,
+        isActive: p.is_active,
+        submissionCount: subsByPage.get(p.id) || 0,
+        createdDate: p.created_at,
+      }))
+
+      const pageNameById = new Map(pages.map((p) => [p.id, p.name]))
+
+      // Latest 50 submissions, most recent first.
+      const sortedSubs = [...submissions].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      const reportSubs: CaptureReportSubmission[] = sortedSubs
+        .slice(0, 50)
+        .map((s) => ({
+          pageName: pageNameById.get(s.capture_page_id) || '—',
+          name: s.name,
+          email: s.email,
+          phone: s.phone,
+          whenIso: s.created_at,
+        }))
+
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const submissions30d = submissions.filter(
+        (s) => new Date(s.created_at).getTime() >= thirtyDaysAgo,
+      ).length
+
+      const blob = await pdf(
+        <CaptureReport
+          workspaceName={workspaceName}
+          filters={[]}
+          metrics={{
+            totalPages: pages.length,
+            activePages: pages.filter((p) => p.is_active).length,
+            totalSubmissions: submissions.length,
+            submissions30d,
+          }}
+          pages={reportPages}
+          submissions={reportSubs}
+        />,
+      ).toBlob()
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const stamp = new Date().toISOString().slice(0, 10)
+      a.download = `${workspaceName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-capture-${stamp}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      console.error('Capture PDF export failed:', err)
+      alert('Could not generate PDF. Check the console for details.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
 function CaptureSkeleton() {
   return (
     <div className="space-y-3 animate-in fade-in">
@@ -707,12 +742,24 @@ function CaptureSkeleton() {
               Submissions
             </button>
 
-            {canEditCapture && (
-  <Button onClick={openNewModal}>
-    <Plus className="h-4 w-4 mr-2" />
-    New Capture Page
-  </Button>
-)}
+            <div className="flex items-center gap-1">
+              {canEditCapture && (
+                <Button onClick={openNewModal}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Capture Page
+                </Button>
+              )}
+              <KebabMenu
+                items={[
+                  {
+                    label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+                    icon: <FileDown className="h-4 w-4" />,
+                    disabled: isExporting,
+                    onClick: handleExportPdf,
+                  },
+                ]}
+              />
+            </div>
           </div>
         </div>
 

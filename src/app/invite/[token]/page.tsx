@@ -46,69 +46,65 @@ export default function InvitePage() {
           return
         }
 
-        const { data, error: invErr } = await supabase
-          .from('users')
-          .select('id, email, name, role, client_id, invitation_accepted')
-          .eq('invitation_token', tokenClean)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (invErr) console.error('Invite lookup error:', invErr)
-
-        if (!data) {
-          setError('Invalid or expired invitation link')
-          return
-        }
-
-        if (data.invitation_accepted) {
-          setError('This invitation has already been used')
-          return
-        }
-
-        setUserData(data as InvitedUser)
-
-        // Load CRM invite info if exists (membership-based role)
-        try {
-          const { data: mem, error: memErr } = await supabase
-            .from('client_memberships')
-            .select('role, client_id, clients:clients(name, business_name)')
-            .eq('user_id', data.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (memErr) {
-            console.error('crm invite info error:', memErr)
-            setCrmInviteInfo(null)
-          } else if (mem?.role && mem?.client_id) {
-            // Define the structure of the client data to satisfy TypeScript
-            type ClientRef = { name: string | null; business_name: string | null }
-            
-            // Cast mem to a specific type containing the clients relationship
-            const membershipWithClients = mem as unknown as { 
-              clients: ClientRef | ClientRef[] | null 
-            }
-            
-            const c = membershipWithClients.clients
-
-            const clientName =
-              (Array.isArray(c) ? c[0]?.business_name || c[0]?.name : c?.business_name || c?.name) || ''
-            setCrmInviteInfo({ role: mem.role, clientId: mem.client_id, clientName })
-          } else {
-            setCrmInviteInfo(null)
+        // Lookup goes through a server route that uses the service role,
+        // because both crm_invites and users are RLS-protected for an
+        // anonymous visitor.
+        const res = await fetch(
+          `/api/invite/lookup?token=${encodeURIComponent(tokenClean)}`,
+        )
+        const json = (await res.json()) as {
+          success: boolean
+          error?: string
+          // Two response shapes: 'crm' = new crm_invites table,
+          // 'legacy' = users.invitation_token (portal client invites).
+          kind?: 'crm' | 'legacy'
+          invite?: {
+            email: string
+            name: string | null
+            role: string
+            clientId?: string | null
+            clientName?: string
+            expiresAt?: string
           }
-        } catch (e) {
-          console.error('crm invite info exception:', e)
+        }
+
+        if (!res.ok || !json.success || !json.invite) {
+          setError(json.error || 'Invalid or expired invitation link')
+          return
+        }
+
+        // Adapt both response kinds into the existing local state shape
+        // so the rest of the page renders the same way.
+        const inv = json.invite
+        setUserData({
+          // No id is needed here - server route does the auth provisioning
+          // by token, not by id.
+          id: '',
+          email: inv.email,
+          name: inv.name,
+          role: inv.role,
+          client_id: inv.clientId || null,
+          invitation_accepted: false,
+        })
+        if (json.kind === 'crm' && inv.clientId) {
+          setCrmInviteInfo({
+            role: inv.role,
+            clientId: inv.clientId,
+            clientName: inv.clientName || 'a client CRM',
+          })
+        } else {
           setCrmInviteInfo(null)
         }
+      } catch (err) {
+        console.error('invite lookup exception:', err)
+        setError('Could not load invitation. Try the link again.')
       } finally {
         setIsLoading(false)
       }
     }
 
     run()
-  }, [token, supabase])
+  }, [token])
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -127,74 +123,44 @@ export default function InvitePage() {
     setError('')
 
     try {
-      let authUserId: string | null = null
-
-      const signUpRes = await supabase.auth.signUp({
-        email: userData.email,
-        password,
+      // Activation runs server-side: it provisions the auth user (or
+      // resets the password on a pre-existing one), aligns the public.users
+      // row id to the new auth uid, and clears the invitation token.
+      // We then sign in client-side to establish a browser session.
+      const acceptRes = await fetch('/api/invite/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
       })
-
-      if (signUpRes.error) {
-        const msg = (signUpRes.error.message || '').toLowerCase()
-        if (msg.includes('already registered')) {
-          const signInRes = await supabase.auth.signInWithPassword({
-            email: userData.email,
-            password,
-          })
-          if (signInRes.error) {
-            setError(signInRes.error.message)
-            return
-          }
-          authUserId = signInRes.data.user?.id || null
-        } else {
-          setError(signUpRes.error.message)
-          return
-        }
-      } else {
-        authUserId = signUpRes.data.user?.id || null
+      const acceptJson = (await acceptRes.json()) as {
+        success: boolean
+        error?: string
+        email?: string
+        redirectTo?: string
       }
 
-      if (!authUserId) {
-        setError('Account created but session could not start. Please go to login.')
+      if (!acceptRes.ok || !acceptJson.success || !acceptJson.email) {
+        setError(acceptJson.error || 'Failed to activate account')
         return
       }
 
-      // Mark invitation accepted + clear token.
-      // IMPORTANT: your system changes the public.users PK to auth uid.
-      const { error: updateErr } = await supabase
-        .from('users')
-        .update({
-          id: authUserId,
-          invitation_accepted: true,
-          invitation_token: null,
-        })
-        .eq('invitation_token', token)
-
-      if (updateErr) {
-        console.error('Invite accept update error:', updateErr)
-        setError('Failed to activate account')
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: acceptJson.email,
+        password,
+      })
+      if (signInRes.error) {
+        // Server activation succeeded; user just needs to log in manually.
+        setError(
+          `Account activated, but auto sign-in failed: ${signInRes.error.message}. Go to /login to sign in.`,
+        )
         return
       }
 
       setSuccess(true)
-
-      // Redirect logic:
-      // - client portal users land on their CRM dashboard so they don't have
-      //   to re-paste a separate CRM URL after setting their password.
-      // - agency-staff CRM invites (membership-based) go to that specific
-      //   client's CRM.
-      // - everyone else falls through to the agency dashboard.
-      if (userData.role === 'client' && userData.client_id) {
-        router.push(`/crm/${userData.client_id}/dashboard`)
-        return
-      }
-
-      if (crmInviteInfo?.clientId) {
-        router.push(`/crm/${crmInviteInfo.clientId}/dashboard`)
-        return
-      }
-
-      router.push('/dashboard')
+      router.push(acceptJson.redirectTo || '/dashboard')
+    } catch (err) {
+      console.error('invite accept exception:', err)
+      setError(err instanceof Error ? err.message : 'Failed to activate account')
     } finally {
       setIsSubmitting(false)
     }
@@ -258,14 +224,16 @@ export default function InvitePage() {
           </h2>
           <p className="text-center text-[var(--text-tertiary)] mb-6">Set your password to activate your account</p>
 
-          <div className="bg-[#E8F1FF] text-[#2B79F7] px-4 py-2 rounded-lg text-center text-sm mb-6">
+          <div className="bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] px-4 py-2 rounded-lg text-center text-sm mb-6 capitalize">
             {crmInviteInfo ? (
               <>
-                You’re joining <strong>{crmInviteInfo.clientName || 'a client CRM'}</strong> as <strong>{crmInviteInfo.role}</strong>
+                You&rsquo;re joining{' '}
+                <strong>{crmInviteInfo.clientName || 'a client CRM'}</strong> as{' '}
+                <strong>{crmInviteInfo.role}</strong>
               </>
             ) : (
               <>
-                You’re joining as <strong>{userData?.role}</strong>
+                You&rsquo;re joining as <strong>{userData?.role}</strong>
               </>
             )}
           </div>

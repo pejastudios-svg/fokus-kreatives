@@ -112,7 +112,13 @@ h1, h2, h3, h4, h5, h6 {
   --bg-tertiary: #0F1929;
   --bg-card: #1E2A41;
   --bg-card-hover: #293548;
-  --bg-input: #1E2A41;
+  /* Input bg is intentionally one step DARKER than --bg-card so a
+     field placed inside a card "sinks in" and the border becomes
+     legible. Without this gap inputs blend into the card surface,
+     leaving only the faint border to mark the field (the bug seen
+     on the login + invite pages). The agency-scope already uses
+     #0F1929 for the same reason. */
+  --bg-input: #0F1929;
   --bg-sidebar: linear-gradient(180deg, #060B16 0%, #0F1929 100%);
   
   --text-primary: #f8fafc;
@@ -141,9 +147,21 @@ h1, h2, h3, h4, h5, h6 {
   --bg-input: #0F1929;
 }
 
-:root .agency-scope,
+/* Light-mode only: warm the page background a touch so cards have a hint
+   more contrast. Without the :not(.dark) guard this leaks into dark mode
+   and turns modal inputs / board cards into light surfaces on a dark
+   page. */
+:root:not(.dark) .agency-scope,
 .light .agency-scope {
   --bg-secondary: #f1f5f9;
+}
+
+/* Dark-mode: the agency-scope page bg is pure black; bump --bg-secondary
+   one notch above the page so card-on-card surfaces (modal inputs, board
+   cards, table footers) read as a separate layer rather than blending
+   into the card. */
+.dark .agency-scope {
+  --bg-secondary: #060B16;
 }
 
 .dark .agency-scope .bg-\[var\(--bg-card\)\].rounded-xl.border {
@@ -173,6 +191,26 @@ body {
   font-weight: 400;
 }
 
+/* WebKit autofill: by default Chrome/Safari paint a yellow-ish (or
+   theme-tinted) background and use their own text color when the user
+   accepts a saved password. Override with our theme colors so password
+   inputs don't suddenly look different from sibling fields. The 5000s
+   transition delay is the standard hack to keep the override sticking
+   - WebKit clears it after a moment otherwise. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--text-primary) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-input) inset !important;
+  box-shadow: 0 0 0 1000px var(--bg-input) inset !important;
+  caret-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -190,6 +228,27 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+/* Shared modal input style - dark surface, primary text, blue focus
+   ring. Used by the team-management modals (invite, remove, cancel)
+   so all the form fields render consistently. */
+.modal-input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  outline: none;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.modal-input:focus {
+  box-shadow: 0 0 0 2px rgba(43, 121, 247, 0.4);
+  border-color: transparent;
+}
+.modal-input::placeholder {
+  color: var(--text-tertiary);
 }
 
 /* Theme-aware utility classes */

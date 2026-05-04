@@ -1,12 +1,29 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { Montserrat } from 'next/font/google'
+import { Montserrat, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 
 const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
   variable: '--font-montserrat',
+  display: 'swap',
+})
+
+// IBM Plex Sans/Mono are scoped to the new dashboard surfaces (CRM
+// dashboard for now). Loaded as CSS variables so individual pages can
+// opt in via `font-[var(--font-plex-sans)]` without leaking the font
+// across the rest of the app.
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-sans',
+  display: 'swap',
+})
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-plex-mono',
   display: 'swap',
 })
 
@@ -33,7 +50,11 @@ const themeBootstrap = `
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // Added suppressHydrationWarning to ignore extension injections like 'webcrx'
-    <html lang="en" className={montserrat.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${montserrat.variable} ${plexSans.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>

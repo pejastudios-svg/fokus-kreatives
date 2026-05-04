@@ -33,21 +33,26 @@ function LoginForm() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Already-authed users skip the form. Clients land in their own CRM,
-        // everyone else (admin/manager/employee) goes to the agency dashboard.
-        const { data: userRow } = await supabase
-          .from('users')
-          .select('role, client_id')
-          .eq('id', user.id)
-          .single()
-
-        if (userRow?.role === 'client' && userRow.client_id) {
-          router.push(`/crm/${userRow.client_id}/dashboard`)
-        } else {
-          router.push('/dashboard')
-        }
+      // Already-signed-in users skip the form and go to wherever they
+      // belong. Routing goes through /api/me/landing so CRM team
+      // members (whose memberships are RLS-hidden from a browser
+      // query) actually reach their CRM instead of looping back here.
+      const res = await fetch('/api/me/landing', { cache: 'no-store' })
+      if (res.status === 401) {
+        setIsChecking(false)
+        return
+      }
+      const json = (await res.json()) as
+        | { authed: true; signOut: true }
+        | { authed: true; destination: string }
+        | { authed: false }
+      if ('signOut' in json && json.signOut) {
+        await supabase.auth.signOut()
+        setIsChecking(false)
+        return
+      }
+      if ('destination' in json) {
+        router.push(json.destination)
         return
       }
       setIsChecking(false)
@@ -82,20 +87,15 @@ function LoginForm() {
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (user) {
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, client_id')
-        .eq('id', user.id)
-        .single()
-
-      if (userRow?.role === 'client' && userRow.client_id) {
-        router.push(`/crm/${userRow.client_id}/dashboard`)
-      } else {
-        router.push('/dashboard')
-      }
+    // Same service-role-backed lookup as the auto-redirect above.
+    const res = await fetch('/api/me/landing', { cache: 'no-store' })
+    const json = (await res.json().catch(() => null)) as
+      | { authed: true; destination: string }
+      | { authed: true; signOut: true }
+      | { authed: false }
+      | null
+    if (json && 'destination' in json) {
+      router.push(json.destination)
     } else {
       router.push('/dashboard')
     }
