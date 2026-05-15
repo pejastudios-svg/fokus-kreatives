@@ -87,6 +87,11 @@ useEffect(() => {
   const [meetingsViewed, setMeetingsViewed] = useState(false)
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   const [newMeetingsCount, setNewMeetingsCount] = useState(0)
+  // Inbox badge - reflects unread CRM-scoped notifications for THIS
+  // client. Source of truth is the `notifications` table (no
+  // localStorage cache needed). Recomputes live via the supabase
+  // channel below.
+  const [inboxUnreadCount, setInboxUnreadCount] = useState(0)
 
   // Popup inside CRM (for leads/meetings only; approval popups handled globally)
   const [popup, setPopup] = useState<{ type: 'lead' | 'meeting'; title: string; subtitle?: string } | null>(null)
@@ -303,6 +308,68 @@ useEffect(() => {
     }
   }, [supabase, clientId, isAuthorized, leadsViewed, meetingsViewed])
 
+  // Inbox badge: recomputes the unread CRM-scoped notification count
+  // for this client. Refetches initially, on every change to the
+  // notifications table for this user, and whenever the user
+  // navigates back into the CRM. Source of truth = notifications
+  // table - the inbox page marks rows read, which fires the channel
+  // and brings the badge down to zero automatically.
+  useEffect(() => {
+    if (!clientId || !isAuthorized) return
+    let cancelled = false
+
+    const CRM_TYPES = [
+      'lead_created',
+      'capture_submission',
+      'meeting_created',
+      'payment_created',
+      'payment_due',
+    ]
+
+    const refresh = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, data, type')
+        .eq('user_id', user.id)
+        .is('read_at', null)
+        .in('type', CRM_TYPES)
+      if (error || cancelled) return
+      const count = (data || []).filter((n) => {
+        const d = n.data as { clientId?: unknown } | null
+        return typeof d?.clientId === 'string' && d.clientId === clientId
+      }).length
+      if (!cancelled) setInboxUnreadCount(count)
+    }
+
+    void refresh()
+
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      channel = supabase
+        .channel(`crm-inbox-badge-${clientId}-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => void refresh(),
+        )
+        .subscribe()
+    })()
+
+    return () => {
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [supabase, clientId, isAuthorized])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -461,6 +528,20 @@ useEffect(() => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0
               const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0
+              const showInboxBadge = item.name === 'Inbox' && inboxUnreadCount > 0
+              const badgeCount = showLeadsBadge
+                ? newLeadsCount
+                : showMeetingsBadge
+                ? newMeetingsCount
+                : showInboxBadge
+                ? inboxUnreadCount
+                : 0
+              // Badge style: light-blue pill on inactive tabs (works
+              // on both light + dark mode), white-on-blue on the
+              // active tab so it stays legible.
+              const badgeClass = isActive
+                ? 'bg-white/95 text-[#1E54B7]'
+                : 'bg-[#2B79F7]/15 text-[#2B79F7]'
               return (
                 <Link
                   key={item.name}
@@ -475,9 +556,14 @@ useEffect(() => {
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   <span>{item.name}</span>
-                  {(showLeadsBadge || showMeetingsBadge) && (
-                    <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/90 text-[#1E54B7] text-[10px] font-bold">
-                      {badgeValue(showLeadsBadge ? newLeadsCount : newMeetingsCount)}
+                  {badgeCount > 0 && (
+                    <span
+                      className={cn(
+                        'ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold',
+                        badgeClass,
+                      )}
+                    >
+                      {badgeValue(badgeCount)}
                     </span>
                   )}
                 </Link>
@@ -607,6 +693,17 @@ useEffect(() => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const showLeadsBadge = item.name === 'Leads' && newLeadsCount > 0
                 const showMeetingsBadge = item.name === 'Meetings' && newMeetingsCount > 0
+                const showInboxBadge = item.name === 'Inbox' && inboxUnreadCount > 0
+                const badgeCount = showLeadsBadge
+                  ? newLeadsCount
+                  : showMeetingsBadge
+                  ? newMeetingsCount
+                  : showInboxBadge
+                  ? inboxUnreadCount
+                  : 0
+                const badgeClass = isActive
+                  ? 'bg-white/95 text-[#1E54B7]'
+                  : 'bg-[#2B79F7]/15 text-[#2B79F7]'
                 return (
                   <Link
                     key={item.name}
@@ -624,9 +721,14 @@ useEffect(() => {
                   >
                     <item.icon className="h-5 w-5 shrink-0" />
                     <span className="flex-1">{item.name}</span>
-                    {(showLeadsBadge || showMeetingsBadge) && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/90 text-[#1E54B7] text-[10px] font-bold">
-                        {badgeValue(showLeadsBadge ? newLeadsCount : newMeetingsCount)}
+                    {badgeCount > 0 && (
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold',
+                          badgeClass,
+                        )}
+                      >
+                        {badgeValue(badgeCount)}
                       </span>
                     )}
                   </Link>

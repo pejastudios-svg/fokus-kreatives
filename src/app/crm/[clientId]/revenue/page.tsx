@@ -1078,7 +1078,10 @@ function RevenueSkeleton() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-[280px]">
+        {/* Search + sort group wraps to its own line on mobile so it
+            doesn't get crushed against the filter pills. flex-1 only
+            kicks in from sm: up - on mobile it takes the full row. */}
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-[280px]">
           {/* Search */}
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-tertiary)]" />

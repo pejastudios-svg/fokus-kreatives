@@ -209,8 +209,10 @@ export default function CRMInboxPage() {
         Your activity. Leads, meetings, submissions, payments.
       </p>
 
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <div className="flex items-center gap-6 border-b border-[var(--border-primary)] flex-1 min-w-0">
+      {/* Toolbar stacks on mobile so the action buttons don't crowd
+          the tab strip. Desktop keeps them side-by-side. */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex items-center gap-6 border-b border-[var(--border-primary)] min-w-0">
           {(['all', 'unread'] as const).map((f) => {
             const active = filter === f
             const count = f === 'unread' ? unreadCount : items.length
@@ -236,7 +238,7 @@ export default function CRMInboxPage() {
             )
           })}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <Button
             size="sm"
             variant="outline"
@@ -245,7 +247,7 @@ export default function CRMInboxPage() {
             title="Mark all your notifications as read"
           >
             <CheckCheck className="h-4 w-4 mr-1.5" />
-            Mark all read
+            <span className="whitespace-nowrap">Mark all read</span>
           </Button>
           <Button
             size="sm"
@@ -255,7 +257,7 @@ export default function CRMInboxPage() {
             title="Delete all your notifications"
           >
             <Trash2 className="h-4 w-4 mr-1.5" />
-            Clear all
+            <span className="whitespace-nowrap">Clear all</span>
           </Button>
         </div>
       </div>

@@ -55,6 +55,7 @@ export function CurrencyPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -63,6 +64,28 @@ export function CurrencyPicker({
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  // After the dropdown opens, measure its bounding box and shift it
+  // back into the viewport if it overflows on the left or right. The
+  // dropdown is positioned via Tailwind classes relative to its
+  // trigger; this layout effect adds a `translate` only when needed.
+  // No state-update inside the effect to avoid re-render loops -
+  // mutate the DOM directly.
+  useEffect(() => {
+    if (!open || !dropdownRef.current) return
+    const el = dropdownRef.current
+    // Reset any prior translate so re-opens recompute from scratch.
+    el.style.transform = ''
+    const rect = el.getBoundingClientRect()
+    const padding = 8
+    const vw = window.innerWidth
+    let dx = 0
+    if (rect.left < padding) dx = padding - rect.left
+    if (rect.right > vw - padding) dx = vw - padding - rect.right
+    if (dx !== 0) {
+      el.style.transform = `translateX(${dx}px)`
+    }
   }, [open])
 
   const sorted = useMemo(() => [...options].sort(), [options])
@@ -129,6 +152,7 @@ export function CurrencyPicker({
 
       {open && (
         <div
+          ref={dropdownRef}
           className={`absolute z-30 mt-1 ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} w-72 max-w-[calc(100vw-1rem)] max-h-72 overflow-hidden rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg flex flex-col`}
         >
           <div className="p-2 border-b border-[var(--border-primary)]">
