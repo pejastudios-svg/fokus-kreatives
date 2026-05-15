@@ -19,6 +19,8 @@ import {
   Sparkles,
   Sun,
   Moon,
+  CalendarRange,
+  ShieldCheck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -28,6 +30,7 @@ const LOGO_URL = 'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20
 const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
+  { name: 'Planner', href: '/planner', icon: CalendarRange },
   { name: 'Team', href: '/team', icon: UserCircle },
   { name: 'Competitors', href: '/competitors', icon: Search },
   { name: 'Approvals', href: '/approvals', icon: ClipboardList },
@@ -50,6 +53,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
 
   const [userName, setUserName] = useState('')
   const [userPicture, setUserPicture] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { theme, toggleTheme } = useTheme()
 
@@ -68,13 +72,14 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('name, profile_picture_url')
+          .select('name, profile_picture_url, role')
           .eq('id', user.id)
           .single()
 
         if (data) {
           setUserName(data.name || '')
           setUserPicture(data.profile_picture_url || user.user_metadata?.avatar_url || null)
+          setUserRole(data.role || null)
         }
       }
     }
@@ -229,6 +234,16 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
                 <Settings className="h-4 w-4" />
                 Settings
               </Link>
+              {userRole === 'admin' && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors border-t border-[var(--border-primary)]"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Admin
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-4 py-2.5 w-full text-sm text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors border-t border-[var(--border-primary)]"

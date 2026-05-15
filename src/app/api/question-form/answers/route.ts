@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'crypto'
+import type { FormTopic } from '@/lib/types/questionForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +16,11 @@ interface FormQuestionRow {
   pillar?: string
 }
 
+function topicGroupIdFor(formId: string, topicId: string): string {
+  const h = createHash('sha256').update(`${formId}:${topicId}`).digest('hex')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
@@ -24,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const { data: form, error } = await supabase
     .from('question_forms')
-    .select('id, client_id, title, questions, submitted_at')
+    .select('id, client_id, title, questions, topics, submitted_at')
     .eq('token', token)
     .maybeSingle()
 
@@ -33,47 +40,116 @@ export async function GET(req: NextRequest) {
   }
 
   if (!form.submitted_at) {
-    return NextResponse.json({ success: true, submitted: false, answers: [] })
+    return NextResponse.json({ success: true, submitted: false, answers: [], topics: [] })
   }
 
-  const questions = (Array.isArray(form.questions) ? form.questions : []) as FormQuestionRow[]
+  const formTopics = (Array.isArray(form.topics) ? form.topics : []) as FormTopic[]
+  const isTopicForm = formTopics.length > 0
 
-  // Submission inserts one `topics` row per answered question with
-  // `source='form'`. We re-join by matching question text - the schema
-  // doesn't carry a form_id reference yet. A small risk if the same
-  // question text repeats across forms for the same client; acceptable
-  // for now since we filter by submission window.
+  if (isTopicForm) {
+    // Look up answers by topic_group_id (deterministic). Returns the
+    // grouped shape expected by the M2 viewer.
+    const groupIds = formTopics.map((t) => topicGroupIdFor(form.id, t.id))
+    const { data: rows } = await supabase
+      .from('topics')
+      .select('answer, input_type, thin_flag, topic_group_id, group_position')
+      .eq('client_id', form.client_id)
+      .eq('source', 'form')
+      .in('topic_group_id', groupIds)
+
+    const byGroup = new Map<
+      string,
+      Array<{ input_type: string; answer: string; thin_flag: boolean; group_position: number | null }>
+    >()
+    for (const r of rows || []) {
+      if (!r.topic_group_id) continue
+      const list = byGroup.get(r.topic_group_id) || []
+      list.push({
+        input_type: r.input_type || 'untyped',
+        answer: r.answer || '',
+        thin_flag: !!r.thin_flag,
+        group_position: r.group_position ?? null,
+      })
+      byGroup.set(r.topic_group_id, list)
+    }
+
+    const topicsOut = formTopics.map((t) => {
+      const gid = topicGroupIdFor(form.id, t.id)
+      const stored = byGroup.get(gid) || []
+      const byType = new Map<string, { answer: string; thin_flag: boolean }>()
+      for (const s of stored) byType.set(s.input_type, { answer: s.answer, thin_flag: s.thin_flag })
+
+      const questions = t.questions.map((q) => {
+        const hit = byType.get(q.input_type)
+        return {
+          id: q.id,
+          input_type: q.input_type,
+          text: q.text,
+          answer: hit?.answer ?? null,
+          thin_flag: hit?.thin_flag ?? false,
+        }
+      })
+
+      return {
+        id: t.id,
+        title: t.title,
+        pillar_hint: t.pillar_hint,
+        questions,
+        thin_count: questions.filter((q) => q.thin_flag).length,
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      submitted: true,
+      isTopicForm: true,
+      title: form.title,
+      submittedAt: form.submitted_at,
+      topics: topicsOut,
+      // legacy field stays so callers expecting `answers` don't break.
+      answers: [],
+    })
+  }
+
+  // Legacy path - flat questions matched by text inside the submission window.
+  const questions = (Array.isArray(form.questions) ? form.questions : []) as FormQuestionRow[]
   const submittedAt = new Date(form.submitted_at)
   const windowStart = new Date(submittedAt.getTime() - 5 * 60 * 1000).toISOString()
   const windowEnd = new Date(submittedAt.getTime() + 5 * 60 * 1000).toISOString()
 
   const { data: topicRows } = await supabase
     .from('topics')
-    .select('question, answer, pillar')
+    .select('question, answer, pillar, thin_flag')
     .eq('client_id', form.client_id)
     .eq('source', 'form')
     .gte('created_at', windowStart)
     .lte('created_at', windowEnd)
 
-  const answerByQuestion = new Map<string, string>()
+  const answerByQuestion = new Map<string, { answer: string; thin_flag: boolean }>()
   for (const row of topicRows || []) {
     if (typeof row.question === 'string' && typeof row.answer === 'string') {
-      answerByQuestion.set(row.question, row.answer)
+      answerByQuestion.set(row.question, { answer: row.answer, thin_flag: !!row.thin_flag })
     }
   }
 
-  const answers = questions.map((q) => ({
-    id: q.id,
-    text: q.text || '',
-    pillar: q.pillar || null,
-    answer: answerByQuestion.get(q.text || '') || null,
-  }))
+  const answers = questions.map((q) => {
+    const hit = answerByQuestion.get(q.text || '')
+    return {
+      id: q.id,
+      text: q.text || '',
+      pillar: q.pillar || null,
+      answer: hit?.answer ?? null,
+      thin_flag: hit?.thin_flag ?? false,
+    }
+  })
 
   return NextResponse.json({
     success: true,
     submitted: true,
+    isTopicForm: false,
     title: form.title,
     submittedAt: form.submitted_at,
+    topics: [],
     answers,
   })
 }

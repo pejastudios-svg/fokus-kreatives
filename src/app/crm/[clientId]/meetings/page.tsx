@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
@@ -35,6 +35,10 @@ interface Meeting {
   status: Status
   location_type: LocationType
   location_url: string | null
+  /** Which scheduling integration created this meeting (if any).
+   *  Used so meetings booked via Calendly are labelled "Calendly"
+   *  rather than falling through to the legacy "Jitsi" default. */
+  integration_provider?: 'calendly' | 'google_meet' | 'zoom' | null
   created_at: string
   creator?: {
     id: string
@@ -48,6 +52,10 @@ export default function CRMMeetingsPage() {
   const params = useParams()
   // Fix: Cast params to Record<string, string> instead of any
   const clientId = ((params as Record<string, string>).clientid || (params as Record<string, string>).clientId) as string
+  // ?focus=<meetingId> deep-link from the Inbox - target card pulses
+  // + scrolls into view on mount.
+  const searchParams = useSearchParams()
+  const focusedMeetingId = searchParams?.get('focus') || null
   const supabase = createClient()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -318,6 +326,24 @@ export default function CRMMeetingsPage() {
         } catch (notifyErr) {
           console.error('Failed to send meeting_created email', notifyErr)
         }
+
+        // In-app notification to every CRM team member (separate from
+        // the email above). Personal `notify_new_meeting` pref gates
+        // it server-side. Fire-and-forget.
+        void fetch('/api/notifications/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId,
+            type: 'meeting_created',
+            data: {
+              meetingTitle: data.title,
+              dateTime: data.date_time,
+              link: data.location_url,
+              clientName: clientName || '',
+            },
+          }),
+        }).catch((e) => console.error('in-app meeting notification failed:', e))
       }
   } catch (err) {
     console.error('Meeting create exception:', err)
@@ -358,7 +384,8 @@ export default function CRMMeetingsPage() {
     <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
       <div className="flex items-center justify-between mb-4 gap-2">
         <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
-        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+        {/* Kebab only - Add Meeting now lives inside it. */}
+        <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -425,22 +452,21 @@ export default function CRMMeetingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 gap-2">
           <p className="text-xs text-[var(--text-tertiary)] truncate">See and schedule meetings for this client</p>
-          <div className="flex items-center gap-1 shrink-0">
-            <Button size="sm" onClick={() => setShowAddModal(true)}>
-              <Plus className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Add Meeting</span>
-            </Button>
-            <KebabMenu
-              items={[
-                {
-                  label: isExporting ? 'Generating PDF…' : 'Export as PDF',
-                  icon: <FileDown className="h-4 w-4" />,
-                  disabled: isExporting,
-                  onClick: handleExportPdf,
-                },
-              ]}
-            />
-          </div>
+          <KebabMenu
+            items={[
+              {
+                label: 'Add Meeting',
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => setShowAddModal(true),
+              },
+              {
+                label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+                icon: <FileDown className="h-4 w-4" />,
+                disabled: isExporting,
+                onClick: handleExportPdf,
+              },
+            ]}
+          />
         </div>
 
         {/* Filters */}
@@ -500,7 +526,16 @@ export default function CRMMeetingsPage() {
                 )
 
               return (
-                <div key={m.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                <div
+                  key={m.id}
+                  ref={(el) => {
+                    if (el && focusedMeetingId === m.id) {
+                      el.classList.add('focus-pulse')
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      setTimeout(() => el.classList.remove('focus-pulse'), 3000)
+                    }
+                  }}
+                  className="px-4 py-3 flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <div className="p-2 rounded-lg bg-[var(--bg-tertiary)] text-[#2B79F7] shrink-0">
                       <Calendar className="h-4 w-4" />
@@ -517,14 +552,22 @@ export default function CRMMeetingsPage() {
                           <Clock className="h-3 w-3" />
                           {dateStr} · {timeStr} · {m.duration_minutes}m
                         </span>
-                        {m.location_type !== 'custom' && (
+                        {(m.location_type !== 'custom' || m.integration_provider) && (
                           <span className="inline-flex items-center gap-1">
                             <Video className="h-3 w-3" />
                             {m.location_type === 'zoom'
                               ? 'Zoom'
                               : m.location_type === 'google_meet'
                               ? 'Google Meet'
-                              : 'Jitsi'}
+                              : m.location_type === 'jitsi'
+                              ? 'Jitsi'
+                              : m.integration_provider === 'calendly'
+                              ? 'Calendly'
+                              : m.integration_provider === 'google_meet'
+                              ? 'Google Meet'
+                              : m.integration_provider === 'zoom'
+                              ? 'Zoom'
+                              : 'Other'}
                           </span>
                         )}
                       </p>
@@ -785,8 +828,8 @@ export default function CRMMeetingsPage() {
           </div>
         )}
         {meetingToDelete && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Meeting</h3>
         <button

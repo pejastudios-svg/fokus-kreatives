@@ -609,7 +609,7 @@ function TeamSkeleton() {
                         </button>
 
                         {isMenuOpen && (
-                          <div className="absolute right-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                             <div className="px-4 py-3 space-y-2 border-b border-[var(--border-primary)]">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-xs text-[var(--text-tertiary)]">Role</span>

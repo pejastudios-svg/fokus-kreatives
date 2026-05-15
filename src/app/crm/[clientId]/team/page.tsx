@@ -718,27 +718,25 @@ export default function CRMTeamPage() {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {canManage && (
-            <Button
-              size="sm"
-              onClick={() => setShowInviteModal(true)}
-            >
-              <Plus className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Invite Member</span>
-            </Button>
-          )}
-          <KebabMenu
-            items={[
-              {
-                label: isExporting ? 'Generating PDF…' : 'Export as PDF',
-                icon: <FileDown className="h-4 w-4" />,
-                disabled: isExporting,
-                onClick: handleExportPdf,
-              },
-            ]}
-          />
-        </div>
+        <KebabMenu
+          items={[
+            ...(canManage
+              ? [
+                  {
+                    label: 'Invite Member',
+                    icon: <Plus className="h-4 w-4" />,
+                    onClick: () => setShowInviteModal(true),
+                  },
+                ]
+              : []),
+            {
+              label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+              icon: <FileDown className="h-4 w-4" />,
+              disabled: isExporting,
+              onClick: handleExportPdf,
+            },
+          ]}
+        />
       </div>
 
       <div className="mb-4">
@@ -1235,7 +1233,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl animate-in zoom-in-95"
+        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
@@ -1268,7 +1266,8 @@ function TeamSkeleton() {
           <Skeleton className="h-3 w-48 bg-[var(--bg-card-hover)]" />
           <Skeleton className="h-3 w-32 bg-[var(--bg-card-hover)]" />
         </div>
-        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+        {/* Kebab only - Invite Member now lives inside it. */}
+        <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
       <Skeleton className="h-9 sm:h-10 w-full sm:w-80 mb-4 rounded-xl bg-[var(--bg-card-hover)]" />
       {[1, 2].map((section) => (

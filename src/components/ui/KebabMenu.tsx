@@ -83,7 +83,7 @@ export function KebabMenu({
 
       {open && (
         <div
-          className={`absolute z-30 mt-1 ${align === 'right' ? 'right-0' : 'left-0'} w-60 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl overflow-hidden max-h-[70vh] overflow-y-auto`}
+          className={`absolute z-30 mt-1 ${align === 'right' ? 'right-0' : 'left-0'} w-60 max-w-[calc(100vw-1rem)] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl overflow-hidden max-h-[70vh] overflow-y-auto`}
         >
           <ul className="py-1">
             {items.map((item, i) => {

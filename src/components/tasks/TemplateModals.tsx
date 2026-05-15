@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Save, Trash2, Sparkles } from 'lucide-react'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 interface TaskTemplate {
   id: string
@@ -54,6 +55,8 @@ export function SaveTemplateModal({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  useBodyScrollLock(open)
+
   if (!open) return null
 
   const handleSave = async () => {
@@ -90,7 +93,7 @@ export function SaveTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -214,6 +217,8 @@ export function ApplyTemplateModal({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  useBodyScrollLock(open)
+
   if (!open) return null
 
   const handleApply = async (templateId: string) => {
@@ -248,7 +253,7 @@ export function ApplyTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

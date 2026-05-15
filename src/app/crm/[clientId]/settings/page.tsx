@@ -9,6 +9,9 @@ import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
 import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { IntegrationsCard } from '@/components/integrations/IntegrationsCard'
+import { AvailabilityCard } from '@/components/integrations/AvailabilityCard'
+import { useCrmRole } from '@/components/crm/CrmRoleContext'
 import {
   User,
   Lock,
@@ -38,6 +41,9 @@ export default function CRMSettingsPage() {
   const routeParams = params as Record<string, string>
   const clientId = routeParams.clientid || routeParams.clientId
   const supabase = createClient()
+  // Manager+ can connect/disconnect integrations. Employees see the
+  // card in read-only mode (so they can see what's connected).
+  const { canEditWorkspace } = useCrmRole()
 
   const [isLoading, setIsLoading] = useState(true)
 
@@ -313,6 +319,13 @@ function SettingsSkeleton() {
 
             </CardContent>
           </Card>
+
+          {/* Meeting integrations - Calendly today, Google Meet + Zoom
+              wired later. Bookings made via any connected provider
+              auto-log into the meetings table. */}
+          <IntegrationsCard clientId={clientId} canManage={canEditWorkspace} />
+
+          <AvailabilityCard clientId={clientId} canManage={canEditWorkspace} />
 
           {/* Personal notifications - one toggle per CRM event type. The
               actual gating of notification firing is wired in Phase D; for

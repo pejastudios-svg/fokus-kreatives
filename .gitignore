@@ -43,3 +43,7 @@ next-env.d.ts
 # local-only references / tooling (don't commit)
 /awesome-design-md-main/
 /claude/
+
+# google service account credentials - NEVER commit
+google-service-account*.json
+service-account*.json

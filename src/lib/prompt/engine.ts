@@ -1,4 +1,12 @@
 import type { BrandProfile } from '@/components/clients/brandProfile'
+import {
+  ammoBlock as renderAmmoBlock,
+  bansBlock as renderBansBlock,
+  clientContextBlock,
+  commonEnemyLine as renderCommonEnemyLine,
+  voiceFingerprintLine,
+  voiceSamplesBlock,
+} from './brandContext'
 import { frameworkBlock, pillarFrameworkBlock } from './framework'
 
 export type Tier = 'beginner' | 'mid' | 'advanced'
@@ -24,7 +32,7 @@ export interface BuiltPrompt {
   temperature: number
 }
 
-const HARD_BANS = [
+export const HARD_BANS = [
   // Em-dash and en-dash - convert to commas via the repair regex; if any
   // survive the repair pass we want them surgically stripped. NOTE: this
   // entry MUST NOT be a plain hyphen ("-"), or surgicalBanRemoval will
@@ -54,7 +62,36 @@ const HARD_BANS = [
   // inside a real sentence - "I was honestly surprised" - is fine).
   'honestly?',
   'honestly,',
+  'and honestly,',
+  'and honestly',
   'look,',
+  // "What most people miss" - generic REHOOK 2 opener, AI tell.
+  'what most people miss',
+  "what most people don't",
+  'most people miss this',
+  'most people get wrong',
+  // Declarative-variant rhetorical tells. We already ban "the kicker?"
+  // (interrogative). The "and the kicker is," / "the kicker is," etc.
+  // declarative form is the same tell, different punctuation.
+  'and the kicker is',
+  'the kicker is,',
+  'and the catch is',
+  'the catch is,',
+  'and the trick is',
+  'the trick is,',
+  'and the secret is',
+  'the secret is,',
+  'the truth is,',
+  'the real truth is',
+  'the wild truth is',
+  'and the result is',
+  'the result is,',
+  "what's wild is",
+  "what's crazy is",
+  // Generic empathy beats invented when not anchored to raw material.
+  'if you\'ve been there',
+  'if you\'ve felt this',
+  'we\'ve all been there',
   // Common longer AI tells.
   'what if i told you',
   "here's what i've learned",
@@ -99,14 +136,54 @@ const HARD_BANS = [
   // "Here's the thing" - the OG of this whole family.
   "here's the thing",
   'here is the thing',
+  // Colon-led label patterns - state the thing instead. Section 9.7.
+  "what's actually happening:",
+  "what i learned:",
+  "what they miss:",
+  "the bigger lesson:",
+  "the takeaway:",
+  "the truth is:",
+  "here's why:",
+  "what they should have said:",
+  // Preambles to the final list item - the cadence is the tell.
+  "and the last one is the one most people miss",
+  "saving the best for last",
+  // Generic friendly openers - throat-clearing.
+  "hey friend",
+  "hi friends",
+  "let me tell you",
+  "let me share",
+  // Noun-phrase versions of common tells. The AI uses these as standalone
+  // nouns ("hours of stuck on the first line", "tired of stuck on the first
+  // line") which is grammatically broken AND a recurring pattern. Banned
+  // outright so the AI rewrites the sentence rather than dropping in this
+  // specific phrasing.
+  "stuck on the first line",
+  "staring at a blank camera",
+  "staring at the camera",
+  "stuck staring at",
+  // Canned YouTube description welcome lines. The brand-voice synthesis
+  // in the [DESCRIPTION] 📌 welcome block must be written fresh - these
+  // are the stock phrasings every AI defaults to. Surgical removal drops
+  // the sentence, leaving the brand-voice paragraph around it intact.
+  "if this is your first time here",
+  "subscribe below and hit the bell",
+  "hit the bell so you",
+  "hit that bell",
+  "so you don't miss what's coming",
 ]
 
-const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
-  // Em dash / en dash (spaced or unspaced) becomes a comma break. The regex
-  // MUST NOT match plain hyphens - earlier versions did and corrupted every
-  // compound modifier in the output ("5-part" → "5, part", "lead-generating"
-  // → "lead, generating", "RE-HOOK" → "RE, HOOK", etc.).
-  { re: /\s*[-–]\s*/g, replace: ', ' },
+type RepairReplacer = string | ((substring: string, ...args: string[]) => string)
+const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
+  // Em-dash dramatic-reframe pattern only. Targets "X — that's/it's/this is Y"
+  // and similar restate-with-punch patterns. Em-dashes for natural pauses
+  // are preserved.
+  // The previous blanket regex `[-–]` was a bug - it included plain hyphens
+  // (U+002D) in addition to en-dashes, corrupting every compound modifier
+  // ("Behind-the-Scenes" → "Behind, the, Scenes", "5-part" → "5, part",
+  // "lead-generating" → "lead, generating"). Plain hyphens are NEVER touched
+  // by sanitize anymore.
+  { re: /\s+—\s+(?=(?:that['’]s|it['’]s|this\s+is|those\s+are|they['’]re)\s+)/g, replace: ', ' },
   // "X is not Y. It's Z." / "X isn't Y. It's Z." → drop the negation clause, keep the positive claim
   { re: /\b(\w[\w\s]{0,30})\s+is\s+not\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
   { re: /\b(\w[\w\s]{0,30})\s+isn['’]t\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
@@ -123,6 +200,11 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
   { re: /\b([A-Za-z][\w,\s-]{1,60}?)\s+(?:['’]s\s+not|['’]re\s+not|is\s+not|isn['’]t|are\s+not|aren['’]t)(?:\s+(?:just|simply|merely|only))?\s+about\s+[^.,;!?]{1,80}[,;.]\s*(?:it['’]s|that['’]s|they['’]re|this\s+is|these\s+are)(?:\s+(?:just|simply|merely|only))?\s+about\s+/gi, replace: '$1 is about ' },
   // Same construction but connector is "but" instead of "it's": "X isn't about Y, but Y'" → "X is about Y'".
   { re: /\b([A-Za-z][\w,\s-]{1,60}?)\s+(?:['’]s\s+not|['’]re\s+not|is\s+not|isn['’]t|are\s+not|aren['’]t)(?:\s+(?:just|simply|merely|only))?\s+about\s+[^.,;!?]{1,80}[,;]\s*but\s+(?:rather\s+|instead\s+)?(?:just\s+|simply\s+|merely\s+|only\s+)?(?:about\s+)?/gi, replace: '$1 is about ' },
+  // "<determiner subject> isn't/aren't (just) X, but Y" → "<subject> is/are Y" (general, not "about"-gated).
+  // Catches the AI tell "the problem wasn't just *what* to say, but *how* to say it" → "the problem was *how* to say it".
+  { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:isn['’]t|aren['’]t|is\s+not|are\s+not)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,60}[,;]\s+but\s+(?:rather\s+|instead\s+)?(?:just\s+|simply\s+|merely\s+|only\s+)?/gi, replace: '$1 is ' },
+  // Past-tense version: "<determiner subject> wasn't/weren't (just) X, but Y" → "<subject> was/were Y".
+  { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:wasn['’]t|weren['’]t|was\s+not|were\s+not)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,60}[,;]\s+but\s+(?:rather\s+|instead\s+)?(?:just\s+|simply\s+|merely\s+|only\s+)?/gi, replace: '$1 was ' },
   // Auxiliary-verb negation: "<pronoun> don't/doesn't (just) X; <pronoun> Y" → "<pronoun> Y".
   // Drops the negation clause and the repeated subject, keeping only the positive Y clause.
   { re: /\b(I|we|you|they|he|she|it)\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:I|we|you|they|he|she|it)\s+/gi, replace: '$1 ' },
@@ -230,6 +312,282 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: string }> = [
 
   // Tag-question filler at end of sentence: "...impossible task, right?"
   { re: /,\s*right\?/g, replace: '.' },
+
+  // ", and honestly," / "and honestly," softener mid-sentence transition.
+  { re: /,?\s+and honestly,?\s+/gi, replace: ', ' },
+  // "What most people miss is..." / "What most people don't realize is..." - REHOOK 2 AI tell.
+  { re: /\bwhat most people miss is(?:\s+that)?\s+/gi, replace: '' },
+  { re: /\bwhat most people don['’]t (?:realize|see|get) is(?:\s+that)?\s+/gi, replace: '' },
+  { re: /\bmost people (?:miss|don['’]t see) this[.,]?\s+/gi, replace: '' },
+  // Generic empathy beats - drop entirely when they appear as standalone clauses.
+  { re: /\b(?:if\s+you['’]ve\s+been\s+there|if\s+you['’]ve\s+felt\s+this|we['’]ve\s+all\s+been\s+there)[,.]?\s+/gi, replace: '' },
+  // a/an article repair for common offenders. The AI occasionally writes
+  // "a empty draft" / "a AI script" / "a important takeaway" - vowel-led
+  // words that need "an". Curated list rather than universal vowel-check
+  // because exceptions exist ("a unique", "a one-time" - consonant sound
+  // despite vowel start; "an hour", "an honest" - vowel sound despite
+  // consonant start).
+  { re: /\ba\s+(?=(?:empty|AI|important|awesome|amazing|easy|easier|effective|even|ever|honest|hour|hours|impossible|incredible|insane|interesting|obvious|open|opening|empty|outrageous|absolute|absolute|enormous|odd|adamant|early|easy|elegant|enthusiastic|excellent|exhausted|engineered)\b)/g, replace: 'an ' },
+  // Broken multi-word hashtag with embedded space. Catches "#fokus
+  // kreativez" (brand-name with space) and joins to "#fokuskreativez".
+  // Constrained to hashtag-list context by requiring the match be
+  // followed by another hashtag, end of line, or end of string - so
+  // prose like "from #framework approach" is left alone.
+  { re: /(#\w+)\s+(\w+)(?=\s+#|\s*\n|\s*$)/g, replace: '$1$2' },
+  // Caps-for-emphasis on common pronouns + adjectives mid-sentence. Matches
+  // when surrounded by whitespace/punctuation so proper nouns and acronyms
+  // are preserved. Only trips when the word is fully capped AND it's a
+  // known emphasis target (these specific words signal "I'm trying to
+  // emphasize this" rather than "this is a brand name").
+  { re: /(\s)YOU(\s|[.,!?;:'])/g, replace: '$1you$2' },
+  { re: /(\s)YOUR(\s|[.,!?;:'])/g, replace: '$1your$2' },
+  { re: /(\s)YOURS(\s|[.,!?;:'])/g, replace: '$1yours$2' },
+  { re: /(\s)NOT(\s|[.,!?;:'])/g, replace: '$1not$2' },
+  { re: /(\s)REAL(\s|[.,!?;:'])/g, replace: '$1real$2' },
+  { re: /(\s)THIS(\s|[.,!?;:'])/g, replace: '$1this$2' },
+  { re: /(\s)THAT(\s|[.,!?;:'])/g, replace: '$1that$2' },
+  { re: /(\s)ME(\s|[.,!?;:'])/g, replace: '$1me$2' },
+  { re: /(\s)MINE(\s|[.,!?;:'])/g, replace: '$1mine$2' },
+  // Additional caps-for-emphasis offenders that slip through. Same word-
+  // boundary logic - only trips when the word is fully capped AND surrounded
+  // by whitespace/punctuation. Acronyms ("EVERY framework's KPI is X") are
+  // not affected; only the standalone caps form is rewritten.
+  { re: /(\s)ONE(\s|[.,!?;:'])/g, replace: '$1one$2' },
+  { re: /(\s)ANY(\s|[.,!?;:'])/g, replace: '$1any$2' },
+  { re: /(\s)EVERY(\s|[.,!?;:'])/g, replace: '$1every$2' },
+  { re: /(\s)NEVER(\s|[.,!?;:'])/g, replace: '$1never$2' },
+  { re: /(\s)FEEL(\s|[.,!?;:'])/g, replace: '$1feel$2' },
+  { re: /(\s)MUST(\s|[.,!?;:'])/g, replace: '$1must$2' },
+  { re: /(\s)ALWAYS(\s|[.,!?;:'])/g, replace: '$1always$2' },
+  // Progressive-aspect contraction repair. Common AI tell: "I just learning
+  // this" / "You just starting out" - drops the auxiliary BE. The fix is
+  // mechanical: inject "'m" / "'re" before "just <verb-ing>". Targets only
+  // -ing verbs to avoid corrupting the legitimate "I just learned" simple
+  // past form. Restricted to mid-sentence (preceded by whitespace) to skip
+  // sentence-initial cases that may be deliberate stylistic fragments.
+  { re: /(\s)I\s+just\s+(\w+ing)\b/g, replace: "$1I'm just $2" },
+  { re: /(\s)You\s+just\s+(\w+ing)\b/g, replace: "$1You're just $2" },
+  { re: /(\s)you\s+just\s+(\w+ing)\b/g, replace: "$1you're just $2" },
+  { re: /(\s)We\s+just\s+(\w+ing)\b/g, replace: "$1We're just $2" },
+  { re: /(\s)we\s+just\s+(\w+ing)\b/g, replace: "$1we're just $2" },
+  // Bare pronoun + gerund without an aux verb. Common AI tell: "I taking
+  // their ingredients", "You documenting your reality", "We building a
+  // system". Restricted to a narrow gerund whitelist of high-frequency
+  // offenders that almost never appear as parenthetical insertions in
+  // legitimate prose ("I, running late, missed the bus" type cases would
+  // need their own grammatical structure - which we don't catch here).
+  // Only fires when the pronoun is the FIRST token of the clause (after
+  // sentence-ending punctuation or start-of-line), so noun-clause uses
+  // ("the report I writing showed...") are not affected.
+  { re: /(^|[.!?]\s+)I\s+(taking|making|doing|writing|building|trying|working|creating|teaching|sharing|talking|using|running|showing|telling|asking|giving|finding|getting|calling|seeing|reading|adding|playing|sending|reading|reviewing)\b/g, replace: "$1I'm $2" },
+  { re: /(^|[.!?]\s+)You\s+(taking|making|doing|writing|building|trying|working|creating|teaching|sharing|talking|using|running|showing|telling|asking|giving|finding|getting|calling|seeing|reading|adding|playing|sending|reviewing)\b/g, replace: "$1You're $2" },
+  { re: /(^|[.!?]\s+)We\s+(taking|making|doing|writing|building|trying|working|creating|teaching|sharing|talking|using|running|showing|telling|asking|giving|finding|getting|calling|seeing|reading|adding|playing|sending|reviewing)\b/g, replace: "$1We're $2" },
+  // Comma splice repair: ", I/he/she/we/they <verb>" where the comma should
+  // be a period. Narrow trigger to specific past-tense / simple-present
+  // verbs that signal an independent-clause continuation rather than a
+  // legitimate appositive ("I, frustrated, walked away" - won't match
+  // because "frustrated" isn't in the verb list).
+  { re: /,\s+(I|he|she|we|they|you)\s+(spent|tried|did|said|went|made|wrote|built|saw|told|gave|bought|paid|got|had)\b/g, replace: ". $1 $2" },
+  // Meta-writing leaks - phrases that address the writer/team, not the
+  // viewer. These are scaffolding the AI accidentally bleeds into the
+  // spoken script. Strip the lead-in entirely (the actual content beat
+  // following it usually stands on its own).
+  { re: /\bthis\s+is\s+(?:a\s+great|the\s+perfect|a\s+good)\s+place\s+to\s+(?:mention|insert|add|drop|plug|cite|note)\b[^.,;!?]{0,80}[.,;]?\s*/gi, replace: '' },
+  { re: /\b(?:remember|note|also)\s+to\s+(?:mention|insert|include|add|cite)\b[^.,;!?]{0,80}[.,;]?\s*/gi, replace: '' },
+  { re: /\b\(?\s*(?:insert|add|mention)\s+(?:a\s+)?(?:b-?roll|graphic|callout|card|cta|link|product|tool)[^)]{0,80}\)?\s*/gi, replace: '' },
+  // Reverse direction - declarative ending in `?`. The AI sometimes
+  // closes a long declarative clause with a question mark when the clause
+  // FEELS rhetorical to it ("which is why most people freeze and give up?",
+  // "which are things like polls or contrarian one-liners?"). The `which
+  // is/are/was/were` relative clause cannot grammatically form a question
+  // - the antecedent is the question target, not the relative clause - so
+  // any `?` ending a `which is/are` clause is wrong. Convert to `.`.
+  // Narrow trigger words (which is/are/was/were) keeps this safe; we don't
+  // touch true questions like "Which is faster?" because those don't
+  // have a preceding clause + comma to anchor the relative reading.
+  { re: /(,\s+which\s+(?:is|are|was|were)\s+[^.?!]{1,120})\?/gi, replace: '$1.' },
+  // Run-on join repair. Scripts occasionally produce "...steps in order. That's
+  // the framework." or "...beats together. That's how it works." where the
+  // demonstrative "That's" awkwardly references the prior sentence. Convert to
+  // a comma continuation so the second clause flows naturally. Restricted to
+  // these specific connector phrases to avoid touching legitimate "That's"
+  // sentence starts.
+  { re: /\b(in\s+order|together|in\s+sequence|step\s+by\s+step)\.\s+That['’]s\s+/g, replace: '$1, which is ' },
+  // Capitalized continuation after "etc.)": "...(Scene, Proof, etc.) To a specific X."
+  // The model treats "etc." as a sentence terminator and capitalizes the next
+  // word, but the sentence continues. Lowercase it. Narrow trigger: only fires
+  // for prepositions / common continuation words that would never legitimately
+  // start a new sentence right after a parenthetical "etc.)".
+  { re: /(\betc\.\)\s+)(To|At|On|In|By|For|With|From|Of|As|Into|Onto)\b/g, replace: (_m: string, p1: string, p2: string) => p1 + p2.toLowerCase() },
+  // Predicate-less subject repair: "<and> your 'X' answer, where you Y. That's Z"
+  // → "<and> your 'X' answer, where you Y, that's Z." The first "sentence" has
+  // no main predicate ("your X answer, where you Y" is a noun + relative clause
+  // only); the period before "That's" is the bug. Apposition via comma fixes
+  // the fragment. Narrow lead-in (`your <quoted-noun> answer, where`) so we
+  // don't touch real prose ending in a `where`-clause.
+  { re: /\b((?:and\s+)?your\s+['"‘’“”][^'"‘’“”]+['"‘’“”]\s+answer,?\s+where\s+(?:you|I|we|they)\s+\w+(?:\s+[^.?!]{0,80})?)\.\s+That['’]s\s+/gi, replace: '$1, that\'s ' },
+  // Conditional missing antecedent: "...secret sauce is 'X.' If they won't Y."
+  // The conditional has no IF-clause - the AI dropped the antecedent. Fix by
+  // injecting "If they don't, " (the implied antecedent for the most common
+  // failure shape we see). The lead-in allows an optional closing quote
+  // (straight or curly) so the pattern fires when the prior sentence ended
+  // inside a quote: ".'  If they..." or ".'  If you..."
+  { re: /([.!?][\*'’"`“”]?)\s+If\s+(they|you)\s+won['’]t\s+([a-z]\w+(?:\s+[^.?!,]{0,60})?)\.(['’"`“”]?)(?=\s|$)/g, replace: "$1 If $2 don't, $2 won't $3.$4" },
+  // Same conditional-without-antecedent pattern, uncontracted form: "...feel
+  // the pain. If they will not care about your solution." Mirror the same
+  // restoration: insert "don't, " as the implicit antecedent.
+  { re: /([.!?][\*'’"`“”]?)\s+If\s+(they|you)\s+will\s+not\s+([a-z]\w+(?:\s+[^.?!,]{0,60})?)\.(['’"`“”]?)(?=\s|$)/g, replace: "$1 If $2 don't, $2 will not $3.$4" },
+  // Conditional-without-antecedent, "can't" form: "...needs a real contrarian
+  // opinion plus a specific case study. If you can't use the recipe." The
+  // "If you can't" clause is dangling - no condition was stated. Inject
+  // "If you don't have one, " as the implicit antecedent for the most common
+  // failure shape. Tightened to no comma in body so grammatical "If you
+  // can't X, Y" continuations are not touched.
+  { re: /([.!?][\*'’"`“”]?)\s+If\s+(they|you)\s+can['’]t\s+([a-z]\w+(?:\s+[^.?!,]{0,60})?)\.(['’"`“”]?)(?=\s|$)/g, replace: "$1 If $2 don't have one, $2 can't $3.$4" },
+  // Missing gerund after "stop": "you can stop stuck on..." -> "you can stop
+  // being stuck on...". Narrow trigger: "stop" + adjective participle. The
+  // adjective list is intentionally short (just the failure shapes we've
+  // observed) to avoid false positives on legitimate "stop angry shouting"
+  // / "stop slow loading" type prose.
+  { re: /\bstop\s+(stuck|frozen|paralyzed|confused)\b/g, replace: 'stop being $1' },
+  // Period before a closing quote when the quoted text starts with a
+  // question word - common AI tell in fragments like "Instead of asking
+  // 'what should we post.'" - convert the period to a question mark.
+  // Targets only quoted fragments to avoid over-matching declaratives that
+  // happen to start with "what" / "how" / etc. Catches both straight
+  // ASCII quotes ("'`) AND curly/smart quotes (" " ' ' ` `).
+  //
+  // The body of the question allows apostrophes (straight + curly) so
+  // contractions inside the question (didn't / don't / won't / it's)
+  // don't break the match. We still exclude OPENING-quote characters
+  // ("/'/`/'/`/curly-doubles) to keep the match anchored to a single
+  // quoted fragment. Closing quote can be any of those quote characters
+  // OR a sentence-final apostrophe (some scripts use bare-apostrophe
+  // close after a period: "what's the catch.'").
+  { re: /((?:what|how|why|when|where|who|which)[^.?!"`“”]{1,60})\.(["`'‘’“”])/gi, replace: '$1?$2' },
+  // Unquoted question fragment ending in a period. Catches "Where were
+  // you." / "And what was the proof." that appear inside a list of
+  // questions ("5 questions: Where were you. What did you try?...") or
+  // mid-sentence after a comma ("If you've felt that, what was the
+  // worst line it ever gave you."). The leading delimiter list now
+  // includes comma so post-clause questions get caught. Constrained to
+  // question-word + auxiliary-verb to avoid over-matching noun clauses
+  // like "What I learned was helpful." Case-insensitive so lowercase
+  // "what was" / "where did" caught too (real failure: "...actually
+  // worked? And what was the result." stayed unfixed because of casing).
+  { re: /([:,.!?]\s+)((?:And\s+|Or\s+|But\s+|So\s+)?(?:What|How|Why|When|Where|Who|Which)\s+(?:was|were|is|are|did|do|does|will|would|can|could|should|has|have|had|am)\b[^.?!]{1,80})\.(?=\s|$)/gi, replace: '$1$2?' },
+  // Contraction-led question: "What's your fix for X.", "How's your week.",
+  // "Where's the catch." - common AI tell where a captioned question ends
+  // in a period instead of a question mark. The contraction "'s" already
+  // implies the auxiliary verb, so we don't need a separate aux check;
+  // we DO require something after the contraction (otherwise "What's." is
+  // not a real question). Case-insensitive for the same reason as above.
+  { re: /([:.!?]\s+|^)((?:And\s+|Or\s+|But\s+|So\s+)?(?:What|How|Why|When|Where|Who)['’]s\s+\w+[^.?!]{1,80})\.(?=\s|$)/gmi, replace: '$1$2?' },
+  // Label-prefixed question without auxiliary verb. Catches:
+  //   "TURNING POINT: What changed your direction." -> "?"
+  //   "FRAMEWORK: What method finally worked." -> "?"
+  //   "FAILED ATTEMPT: How did this even start." (already covered by aux
+  //    pattern but harmless to double-match).
+  // The aux-verb pattern above (`What did | What was | ...`) misses bare-
+  // verb questions ("What changed", "What worked", "What method..."). The
+  // all-caps label prefix is what makes this safe to widen - prose rarely
+  // has the form "<ALL CAPS LABEL>: <wh-word> <bare verb>." outside of
+  // structured Q&A blocks. The negative lookahead blocks pronoun-led noun
+  // clauses ("What I learned.", "What you did.") which DO appear in normal
+  // prose and are not questions.
+  { re: /((?:^|[\s,(])[A-Z][A-Z\s]{1,30}:\s+)((?:What|How|Why|When|Where|Who|Which)\s+(?!(?:I|we|you|they|he|she|it|that|this|these|those)\b)[a-z]\w*(?:\s+[^.?!]{0,60})?)\.(?=\s|$)/g, replace: '$1$2?' },
+  // Inline separator after "Connect with X!" header repair. The brand
+  // template requires the "===========================" separator to live
+  // on its OWN line above and below the header. The AI occasionally
+  // collapses the second separator onto the same line as the header
+  // ("Connect with me! =============================="). Push it onto
+  // the next line.
+  { re: /(Connect\s+with\s+(?:us|me)!)\s+(={20,})/g, replace: '$1\n$2' },
+  // Duplicate "Connect with us/me!" block collapser. The AI sometimes
+  // renders the entire Connect block twice - once with handles, once
+  // empty. Detect a SECOND occurrence of the header-with-separators that
+  // has no body lines (no handle bullets) before the next blank line and
+  // strip it. Restricted to the empty-second-block case so we don't
+  // delete a legitimately-handle-bearing duplicate (which would itself
+  // be a separate bug, but we leave that to manual review).
+  { re: /\n\s*={20,}\s*\n\s*Connect\s+with\s+(?:us|me)!\s*\n?\s*={20,}\s*\n(?=\s*\n|\s*={3,}|\s*📌)/g, replace: '\n' },
+  // Long-form description section header all-caps repair. Catches:
+  //   "📌 WHO this IS FOR:" -> "📌 WHO THIS IS FOR:"
+  //   "📌 Who This is For:" -> "📌 WHO THIS IS FOR:"
+  // The `📌 WHO THIS IS FOR:` header MUST be fully uppercase per the brand
+  // template. The AI occasionally lowercases an interior word; this regex
+  // repairs the whole header in one shot.
+  { re: /(📌\s*)who\s+this\s+is\s+for(\s*:)/gi, replace: '$1WHO THIS IS FOR$2' },
+  // Same for "ABOUT" header - the emoji + "ABOUT" should always be
+  // uppercase. The lookahead allows whitespace OR direct colon
+  // ("📌 about Fokus:" and "📌 ABOUT:" both repaired) without consuming
+  // the trailing char so callers can append the original brand name
+  // / colon as-is.
+  { re: /(📌\s*)about(?=[\s:])/gi, replace: (_m: string, p1: string) => `${p1}ABOUT` },
+  // Question fragment inside a slide-list bullet. Catches:
+  //   "Slide 7: 4. Framework: What steps finally worked."
+  //   "Slide 4: Q1: SCENE - Where were you when this started."
+  //   "Slide 6: Q3: TURNING POINT - What changed your direction."
+  // The prefix between "Slide N:" and the question word can be many
+  // shapes (numbered, lettered, dashed, colon-led, including a period
+  // after a list number like "4. Framework"). We allow up to 40 chars
+  // of anything except `?`/`!`/newline (period IS allowed - "4." is a
+  // common list separator inside the prefix).
+  { re: /(\bSlide\s+\d+:\s+[^?!\n]{0,40}?)\b((?:What|How|Why|When|Where|Who|Which)\s+\w+[^.?!]{1,60})\.(?=\s|$)/gi, replace: '$1$2?' },
+  // Strip meta format-type words from the [TITLE] section, anywhere
+  // they appear within the title line. The title is an internal label;
+  // having "Carousel" / "Reel" / "Engagement Reel" / "Hero's Journey" /
+  // "Short-form" / "Long-form" appear in the title text is a label leak.
+  // The format word can be at the start ("Carousel: One Story..."), end
+  // ("One Story... Carousel"), or middle.
+  // CRITICAL: "Story" is NOT in this list. It's a common English word
+  // that legitimately appears in titles like "One Story to a Month of
+  // Content" - stripping it produced "Oneto a Month of Content" (real
+  // bug we hit in production). "Reel" stays since it's uncommon outside
+  // the format context. Longest alternatives first so "Engagement Reel"
+  // matches before bare "Reel".
+  {
+    re: /(\[TITLE\]\s*\n?)([^\n\[]*?)\s*[-:–—]*\s*\b(?:Engagement\s+Reel|Hero['’]s\s+Journey(?:\s+\(Text-Only\))?|Short-form|Long-form|Carousel|Reel)\b\s*[-:–—]*\s*([^\n\[]*)(?=\n|\[|$)/gi,
+    replace: '$1$2$3',
+  },
+  // Cleanup pass: collapse double spaces inside the title that the strip
+  // above might have left behind when the format word was mid-title.
+  {
+    re: /(\[TITLE\]\s*\n?[^\n\[]*?)\s{2,}([^\n\[]*?)(?=\n|\[|$)/g,
+    replace: '$1 $2',
+  },
+  // Clean up any leading separator left in the title after the strip
+  // (edge case where the format word was at the start with no prior text).
+  {
+    re: /(\[TITLE\]\s*\n?)\s*[-:–—]\s*/g,
+    replace: '$1',
+  },
+  // Declarative rhetorical tells: "and the kicker is, X" / "the catch is, X"
+  // / "the secret is, X" / "the truth is, X". Strip the lead-in clause and
+  // keep the payload. The repair lower-cases the first word of the payload
+  // since it was originally mid-sentence; the surgicalBanRemoval pass picks
+  // up any leftover capitalization issues.
+  { re: /([.!?]\s+)(?:And\s+)?[Tt]he\s+(?:kicker|catch|trick|secret|result)\s+is\s*,?\s+/g, replace: '$1' },
+  { re: /\s+(?:and\s+)?the\s+(?:kicker|catch|trick|secret|result)\s+is\s*,?\s+/gi, replace: ' ' },
+  { re: /\s+the\s+(?:real|wild)\s+truth\s+is\s*,?\s+/gi, replace: ' ' },
+  { re: /\s+what['’]s\s+(?:wild|crazy)\s+is\s*,?\s+/gi, replace: ' ' },
+  // Section 9.7 - colon-led label patterns. Strip the label so the AI states
+  // the thing directly. Even when the exact phrase isn't in the bans list, the
+  // model uses these as cadence; surgical removal keeps the sentence flow.
+  { re: /\bwhat['’]?s actually happening\s*[:,]?\s*/gi, replace: "what's happening is " },
+  { re: /\bwhat i learned\s*[:,]?\s*/gi, replace: '' },
+  { re: /\bthe bigger lesson\s*[:,]?\s*/gi, replace: 'the bigger lesson is ' },
+  { re: /\bthe takeaway\s*[:,]?\s*/gi, replace: 'the takeaway is ' },
+  { re: /\bwhat they miss\s*[:,]?\s*/gi, replace: 'they forget ' },
+  { re: /\bwhat they should have said\s*[:,]?\s*/gi, replace: 'what they should have said is ' },
+  { re: /\bhere['’]s why\s*[:,]?\s*/gi, replace: '' },
+  // "And the last one..." preambles
+  { re: /\band the last one is the one most people miss\s*[:,]?\s*/gi, replace: '' },
+  { re: /\bsaving the best for last\s*[:,]?\s*/gi, replace: '' },
+  // Generic friendly openers
+  { re: /\b(hey|hi)\s+friends?\s*[,.]?\s*/gi, replace: '' },
+  { re: /\blet me (tell|share)(\s+you)?\s*[,.]?\s*/gi, replace: '' },
+  { re: /\blisten up\s*[,.]?\s*/gi, replace: '' },
 ]
 
 const PREAMBLE_STRIPPERS: RegExp[] = [
@@ -299,71 +657,6 @@ export function coerceInput(raw: {
     referenceScript: (raw.referenceScript || '').trim() || undefined,
     seriesDay: raw.seriesDay,
   }
-}
-
-function voiceFingerprint(profile: BrandProfile | null): string {
-  if (!profile) return 'casual conversational, warm, no jargon.'
-  const v = profile.voice
-  const dial = (n: number) => (n <= 2 ? 'low' : n >= 4 ? 'high' : 'medium')
-  const parts = [
-    `addresses audience as "${v.address_audience_as || 'you'}"`,
-    `casual=${dial(v.casualness)}`,
-    `funny=${dial(v.funny)}`,
-    `enthusiastic=${dial(v.enthusiastic)}`,
-    `emotional=${dial(v.emotional)}`,
-    `irreverent=${dial(v.irreverent)}`,
-    `jargon=${v.uses_jargon}`,
-    `personal stories=${v.shares_personal_stories}`,
-    `profanity=${v.profanity_level}`,
-  ]
-  const traits = (v.traits || '').trim()
-  if (traits) parts.push(`traits="${traits}"`)
-  const sigs = (v.signature_phrases || []).map((s) => s.trim()).filter(Boolean)
-  if (sigs.length) parts.push(`signature phrases (use sparingly): ${sigs.map((s) => `"${s}"`).join(', ')}`)
-  return parts.join(' | ')
-}
-
-function voiceSamples(profile: BrandProfile | null): string {
-  const samples = (profile?.voice.samples || []).map((s) => s.trim()).filter(Boolean).slice(0, 3)
-  if (!samples.length) return ''
-  return [
-    'VOICE SAMPLES (mirror the rhythm, word choice, sentence length - do NOT quote):',
-    ...samples.map((s, i) => `<sample ${i + 1}>\n${s}\n</sample>`),
-  ].join('\n')
-}
-
-function commonEnemyLine(profile: BrandProfile | null, tier: Tier): string {
-  const explicit = (profile?.voice.common_enemy || '').trim()
-  const enemy = explicit || deriveEnemy(profile)
-  const stance =
-    tier === 'beginner'
-      ? `Frame as "me and you, figuring this out together" vs ${enemy}.`
-      : tier === 'mid'
-        ? `Frame as "me, a few steps ahead, pulling you past ${enemy}".`
-        : `Frame as "I've seen what keeps people stuck in ${enemy} - here's the way through".`
-  return `COMMON ENEMY: ${stance} Never say "the enemy is". Show the trap; don't label it.`
-}
-
-function deriveEnemy(profile: BrandProfile | null): string {
-  const pains = (profile?.audience.pain_points || []).map((p) => p.trim()).filter(Boolean)
-  const joined = pains.join(' | ').toLowerCase()
-  if (/inconsist/.test(joined)) return 'the post-ghost-guilt loop'
-  if (/overwhelm|confus/.test(joined)) return 'the overwhelm trap'
-  if (/time|busy/.test(joined)) return 'the time tax'
-  if (/view|reach|engage/.test(joined)) return 'the attention treadmill'
-  if (/lead|sale|convert/.test(joined)) return 'busy content that doesn\'t convert'
-  return 'generic advice that keeps you stuck'
-}
-
-function bansBlock(profile: BrandProfile | null): string {
-  const custom = [
-    ...(profile?.voice.banned_phrases || []),
-    ...(profile?.voice.forbidden_words || []),
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const all = [...HARD_BANS, ...custom]
-  return `BANNED (never use, no exceptions): ${all.map((s) => `"${s}"`).join(', ')}.`
 }
 
 function tierVoiceBlock(tier: Tier): string {
@@ -582,58 +875,27 @@ function ctaBlock(cta?: string, profile?: BrandProfile | null): string {
   return `CTA: No CTA was provided. Keep it ${soft ? 'soft' : 'direct'}. Default intent: ${desired}.`
 }
 
-function businessBlock(profile: BrandProfile | null): string {
-  if (!profile) return ''
-  const b = profile.business
-  const a = profile.audience
-  const lines = [
-    b.mission && `mission: ${b.mission}`,
-    b.problem_solved && `problem solved: ${b.problem_solved}`,
-    b.differentiation && `differentiator: ${b.differentiation}`,
-    b.signature_offer && `offer: ${b.signature_offer}`,
-    a.work_roles && `audience: ${a.work_roles}`,
-    a.desires && `desires: ${a.desires}`,
-    a.objections && `objections: ${a.objections}`,
-    a.tried_failed && `tried & failed: ${a.tried_failed}`,
-  ].filter(Boolean)
-  if (!lines.length) return ''
-  return `CLIENT CONTEXT:\n- ${lines.join('\n- ')}`
-}
-
-function ammoBlock(profile: BrandProfile | null): string {
-  if (!profile) return ''
-  const pains = profile.audience.pain_points.filter(Boolean)
-  const myths = profile.content_strategy.myths.filter((m) => m.myth && m.truth)
-  const hot = profile.content_strategy.hot_takes.filter(Boolean)
-  const ever = profile.content_strategy.evergreen_topics.filter(Boolean)
-  const parts: string[] = []
-  if (pains.length) parts.push(`pain points: ${pains.join(' | ')}`)
-  if (myths.length) parts.push(`myths: ${myths.map((m) => `"${m.myth}" → "${m.truth}"`).join(' | ')}`)
-  if (hot.length) parts.push(`hot takes: ${hot.join(' | ')}`)
-  if (ever.length) parts.push(`evergreen topics: ${ever.join(' | ')}`)
-  if (!parts.length) return ''
-  return `AMMO (use when relevant):\n- ${parts.join('\n- ')}`
-}
-
 export function buildPrompt(input: BuildInput): BuiltPrompt {
   const { profile, tier, pillar, contentType, topic, cta, referenceScript, seriesDay, competitorPatterns } = input
 
+  const voiceLine = voiceFingerprintLine(profile, 'full')
+
   const blocks = [
     `You are a ghostwriter. You write like a real human creator. Short sentences. Specific words. No AI filler. You can write from multiple angles - "I used to…", "Here's how I do X now…", "When I first tried X…", "If I were starting today…" - not just "you're a ___ who…".`,
-    voiceFingerprint(profile) && `VOICE: ${voiceFingerprint(profile)}`,
-    voiceSamples(profile),
+    voiceLine && `VOICE: ${voiceLine}`,
+    voiceSamplesBlock(profile),
     tierVoiceBlock(tier),
-    businessBlock(profile),
-    ammoBlock(profile),
+    clientContextBlock(profile, 'extended'),
+    renderAmmoBlock(profile),
     competitorPatterns?.length
       ? `COMPETITOR PATTERNS (structure only, never name them):\n- ${competitorPatterns.join('\n- ')}`
       : '',
-    commonEnemyLine(profile, tier),
+    renderCommonEnemyLine(profile, tier),
     frameworkBlock(),
     pillarFrameworkBlock(pillar),
     pillarBlock(pillar, tier, seriesDay),
     patternBlock(contentType),
-    bansBlock(profile),
+    renderBansBlock(profile, HARD_BANS),
     `FABRICATION PREVENTION:
 - Never invent social proof: "you keep asking", "my most requested", "everyone's been DMing me". Only claims from the client context or the topic are allowed.
 - Never invent numbers, percentages, dollars, follower counts, timeframes, or outcomes.
@@ -749,7 +1011,9 @@ export function sanitize(text: string): string {
   // Strip model preambles like "Here's an improved version of the draft:"
   for (const re of PREAMBLE_STRIPPERS) t = t.replace(re, '')
 
-  for (const { re, replace } of REPAIR_REGEX) t = t.replace(re, replace)
+  for (const { re, replace } of REPAIR_REGEX) {
+    t = typeof replace === 'string' ? t.replace(re, replace) : t.replace(re, replace)
+  }
 
   // Repairs above can land a lowercase "it's"/"that's" at a sentence boundary.
   // Restore capitalization after `.`, `:`, or at start of string / line.

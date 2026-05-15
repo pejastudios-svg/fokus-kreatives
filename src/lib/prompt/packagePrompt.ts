@@ -1,8 +1,11 @@
 import type { BrandProfile } from '@/components/clients/brandProfile'
+import { clientContextBlock, voiceFingerprintLine } from './brandContext'
 import {
+  FRAMEWORK_BASE,
   FRAMEWORK_CORE,
   PILLAR_FRAMEWORK,
   LONGFORM_FRAMEWORK,
+  SHORTFORM_BUILDOUT,
   CAROUSEL_FROM_LONGFORM,
   REEL_FROM_LONGFORM,
   STORY_FROM_LONGFORM,
@@ -10,40 +13,10 @@ import {
 
 export type PackagePillar = keyof typeof PILLAR_FRAMEWORK
 
-function voiceLine(profile: BrandProfile | null): string {
-  if (!profile) return 'VOICE: casual conversational, warm, no jargon.'
-  const v = profile.voice
-  const dial = (n: number) => (n <= 2 ? 'low' : n >= 4 ? 'high' : 'medium')
-  const parts = [
-    `addresses audience as "${v.address_audience_as || 'you'}"`,
-    `casual=${dial(v.casualness)}`,
-    `funny=${dial(v.funny)}`,
-    `enthusiastic=${dial(v.enthusiastic)}`,
-    `emotional=${dial(v.emotional)}`,
-    `jargon=${v.uses_jargon}`,
-  ]
-  const traits = (v.traits || '').trim()
-  if (traits) parts.push(`traits="${traits}"`)
-  const sigs = (v.signature_phrases || []).map((s) => s.trim()).filter(Boolean)
-  if (sigs.length) parts.push(`signature (use sparingly): ${sigs.map((s) => `"${s}"`).join(', ')}`)
-  return `VOICE: ${parts.join(' | ')}`
-}
-
-function clientLine(profile: BrandProfile | null): string {
-  if (!profile) return ''
-  const b = profile.business
-  const a = profile.audience
-  const bits = [
-    b.mission && `mission=${b.mission}`,
-    b.problem_solved && `problem=${b.problem_solved}`,
-    b.differentiation && `diff=${b.differentiation}`,
-    b.signature_offer && `offer=${b.signature_offer}`,
-    a.work_roles && `audience=${a.work_roles}`,
-    a.desires && `desires=${a.desires}`,
-  ].filter(Boolean)
-  if (!bits.length) return ''
-  return `CLIENT CONTEXT:\n- ${bits.join('\n- ')}`
-}
+const voiceLine = (profile: BrandProfile | null) =>
+  `VOICE: ${voiceFingerprintLine(profile, 'light')}`
+const clientLine = (profile: BrandProfile | null) =>
+  clientContextBlock(profile, 'minimal')
 
 const SHARED_GUARDRAILS = `GUARDRAILS:
 - No em dashes (-) or en dashes (–) anywhere. Use commas or periods instead. Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple, RE-HOOK, 2-1-3-4) ARE allowed and required - never replace them with commas.
@@ -188,11 +161,19 @@ function repurposeBase(kind: 'carousel' | 'reel' | 'story', input: RepurposeProm
     : kind === 'reel' ? REEL_FROM_LONGFORM
     : STORY_FROM_LONGFORM
 
+  // Repurpose paths produce SHORT-FORM-shaped output (carousel slides, reel
+  // scenes, story slides), so they get FRAMEWORK_BASE + SHORTFORM_BUILDOUT
+  // instead of the long-form-shaped FRAMEWORK_CORE. The format-specific
+  // spec (CAROUSEL_FROM_LONGFORM / REEL_FROM_LONGFORM / STORY_FROM_LONGFORM)
+  // still defines the slide / scene / overlay output schema; the new
+  // SHORTFORM_BUILDOUT provides the universal short-form rules they all
+  // share (length cap, single CTA, REHOOK 1, etc).
   const systemParts = [
     `You are a ghostwriter repurposing a long-form script into ${kind} format. Every line you write must trace back to a specific beat in the long-form. You are slicing and reframing existing material, not generating new ideas.`,
     voiceLine(profile),
     clientLine(profile),
-    FRAMEWORK_CORE,
+    FRAMEWORK_BASE,
+    SHORTFORM_BUILDOUT,
     PILLAR_FRAMEWORK[pillar],
     formatSpec,
     SHARED_GUARDRAILS,

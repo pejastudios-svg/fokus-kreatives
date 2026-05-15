@@ -1630,7 +1630,7 @@ function ApprovalsBoardSkeleton() {
       </div>
       {confirmAction && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm shadow-2xl">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
       <div className="px-4 py-3 border-b border-[var(--border-primary)]">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">
           {confirmAction.mode === 'approve'
@@ -1675,7 +1675,7 @@ function ApprovalsBoardSkeleton() {
 
 {deleteConfirm && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm shadow-2xl">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
       <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete Approval?</h3>
         <button

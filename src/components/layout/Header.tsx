@@ -61,15 +61,31 @@ export function Header({ title, subtitle }: HeaderProps) {
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(20)
+          .limit(40)
         if (error) {
           console.error('Load notifications error:', error)
           return
         }
         if (isMounted) {
-          const rows = (data || []) as NotificationRow[]
-          setNotifications(rows)
-          setUnreadCount(rows.filter((n) => !n.read_at).length)
+          // The header bell is the WORKSPACE-level surface (approvals,
+          // tasks, brand intake). CRM-scoped notifications (leads,
+          // capture submissions, meetings, payments) live inside each
+          // client's CRM Inbox instead, so we filter them out here.
+          const CRM_SCOPED = new Set([
+            'lead_created',
+            'capture_submission',
+            'meeting_created',
+            'payment_created',
+            'payment_due',
+          ])
+          const rows = ((data || []) as NotificationRow[]).filter(
+            (n) => !CRM_SCOPED.has(n.type),
+          )
+          // Cap at 20 visible rows after filtering, to match the
+          // dropdown's intended size.
+          const trimmed = rows.slice(0, 20)
+          setNotifications(trimmed)
+          setUnreadCount(trimmed.filter((n) => !n.read_at).length)
         }
       }
 
@@ -284,7 +300,7 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         {notifMounted && (
           <div
-            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-[var(--bg-primary)] rounded-xl shadow-lg border border-[var(--border-primary)] z-50 origin-top-right transition-all duration-200 ease-out ${
+            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-[var(--bg-card)] rounded-xl shadow-2xl shadow-black/40 ring-1 ring-black/5 dark:ring-white/5 border border-[var(--border-primary)] z-50 origin-top-right transition-all duration-200 ease-out ${
               showNotif ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
             }`}
           >
@@ -361,11 +377,11 @@ function NotificationRowItem({
     <div
       className={`group relative flex items-start gap-2 border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] ${
         !n.read_at
-          ? // Subtle blue tint that reads as "unread" in BOTH light and
-            // dark modes - was bg-blue-50/60 which became a glaring
-            // near-white wash on dark surfaces.
-            'bg-[#2B79F7]/10 dark:bg-[#2B79F7]/15'
-          : ''
+          ? // Pronounced blue tint with a left accent so unread reads
+            // clearly in dark mode without the near-white wash that
+            // bg-blue-50/60 produced.
+            'bg-[#2B79F7]/15 dark:bg-[#2B79F7]/25 border-l-2 border-l-[#2B79F7]'
+          : 'border-l-2 border-l-transparent'
       }`}
     >
       <button

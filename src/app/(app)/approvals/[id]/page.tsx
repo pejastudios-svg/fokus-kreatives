@@ -285,6 +285,10 @@ export default function ApprovalDetailPage() {
       alert('Play or seek the video first, then click Grab time.')
       return
     }
+    // Freeze playback the moment the timestamp is captured so the user
+    // can review the exact frame they're tagging instead of the video
+    // running past it.
+    handle.pauseActive()
     handle.scrollIntoView()
     setPendingAnnotation((prev) => ({
       ...prev,
@@ -299,6 +303,9 @@ export default function ApprovalDetailPage() {
   const handleAnnotate = async (itemId: string, shape: 'circle' | 'freeform') => {
     const handle = assetRendererRefs.current[itemId]
     if (!handle) return
+    // Pause before entering draw mode - drawing on a moving frame is
+    // useless, and the highlight is implicitly anchored to this moment.
+    handle.pauseActive()
     handle.scrollIntoView()
     const result = await handle.enterDrawMode(shape)
     if (!result) return

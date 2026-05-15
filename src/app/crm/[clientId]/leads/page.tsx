@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
 import { 
@@ -30,6 +30,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { DonutChart, ChartLegend } from '@/components/charts/MiniCharts'
@@ -212,6 +213,11 @@ function serializeUrlValue(url: string, text: string): string {
 export default function CRMLeads() {
   const params = useParams()
   const clientId = (params?.clientId || params?.clientid) as string
+  // ?focus=<leadId> from the Inbox navigation. The matching row gets
+  // a temporary `focus-pulse` class and scrolls into view so the
+  // user can see exactly which lead the notification was about.
+  const searchParams = useSearchParams()
+  const focusedLeadId = searchParams?.get('focus') || null
   const supabase = createClient()
   // Workspace-structure edits (custom fields, status options) are
   // manager+ only. Employees can still update field VALUES on a lead.
@@ -227,9 +233,14 @@ export default function CRMLeads() {
   const [view, setView] = useState<'table' | 'board' | 'chart'>('table')
   const [searchQuery, setSearchQuery] = useState('')
   // Sort + status filter (driven from the kebab menu).
+  // Default to 'newest' (created_at DESC) so the most recently
+  // captured lead is at the top - standard CRM pattern, matches
+  // "new lead just came in, show it first". 'manual' kicks in
+  // automatically the moment the user drags a row, so drag-reorder
+  // still works without forcing them to flip the sort menu.
   const [sortBy, setSortBy] = useState<
     'manual' | 'newest' | 'oldest' | 'updated' | 'az' | 'za'
-  >('manual')
+  >('newest')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   
   // Modal state
@@ -415,6 +426,24 @@ export default function CRMLeads() {
 
       if (error) throw error
       setLeads((prev) => prev.map((l) => (l.id === tempId ? data : l)))
+
+      // Fire-and-forget in-app notification to every CRM team member.
+      // /api/notifications/create gates by each user's notify_new_lead
+      // pref so opted-out users see nothing. Failures are swallowed -
+      // the lead is already saved.
+      const leadName =
+        (rawData.name && rawData.name.trim())
+          || (rawData.email && rawData.email.trim())
+          || 'New lead'
+      void fetch('/api/notifications/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          type: 'lead_created',
+          data: { leadName, source: 'manual' },
+        }),
+      }).catch((e) => console.error('lead notification failed:', e))
     } catch (err) {
       console.error('Failed to create lead:', err instanceof Error ? err.message : err)
       setLeads((prev) => prev.filter((l) => l.id !== tempId))
@@ -1392,6 +1421,17 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   {filteredLeads.map((lead) => (
                     <tr
                       key={lead.id}
+                      ref={(el) => {
+                        // Scroll the focused row into view + briefly
+                        // pulse it. Only fires when the ref node
+                        // mounts so the effect runs once per arrival
+                        // from a notification deep-link.
+                        if (el && focusedLeadId === lead.id) {
+                          el.classList.add('focus-pulse')
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          setTimeout(() => el.classList.remove('focus-pulse'), 3000)
+                        }
+                      }}
                       className={`group transition-colors cursor-pointer ${
                         pendingLeads.has(lead.id) ? 'opacity-50' : ''
                       } ${
@@ -1411,7 +1451,19 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       <td
                         className="px-3 py-3 bg-[var(--bg-card)]"
                         draggable
-                        onDragStart={(e) => handleRowDragStart(e, lead.id)}
+                        onDragStart={(e) => {
+                          // Use the entire row as the drag preview (ClickUp
+                          // pattern) instead of just the handle cell. Without
+                          // this the browser drags only the <td> the user
+                          // grabbed, which looks like a tiny floating sliver.
+                          const row = (e.currentTarget as HTMLElement).closest('tr')
+                          if (row) {
+                            // Offset the image so the cursor sits inside the
+                            // row rather than at the top-left corner.
+                            e.dataTransfer.setDragImage(row, 20, 20)
+                          }
+                          handleRowDragStart(e, lead.id)
+                        }}
                         onDragEnd={() => {
                           setDraggedRowId(null)
                           setDragOverRowId(null)
@@ -2060,10 +2112,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         {/* Add Lead Modal */}
         {showAddLead && (
           <Modal onClose={() => { setShowAddLead(false); setNewLead({}) }} title="Add New Lead">
-            <div
-              className="space-y-4 max-h-[60vh] overflow-y-auto pl-1 -ml-1 pr-3 -mr-3 py-1"
-              style={{ scrollbarGutter: 'stable' }}
-            >
+            <div className="space-y-4">
               {fields.map((field) => {
                 const options = getFieldOptions(field)
                 
@@ -2377,26 +2426,36 @@ function UrlDisplay({
 }
 
 // Modal Component
+//
+// Caps the panel at 90vh and scrolls the body internally so tall
+// content (e.g. status options with 10+ entries) never overflows the
+// top/bottom of the viewport. The header stays pinned; only the body
+// scrolls. `scrollbar-none` hides the scroll chrome - the user feels
+// the overflow, doesn't see a heavy bar.
+//
+// Body scroll is locked while open so the page underneath can't scroll
+// while a modal is up (the modal IS the foreground).
 function Modal({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
+  useBodyScrollLock(true)
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
-        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-150"
+      <div
+        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)]">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)] shrink-0">
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto scrollbar-none flex-1 min-h-0">{children}</div>
       </div>
     </div>
   )
@@ -2849,6 +2908,8 @@ function LeadDetailModal({
   // Local state for status dropdown popover.
   const [statusOpen, setStatusOpen] = useState(false)
 
+  useBodyScrollLock(true)
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -2898,7 +2959,7 @@ function LeadDetailModal({
                         className="fixed inset-0 z-10"
                         onClick={() => setStatusOpen(false)}
                       />
-                      <div className="absolute z-20 left-0 mt-1 w-56 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1 max-h-64 overflow-y-auto">
+                      <div className="absolute z-20 left-0 mt-1 w-56 max-w-[calc(100vw-1rem)] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1 max-h-64 overflow-y-auto">
                         {getFieldOptions(statusField).map((opt) => (
                           <button
                             key={opt.value}
@@ -3263,8 +3324,8 @@ function StatusDropdown({
       className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
       onClick={onClose}
     >
-      <div 
-        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-h-[400px] overflow-y-auto animate-in fade-in zoom-in duration-150"
+      <div
+        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">

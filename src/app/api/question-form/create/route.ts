@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
-import type { FormQuestion } from '@/lib/types/questionForm'
+import type {
+  FormQuestion,
+  FormTopic,
+  FormTopicQuestion,
+  TopicInputType,
+} from '@/lib/types/questionForm'
 import type { TopicPillar } from '@/lib/types/topics'
 
 export const dynamic = 'force-dynamic'
@@ -23,9 +28,25 @@ const VALID_PILLARS: TopicPillar[] = [
 interface Body {
   clientId?: string
   title?: string | null
+  // Legacy flat-question shape - still accepted for forms not using the
+  // 5-question topic flow.
   questions?: FormQuestion[]
+  // M2 topic-group shape. When present (and non-empty) the form is saved
+  // as a topic form and the legacy `questions` column is left empty.
+  topics?: FormTopic[]
   pillars?: TopicPillar[]
 }
+
+const VALID_INPUT_TYPES: TopicInputType[] = [
+  'scene',
+  'failed_attempt',
+  'turning_point',
+  'framework',
+  'proof',
+  'opinion',
+  'named_mentor',
+  'win_moment',
+]
 
 function sanitizeQuestions(raw: unknown): FormQuestion[] {
   if (!Array.isArray(raw)) return []
@@ -50,6 +71,48 @@ function sanitizeQuestions(raw: unknown): FormQuestion[] {
   return out
 }
 
+function sanitizeTopics(raw: unknown): FormTopic[] {
+  if (!Array.isArray(raw)) return []
+  const out: FormTopic[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const t = item as Record<string, unknown>
+    const title = typeof t.title === 'string' ? t.title.trim() : ''
+    if (!title) continue
+    const rawPillar = typeof t.pillar_hint === 'string' ? t.pillar_hint.toLowerCase() : ''
+    const pillarHint: TopicPillar = (VALID_PILLARS as string[]).includes(rawPillar)
+      ? (rawPillar as TopicPillar)
+      : 'storytelling'
+
+    const rawQs = Array.isArray(t.questions) ? t.questions : []
+    const questions: FormTopicQuestion[] = []
+    for (const qRaw of rawQs) {
+      if (!qRaw || typeof qRaw !== 'object') continue
+      const q = qRaw as Record<string, unknown>
+      const text = typeof q.text === 'string' ? q.text.trim() : ''
+      if (!text) continue
+      const rawType = typeof q.input_type === 'string' ? q.input_type : ''
+      if (!(VALID_INPUT_TYPES as string[]).includes(rawType)) continue
+      const placeholder = typeof q.placeholder === 'string' ? q.placeholder.trim() : ''
+      questions.push({
+        id: typeof q.id === 'string' && q.id ? q.id : randomUUID(),
+        input_type: rawType as TopicInputType,
+        text,
+        placeholder: placeholder || undefined,
+      })
+    }
+    if (!questions.length) continue
+
+    out.push({
+      id: typeof t.id === 'string' && t.id ? t.id : randomUUID(),
+      title,
+      pillar_hint: pillarHint,
+      questions,
+    })
+  }
+  return out
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createServerClient()
@@ -69,9 +132,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing clientId' }, { status: 400 })
     }
 
-    const questions = sanitizeQuestions(body.questions)
-    if (!questions.length) {
-      return NextResponse.json({ success: false, error: 'No questions provided' }, { status: 400 })
+    const topics = sanitizeTopics(body.topics)
+    const questions = topics.length ? [] : sanitizeQuestions(body.questions)
+
+    if (!topics.length && !questions.length) {
+      return NextResponse.json(
+        { success: false, error: 'Provide either topics or questions' },
+        { status: 400 },
+      )
     }
 
     const pillars = Array.isArray(body.pillars)
@@ -88,6 +156,7 @@ export async function POST(req: NextRequest) {
         token,
         title: title || null,
         questions,
+        topics,
         pillars,
       })
       .select('id, token')

@@ -35,6 +35,7 @@ import { Skeleton } from '@/components/ui/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { ClientAssignees } from '@/components/clients/ClientAssignees'
 import { TopicsBank } from '@/components/clients/TopicsBank'
+import { StageBadge } from '@/components/planner/StageBadge'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
 
@@ -399,6 +400,10 @@ export default function ClientProfilePage() {
                 )}
               </div>
 
+              <div className="mt-3 flex justify-center">
+                <StageBadge clientId={client.id} />
+              </div>
+
               {clientEmails.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                   {clientEmails.map((u) => {
@@ -454,7 +459,7 @@ export default function ClientProfilePage() {
                   <MoreVertical className="h-5 w-5" />
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     <MenuItem
                       icon={Sparkles}
                       label="Create content"

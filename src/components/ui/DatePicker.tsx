@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface DatePickerProps {
@@ -19,7 +19,12 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
     if (value) return new Date(value)
     return new Date()
   })
+  // Flip the calendar above the trigger when there isn't enough room
+  // below (common on capture pages where the meeting section is near
+  // the bottom of the viewport).
+  const [dropDirection, setDropDirection] = useState<'down' | 'up'>('down')
   const containerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -30,6 +35,20 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Decide drop direction on open. Calendar approx height = 420px
+  // (header + 6 rows + footer).
+  useLayoutEffect(() => {
+    if (!isOpen || !buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    const POPOVER_HEIGHT = 420
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    const next: 'up' | 'down' =
+      spaceBelow < POPOVER_HEIGHT && spaceAbove > spaceBelow ? 'up' : 'down'
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- viewport-conditional flip on open
+    setDropDirection(next)
+  }, [isOpen])
 
   const selectedDate = value ? new Date(value) : null
 
@@ -78,14 +97,27 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))
   }
 
+  // Format the picked Date as YYYY-MM-DD using LOCAL components,
+  // not UTC. toISOString() converts to UTC first - so in a timezone
+  // east of UTC, picking May 15 (midnight local = previous-day-23:00
+  // UTC) would emit "2026-05-14" and the user would see the wrong
+  // day selected. Reading year/month/date in local fixes the
+  // off-by-one across all eastern zones.
+  const toLocalYmd = (d: Date) => {
+    const yyyy = d.getFullYear()
+    const mm = (d.getMonth() + 1).toString().padStart(2, '0')
+    const dd = d.getDate().toString().padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
   const handleSelectDate = (date: Date) => {
-    onChange(date.toISOString().split('T')[0])
+    onChange(toLocalYmd(date))
     setIsOpen(false)
   }
 
   const handleToday = () => {
     const today = new Date()
-    onChange(today.toISOString().split('T')[0])
+    onChange(toLocalYmd(today))
     setViewDate(today)
     setIsOpen(false)
   }
@@ -104,6 +136,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center gap-3 px-4 py-2.5 bg-theme-input border border-theme-primary rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-[#2B79F7] transition-all"
@@ -119,7 +152,11 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-80 bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-4 animate-in fade-in zoom-in duration-150">
+        <div
+          className={`absolute z-50 w-80 max-w-[calc(100vw-1rem)] bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-4 animate-in fade-in zoom-in duration-150 ${
+            dropDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <button

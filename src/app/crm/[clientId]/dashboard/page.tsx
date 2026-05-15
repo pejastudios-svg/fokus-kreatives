@@ -1665,24 +1665,48 @@ function timeAgo(iso: string): string {
 // ============================================================================
 
 function DashboardSkeleton() {
+  // Mirror the real dashboard's container (no max-w cap, same px/py
+  // as the loaded view) so the skeleton occupies the same screen
+  // area. Metric heights, chart heights, and column ratios match
+  // their loaded counterparts so the layout doesn't visibly jump
+  // when data resolves.
   return (
-    <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
-      <div>
-        <Skeleton className="h-4 w-48 bg-[var(--bg-tertiary)] mb-1.5" />
-        <Skeleton className="h-3 w-20 bg-[var(--bg-tertiary)]" />
+    <div className="font-[family-name:var(--font-plex-sans)] px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      {/* Header: greeting + subtitle on left, currency controls on right */}
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <Skeleton className="h-7 sm:h-8 w-56 bg-[var(--bg-tertiary)] mb-2" />
+          <Skeleton className="h-3 w-72 bg-[var(--bg-tertiary)]" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-48 bg-[var(--bg-tertiary)] rounded-lg" />
+          <Skeleton className="h-9 w-9 bg-[var(--bg-tertiary)] rounded-lg" />
+        </div>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+
+      {/* 4 metric cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[88px] sm:h-[108px] bg-[var(--bg-tertiary)] rounded-xl" />
+          <Skeleton key={i} className="h-[120px] sm:h-[140px] bg-[var(--bg-tertiary)] rounded-xl" />
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <Skeleton className="h-44 sm:h-56 lg:col-span-2 bg-[var(--bg-tertiary)] rounded-xl" />
-        <Skeleton className="h-44 sm:h-56 bg-[var(--bg-tertiary)] rounded-xl" />
+
+      {/* Leads-by-status (2 cols) + Invoice mix (1 col) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <Skeleton className="h-[340px] lg:col-span-2 bg-[var(--bg-tertiary)] rounded-xl" />
+        <Skeleton className="h-[340px] bg-[var(--bg-tertiary)] rounded-xl" />
       </div>
+
+      {/* Revenue trend + secondary chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <Skeleton className="h-[260px] lg:col-span-2 bg-[var(--bg-tertiary)] rounded-xl" />
+        <Skeleton className="h-[260px] bg-[var(--bg-tertiary)] rounded-xl" />
+      </div>
+
+      {/* Lower row: 3 equal cards (system metrics, activity, etc) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-44 sm:h-56 bg-[var(--bg-tertiary)] rounded-xl" />
+          <Skeleton key={i} className="h-[220px] bg-[var(--bg-tertiary)] rounded-xl" />
         ))}
       </div>
     </div>

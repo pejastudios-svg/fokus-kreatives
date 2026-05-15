@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -19,8 +19,6 @@ import {
   CheckCircle,
   X,
   Search,
-  BarChart3,
-  List,
   Image as ImageIcon,
   ChevronDown,
   Type,
@@ -28,12 +26,22 @@ import {
   Calendar,
   ListChecks,
   FileDown,
+  Info,
 } from 'lucide-react'
 import { KebabMenu } from '@/components/ui/KebabMenu'
+import { Tooltip } from '@/components/ui/Tooltip'
 import type {
   CaptureReportPage,
   CaptureReportSubmission,
 } from '@/components/reports/CaptureReport'
+import { LAYOUT_TEMPLATES } from '@/components/capture/layouts'
+import { LayoutThumb } from '@/components/capture/LayoutThumb'
+import { CapturePagePreview } from '@/components/capture/CapturePagePreview'
+import { BrandImageUpload } from '@/components/capture/BrandImageUpload'
+import { ThemePicker } from '@/components/capture/ThemePicker'
+import { CaptureFieldRow } from '@/components/capture/CaptureFieldRow'
+import { CaptureAdvancedAnalytics } from '@/components/capture/CaptureAdvancedAnalytics'
+import type { LayoutTemplate } from '@/components/capture/types'
 
 type FieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'date' | 'time' | 'embed'
 
@@ -56,6 +64,8 @@ type CaptureTheme = {
   fontFamily: 'system' | 'inter' | 'poppins'
 }
 
+type MeetingIntegration = 'calendly' | 'google_meet' | 'zoom' | null
+
 interface CapturePage {
   id: string
   client_id: string
@@ -69,8 +79,23 @@ interface CapturePage {
   banner_url: string | null
   include_meeting: boolean
   calendly_url: string | null
+  meeting_integration: MeetingIntegration
+  /** Label shown on the success-state CTA button. Null falls back to
+   *  "Access Your Free Resource" at render time so existing pages
+   *  don't change their copy. */
+  success_button_text: string | null
+  success_message: string | null
+  accent_color: string | null
+  /** When true, the public submit endpoint rejects a second submission
+   *  from an email that's already been captured on this page. Default
+   *  false (allow + dedupe leads). */
+  block_duplicate_emails: boolean
+  /** Per-page meeting length (minutes) for Google Meet + Zoom flows.
+   *  Drives slot generation in the availability picker. */
+  meeting_duration_minutes: number
   fields: CaptureField[] | null
   theme: CaptureTheme | null
+  layout_template: LayoutTemplate | null
   created_at: string
 }
 
@@ -83,6 +108,12 @@ interface SubmissionRow {
   phone: string | null
   notes: string | null
   data: Record<string, unknown>
+  /** Snapshot of {fieldId: label} the page had at submission time.
+   *  Used by the detail modal so renamed/removed fields still render
+   *  with their original labels. Older submissions captured before
+   *  this column existed have null here and fall back to the page's
+   *  current fields. */
+  field_labels: Record<string, string> | null
   created_at: string
 }
 
@@ -105,9 +136,29 @@ function makeDefaultTheme(): CaptureTheme {
 
 function normalizeTheme(t: unknown): CaptureTheme {
   const d = makeDefaultTheme()
-  if (!t || typeof t !== 'object') return d
-  const theme = t as Partial<CaptureTheme>
+  if (!t) return d
 
+  // Supabase JSONB columns sometimes come back as a string (when fetched
+  // raw without a parsed type), sometimes as a parsed object. Handle
+  // both - mirror what /api/capture/info does for the public page.
+  // Without this branch, a string-encoded theme falls through to the
+  // typeof !== 'object' check below and we silently revert to defaults,
+  // losing the saved cardColor + background + everything else.
+  let parsed: unknown = t
+  if (typeof t === 'string') {
+    try {
+      parsed = JSON.parse(t)
+    } catch {
+      return d
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return d
+
+  // Spread preserves any property present on the parsed theme - including
+  // `cardColor` which isn't in the local CaptureTheme type but rides
+  // through at runtime so the picker can read it back. The shared
+  // CaptureTheme type (used by ThemePicker) carries the cardColor field.
+  const theme = parsed as Partial<CaptureTheme> & { cardColor?: string | null }
   return {
     ...d,
     ...theme,
@@ -151,9 +202,22 @@ function normalizeFields(f: unknown): CaptureField[] {
 export default function CRMCapturePages() {
   const params = useParams()
   const clientId = (params?.clientId || params?.clientid) as string
+  // Deep-link from the Inbox: `?tab=submissions&focus=<submissionId>`
+  // switches to the Submissions tab on mount + opens the detail modal
+  // for that submission once submissions load. Tracked in a ref-like
+  // state so we only consume it once - subsequent navigations within
+  // the page (manual tab switches, search) shouldn't re-trigger it.
+  const searchParams = useSearchParams()
+  const initialTab = searchParams?.get('tab')
+  const initialFocus = searchParams?.get('focus')
   const supabase = createClient()
 
-  const [tab, setTab] = useState<'pages' | 'submissions'>('pages')
+  const [tab, setTab] = useState<'pages' | 'submissions'>(
+    initialTab === 'submissions' ? 'submissions' : 'pages',
+  )
+  const [pendingFocusSubmissionId, setPendingFocusSubmissionId] = useState<string | null>(
+    initialTab === 'submissions' ? initialFocus : null,
+  )
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRow | null>(null)
   // Capture pages are workspace structure (they shape lead intake), so
   // editing is manager+ - matches the leads custom-fields gate.
@@ -179,6 +243,7 @@ export default function CRMCapturePages() {
   const [slugError, setSlugError] = useState<string | null>(null)
 
   // submissions
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
   const [submissionToDelete, setSubmissionToDelete] = useState<SubmissionRow | null>(null)
   const [deletingSubmission, setDeletingSubmission] = useState(false)
@@ -187,9 +252,18 @@ export default function CRMCapturePages() {
   const [subPageId, setSubPageId] = useState<string>('') // filter by page
   const [stats, setStats] = useState({ submissions: 0, leads: 0, meetings: 0 })
 
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
+  // Public capture URL base. On localhost we ALWAYS use the current
+  // window origin so dev links open the local dev server (e.g.
+  // http://localhost:3000/capture/<slug>). Anywhere else we prefer the
+  // canonical NEXT_PUBLIC_APP_URL so prod / preview deploys hand out
+  // the right domain in the Copy Link button.
+  const appUrl = (() => {
+    if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_APP_URL || ''
+    const host = window.location.hostname
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')
+    if (isLocal) return window.location.origin
+    return process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+  })()
 
   const [form, setForm] = useState<{
     name: string
@@ -202,8 +276,15 @@ export default function CRMCapturePages() {
     is_active: boolean
     include_meeting: boolean
     calendly_url: string
+    meeting_integration: MeetingIntegration
+    success_button_text: string
+    success_message: string
+    accent_color: string
+    block_duplicate_emails: boolean
+    meeting_duration_minutes: number
     fields: CaptureField[]
     theme: CaptureTheme
+    layout_template: LayoutTemplate
   }>({
     name: '',
     slug: '',
@@ -215,9 +296,83 @@ export default function CRMCapturePages() {
     is_active: true,
     include_meeting: false,
     calendly_url: '',
+    meeting_integration: null,
+    success_button_text: '',
+    success_message: '',
+    accent_color: '',
+    block_duplicate_emails: false,
+    meeting_duration_minutes: 30,
     fields: normalizeFields(makeDefaultFields()),
     theme: normalizeTheme(makeDefaultTheme()),
+    layout_template: 'compact',
   })
+
+  // Connected meeting integrations for THIS CRM. Used by the editor's
+  // Meeting section to populate the integration picker (only providers
+  // that are actually wired up appear as selectable). Loaded once per
+  // CRM via /api/integrations/list.
+  const [connectedIntegrations, setConnectedIntegrations] = useState<
+    Array<'calendly' | 'google_meet' | 'zoom'>
+  >([])
+
+  // Calendly event types belonging to the connected account. Loaded
+  // lazily the first time Calendly is picked as the meeting provider
+  // so we don't hit Calendly's API on every modal open. Lets users
+  // embed a SPECIFIC event (e.g. "Onboarding Call") instead of their
+  // main scheduling page (which lists every event).
+  interface CalendlyEventTypeBrief {
+    uri: string
+    name: string
+    slug: string
+    scheduling_url: string
+    duration: number
+  }
+  const [calendlyEventTypes, setCalendlyEventTypes] = useState<CalendlyEventTypeBrief[] | null>(null)
+  const [loadingEventTypes, setLoadingEventTypes] = useState(false)
+
+  useEffect(() => {
+    if (!clientId) return
+    let cancelled = false
+    fetch(`/api/integrations/list?clientId=${encodeURIComponent(clientId)}`, {
+      cache: 'no-store',
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || !data?.success) return
+        const connected = (data.integrations as Array<{ provider: string; status: string }>)
+          .filter((i) => i.status === 'connected')
+          .map((i) => i.provider as 'calendly' | 'google_meet' | 'zoom')
+        setConnectedIntegrations(connected)
+      })
+      .catch(() => {
+        // Non-fatal: the picker just shows "none" if list fails.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clientId])
+
+  // Fetch event types the first time Calendly is selected. We cache
+  // the result for the lifetime of the page; the editor refreshes
+  // when the user navigates away and back.
+  useEffect(() => {
+    if (form.meeting_integration !== 'calendly') return
+    if (calendlyEventTypes !== null) return
+    if (loadingEventTypes) return
+    if (!connectedIntegrations.includes('calendly')) return
+    setLoadingEventTypes(true)
+    fetch(`/api/integrations/calendly/event-types?clientId=${encodeURIComponent(clientId)}`, {
+      cache: 'no-store',
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success) setCalendlyEventTypes(data.eventTypes || [])
+        else setCalendlyEventTypes([])
+      })
+      .catch(() => setCalendlyEventTypes([]))
+      .finally(() => setLoadingEventTypes(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.meeting_integration, connectedIntegrations])
 
   useEffect(() => {
     if (clientId) loadPages()
@@ -274,8 +429,15 @@ export default function CRMCapturePages() {
       is_active: true,
       include_meeting: false,
       calendly_url: '',
+      meeting_integration: null,
+      success_button_text: '',
+      success_message: '',
+      accent_color: '',
+      block_duplicate_emails: false,
+      meeting_duration_minutes: 30,
       fields: makeDefaultFields(),
       theme: makeDefaultTheme(),
+      layout_template: 'compact',
     })
     setShowModal(true)
   }
@@ -294,8 +456,18 @@ export default function CRMCapturePages() {
       is_active: page.is_active,
       include_meeting: page.include_meeting ?? false,
       calendly_url: page.calendly_url || '',
+      meeting_integration: page.meeting_integration ?? null,
+      success_button_text: page.success_button_text || '',
+      success_message: page.success_message || '',
+      accent_color: page.accent_color || '',
+      block_duplicate_emails: !!page.block_duplicate_emails,
+      meeting_duration_minutes:
+        typeof page.meeting_duration_minutes === 'number'
+          ? page.meeting_duration_minutes
+          : 30,
       fields: normalizeFields(page.fields),
       theme: normalizeTheme(page.theme),
+      layout_template: (page.layout_template ?? 'compact') as LayoutTemplate,
     })
     setShowModal(true)
   }
@@ -365,6 +537,44 @@ export default function CRMCapturePages() {
     })
   }
 
+  // ---- Drag-to-reorder fields. Parent owns the drag state so the
+  // dragged-row + drop-target highlights stay in sync across the
+  // list. The global useDragAutoScroll hook (mounted in (app)/layout)
+  // scrolls the modal's left pane when the cursor nears the edge. ---
+  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null)
+  const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null)
+
+  const handleFieldDragStart = (id: string) => {
+    setDraggedFieldId(id)
+  }
+  const handleFieldDragOver = (id: string) => {
+    if (draggedFieldId && draggedFieldId !== id) {
+      setDragOverFieldId(id)
+    }
+  }
+  const handleFieldDropOn = (targetId: string) => {
+    if (!draggedFieldId || draggedFieldId === targetId) {
+      setDraggedFieldId(null)
+      setDragOverFieldId(null)
+      return
+    }
+    setForm((prev) => {
+      const fromIdx = prev.fields.findIndex((f) => f.id === draggedFieldId)
+      const toIdx = prev.fields.findIndex((f) => f.id === targetId)
+      if (fromIdx < 0 || toIdx < 0) return prev
+      const copy = [...prev.fields]
+      const [picked] = copy.splice(fromIdx, 1)
+      copy.splice(toIdx, 0, picked)
+      return { ...prev, fields: copy }
+    })
+    setDraggedFieldId(null)
+    setDragOverFieldId(null)
+  }
+  const handleFieldDragEnd = () => {
+    setDraggedFieldId(null)
+    setDragOverFieldId(null)
+  }
+
   const handleSave = async () => {
     if (!form.name || !form.slug) return
     if (slugError) return
@@ -385,15 +595,34 @@ export default function CRMCapturePages() {
             is_active: form.is_active,
             include_meeting: form.include_meeting,
             calendly_url: form.calendly_url || null,
+            meeting_integration: form.meeting_integration,
+            success_button_text: form.success_button_text || null,
+            success_message: form.success_message || null,
+            accent_color: form.accent_color || null,
+            block_duplicate_emails: form.block_duplicate_emails,
+            meeting_duration_minutes: form.meeting_duration_minutes || 30,
             fields: form.fields,
-            theme: null,
+            theme: form.theme,
+            layout_template: form.layout_template,
           })
           .eq('id', editingPage.id)
 
         if (error) {
-          console.error('Update capture page error:', error)
-          setNotification(`Error: ${error.message}`)
-          setTimeout(() => setNotification(null), 3000)
+          // Some Postgrest error shapes have non-enumerable fields,
+          // which makes a naive console.error print `{}`. We pull the
+          // common fields explicitly AND fall back to JSON.stringify
+          // with the Error-property reflector so nothing is lost
+          // regardless of how the SDK packaged the failure.
+          const errBag = {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            raw: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+          }
+          console.error('Update capture page error:', errBag)
+          setNotification(`Error: ${error.message || error.details || 'Update failed - check console'}`)
+          setTimeout(() => setNotification(null), 4000)
         } else {
           setNotification('Capture page updated')
           setTimeout(() => setNotification(null), 3000)
@@ -427,13 +656,25 @@ export default function CRMCapturePages() {
           is_active: form.is_active,
           include_meeting: form.include_meeting,
           calendly_url: form.calendly_url || null,
+          meeting_integration: form.meeting_integration,
+          success_button_text: form.success_button_text || null,
+          success_message: form.success_message || null,
+          accent_color: form.accent_color || null,
+          block_duplicate_emails: form.block_duplicate_emails,
+          meeting_duration_minutes: form.meeting_duration_minutes || 30,
           fields: form.fields,
           theme: form.theme,
+          layout_template: form.layout_template,
         })
 
         if (error) {
-          console.error('Create capture page error:', error)
-          setNotification(`Error: ${error.message}`)
+          console.error('Create capture page error:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          })
+          setNotification(`Error: ${error.message || 'Create failed'}`)
           setTimeout(() => setNotification(null), 3000)
         } else {
           setNotification('Capture page created')
@@ -543,6 +784,18 @@ export default function CRMCapturePages() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, subPageId])
+
+  // Once submissions resolve, pop the detail modal for the
+  // deep-linked submission (?focus=<id> from Inbox). Consume the
+  // pending id so we don't re-open the modal if the user closes it.
+  useEffect(() => {
+    if (!pendingFocusSubmissionId) return
+    const match = submissions.find((s) => s.id === pendingFocusSubmissionId)
+    if (match) {
+      setSelectedSubmission(match)
+      setPendingFocusSubmissionId(null)
+    }
+  }, [submissions, pendingFocusSubmissionId])
 
   const filteredSubmissions = useMemo(() => {
     const q = subSearch.trim().toLowerCase()
@@ -673,13 +926,18 @@ const deleteSubmission = async () => {
   }
 
 function CaptureSkeleton() {
+  // Renders inside the Pages tab body - the page-level header and
+  // the Pages/Submissions tab strip are already shown above by the
+  // real component, so we only mirror the page card rows here. Each
+  // row shows three icon-button skeletons (copy-link, edit, delete)
+  // matching the icon-only treatment.
   return (
     <div className="space-y-3 animate-in fade-in">
       {[1, 2, 3].map((i) => (
         <Card key={i} className="bg-[var(--bg-card)] border-[var(--border-primary)]">
-          <CardContent className="p-4 flex items-start justify-between gap-3">
+          <CardContent className="p-5 flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0 flex-1">
-              <Skeleton className="h-9 w-9 rounded-lg bg-[var(--bg-card-hover)] shrink-0" />
+              <Skeleton className="h-11 w-11 rounded-lg bg-[var(--bg-card-hover)] shrink-0" />
               <div className="space-y-2 min-w-0 flex-1">
                 <div className="flex gap-2">
                   <Skeleton className="h-4 w-24 sm:w-32 bg-[var(--bg-card-hover)]" />
@@ -689,12 +947,10 @@ function CaptureSkeleton() {
                 <Skeleton className="hidden sm:block h-3 w-64 bg-[var(--bg-card-hover)]" />
               </div>
             </div>
-            <div className="flex flex-col gap-2 shrink-0">
-              <Skeleton className="h-7 w-16 sm:w-24 bg-[var(--bg-card-hover)]" />
-              <div className="flex gap-1.5 justify-end">
-                <Skeleton className="h-7 w-7 rounded-lg bg-[var(--bg-card-hover)]" />
-                <Skeleton className="h-7 w-7 rounded-lg bg-[var(--bg-card-hover)]" />
-              </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
+              <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
             </div>
           </CardContent>
         </Card>
@@ -711,56 +967,54 @@ function CaptureSkeleton() {
           </div>
         )}
 
-        {/* Header + tabs */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+        {/* Header: copy on the left, kebab on the right. The
+            Pages/Submissions switch lives below as proper underline
+            tabs (replacing the pill-button pair). New Capture Page
+            moved into the kebab so the top bar stays clean. */}
+        <div className="flex items-center justify-between gap-3 mb-4">
           <p className="text-xs text-[var(--text-tertiary)]">Build pages to capture leads</p>
+          <KebabMenu
+            items={[
+              ...(canEditCapture
+                ? [
+                    {
+                      label: 'New Capture Page',
+                      icon: <Plus className="h-4 w-4" />,
+                      onClick: openNewModal,
+                    },
+                  ]
+                : []),
+              {
+                label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+                icon: <FileDown className="h-4 w-4" />,
+                disabled: isExporting,
+                onClick: handleExportPdf,
+              },
+            ]}
+          />
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setTab('pages')}
-              className={`px-3 py-2 rounded-xl text-sm border ${
-                tab === 'pages'
-                  ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-primary)]'
-              }`}
-            >
-              <List className="h-4 w-4 inline mr-2" />
-              Pages
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTab('submissions')}
-              className={`px-3 py-2 rounded-xl text-sm border ${
-                tab === 'submissions'
-                  ? 'bg-[#2B79F7] text-white border-[#2B79F7]'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-primary)]'
-              }`}
-            >
-              <BarChart3 className="h-4 w-4 inline mr-2" />
-              Submissions
-            </button>
-
-            <div className="flex items-center gap-1">
-              {canEditCapture && (
-                <Button onClick={openNewModal}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Capture Page
-                </Button>
-              )}
-              <KebabMenu
-                items={[
-                  {
-                    label: isExporting ? 'Generating PDF…' : 'Export as PDF',
-                    icon: <FileDown className="h-4 w-4" />,
-                    disabled: isExporting,
-                    onClick: handleExportPdf,
-                  },
-                ]}
-              />
-            </div>
-          </div>
+        <div className="flex items-center gap-6 border-b border-[var(--border-primary)] mb-5">
+          {(['pages', 'submissions'] as const).map((t) => {
+            const active = tab === t
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`relative pb-3 text-sm font-medium capitalize transition-colors ${
+                  active
+                    ? 'text-[#2B79F7]'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                {t}
+                {active && (
+                  <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-[#2B79F7] rounded-full" />
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {tab === 'pages' && (
@@ -826,32 +1080,28 @@ function CaptureSkeleton() {
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <Button variant="outline" size="sm" onClick={() => handleCopyLink(page)}>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleCopyLink(page)}
+                            className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+                            title={copyingId === page.id ? 'Copied!' : 'Copy public link'}
+                          >
                             {copyingId === page.id ? (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Copied
-                              </>
+                              <CheckCircle className="h-4 w-4 text-green-500" />
                             ) : (
-                              <>
-                                <LinkIcon className="h-4 w-4 mr-1" />
-                                Copy Link
-                              </>
+                              <LinkIcon className="h-4 w-4" />
                             )}
-                          </Button>
-
-                          <div className="flex items-center gap-2">
-                            {canEditCapture && (
+                          </button>
+                          {canEditCapture && (
                             <button
                               onClick={() => openEditModal(page)}
-                              className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[#111827] transition-colors"
+                              className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
                               title="Edit"
                             >
                               <Edit3 className="h-4 w-4" />
                             </button>
-                )}
-                {canEditCapture && (
+                          )}
+                          {canEditCapture && (
                             <button
                               onClick={() => setPageToDelete(page)}
                               className="p-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -859,8 +1109,7 @@ function CaptureSkeleton() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
-                )}
-                          </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -911,26 +1160,50 @@ function CaptureSkeleton() {
 
             {/* Stats */}
             {subPageId && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-[var(--text-tertiary)]">Submissions</p>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.submissions}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-[var(--text-tertiary)]">Leads Created</p>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.leads}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-[var(--text-tertiary)]">Meetings Booked</p>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.meetings}</p>
-                  </CardContent>
-                </Card>
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-[var(--text-tertiary)]">Submissions</p>
+                      <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.submissions}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-[var(--text-tertiary)]">Leads Created</p>
+                      <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.leads}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[var(--bg-card)] border-[var(--border-primary)]">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-[var(--text-tertiary)]">Meetings Booked</p>
+                      <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{stats.meetings}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Advanced toggle + panel. Drops below the basic
+                    stats so the simple view stays at the top. */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#2B79F7] hover:text-[#1E54B7] transition-colors"
+                  >
+                    {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#2B79F7]/10 text-[#2B79F7]">
+                      Beta
+                    </span>
+                  </button>
+                </div>
+
+                {showAdvanced && (
+                  <CaptureAdvancedAnalytics
+                    clientId={clientId}
+                    pageId={subPageId}
+                  />
+                )}
+              </>
             )}
 
             {/* Table */}
@@ -1004,23 +1277,85 @@ function CaptureSkeleton() {
           </div>
         )}
 
-        {/* Builder Modal */}
+        {/* Builder Modal - split-view: builder on left, live preview on
+            right. Preview reflects the current form state in real time
+            so you see exactly what visitors will see before saving. */}
         {showModal && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-7xl h-[92vh] shadow-2xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[var(--border-primary)] shrink-0">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   {editingPage ? 'Edit Capture Page' : 'New Capture Page'}
                 </h3>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+
+                {/* Active toggle pinned in the header so it's always
+                    one click away. The info icon explains what off
+                    does without taking up modal space. */}
+                <div className="flex items-center gap-3 ml-auto">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                      Active
+                    </span>
+                    <Tooltip
+                      content="When off, the public capture page returns a 'no longer available' message. New leads can't submit. Existing leads are kept."
+                      position="bottom"
+                      maxWidth={280}
+                    >
+                      <span className="inline-flex text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] cursor-help">
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </Tooltip>
+                  </div>
+                  <Toggle
+                    checked={form.is_active}
+                    onChange={(v) => setForm((prev) => ({ ...prev, is_active: v }))}
+                  />
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
-              <div className="px-6 py-5 space-y-6">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 min-h-0">
+                {/* Left pane: form builder (scrolls internally) */}
+                <div className="px-6 py-5 space-y-6 overflow-y-auto scrollbar-none lg:border-r border-[var(--border-primary)]">
+                  {/* Layout picker - 6 thumbnails. Click one and the
+                      preview pane on the right snaps to that shell. */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <ImageIcon className="h-4 w-4 text-[#2B79F7]" />
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">Layout</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {LAYOUT_TEMPLATES.map((t) => {
+                        const active = form.layout_template === t.key
+                        return (
+                          <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setForm((prev) => ({ ...prev, layout_template: t.key }))}
+                            className={`text-left rounded-lg border p-2.5 transition-colors ${
+                              active
+                                ? 'border-[#2B79F7] bg-[#2B79F7]/5'
+                                : 'border-[var(--border-primary)] hover:border-[var(--text-tertiary)]'
+                            }`}
+                          >
+                            <LayoutThumb kind={t.key} active={active} />
+                            <div className={`mt-1.5 text-xs font-medium ${active ? 'text-[#2B79F7]' : 'text-[var(--text-primary)]'}`}>
+                              {t.label}
+                            </div>
+                            <div className="text-[10px] text-[var(--text-tertiary)] leading-tight">
+                              {t.description}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                 {/* Basic */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
@@ -1068,52 +1403,138 @@ function CaptureSkeleton() {
                   placeholder="https://example.com/your-pdf-or-video"
                 />
 
-                {/* Branding: Banner + Logo */}
+                {/* CTA label after the visitor submits successfully.
+                    Only shows when a lead-magnet URL is set (the
+                    button itself is conditional on URL presence).
+                    Empty falls back to the legacy default at render. */}
+                {form.lead_magnet_url && (
+                  <Input
+                    label="Success button text"
+                    name="success_button_text"
+                    value={form.success_button_text}
+                    onChange={handleFormChange}
+                    placeholder="Access Your Free Resource"
+                  />
+                )}
+
+                {/* Custom success-state confirmation message. Empty
+                    falls back to "You're in! Let's Keep Going.". */}
+                <Input
+                  label="Success message"
+                  name="success_message"
+                  value={form.success_message}
+                  onChange={handleFormChange}
+                  placeholder="You're in! Let's Keep Going."
+                />
+
+                {/* Button accent color drives both the Submit button
+                    and the success-state lead-magnet button. Uses a
+                    native color input so we get the browser's
+                    swatches without bringing in another picker lib.
+                    Empty value falls back to the default blue. */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                    Button color
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={form.accent_color || '#2B79F7'}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, accent_color: e.target.value }))
+                      }
+                      className="h-10 w-14 rounded-lg border border-[var(--border-primary)] bg-transparent cursor-pointer"
+                    />
+                    <Input
+                      name="accent_color"
+                      value={form.accent_color}
+                      onChange={handleFormChange}
+                      placeholder="#2B79F7"
+                      className="flex-1"
+                    />
+                    {form.accent_color && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => ({ ...prev, accent_color: '' }))
+                        }
+                        className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] px-2"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+                    Applies to the Submit button{form.lead_magnet_url ? ' and the success-state button' : ''}.
+                  </p>
+                </div>
+
+                {/* One-submission-per-email gate. Off by default - most
+                    forms benefit from being retry-friendly (network
+                    blips, "I want to update my answer"). Turn on for
+                    one-shot signups (giveaways, event RSVPs) where a
+                    duplicate is almost always a mistake. */}
+                <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                  <Toggle
+                    checked={form.block_duplicate_emails}
+                    onChange={(v) =>
+                      setForm((prev) => ({ ...prev, block_duplicate_emails: v }))
+                    }
+                    label="Block duplicate submissions per email"
+                    description="When on, a second submission from the same email shows a friendly 'you've already submitted' message. Off by default - duplicates are allowed and your leads list dedupes them automatically."
+                  />
+                </div>
+
+                {/* Branding: Banner + Logo. The banner upload shows a
+                    LIVE thumbnail of the current image with a hover-
+                    replace overlay, plus a layout-aware size hint so
+                    the user knows what dimensions look best with their
+                    currently-selected layout. */}
                 <div className="border-t border-[var(--border-primary)] pt-5 space-y-4">
                   <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
                     <ImageIcon className="h-4 w-4 text-[#2B79F7]" />
                     Branding
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-sm text-[var(--text-primary)] font-medium">Banner image (optional)</p>
-                      <FileUpload
-                        label="Upload banner"
-                        folder="capture-banners"
-                        accept="image/*"
-                        onUpload={(url) => setForm((prev) => ({ ...prev, banner_url: url }))}
-                      />
-                      <Input
-                        label="Or banner URL"
-                        name="banner_url"
-                        value={form.banner_url}
-                        onChange={handleFormChange}
-                        placeholder="https://.../banner.png"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-sm text-[var(--text-primary)] font-medium">Logo (optional)</p>
-                      <FileUpload
-                        label="Upload logo"
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+                    {(() => {
+                      const cfg = LAYOUT_TEMPLATES.find((t) => t.key === form.layout_template)
+                      const hint = cfg?.usesBanner
+                        ? `Recommended: ${cfg.bannerSize} · ${cfg.bannerAspect}`
+                        : 'This layout doesn’t use the banner image.'
+                      return (
+                        <BrandImageUpload
+                          label="Banner image (optional)"
+                          folder="capture-banners"
+                          value={form.banner_url}
+                          onChange={(url) => setForm((prev) => ({ ...prev, banner_url: url }))}
+                          sizeHint={hint}
+                          aspect={form.layout_template === 'banner-top' ? '8 / 3' : '16 / 9'}
+                        />
+                      )
+                    })()}
+                    <div className="md:w-40">
+                      <BrandImageUpload
+                        label="Logo (optional)"
                         folder="capture-logos"
-                        accept="image/*"
-                        onUpload={(url) => setForm((prev) => ({ ...prev, logo_url: url }))}
-                      />
-                      <Input
-                        label="Or logo URL"
-                        name="logo_url"
                         value={form.logo_url}
-                        onChange={handleFormChange}
-                        placeholder="https://.../logo.png"
+                        onChange={(url) => setForm((prev) => ({ ...prev, logo_url: url }))}
+                        sizeHint="Square. 512×512 px or larger."
+                        aspect="1 / 1"
+                        circle
                       />
                     </div>
                   </div>
+                </div>
 
-                  <p className="text-xs text-[var(--text-tertiary)]">
-                    Upload one or both
-                  </p>
+                {/* Colors / theme. Picker controls the PAGE background.
+                    Card surface stays the app palette so submit/fields
+                    stay readable across themes. */}
+                <div className="border-t border-[var(--border-primary)] pt-5">
+                  <ThemePicker
+                    value={form.theme}
+                    onChange={(next) => setForm((prev) => ({ ...prev, theme: next }))}
+                  />
                 </div>
 
                 {/* Fields - rounded-full pills with icons make the
@@ -1145,139 +1566,23 @@ function CaptureSkeleton() {
                     ))}
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {form.fields.map((f, idx) => (
-                      <div key={f.id} className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="text-xs text-[var(--text-tertiary)]">
-                            Field #{idx + 1} · <code>{f.id}</code>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => moveField(f.id, -1)}
-                              className="px-2 py-1 text-xs rounded border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7]"
-                              title="Move up"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveField(f.id, 1)}
-                              className="px-2 py-1 text-xs rounded border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7]"
-                              title="Move down"
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeField(f.id)}
-                              className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10"
-                              title="Delete field"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="md:col-span-2">
-                            <Input
-                              label="Label"
-                              value={f.label}
-                              onChange={(e) => updateField(f.id, { label: e.target.value })}
-                              placeholder="Field label"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Type</label>
-                            <select
-                              value={f.type}
-                              onChange={(e) => updateField(f.id, { type: e.target.value as FieldType })}
-                              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                            >
-                              <option value="text">Text</option>
-                              <option value="email">Email</option>
-                              <option value="phone">Phone</option>
-                              <option value="textarea">Long text</option>
-                              <option value="select">Dropdown</option>
-                              <option value="radio">Options</option>
-                              <option value="date">Date</option>
-                              <option value="time">Time</option>
-                              <option value="embed">Embed</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                            <input
-                              type="checkbox"
-                              checked={!!f.required}
-                              onChange={(e) => updateField(f.id, { required: e.target.checked })}
-                              className="h-4 w-4 rounded border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[#2B79F7]"
-                            />
-                            Required
-                          </label>
-
-                          {f.type !== 'embed' && (
-                            <Input
-                              label="Placeholder (optional)"
-                              value={f.placeholder || ''}
-                              onChange={(e) => updateField(f.id, { placeholder: e.target.value })}
-                              placeholder="Type here..."
-                            />
-                          )}
-                        </div>
-
-                        <Input
-                          label="Helper text (optional)"
-                          value={f.description || ''}
-                          onChange={(e) => updateField(f.id, { description: e.target.value })}
-                          placeholder="Small note shown under the field"
-                        />
-
-                        {(f.type === 'select' || f.type === 'radio') && (
-                          <div>
-                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-                              Options (one per line)
-                            </label>
-                            <textarea
-                              value={(f.options || []).join('\n')}
-                              onChange={(e) =>
-                                updateField(f.id, {
-                                  options: e.target.value
-                                    .split('\n')
-                                    .map((x) => x.trim())
-                                    .filter(Boolean),
-                                })
-                              }
-                              rows={4}
-                              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
-                            />
-                          </div>
-                        )}
-
-                        {f.type === 'embed' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <Input
-                              label="Embed URL"
-                              value={f.embedUrl || ''}
-                              onChange={(e) => updateField(f.id, { embedUrl: e.target.value })}
-                              placeholder="https://..."
-                            />
-                            <Input
-                              label="Embed height (px)"
-                              type="number"
-                              value={String(f.embedHeight || 520)}
-                              onChange={(e) => updateField(f.id, { embedHeight: Number(e.target.value) || 520 })}
-                              placeholder="520"
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <CaptureFieldRow
+                        key={f.id}
+                        field={f}
+                        index={idx}
+                        total={form.fields.length}
+                        onUpdate={updateField}
+                        onMove={moveField}
+                        onRemove={removeField}
+                        isDragging={draggedFieldId === f.id}
+                        isDragOver={dragOverFieldId === f.id}
+                        onDragStartField={handleFieldDragStart}
+                        onDragOverField={handleFieldDragOver}
+                        onDropOnField={handleFieldDropOn}
+                        onDragEndField={handleFieldDragEnd}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1296,33 +1601,211 @@ function CaptureSkeleton() {
                     description="Adds a date + time picker to the form so leads can pick when they'd like to talk."
                   />
                   {form.include_meeting && (
-                    <Input
-                      label="Calendly URL (optional)"
-                      name="calendly_url"
-                      value={form.calendly_url}
-                      onChange={handleFormChange}
-                      placeholder="https://calendly.com/your-link"
-                    />
+                    <>
+                      {/* Integration picker. When a CRM-wide integration
+                          (Calendly today; Google Meet / Zoom next) is
+                          connected on the Settings page, picking it here
+                          replaces the date/time inputs with the provider's
+                          live scheduler. Bookings flow into the meetings
+                          table via the provider webhook, so the host
+                          doesn't have to re-enter the time the visitor
+                          chose. */}
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                          Meeting provider
+                        </label>
+                        <select
+                          value={form.meeting_integration ?? ''}
+                          onChange={(e) => {
+                            const next = (e.target.value || null) as MeetingIntegration
+                            setForm((prev) => ({
+                              ...prev,
+                              meeting_integration: next,
+                              // Clear stale Calendly URL when switching
+                              // off Calendly. Calendly is the only
+                              // provider that uses calendly_url; for
+                              // Google Meet / none, a leftover URL
+                              // would render a phantom Calendly embed
+                              // on the public page.
+                              calendly_url:
+                                next === 'calendly' ? prev.calendly_url : '',
+                            }))
+                          }}
+                          className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        >
+                          <option value="">None - manual date/time only</option>
+                          <option
+                            value="calendly"
+                            disabled={!connectedIntegrations.includes('calendly')}
+                          >
+                            Calendly
+                            {connectedIntegrations.includes('calendly')
+                              ? ''
+                              : ' (not connected - see Settings)'}
+                          </option>
+                          <option
+                            value="google_meet"
+                            disabled={!connectedIntegrations.includes('google_meet')}
+                          >
+                            Google Meet
+                            {connectedIntegrations.includes('google_meet')
+                              ? ''
+                              : ' (not connected - see Settings)'}
+                          </option>
+                          <option
+                            value="zoom"
+                            disabled={!connectedIntegrations.includes('zoom')}
+                          >
+                            Zoom
+                            {connectedIntegrations.includes('zoom')
+                              ? ''
+                              : ' (not connected - see Settings)'}
+                          </option>
+                        </select>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+                          {form.meeting_integration === 'calendly'
+                            ? 'Visitors see your Calendly scheduler. Bookings auto-log into the meetings table.'
+                            : form.meeting_integration === 'google_meet'
+                            ? 'Visitors pick a date/time below. On submit we create a Google Calendar event with a Meet link and email the invite.'
+                            : form.meeting_integration === 'zoom'
+                            ? 'Visitors pick a date/time below. On submit we create a Zoom meeting and include the join link in the notification email.'
+                            : 'No integration selected. You can still paste a Calendly URL below for the legacy embed.'}
+                        </p>
+                      </div>
+
+                      {/* Per-page event-type override. Picking one
+                          embeds that event's scheduler directly so
+                          visitors don't have to scroll a list of every
+                          Calendly event the host has. Leaving on
+                          "main scheduling page" embeds the user's
+                          home Calendly URL (legacy default). */}
+                      {form.meeting_integration === 'calendly' && (
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                            Specific event
+                          </label>
+                          {loadingEventTypes ? (
+                            <div className="text-xs text-[var(--text-tertiary)]">
+                              Loading events from Calendly…
+                            </div>
+                          ) : calendlyEventTypes && calendlyEventTypes.length > 0 ? (
+                            <>
+                              <select
+                                value={form.calendly_url || ''}
+                                onChange={(e) =>
+                                  setForm((prev) => ({ ...prev, calendly_url: e.target.value }))
+                                }
+                                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                              >
+                                <option value="">
+                                  Main scheduling page (visitor picks an event)
+                                </option>
+                                {calendlyEventTypes.map((et) => (
+                                  <option key={et.uri} value={et.scheduling_url}>
+                                    {et.name} ({et.duration} min)
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+                                Pick one to skip the event-list step and send
+                                visitors straight to the date picker.
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-[var(--text-tertiary)] leading-snug">
+                              No active event types found on this Calendly
+                              account. Create one in Calendly to enable this.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {!form.meeting_integration && (
+                        <Input
+                          label="Calendly URL (optional)"
+                          name="calendly_url"
+                          value={form.calendly_url}
+                          onChange={handleFormChange}
+                          placeholder="https://calendly.com/your-link"
+                        />
+                      )}
+
+                      {/* Meeting duration controls slot length in the
+                          public availability picker. Only relevant when
+                          we're the ones creating the meeting (Google
+                          Meet / Zoom) - Calendly's own scheduler owns
+                          duration for those events. */}
+                      {(form.meeting_integration === 'google_meet' ||
+                        form.meeting_integration === 'zoom') && (
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                            Meeting duration
+                          </label>
+                          <select
+                            value={form.meeting_duration_minutes}
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                meeting_duration_minutes: parseInt(e.target.value, 10) || 30,
+                              }))
+                            }
+                            className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          >
+                            <option value={15}>15 minutes</option>
+                            <option value={30}>30 minutes</option>
+                            <option value={45}>45 minutes</option>
+                            <option value={60}>1 hour</option>
+                            <option value={90}>1 hour 30 minutes</option>
+                            <option value={120}>2 hours</option>
+                          </select>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+                            How long each meeting runs. The availability picker
+                            shows slots in this length and hides any that
+                            overlap an existing booking.
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
-                <div className="border-t border-[var(--border-primary)] pt-5">
-                  <Toggle
-                    checked={form.is_active}
-                    onChange={(v) => setForm((prev) => ({ ...prev, is_active: v }))}
-                    label="Active"
-                    description="When off, the public capture page returns a 'no longer available' message."
-                  />
+                </div>
+
+                {/* Right pane: live preview. Renders the actual
+                    CaptureLayout with the current form state so what
+                    you see here IS what visitors will see when you
+                    publish. Scaled down so the desktop layout fits in
+                    the pane.
+                    The pane background mirrors the preview's own
+                    background so any space below the scaled content
+                    blends into the same color - no dark strip at the
+                    bottom. */}
+                <div
+                  className="hidden lg:block overflow-hidden relative"
+                  style={(() => {
+                    const bg = form.theme?.background
+                    if (bg?.type === 'gradient') {
+                      const from = bg.from || '#2B79F7'
+                      const to = bg.to || '#143A80'
+                      const dir = bg.direction || '135deg'
+                      return { background: `linear-gradient(${dir}, ${from}, ${to})` }
+                    }
+                    return { background: bg?.color || '#f9fafb' }
+                  })()}
+                >
+                  <div className="absolute top-2 left-3 z-10 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mix-blend-difference">
+                    Live preview
+                  </div>
+                  <div className="h-full overflow-y-auto scrollbar-none">
+                    <CapturePagePreview form={form} />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
-                <Button variant="outline" onClick={() => setShowModal(false)} disabled={isSaving}>
-                  Cancel
-                </Button>
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)] shrink-0">
                 <Button onClick={handleSave} isLoading={isSaving} disabled={!canEditCapture || !!slugError || !form.name || !form.slug}>
-  Save
-</Button>
+                  Save
+                </Button>
               </div>
             </div>
           </div>
@@ -1331,7 +1814,7 @@ function CaptureSkeleton() {
         {/* Delete confirm */}
         {pageToDelete && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Capture Page</h3>
                 <button
@@ -1385,7 +1868,13 @@ function CaptureSkeleton() {
           <div className="space-y-2">
             {(() => {
   const page = pages.find((p) => p.id === selectedSubmission.capture_page_id)
-  const labelMap = buildFieldLabelMap(page?.fields)
+  const currentLabels = buildFieldLabelMap(page?.fields)
+  // Snapshot taken at submission time wins - if a field was renamed
+  // since, we still show the original label the visitor actually saw.
+  // Fall back to the page's CURRENT labels for legacy submissions
+  // that pre-date the field_labels column.
+  const snapshot = selectedSubmission.field_labels || {}
+  const labelMap: Record<string, string> = { ...currentLabels, ...snapshot }
 
   return Object.entries(selectedSubmission.data || {}).map(([k, v]) => {
     const label = labelMap[k] || prettyKey(k)

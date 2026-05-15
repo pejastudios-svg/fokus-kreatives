@@ -115,7 +115,7 @@ export function LeadFilter({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 right-0 w-72 max-h-80 overflow-hidden rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg flex flex-col">
+        <div className="absolute z-30 mt-1 left-0 sm:right-0 sm:left-auto w-72 max-w-[calc(100vw-1rem)] max-h-80 overflow-hidden rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg flex flex-col">
           <div className="p-2 border-b border-[var(--border-primary)]">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-tertiary)]" />

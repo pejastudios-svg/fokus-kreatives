@@ -16,10 +16,18 @@ import {
   RefreshCw,
   ClipboardList,
   Eye,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import { defaultBrandProfile, type BrandProfile } from '../clients/brandProfile'
-import type { FormQuestion, QuestionForm } from '@/lib/types/questionForm'
+import type {
+  FormTopic,
+  FormTopicQuestion,
+  QuestionForm,
+  TopicInputType,
+} from '@/lib/types/questionForm'
 import type { TopicPillar } from '@/lib/types/topics'
+import type { PackageTier } from '@/lib/campaignTiers'
 import { ClientPicker } from './ClientPicker'
 import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 
@@ -38,6 +46,7 @@ interface ClientRow {
   social_proof: string | null
   competitor_insights: string | null
   brand_profile: BrandProfile | null
+  package_tier: PackageTier | null
 }
 
 const PILLARS: { id: TopicPillar; label: string }[] = [
@@ -48,7 +57,33 @@ const PILLARS: { id: TopicPillar; label: string }[] = [
   { id: 'doubledown', label: 'Double Down' },
 ]
 
-const DEFAULT_PILLARS: TopicPillar[] = ['educational', 'storytelling', 'authority']
+const INPUT_TYPE_ORDER: TopicInputType[] = [
+  'scene',
+  'failed_attempt',
+  'turning_point',
+  'framework',
+  'proof',
+  'opinion',
+]
+
+const INPUT_TYPE_LABEL: Record<TopicInputType, string> = {
+  scene: 'Scene',
+  failed_attempt: 'Failed Attempt',
+  turning_point: 'Turning Point',
+  framework: 'Framework',
+  proof: 'Proof',
+  opinion: 'Opinion',
+  named_mentor: 'Mentor',
+  win_moment: 'Win',
+}
+
+// Doc 10.6 spec - tier-aware default topic counts.
+function defaultTopicCountForTier(tier: PackageTier | null | undefined): number {
+  if (tier === 'top') return 4
+  if (tier === 'middle') return 2
+  if (tier === 'lower') return 1
+  return 2
+}
 
 function buildProfileForClient(c: ClientRow): BrandProfile {
   if (c.brand_profile) return c.brand_profile
@@ -64,6 +99,13 @@ function buildProfileForClient(c: ClientRow): BrandProfile {
   }
 }
 
+function tierLabel(tier: PackageTier | null | undefined): string {
+  if (tier === 'top') return 'Top'
+  if (tier === 'middle') return 'Middle'
+  if (tier === 'lower') return 'Lower'
+  return 'Untiered'
+}
+
 export function QuestionsFormEngine() {
   const supabase = useMemo(() => createClient(), [])
   const [clients, setClients] = useState<ClientRow[]>([])
@@ -71,13 +113,24 @@ export function QuestionsFormEngine() {
   const [selectedClientId, setSelectedClientId] = useState(readStashedClientId)
   useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
 
-  const [pillars, setPillars] = useState<TopicPillar[]>(DEFAULT_PILLARS)
-  const [count, setCount] = useState(12)
+  const [topicCount, setTopicCount] = useState(2)
   const [title, setTitle] = useState('')
+  // Manual seed topic titles. Each non-empty string becomes a topic with
+  // its title pre-set; the AI just generates the 6 questions for it. Lets
+  // staff drop in topics the brand profile doesn't capture (e.g. a recent
+  // client win or pivot the AI couldn't have known about).
+  const [seedTopics, setSeedTopics] = useState<string[]>([])
+  // Saturation report from the last generation. Surfaces a warning when
+  // newly-generated titles are largely recycled vs the brand's history.
+  const [saturation, setSaturation] = useState<{
+    score: number
+    saturated: boolean
+    examples: Array<{ newTitle: string; pastTitle: string; overlap: number }>
+  } | null>(null)
 
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [draft, setDraft] = useState<FormQuestion[]>([])
+  const [draftTopics, setDraftTopics] = useState<FormTopic[]>([])
   const [error, setError] = useState('')
 
   const [pastForms, setPastForms] = useState<QuestionForm[]>([])
@@ -85,12 +138,9 @@ export function QuestionsFormEngine() {
 
   const [copiedUrl, setCopiedUrl] = useState('')
 
-  // Inline answers viewer: when the agency clicks the Eye icon on a
-  // submitted form, we fetch the question/answer pairs and expand the
-  // row to show them. Cached per-form so toggling closed/open is free.
   const [expandedFormId, setExpandedFormId] = useState<string | null>(null)
   const [answersByForm, setAnswersByForm] = useState<
-    Record<string, { text: string; pillar: string | null; answer: string | null }[]>
+    Record<string, AnswerSummary>
   >({})
   const [loadingAnswersFor, setLoadingAnswersFor] = useState<string | null>(null)
 
@@ -98,6 +148,13 @@ export function QuestionsFormEngine() {
     () => clients.find((c) => c.id === selectedClientId) || null,
     [clients, selectedClientId],
   )
+
+  // Sync default topic count when the selected client's tier changes.
+  useEffect(() => {
+    if (selectedClient) {
+      setTopicCount(defaultTopicCountForTier(selectedClient.package_tier))
+    }
+  }, [selectedClient])
 
   const fetchClients = useCallback(async () => {
     setLoadingClients(true)
@@ -125,45 +182,43 @@ export function QuestionsFormEngine() {
   )
 
   useEffect(() => {
-    setDraft([])
+    setDraftTopics([])
     setError('')
     if (selectedClientId) fetchPastForms(selectedClientId)
     else setPastForms([])
   }, [selectedClientId, fetchPastForms])
-
-  const togglePillar = (id: TopicPillar) => {
-    setPillars((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
-    )
-  }
 
   const handleGenerate = async () => {
     if (!selectedClient) {
       setError('Pick a client first.')
       return
     }
-    if (!pillars.length) {
-      setError('Select at least one pillar.')
-      return
-    }
     setError('')
     setGenerating(true)
     try {
+      // Drop empty seed rows before sending. The server uses each non-empty
+      // seed as a fixed topic title; the AI fills in the questions. Any
+      // remaining quota (topicCount - seeds.length) gets AI-generated
+      // titles + questions as before.
+      const cleanedSeeds = seedTopics.map((s) => s.trim()).filter(Boolean)
+
       const res = await fetch('/api/question-form/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          clientId: selectedClient.id,
           clientProfile: buildProfileForClient(selectedClient),
           clientName: selectedClient.name,
           businessName: selectedClient.business_name,
           industry: selectedClient.industry,
-          pillars,
-          count,
+          topicCount: Math.max(topicCount, cleanedSeeds.length),
+          seedTopics: cleanedSeeds.length ? cleanedSeeds : undefined,
         }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || 'Generation failed')
-      setDraft(data.questions as FormQuestion[])
+      setDraftTopics(data.topics as FormTopic[])
+      setSaturation(data.saturation ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -171,31 +226,60 @@ export function QuestionsFormEngine() {
     }
   }
 
-  const updateQuestion = (id: string, patch: Partial<FormQuestion>) => {
-    setDraft((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)))
+  const updateTopic = (topicId: string, patch: Partial<FormTopic>) => {
+    setDraftTopics((prev) => prev.map((t) => (t.id === topicId ? { ...t, ...patch } : t)))
   }
 
-  const removeQuestion = (id: string) => {
-    setDraft((prev) => prev.filter((q) => q.id !== id))
+  const updateTopicQuestion = (
+    topicId: string,
+    qid: string,
+    patch: Partial<FormTopicQuestion>,
+  ) => {
+    setDraftTopics((prev) =>
+      prev.map((t) =>
+        t.id === topicId
+          ? { ...t, questions: t.questions.map((q) => (q.id === qid ? { ...q, ...patch } : q)) }
+          : t,
+      ),
+    )
   }
 
-  const addBlankQuestion = () => {
-    setDraft((prev) => [
+  const removeTopic = (topicId: string) => {
+    setDraftTopics((prev) => prev.filter((t) => t.id !== topicId))
+  }
+
+  const addBlankTopic = () => {
+    const newQuestions: FormTopicQuestion[] = INPUT_TYPE_ORDER.map((it) => ({
+      id: crypto.randomUUID(),
+      input_type: it,
+      text: '',
+      placeholder: '',
+    }))
+    setDraftTopics((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
-        text: '',
-        pillar: pillars[0] || 'educational',
-        placeholder: '',
+        title: '',
+        pillar_hint: 'storytelling',
+        questions: newQuestions,
       },
     ])
   }
 
   const handleSaveAndShare = async () => {
     if (!selectedClient) return
-    const cleaned = draft.filter((q) => q.text.trim())
+    const cleaned = draftTopics
+      .map((t) => ({
+        ...t,
+        title: t.title.trim(),
+        questions: t.questions
+          .map((q) => ({ ...q, text: q.text.trim(), placeholder: q.placeholder?.trim() }))
+          .filter((q) => q.text),
+      }))
+      .filter((t) => t.title && t.questions.length === INPUT_TYPE_ORDER.length)
+
     if (!cleaned.length) {
-      setError('Add at least one question with text.')
+      setError(`Each topic needs a title and all ${INPUT_TYPE_ORDER.length} questions filled in.`)
       return
     }
     setSaving(true)
@@ -207,14 +291,18 @@ export function QuestionsFormEngine() {
         body: JSON.stringify({
           clientId: selectedClient.id,
           title: title.trim() || null,
-          questions: cleaned,
-          pillars,
+          topics: cleaned,
         }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || 'Save failed')
-      setDraft([])
+      setDraftTopics([])
       setTitle('')
+      // Clear seeds so they don't carry over to the next batch generation
+      // (the next batch is for new material, not a re-run of the same seeds).
+      setSeedTopics([])
+      // Same for saturation - it referred to the just-saved batch.
+      setSaturation(null)
       await fetchPastForms(selectedClient.id)
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(data.url).catch(() => {})
@@ -249,7 +337,14 @@ export function QuestionsFormEngine() {
       )
       const data = await res.json()
       if (data.success && data.submitted) {
-        setAnswersByForm((prev) => ({ ...prev, [form.id]: data.answers }))
+        setAnswersByForm((prev) => ({
+          ...prev,
+          [form.id]: {
+            isTopicForm: !!data.isTopicForm,
+            topics: data.topics ?? [],
+            answers: data.answers ?? [],
+          },
+        }))
       }
     } finally {
       setLoadingAnswersFor(null)
@@ -271,11 +366,12 @@ export function QuestionsFormEngine() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-[#2B79F7]" />
-            <h3 className="text-sm font-semibold text-theme-primary">Question Form Generator</h3>
+            <h3 className="text-sm font-semibold text-theme-primary">Topic Batch Generator</h3>
           </div>
           <p className="text-[11px] text-theme-tertiary mt-0.5">
-            Generate a braindump form tailored to this client. Answers drop straight into their
-            Topics Bank.
+            Each topic becomes 5 questions in Hero&apos;s Journey order
+            (scene, failed attempt, turning point, framework, proof). Counts default
+            to the client&apos;s package tier.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -295,44 +391,25 @@ export function QuestionsFormEngine() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-theme-primary mb-2">
-              Pillars to cover
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {PILLARS.map((p) => {
-                const active = pillars.includes(p.id)
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => togglePillar(p.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      active
-                        ? 'bg-[#2B79F7] dark:bg-[#1E2A41] text-white border-[#2B79F7] hover:bg-[#5A9AFF] dark:hover:bg-[#243352]'
-                        : 'bg-theme-card text-theme-secondary dark:text-white border-theme-primary hover:border-[#5A9AFF] hover:bg-[var(--bg-card-hover)]'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-theme-primary mb-1">
-                # of questions
-              </label>
+              <label className="block text-sm font-medium text-theme-primary mb-1">Topics</label>
               <input
                 type="number"
                 min={1}
-                max={100}
-                value={count}
-                onChange={(e) => setCount(Math.max(1, Math.min(100, Number(e.target.value) || 12)))}
+                max={20}
+                value={topicCount}
+                onChange={(e) =>
+                  setTopicCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))
+                }
                 className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
+              {selectedClient && (
+                <p className="text-[11px] text-theme-tertiary mt-1">
+                  Tier: {tierLabel(selectedClient.package_tier)} · default{' '}
+                  {defaultTopicCountForTier(selectedClient.package_tier)}
+                </p>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-theme-primary mb-1">
@@ -341,10 +418,66 @@ export function QuestionsFormEngine() {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Q2 Content Braindump"
+                placeholder="e.g. Week of Jun 3 - Topic Batch"
                 className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               />
             </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-theme-primary">
+                Seed topics (optional)
+              </label>
+              <button
+                type="button"
+                onClick={() => setSeedTopics((prev) => [...prev, ''])}
+                className="inline-flex items-center gap-1 text-xs text-[#2B79F7] hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                Add seed
+              </button>
+            </div>
+            <p className="text-[11px] text-theme-tertiary mb-2">
+              Drop in specific topic titles you want covered. The AI generates the 6 questions for each. Leftover quota is filled with AI-generated topics.
+            </p>
+            {seedTopics.length === 0 ? (
+              <div className="text-[11px] text-theme-tertiary italic px-3 py-2 rounded-lg border border-dashed border-theme-primary">
+                No seed topics. The AI will generate all {topicCount} on its own.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {seedTopics.map((seed, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      value={seed}
+                      onChange={(e) =>
+                        setSeedTopics((prev) =>
+                          prev.map((s, i) => (i === idx ? e.target.value : s)),
+                        )
+                      }
+                      placeholder="e.g. The $400K contract you just landed"
+                      className="flex-1 px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSeedTopics((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="p-2 rounded-md text-theme-tertiary hover:text-red-500 hover:bg-red-500/10"
+                      aria-label="Remove seed"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {seedTopics.filter((s) => s.trim()).length > topicCount && (
+                  <p className="text-[11px] text-amber-500">
+                    More seeds than topic count. Topic count will be bumped up to fit all seeds.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -355,62 +488,84 @@ export function QuestionsFormEngine() {
             <Button
               onClick={handleGenerate}
               isLoading={generating}
-              disabled={!selectedClient || !pillars.length}
+              disabled={!selectedClient}
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              {draft.length ? 'Regenerate Questions' : 'Generate Questions'}
+              {draftTopics.length ? 'Regenerate Batch' : 'Generate Batch'}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {draft.length > 0 && (
+      {saturation?.saturated && (
+        <Card className="card-premium border border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1.5">
+                <p className="text-sm font-semibold text-theme-primary">
+                  Material is saturating
+                </p>
+                <p className="text-xs text-theme-secondary">
+                  This batch overlaps heavily with past topics ({Math.round(saturation.score * 100)}% average word overlap). The brand's documented material may be running thin. To get fresh angles: add seed topics manually, wait until new client work accumulates, or extend the brand profile with new wins / stories.
+                </p>
+                {saturation.examples.length > 0 && (
+                  <ul className="text-[11px] text-theme-tertiary space-y-0.5 mt-1">
+                    {saturation.examples.map((ex, i) => (
+                      <li key={i}>
+                        <span className="text-theme-secondary">"{ex.newTitle}"</span>
+                        <span className="opacity-60"> overlaps </span>
+                        <span className="text-theme-secondary">"{ex.pastTitle}"</span>
+                        <span className="opacity-60"> ({Math.round(ex.overlap * 100)}%)</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {draftTopics.length > 0 && (
         <Card className="card-premium">
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-theme-primary">Review Questions</h3>
+                <h3 className="text-sm font-semibold text-theme-primary">Review Topics</h3>
                 <p className="text-xs text-theme-secondary">
-                  Edit, reorder, or remove anything before you share the link.
+                  Edit titles, swap a question, or remove a topic before sharing.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={addBlankQuestion}>
+              <Button variant="outline" size="sm" onClick={addBlankTopic}>
                 <Plus className="h-4 w-4 mr-1" />
-                Add question
+                Add topic
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {draft.map((q, idx) => (
+          <CardContent className="space-y-4">
+            {draftTopics.map((topic, tIdx) => (
               <div
-                key={q.id}
-                className="rounded-xl border border-theme-primary bg-theme-tertiary/30 p-3 space-y-2"
+                key={topic.id}
+                className="rounded-xl border border-theme-primary bg-theme-tertiary/30 p-3 space-y-3"
               >
                 <div className="flex items-start gap-2">
                   <span className="shrink-0 h-6 w-6 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center mt-1">
-                    {idx + 1}
+                    {tIdx + 1}
                   </span>
-                  <textarea
-                    value={q.text}
-                    onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
-                    rows={2}
-                    placeholder="Question text…"
-                    className="flex-1 px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary resize-none focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  <input
+                    value={topic.title}
+                    onChange={(e) => updateTopic(topic.id, { title: e.target.value })}
+                    placeholder="Topic title (4-10 words)"
+                    className="flex-1 px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm font-medium text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(q.id)}
-                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0"
-                    aria-label="Remove question"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap pl-8">
                   <select
-                    value={q.pillar}
-                    onChange={(e) => updateQuestion(q.id, { pillar: e.target.value as TopicPillar })}
-                    className="px-2 py-1 rounded-lg border border-theme-primary bg-theme-card text-xs text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    value={topic.pillar_hint}
+                    onChange={(e) =>
+                      updateTopic(topic.id, { pillar_hint: e.target.value as TopicPillar })
+                    }
+                    className="px-2 py-2 rounded-lg border border-theme-primary bg-theme-card text-xs text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    aria-label="Pillar hint"
                   >
                     {PILLARS.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -418,18 +573,37 @@ export function QuestionsFormEngine() {
                       </option>
                     ))}
                   </select>
-                  <input
-                    value={q.placeholder || ''}
-                    onChange={(e) => updateQuestion(q.id, { placeholder: e.target.value })}
-                    placeholder="Placeholder hint (optional)"
-                    className="flex-1 min-w-[200px] px-2 py-1 rounded-lg border border-theme-primary bg-theme-card text-xs text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => removeTopic(topic.id)}
+                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0"
+                    aria-label="Remove topic"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 pl-8">
+                  {topic.questions.map((q) => (
+                    <div key={q.id} className="flex items-start gap-2">
+                      <span className="shrink-0 text-[10px] px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] capitalize whitespace-nowrap">
+                        {INPUT_TYPE_LABEL[q.input_type] || q.input_type}
+                      </span>
+                      <textarea
+                        value={q.text}
+                        onChange={(e) => updateTopicQuestion(topic.id, q.id, { text: e.target.value })}
+                        placeholder={`${INPUT_TYPE_LABEL[q.input_type]} question…`}
+                        rows={2}
+                        className="flex-1 px-3 py-2 rounded-lg border border-theme-primary bg-theme-card text-sm text-theme-primary resize-none focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDraft([])}>
+              <Button variant="outline" onClick={() => setDraftTopics([])}>
                 Discard
               </Button>
               <Button onClick={handleSaveAndShare} isLoading={saving}>
@@ -466,16 +640,18 @@ export function QuestionsFormEngine() {
               <p className="text-sm text-theme-secondary text-center py-4">Loading…</p>
             ) : pastForms.length === 0 ? (
               <p className="text-sm text-theme-secondary text-center py-4">
-                No forms yet. Generate and share the first one above.
+                No forms yet. Generate and share the first batch above.
               </p>
             ) : (
-              <ul className="divide-y divide-theme-primary rounded-xl border border-theme-primary overflow-hidden">
+              <ul className="divide-y divide-[var(--border-primary)] rounded-xl border border-theme-primary overflow-hidden">
                 {pastForms.map((f) => {
                   const url = `${appOrigin}/questions/${f.token}`
-                  const qCount = Array.isArray(f.questions) ? f.questions.length : 0
+                  const topicCountFor = Array.isArray(f.topics) ? f.topics.length : 0
+                  const flatCountFor = Array.isArray(f.questions) ? f.questions.length : 0
+                  const isTopicForm = topicCountFor > 0
                   const submitted = !!f.submitted_at
                   const expanded = expandedFormId === f.id
-                  const answers = answersByForm[f.id]
+                  const summary = answersByForm[f.id]
                   return (
                     <li key={f.id} className="bg-theme-card">
                       <div className="p-3 flex flex-col md:flex-row md:items-center gap-3">
@@ -484,7 +660,10 @@ export function QuestionsFormEngine() {
                             {f.title || 'Untitled form'}
                           </p>
                           <p className="text-xs text-theme-secondary">
-                            {qCount} questions ·{' '}
+                            {isTopicForm
+                              ? `${topicCountFor} topics`
+                              : `${flatCountFor} questions`}{' '}
+                            ·{' '}
                             {submitted
                               ? `Submitted ${new Date(f.submitted_at!).toLocaleDateString()}`
                               : 'Awaiting submission'}{' '}
@@ -545,26 +724,10 @@ export function QuestionsFormEngine() {
                       </div>
                       {expanded && (
                         <div className="border-t border-theme-primary px-3 py-3 space-y-3">
-                          {loadingAnswersFor === f.id && !answers && (
+                          {loadingAnswersFor === f.id && !summary && (
                             <p className="text-xs text-theme-tertiary">Loading answers…</p>
                           )}
-                          {answers && answers.length === 0 && (
-                            <p className="text-xs text-theme-tertiary">No answers found.</p>
-                          )}
-                          {answers && answers.length > 0 && (
-                            <ol className="space-y-3 list-decimal list-inside">
-                              {answers.map((a, i) => (
-                                <li key={i} className="text-xs">
-                                  <span className="text-theme-primary font-medium">{a.text}</span>
-                                  <p className="mt-1 ml-5 text-theme-secondary whitespace-pre-wrap">
-                                    {a.answer || (
-                                      <span className="text-theme-tertiary italic">No answer</span>
-                                    )}
-                                  </p>
-                                </li>
-                              ))}
-                            </ol>
-                          )}
+                          {summary && <AnswerInlineView summary={summary} />}
                         </div>
                       )}
                     </li>
@@ -590,6 +753,92 @@ export function QuestionsFormEngine() {
         onClose={() => setPendingDeleteFormId(null)}
       />
     </div>
+  )
+}
+
+interface AnswerSummary {
+  isTopicForm: boolean
+  topics: Array<{
+    id: string
+    title: string
+    pillar_hint: string
+    thin_count: number
+    questions: Array<{
+      id: string
+      input_type: TopicInputType
+      text: string
+      answer: string | null
+      thin_flag: boolean
+    }>
+  }>
+  answers: Array<{
+    id?: string
+    text: string
+    pillar: string | null
+    answer: string | null
+    thin_flag?: boolean
+  }>
+}
+
+function AnswerInlineView({ summary }: { summary: AnswerSummary }) {
+  if (summary.isTopicForm) {
+    if (!summary.topics.length) {
+      return <p className="text-xs text-theme-tertiary">No answers found.</p>
+    }
+    return (
+      <div className="space-y-3">
+        {summary.topics.map((t) => (
+          <div key={t.id} className="rounded-lg bg-[var(--bg-tertiary)]/50 p-2">
+            <div className="flex items-center gap-2 mb-1.5">
+              <p className="text-xs font-semibold text-theme-primary">{t.title}</p>
+              {t.thin_count > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  {t.thin_count} thin
+                </span>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {t.questions.map((q) => (
+                <div key={q.id} className="text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-card-hover)] text-theme-secondary capitalize">
+                      {INPUT_TYPE_LABEL[q.input_type] || q.input_type}
+                    </span>
+                    {q.thin_flag && (
+                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                    )}
+                  </div>
+                  <p className="text-theme-secondary mt-0.5 ml-1 whitespace-pre-wrap">
+                    {q.answer || (
+                      <span className="text-theme-tertiary italic">No answer</span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (!summary.answers.length) {
+    return <p className="text-xs text-theme-tertiary">No answers found.</p>
+  }
+  return (
+    <ol className="space-y-3 list-decimal list-inside">
+      {summary.answers.map((a, i) => (
+        <li key={i} className="text-xs">
+          <span className="text-theme-primary font-medium">{a.text}</span>
+          {a.thin_flag && (
+            <AlertTriangle className="inline h-3 w-3 text-amber-500 ml-1" />
+          )}
+          <p className="mt-1 ml-5 text-theme-secondary whitespace-pre-wrap">
+            {a.answer || <span className="text-theme-tertiary italic">No answer</span>}
+          </p>
+        </li>
+      ))}
+    </ol>
   )
 }
 

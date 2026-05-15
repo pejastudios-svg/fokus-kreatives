@@ -18,6 +18,7 @@ import {
   X,
   Menu,
   ChevronDown,
+  Inbox,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Loading } from '@/components/ui/Loading'
@@ -313,6 +314,7 @@ useEffect(() => {
   // access (existing clients keep what they had until you assign a tier).
   const allowedTiersByTab: Record<string, PackageTier[]> = {
     Dashboard: ['top'],
+    Inbox: ['top', 'middle'],
     Leads: ['top', 'middle'],
     Revenue: ['top'],
     Meetings: ['top', 'middle'],
@@ -331,6 +333,7 @@ useEffect(() => {
   const tabSlug = (name: string): string => {
     const map: Record<string, string> = {
       Dashboard: 'dashboard',
+      Inbox: 'inbox',
       Leads: 'leads',
       Revenue: 'revenue',
       Meetings: 'meetings',
@@ -349,6 +352,7 @@ useEffect(() => {
   // having an employee role at all.
   const allTabs = [
     { name: 'Dashboard', icon: LayoutDashboard, roles: ['admin','manager','employee','guest'] as Role[] },
+    { name: 'Inbox', icon: Inbox, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Leads', icon: Users, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Revenue', icon: DollarSign, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Meetings', icon: Calendar, roles: ['admin','manager','employee'] as Role[] },
@@ -527,7 +531,7 @@ useEffect(() => {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowUserMenu(false)}
                   />
-                  <div className="absolute top-full right-0 mt-2 w-64 z-50 bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-[var(--border-primary)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute top-full right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] z-50 bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-[var(--border-primary)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     <div className="px-4 py-3 border-b border-[var(--border-primary)]">
                       <p className="text-[var(--text-primary)] text-sm font-semibold truncate">{userName || 'Signed in'}</p>
                       {userEmail && (

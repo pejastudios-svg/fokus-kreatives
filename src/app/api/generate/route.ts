@@ -68,7 +68,11 @@ async function releaseLock(key: string): Promise<void> {
 }
 
 async function groqWithRetry<T>(makeCall: () => Promise<T>): Promise<T> {
-  const maxAttempts = 4
+  // 2 attempts (1 retry). Was 4; trimmed to match the content-retry
+  // discipline used by the planner pipeline. A persistent 429 means we
+  // hit a hard quota, not a transient blip - more retries just waste
+  // tokens and stall the response.
+  const maxAttempts = 2
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await makeCall()

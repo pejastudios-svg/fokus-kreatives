@@ -20,6 +20,8 @@ import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
 import { defaultBrandProfile } from '@/components/clients/brandProfile'
 import { TopicsBank } from '@/components/clients/TopicsBank'
 import { ClientAssignees } from '@/components/clients/ClientAssignees'
+import { StoryDmKeywords } from '@/components/clients/StoryDmKeywords'
+import { BrandDescriptionSettings } from '@/components/clients/BrandDescriptionSettings'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
@@ -810,6 +812,10 @@ export default function ClientDetailPage() {
           </Card>
 
           <TopicsBank clientId={clientId} />
+
+          <StoryDmKeywords clientId={clientId} />
+
+          <BrandDescriptionSettings clientId={clientId} />
 
           <ClientAssignees clientId={clientId} />
 

@@ -1,0 +1,32 @@
+-- =============================================================================
+-- clients.availability_settings
+--
+-- Per-CRM scheduling preferences for the capture-page availability
+-- picker (Calendly-style "host's working hours" model).
+--
+-- Shape:
+--   {
+--     "timezone": "America/New_York",
+--     "days": {
+--       "mon": { "enabled": true,  "startHour": 9, "endHour": 17 },
+--       "tue": { "enabled": true,  "startHour": 9, "endHour": 17 },
+--       "wed": { "enabled": true,  "startHour": 9, "endHour": 17 },
+--       "thu": { "enabled": true,  "startHour": 9, "endHour": 17 },
+--       "fri": { "enabled": true,  "startHour": 9, "endHour": 17 },
+--       "sat": { "enabled": false, "startHour": 9, "endHour": 17 },
+--       "sun": { "enabled": false, "startHour": 9, "endHour": 17 }
+--     }
+--   }
+--
+-- timezone is an IANA name. The capture page's availability endpoint
+-- converts the picked date into the host's local day, applies that
+-- day's startHour/endHour, then converts each generated slot back to
+-- UTC so the comparison with stored meeting timestamps is timezone-safe.
+--
+-- Null = "use defaults" (9-5 Mon-Fri in UTC). Migration adds the
+-- column nullable so existing CRMs keep current behaviour until they
+-- save a configuration.
+-- =============================================================================
+
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS availability_settings jsonb;

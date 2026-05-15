@@ -11,7 +11,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+          // Match the inline label convention used everywhere else
+          // (text-secondary). Using text-primary here was the reason
+          // form labels rendered in two different colors on the same
+          // modal.
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             {label}
           </label>
         )}

@@ -15,12 +15,19 @@ import { cldThumb, cldUrl } from '@/lib/cloudinary'
 import type { CommentRegion } from '@/lib/types/annotations'
 import { RegionOverlay } from './RegionOverlay'
 import { DrawCanvas } from './DrawCanvas'
+import { VideoPlayer, type VideoMarker } from './VideoPlayer'
 
 interface AssetRendererProps {
   attachments: CloudinaryAsset[]
   isCarousel: boolean
   /** Optional click-to-zoom on images. Receives the asset's source URL + name. */
   onImageClick?: (url: string, name: string) => void
+  /** Comment markers to render on each slide's scrubber. Keyed by
+   *  attachment index so a 4-slide carousel can show different ticks
+   *  per slide. */
+  videoMarkersByIndex?: Record<number, VideoMarker[]>
+  /** Click handler for marker pins on the scrubber. */
+  onVideoMarkerClick?: (markerId: string) => void
 }
 
 /**
@@ -37,6 +44,8 @@ export interface AssetRendererHandle {
   goToSlide: (index: number) => void
   /** Scrub the active slide's video to `seconds` (no-op if not a video). */
   seekTo: (seconds: number) => void
+  /** Pause the active slide's video (no-op if not a video / already paused). */
+  pauseActive: () => void
   /** Smooth-scroll the asset into the viewport (used on phone-sized screens). */
   scrollIntoView: () => void
   /**
@@ -80,7 +89,16 @@ const SWIPE_THRESHOLD_PX = 50
  * preserving visible quality.
  */
 export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>(
-  function AssetRenderer({ attachments, isCarousel, onImageClick }, ref) {
+  function AssetRenderer(
+    {
+      attachments,
+      isCarousel,
+      onImageClick,
+      videoMarkersByIndex,
+      onVideoMarkerClick,
+    },
+    ref,
+  ) {
     const [active, setActive] = useState(0)
     const [dragOffset, setDragOffset] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
@@ -182,9 +200,10 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           if (!v) return
           if (attachments[idx]?.resource_type !== 'video') return
           try {
+            // Pause first. Otherwise the video keeps playing and races past
+            // the moment the comment is anchored to before the user can see it.
+            if (!v.paused) v.pause()
             v.currentTime = Math.max(0, seconds)
-            // Don't auto-play; some browsers block it without a gesture
-            // and the user may just want to see the moment paused.
           } catch (err) {
             console.error('AssetRenderer.seekTo failed:', err)
           }
@@ -226,11 +245,19 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
         const scrollIntoView: AssetRendererHandle['scrollIntoView'] = () => {
           containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
+        const pauseActive = () => {
+          const idx = getActiveIdx()
+          const v = videoRefs.current[idx]
+          if (!v) return
+          if (attachments[idx]?.resource_type !== 'video') return
+          if (!v.paused) v.pause()
+        }
         return {
           getCurrentTime,
           getActiveIndex: getActiveIdx,
           goToSlide,
           seekTo,
+          pauseActive,
           scrollIntoView,
           focusAnnotation,
           enterDrawMode,
@@ -295,6 +322,11 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
               lastInteractedVideoIndexRef.current = 0
             }}
             onVideoPlay={onAnyVideoPlay}
+            hideVideoControls={
+              drawingMode !== null && drawingMode.targetSlide === 0
+            }
+            videoMarkers={videoMarkersByIndex?.[0]}
+            onVideoMarkerClick={onVideoMarkerClick}
           />
           {flashOverlayFor(0)}
           {drawCanvasNode}
@@ -377,6 +409,11 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                     lastInteractedVideoIndexRef.current = i
                   }}
                   onVideoPlay={onAnyVideoPlay}
+                  hideVideoControls={
+                    drawingMode !== null && drawingMode.targetSlide === i
+                  }
+                  videoMarkers={videoMarkersByIndex?.[i]}
+                  onVideoMarkerClick={onVideoMarkerClick}
                 />
                 {flashOverlayFor(i)}
                 {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
@@ -442,6 +479,11 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
                 lastInteractedVideoIndexRef.current = i
               }}
               onVideoPlay={onAnyVideoPlay}
+              hideVideoControls={
+                drawingMode !== null && drawingMode.targetSlide === i
+              }
+              videoMarkers={videoMarkersByIndex?.[i]}
+              onVideoMarkerClick={onVideoMarkerClick}
             />
             {flashOverlayFor(i)}
             {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
@@ -471,6 +513,13 @@ interface AssetViewProps {
   /** Fires only on `play` events. Used to clear a saved-region highlight
    *  once the user starts watching - the highlight has done its job. */
   onVideoPlay?: () => void
+  /** When the parent has an annotation overlay open, hide all player
+   *  chrome so it doesn't sit on top of the DrawCanvas. */
+  hideVideoControls?: boolean
+  /** Comment timestamps to render as ticks on the scrubber. Click a
+   *  tick to jump to that frame and (optionally) surface the comment. */
+  videoMarkers?: VideoMarker[]
+  onVideoMarkerClick?: (markerId: string) => void
 }
 
 function AssetView({
@@ -482,10 +531,14 @@ function AssetView({
   assetElRef,
   onVideoInteract,
   onVideoPlay,
+  hideVideoControls,
+  videoMarkers,
+  onVideoMarkerClick,
 }: AssetViewProps) {
-  // Stable merged callback ref - if it weren't memoised, React would treat it
-  // as a new ref each render and fire it (null) -> (el), retriggering the
-  // setState inside assetElRef, which loops.
+  // Bridge the VideoPlayer's videoRef callback through to both the
+  // outer videoRef (for getCurrentTime tracking) and assetElRef (so
+  // RegionOverlay knows where the rendered asset is). Memoised so it
+  // doesn't loop on every render.
   const setVideoRefs = useCallback(
     (el: HTMLVideoElement | null) => {
       videoRef?.(el)
@@ -497,13 +550,15 @@ function AssetView({
   if (asset.resource_type === 'video') {
     const poster = cldThumb(asset, fill ? { w: 600, h: 600, crop: 'fill' } : { w: 1200 })
     return (
-      <video
-        ref={setVideoRefs}
+      <VideoPlayer
         src={cldUrl(asset, { w: 1200 })}
         poster={poster}
-        controls
-        playsInline
-        preload={isActive ? 'metadata' : 'none'}
+        videoRef={setVideoRefs}
+        isActive={isActive}
+        fill={fill}
+        hideControls={hideVideoControls}
+        markers={videoMarkers}
+        onMarkerClick={onVideoMarkerClick}
         onPlay={() => {
           onVideoInteract?.()
           onVideoPlay?.()
@@ -511,11 +566,6 @@ function AssetView({
         onSeeked={onVideoInteract}
         onTimeUpdate={onVideoInteract}
         onLoadedMetadata={onVideoInteract}
-        className={
-          fill
-            ? 'h-full w-full object-cover bg-black'
-            : 'w-full max-h-[70vh] rounded-lg bg-black'
-        }
       />
     )
   }

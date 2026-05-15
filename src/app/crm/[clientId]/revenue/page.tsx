@@ -256,7 +256,7 @@ export default function CRMRevenue() {
                   amount: data.amount,
                   currency: data.currency,
                   dueDate: data.due_date,
-                  clientName: '', 
+                  clientName: '',
                 },
               }),
             })
@@ -264,6 +264,22 @@ export default function CRMRevenue() {
         } catch (err) {
           console.error('Failed to send payment_created email', err)
         }
+
+        // In-app notification to every CRM team member. Gated by each
+        // user's notify_payment_reminder pref server-side.
+        void fetch('/api/notifications/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId,
+            type: 'payment_created',
+            data: {
+              amount: data.amount,
+              currency: data.currency,
+              dueDate: data.due_date,
+            },
+          }),
+        }).catch((e) => console.error('in-app payment notification failed:', e))
       }
     } finally {
       setIsSavingPayment(false)
@@ -814,9 +830,10 @@ export default function CRMRevenue() {
 function RevenueSkeleton() {
   return (
     <div className="p-3 sm:p-4 lg:p-6 min-h-full animate-in fade-in">
-      <div className="flex items-center justify-between mb-4 gap-2">
+      <div className="flex items-center justify-between mb-3 gap-2">
         <Skeleton className="h-3 w-40 bg-[var(--bg-card-hover)]" />
-        <Skeleton className="h-8 w-9 sm:w-32 rounded-lg bg-[var(--bg-card-hover)]" />
+        {/* Kebab only - Add Payment now lives inside it. */}
+        <Skeleton className="h-8 w-8 rounded-lg bg-[var(--bg-card-hover)]" />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -866,22 +883,21 @@ function RevenueSkeleton() {
       {/* Header */}
       <div className="flex items-center justify-between mb-3 gap-2">
         <p className="text-xs text-[var(--text-tertiary)]">Track payments and invoices</p>
-        <div className="flex items-center gap-1">
-          <Button size="sm" onClick={() => setShowAddModal(true)}>
-            <Plus className="h-4 w-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Add Payment</span>
-          </Button>
-          <KebabMenu
-            items={[
-              {
-                label: isExporting ? 'Generating PDF…' : 'Export as PDF',
-                icon: <FileDown className="h-4 w-4" />,
-                disabled: isExporting,
-                onClick: handleExportPdf,
-              },
-            ]}
-          />
-        </div>
+        <KebabMenu
+          items={[
+            {
+              label: 'Add Payment',
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => setShowAddModal(true),
+            },
+            {
+              label: isExporting ? 'Generating PDF…' : 'Export as PDF',
+              icon: <FileDown className="h-4 w-4" />,
+              disabled: isExporting,
+              onClick: handleExportPdf,
+            },
+          ]}
+        />
       </div>
 
       {/* Currency control - filters, default-currency setter, and

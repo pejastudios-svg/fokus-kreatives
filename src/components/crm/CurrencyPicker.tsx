@@ -129,7 +129,7 @@ export function CurrencyPicker({
 
       {open && (
         <div
-          className={`absolute z-30 mt-1 ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} w-72 max-h-72 overflow-hidden rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg flex flex-col`}
+          className={`absolute z-30 mt-1 ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} w-72 max-w-[calc(100vw-1rem)] max-h-72 overflow-hidden rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg flex flex-col`}
         >
           <div className="p-2 border-b border-[var(--border-primary)]">
             <div className="relative">

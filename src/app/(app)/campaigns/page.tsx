@@ -93,6 +93,7 @@ export default function CampaignsPage() {
   const supabase = useMemo(() => createClient(), [])
 
   const [clients, setClients] = useState<ClientLite[]>([])
+  const [clientsLoading, setClientsLoading] = useState(true)
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all')
@@ -139,6 +140,7 @@ export default function CampaignsPage() {
         .is('archived_at', null)
         .order('business_name', { ascending: true })
       setClients((data || []) as ClientLite[])
+      setClientsLoading(false)
     })()
   }, [supabase])
 
@@ -320,6 +322,7 @@ export default function CampaignsPage() {
                 <ClientCombobox
                   clients={clients}
                   selectedId={selectedClientId}
+                  loading={clientsLoading}
                   onSelect={(id) => {
                     setSelectedClientId(id)
                     setNameDirty(false)
@@ -493,7 +496,7 @@ export default function CampaignsPage() {
           onClick={() => deleteMode == null && setPendingDelete(null)}
         >
           <div
-            className="relative w-full max-w-md rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -594,10 +597,12 @@ function ClientCombobox({
   clients,
   selectedId,
   onSelect,
+  loading = false,
 }: {
   clients: ClientLite[]
   selectedId: string
   onSelect: (id: string) => void
+  loading?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -671,7 +676,9 @@ function ClientCombobox({
               />
             </div>
           </div>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <p className="py-6 text-center text-xs text-[var(--text-tertiary)]">Loading clients...</p>
+          ) : filtered.length === 0 ? (
             <p className="py-6 text-center text-xs text-[var(--text-tertiary)]">No matching clients.</p>
           ) : (
             <ul>

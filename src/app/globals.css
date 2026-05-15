@@ -71,11 +71,14 @@ h1, h2, h3, h4, h5, h6 {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Light Theme */
+/* Light Theme
+   bg-primary is intentionally slightly grey (not pure white) so the
+   page sits softer on the eye and cards (which stay #ffffff) read as
+   the elevated surface. Matches the design direction across the app. */
 :root, .light {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
+  --bg-primary: #f4f6fa;
+  --bg-secondary: #eef2f7;
+  --bg-tertiary: #e8edf3;
   --bg-card: #ffffff;
   --bg-card-hover: #f8fafc;
   --bg-input: #ffffff;
@@ -137,14 +140,14 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Agency-side scope: applied at the DashboardLayout level so every agency
    page picks up the same surface treatment.
-   - Dark mode: cards are #0A0F18 (a hair lighter than the pure-black page),
-     inputs stay at #0F1929 so they're tappable, and Card outlines are
-     stripped - surfaces are defined by their fill alone.
+   - Dark mode: cards are #0A0F18 and inputs match. The border alone
+     marks where the field begins; previously inputs were a lighter
+     #0F1929 which read as a separate raised shade on top of the card.
    - Light mode: page bg gets a touch of warmth (#f1f5f9 vs the global
      near-white #f8fafc) so cards have a hint more contrast. */
 .dark .agency-scope {
   --bg-card: #0A0F18;
-  --bg-input: #0F1929;
+  --bg-input: #0A0F18;
 }
 
 /* Light-mode only: warm the page background a touch so cards have a hint
@@ -204,8 +207,16 @@ input:-webkit-autofill:active,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
   -webkit-text-fill-color: var(--text-primary) !important;
-  -webkit-box-shadow: 0 0 0 1000px var(--bg-input) inset !important;
-  box-shadow: 0 0 0 1000px var(--bg-input) inset !important;
+  /* Two layered shadows: the 1000px fill restores our bg color over
+     Chrome's autofill yellow, and the 1px inset stroke recreates the
+     border that the fill would otherwise paint over. Without the second
+     stroke, autofilled fields look borderless next to empty siblings. */
+  -webkit-box-shadow:
+    0 0 0 1px var(--border-primary) inset,
+    0 0 0 1000px var(--bg-input) inset !important;
+  box-shadow:
+    0 0 0 1px var(--border-primary) inset,
+    0 0 0 1000px var(--bg-input) inset !important;
   caret-color: var(--text-primary) !important;
   transition: background-color 5000s ease-in-out 0s,
     color 5000s ease-in-out 0s;
@@ -228,6 +239,19 @@ select:-webkit-autofill {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+/* Utility: hide the scrollbar chrome while keeping scrollability.
+   Used in places where the content is naturally scrollable but the
+   scrollbar itself looks visually heavy (popovers, segmented strips,
+   inline carousels). */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Shared modal input style - dark surface, primary text, blue focus
@@ -320,6 +344,19 @@ select:-webkit-autofill {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Focus highlight - applied to rows the user lands on via a
+   notification deep-link (?focus=<id>). Pulses a blue ring for ~3s
+   so they can see what they just clicked, then settles. */
+@keyframes focusPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(43, 121, 247, 0.6); }
+  40%  { box-shadow: 0 0 0 8px rgba(43, 121, 247, 0.15); }
+  100% { box-shadow: 0 0 0 0 rgba(43, 121, 247, 0); }
+}
+.focus-pulse {
+  animation: focusPulse 1.4s ease-out 2;
+  border-radius: 12px;
 }
 
 @keyframes fadeInUp {

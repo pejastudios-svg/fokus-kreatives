@@ -1097,7 +1097,7 @@ export function ContentCreationEngine() {
       {/* Save CTA Modal */}
       {showCtaModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
-          <Card className="w-full max-w-lg animate-in zoom-in">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none animate-in zoom-in">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">Save CTA to Library</h3>

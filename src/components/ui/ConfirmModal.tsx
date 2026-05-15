@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 import { Button } from './Button'
 import { Input } from './Input'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { cn } from '@/lib/utils'
 
 export type ConfirmTone = 'danger' | 'warning' | 'default'
@@ -54,6 +55,8 @@ export function ConfirmModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, isSubmitting, onClose])
 
+  useBodyScrollLock(open)
+
   if (!open) return null
 
   const toneStyles =
@@ -86,7 +89,7 @@ export function ConfirmModal({
       onClick={() => !isSubmitting && onClose()}
     >
       <div
-        className="relative w-full max-w-md rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-premium-lg"
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-premium-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
