@@ -10,8 +10,8 @@
   "theme_color": "#2B79F7",
   "icons": [
     {
-      "src": "https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png",
-      "sizes": "192x192 512x512",
+      "src": "/apple-icon",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     }
