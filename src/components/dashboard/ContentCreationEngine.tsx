@@ -619,8 +619,14 @@ export function ContentCreationEngine() {
 
   return (
     <div className="space-y-6 animate-in fade-in-up">
-      {/* Client Selection */}
-      <Card className="animate-in fade-in-up">
+      {/* Client Selection. `relative z-30` here lifts the entire
+          card (and the ClientPicker dropdown inside it) above the
+          sibling Content Type card. Without this, both cards have
+          equal stacking contexts created by their fade-in animation
+          transform, and the later sibling (Content Type) wins by
+          source order - which made the dropdown render BEHIND the
+          Content Type tiles. */}
+      <Card className="animate-in fade-in-up relative z-30">
         <CardHeader>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Select Client</h3>
         </CardHeader>
@@ -649,8 +655,9 @@ export function ContentCreationEngine() {
         </CardContent>
       </Card>
 
-      {/* Content Type */}
-      <Card className="animate-in fade-in-up">
+      {/* Content Type - explicit z-10 so it sits BELOW the picker
+          card above. */}
+      <Card className="animate-in fade-in-up relative z-10">
         <CardHeader>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Content Type</h3>
         </CardHeader>

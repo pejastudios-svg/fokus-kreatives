@@ -189,13 +189,12 @@ export async function POST(req: NextRequest) {
       })()
       const body = formatNotificationText(stub)
       const url = notificationHref(stub) || '/'
-      // Group repeated pushes of the same type for the same CRM
-      // so a flurry of "new lead" pushes collapses to one toast.
-      const tag =
-        typeof dataObj.clientId === 'string'
-          ? `${type}-${dataObj.clientId}`
-          : String(type)
-      await sendPushToUsers(filtered, { title, body, url, tag })
+      // No `tag` - using the same tag for multiple pushes (e.g.
+      // 'lead_created-clientId') made each new toast SILENTLY REPLACE
+      // the previous one instead of showing as a fresh notification.
+      // That's the canonical "I see one, then they stop" symptom.
+      // Each push gets its own toast now.
+      await sendPushToUsers(filtered, { title, body, url })
     } catch (e) {
       console.error('[notifications/create] web push fan-out failed:', e)
     }

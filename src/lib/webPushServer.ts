@@ -76,6 +76,11 @@ export async function sendPushToUsers(
 
   const bodyStr = JSON.stringify(payload)
   const deadIds: string[] = []
+  let sent = 0
+
+  console.log(
+    `[webpush] sending to ${subs.length} subscription(s) for ${userIds.length} user(s); payload=${bodyStr.slice(0, 200)}`,
+  )
 
   await Promise.all(
     subs.map(async (sub) => {
@@ -87,9 +92,8 @@ export async function sendPushToUsers(
           },
           bodyStr,
         )
+        sent += 1
       } catch (err: unknown) {
-        // 404 + 410 = subscription gone. Drop it so we don't keep
-        // hammering the push service with a dead endpoint.
         const status =
           err &&
           typeof err === 'object' &&
@@ -97,13 +101,33 @@ export async function sendPushToUsers(
           typeof (err as { statusCode?: unknown }).statusCode === 'number'
             ? (err as { statusCode: number }).statusCode
             : null
+        const message =
+          err && typeof err === 'object' && 'body' in err
+            ? String((err as { body?: unknown }).body)
+            : err instanceof Error
+            ? err.message
+            : String(err)
+        // 404 + 410 = subscription gone. Drop it so we don't keep
+        // hammering the push service with a dead endpoint. Anything
+        // else (400, 401, 429, 5xx) we KEEP and log loudly - dropping
+        // on the first transient failure would silently nuke working
+        // subscriptions and look like "push stopped working".
         if (status === 404 || status === 410) {
           deadIds.push(sub.id)
+          console.warn(
+            `[webpush] dropping expired subscription ${sub.id} (status=${status})`,
+          )
         } else {
-          console.error('[webpush] send error for', sub.endpoint, err)
+          console.error(
+            `[webpush] send error for sub=${sub.id} status=${status ?? 'unknown'} body=${message}`,
+          )
         }
       }
     }),
+  )
+
+  console.log(
+    `[webpush] complete: sent=${sent}/${subs.length} dropped=${deadIds.length}`,
   )
 
   if (deadIds.length > 0) {

@@ -130,10 +130,54 @@ export function BrowserNotificationsToggle() {
         </button>
       </div>
       {active && (
-        <p className="text-[11px] text-emerald-500 mt-3">
-          Active on this device. Add Fokus Kreatives to your Home Screen
-          (iOS) or Install button (desktop) for the best experience.
-        </p>
+        <>
+          <p className="text-[11px] text-emerald-500 mt-3">
+            Active on this device. Add Fokus Kreatives to your Home Screen
+            (iOS) or Install button (desktop) for the best experience.
+          </p>
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/push/test', { method: 'POST' })
+                  if (!res.ok) {
+                    alert('Test push failed. Check server logs for details.')
+                  }
+                } catch (err) {
+                  console.error('[push] test send error:', err)
+                  alert('Could not reach the server.')
+                }
+              }}
+              className="text-xs px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+            >
+              Send test notification
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                // Re-subscribe in place: useful after the server-side
+                // subscription row gets cleaned up (e.g. a transient
+                // 410 from the push service deleted it but the
+                // browser still has its local subscription cached).
+                // Tap this to sync the DB row back without having to
+                // flip the toggle off + on.
+                setBusy(true)
+                try {
+                  await unsubscribeFromPush()
+                  const ok = await subscribeToPush()
+                  if (ok) setActive(true)
+                  else setActive(false)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              className="text-xs px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+            >
+              Re-link this device
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
