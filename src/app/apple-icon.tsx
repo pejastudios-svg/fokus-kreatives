@@ -13,9 +13,11 @@
 
 import { ImageResponse } from 'next/og'
 
-// iOS expects 180x180 for modern iPhones. iPad slots will scale it
-// down. Listing one size is enough.
-export const size = { width: 180, height: 180 }
+// We render at 512x512 (instead of the 180x180 iOS requests) so that
+// retina iPhones / iPads have a sharp source to downscale from.
+// Apple-touch-icon accepts any size; bigger source = crisper home
+// screen icon.
+export const size = { width: 512, height: 512 }
 export const contentType = 'image/png'
 
 const LOGO_URL =
@@ -37,14 +39,15 @@ export default async function AppleIcon() {
           background: '#ffffff',
         }}
       >
-        {/* Logo at ~50% of the canvas leaves a comfortable margin
-            so iOS' corner-radius mask doesn't clip into it. */}
+        {/* Logo at ~72% of the canvas - matches the proportion the
+            Android adaptive icon ends up with after the safe-area
+            mask is applied, so the two platforms look consistent. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={LOGO_URL}
           alt=""
-          width={90}
-          height={90}
+          width={370}
+          height={370}
           style={{ objectFit: 'contain' }}
         />
       </div>
