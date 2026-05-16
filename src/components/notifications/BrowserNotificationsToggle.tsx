@@ -24,6 +24,11 @@ export function BrowserNotificationsToggle() {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const [active, setActive] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Last test push result - rendered inline so the user can read it
+  // on the device without opening DevTools. Helps distinguish "no
+  // subscription registered" from "subscription exists but OS
+  // suppressed the toast".
+  const [testResult, setTestResult] = useState<string | null>(null)
 
   // Hydrate on mount: figure out the current state on THIS browser
   // (permission + whether the SW has a live subscription).
@@ -139,14 +144,37 @@ export function BrowserNotificationsToggle() {
             <button
               type="button"
               onClick={async () => {
+                setTestResult(null)
                 try {
                   const res = await fetch('/api/push/test', { method: 'POST' })
-                  if (!res.ok) {
-                    alert('Test push failed. Check server logs for details.')
+                  const data = await res.json()
+                  if (!res.ok || !data?.success) {
+                    setTestResult(`Failed: ${data?.error || res.statusText}`)
+                    return
+                  }
+                  const n: number = data.subscriptionCount ?? 0
+                  const list = (data.subscriptions || []) as Array<{
+                    pushService: string
+                    userAgent: string
+                  }>
+                  if (n === 0) {
+                    setTestResult(
+                      'No subscriptions registered for your account on any device yet. Tap "Re-link this device" below.',
+                    )
+                  } else {
+                    const services = list
+                      .map(
+                        (s) =>
+                          `${s.pushService}${s.userAgent ? ` · ${s.userAgent}` : ''}`,
+                      )
+                      .join('  |  ')
+                    setTestResult(
+                      `Sent to ${n} device${n === 1 ? '' : 's'}: ${services}. If you don't see the toast within a few seconds, your OS / browser is suppressing it (DND, battery saver, blocked permission).`,
+                    )
                   }
                 } catch (err) {
                   console.error('[push] test send error:', err)
-                  alert('Could not reach the server.')
+                  setTestResult('Could not reach the server.')
                 }
               }}
               className="text-xs px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
@@ -163,11 +191,17 @@ export function BrowserNotificationsToggle() {
                 // Tap this to sync the DB row back without having to
                 // flip the toggle off + on.
                 setBusy(true)
+                setTestResult(null)
                 try {
                   await unsubscribeFromPush()
                   const ok = await subscribeToPush()
-                  if (ok) setActive(true)
-                  else setActive(false)
+                  if (ok) {
+                    setActive(true)
+                    setTestResult('Re-linked. Now tap "Send test notification".')
+                  } else {
+                    setActive(false)
+                    setTestResult('Re-link failed - permission may have been revoked.')
+                  }
                 } finally {
                   setBusy(false)
                 }
@@ -177,6 +211,11 @@ export function BrowserNotificationsToggle() {
               Re-link this device
             </button>
           </div>
+          {testResult && (
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-2 leading-snug break-words">
+              {testResult}
+            </p>
+          )}
         </>
       )}
     </div>
