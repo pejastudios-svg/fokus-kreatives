@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { IntegrationsCard } from '@/components/integrations/IntegrationsCard'
 import { AvailabilityCard } from '@/components/integrations/AvailabilityCard'
+import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
 import { useCrmRole } from '@/components/crm/CrmRoleContext'
 import {
   User,
@@ -326,6 +327,21 @@ function SettingsSkeleton() {
           <IntegrationsCard clientId={clientId} canManage={canEditWorkspace} />
 
           <AvailabilityCard clientId={clientId} canManage={canEditWorkspace} />
+
+          {/* Browser / desktop push notifications. Per-device toggle:
+              when on, the OS shows a push for every CRM event even
+              when the tab is closed. Sits before the per-type My
+              notifications card because flipping it off zeroes out
+              the rest of the notifications system regardless. */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Bell className="h-4 w-4 text-[#2B79F7]" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Desktop &amp; mobile push</h3>
+            </CardHeader>
+            <CardContent>
+              <BrowserNotificationsToggle />
+            </CardContent>
+          </Card>
 
           {/* Personal notifications - one toggle per CRM event type. The
               actual gating of notification firing is wired in Phase D; for

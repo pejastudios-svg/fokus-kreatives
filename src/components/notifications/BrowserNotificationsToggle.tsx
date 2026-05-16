@@ -1,0 +1,140 @@
+'use client'
+
+// Single global toggle for browser/desktop push notifications. Lives
+// on the Settings page (workspace + CRM). When on, the browser sends
+// push notifications even when the tab is closed (or the browser is
+// closed entirely on desktop). When off, only the in-app toasts /
+// header bell / Inbox tab show activity.
+//
+// Permission is per-device + per-origin. The toggle reflects the
+// current SW + permission state on this specific browser.
+
+import { useEffect, useState } from 'react'
+import { Bell, BellOff, AlertCircle } from 'lucide-react'
+import {
+  isPushSupported,
+  getNotificationPermission,
+  hasActiveSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '@/lib/pushNotifications'
+
+export function BrowserNotificationsToggle() {
+  const [supported, setSupported] = useState(true)
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [active, setActive] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  // Hydrate on mount: figure out the current state on THIS browser
+  // (permission + whether the SW has a live subscription).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const ok = isPushSupported()
+      if (!ok) {
+        if (!cancelled) {
+          setSupported(false)
+          setPermission('unsupported')
+        }
+        return
+      }
+      if (!cancelled) setPermission(getNotificationPermission())
+      const has = await hasActiveSubscription()
+      if (!cancelled) setActive(has)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleToggle = async () => {
+    setBusy(true)
+    try {
+      if (active) {
+        const ok = await unsubscribeFromPush()
+        if (ok) setActive(false)
+      } else {
+        const ok = await subscribeToPush()
+        setPermission(getNotificationPermission())
+        if (ok) setActive(true)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!supported) {
+    return (
+      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex items-start gap-3">
+        <AlertCircle className="h-4 w-4 text-[var(--text-tertiary)] shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--text-primary)]">
+            Browser notifications aren&apos;t supported on this device
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+            On iOS, add Fokus Kreatives to your Home Screen first (Share &rarr;
+            Add to Home Screen). Then come back here to enable.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (permission === 'denied') {
+    return (
+      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex items-start gap-3">
+        <BellOff className="h-4 w-4 text-[var(--text-tertiary)] shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--text-primary)]">
+            Browser notifications are blocked
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+            You denied permission earlier. To turn them on, click the
+            lock / site-settings icon in your browser&apos;s address bar and
+            allow notifications for this site, then refresh.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-[#2B79F7]" />
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              Browser notifications
+            </p>
+          </div>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
+            Get a desktop / mobile push when a new lead, submission, or
+            meeting comes in - even when this tab is closed. Toggle
+            this on per device.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={busy}
+          className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            active ? 'bg-[#2B79F7]' : 'bg-[var(--bg-card-hover)]'
+          } ${busy ? 'opacity-60 cursor-wait' : ''}`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              active ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+      {active && (
+        <p className="text-[11px] text-emerald-500 mt-3">
+          Active on this device. Add Fokus Kreatives to your Home Screen
+          (iOS) or Install button (desktop) for the best experience.
+        </p>
+      )}
+    </div>
+  )
+}

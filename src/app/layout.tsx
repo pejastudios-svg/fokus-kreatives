@@ -1,7 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Montserrat, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { ServiceWorkerBoot } from '@/components/notifications/ServiceWorkerBoot'
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -30,6 +31,19 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'Fokus Kreatives',
   description: 'Content Creation & Lead Generation Platform',
+  // manifest -> Install-as-PWA on desktop browsers + Android.
+  // appleWebApp -> iOS Add-to-Home-Screen flow, which is the
+  // prerequisite for iOS 16.4+ Web Push.
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Fokus',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#2B79F7',
 }
 
 // Runs synchronously before React hydrates so the correct theme class is on
@@ -59,7 +73,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body className="antialiased bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {/* Boots the service worker on the first render of any
+              authenticated page + listens for "click a notification"
+              messages from the SW so we can navigate the SPA without
+              forcing a full reload. */}
+          <ServiceWorkerBoot />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )

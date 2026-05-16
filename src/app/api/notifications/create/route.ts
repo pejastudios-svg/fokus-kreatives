@@ -134,6 +134,73 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Fire web push to every active subscription belonging to the
+    // recipients. Best-effort: errors logged inside the helper,
+    // never thrown. The push payload mirrors the human-readable
+    // text the in-app inbox + header bell render, and carries a
+    // url so the SW can deep-link on click.
+    void (async () => {
+      try {
+        const { sendPushToUsers } = await import('@/lib/webPushServer')
+        const { formatNotificationText, notificationHref } = await import(
+          '@/lib/notifications'
+        )
+        const stub = {
+          id: '',
+          type: type as string,
+          data: dataObj,
+          read_at: null,
+          created_at: new Date().toISOString(),
+        }
+        const title = (() => {
+          // Short prefix from the notification type for the OS toast
+          // header. Keeps the body line free for the actual content.
+          switch (type) {
+            case 'lead_created':
+              return 'New lead'
+            case 'capture_submission':
+              return 'New submission'
+            case 'meeting_created':
+              return 'Meeting booked'
+            case 'payment_created':
+              return 'Payment recorded'
+            case 'payment_due':
+              return 'Payment due'
+            case 'approval_created':
+              return 'Approval created'
+            case 'approval_approved':
+              return 'Approval approved'
+            case 'approval_comment':
+              return 'New approval comment'
+            case 'approval_mention':
+              return 'You were mentioned'
+            case 'approval_reminder':
+              return 'Approval reminder'
+            case 'approval_comment_resolved':
+              return 'Comment resolved'
+            case 'brand_intake_submitted':
+              return 'Brand intake submitted'
+            case 'question_form_submitted':
+              return 'Braindump submitted'
+            case 'series_form_submitted':
+              return 'Series form submitted'
+            default:
+              return 'Fokus Kreatives'
+          }
+        })()
+        const body = formatNotificationText(stub)
+        const url = notificationHref(stub) || '/'
+        // Group repeated pushes of the same type for the same CRM
+        // so a flurry of "new lead" pushes collapses to one toast.
+        const tag = typeof dataObj.clientId === 'string'
+          ? `${type}-${dataObj.clientId}`
+          : String(type)
+        await sendPushToUsers(filtered, { title, body, url, tag })
+      } catch (e) {
+        console.error('[notifications/create] web push fan-out failed:', e)
+      }
+    })()
+
     return NextResponse.json({
       success: true,
       sent: filtered.length,
