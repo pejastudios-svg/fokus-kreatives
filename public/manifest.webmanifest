@@ -1,7 +1,7 @@
 {
   "name": "Fokus Kreatives",
   "short_name": "Fokus",
-  "description": "Fokus Kreatives — content + CRM for creative agencies.",
+  "description": "Fokus Kreatives - content + CRM for creative agencies.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -11,21 +11,9 @@
   "icons": [
     {
       "src": "https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png",
-      "sizes": "192x192",
+      "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }

@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
-import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
+import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
 
 export default function SettingsPage() {
   const [name, setName] = useState('')
@@ -299,6 +300,20 @@ function SettingsSkeleton() {
                     Change Password
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Browser/desktop push notifications (per-device).
+                Workspace-side so the agency owner can enable pushes
+                for approvals + tasks + intake without needing to
+                drill into a specific CRM. */}
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <Bell className="h-5 w-5 text-[#2B79F7]" />
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Desktop &amp; mobile push</h3>
+              </CardHeader>
+              <CardContent>
+                <BrowserNotificationsToggle />
               </CardContent>
             </Card>
           </>

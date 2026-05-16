@@ -662,73 +662,89 @@ const submissionData = {
       console.error('Capture notifications error:', notifyErr)
     }
 
-    // 6) In-app notifications (separate channel from the Apps Script
-    // emails above). Fire-and-forget: failures don't block the submit.
-    // /api/notifications/create gates by each recipient's personal
-    // user_preferences toggles before insert, so opted-out users see
-    // nothing.
+    // 6) In-app notifications + web push fan-out.
+    //
+    // We AWAIT these now (used to be void/fire-and-forget). Reason:
+    // on Vercel serverless, the function instance gets torn down the
+    // moment we return the response, which kills any pending
+    // promises. Fire-and-forget meant pushes either didn't reach the
+    // device at all (PWA closed = no realtime channel to fall back
+    // on) or arrived 30s late when the next request happened to
+    // warm a function. Awaiting adds ~200-500ms but makes delivery
+    // deterministic. Wrapped in Promise.allSettled so one failed
+    // notification doesn't take down the others.
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
 
+      const calls: Promise<Response>[] = []
+
       if (createdMeeting) {
-        void fetch(`${appUrl}/api/notifications/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: page.client_id,
-            type: 'meeting_created',
-            data: {
-              meetingTitle: createdMeeting.title,
-              dateTime: createdMeeting.date_time,
-              source: `capture:${slug}`,
-              clientName: clientDisplayName,
-              // ID lets the Inbox deep-link to this exact meeting
-              // (Meetings page reads ?focus= and pulses the card).
-              meetingId: createdMeeting.id,
-            },
+        calls.push(
+          fetch(`${appUrl}/api/notifications/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientId: page.client_id,
+              type: 'meeting_created',
+              data: {
+                meetingTitle: createdMeeting.title,
+                dateTime: createdMeeting.date_time,
+                source: `capture:${slug}`,
+                clientName: clientDisplayName,
+                meetingId: createdMeeting.id,
+              },
+            }),
           }),
-        }).catch((e) => console.error('in-app meeting notification failed:', e))
+        )
       }
 
-      // In-app notification: same dedup rule as the email above -
-      // skip when we merged into an existing lead so the user
-      // doesn't see a duplicate "new lead" toast in their inbox.
+      // Skip when we deduped into an existing lead - host already
+      // got a "new lead" notification the first time around.
       if (!existingLeadId) {
         const leadName = leadData.name || 'New Lead'
-        void fetch(`${appUrl}/api/notifications/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: page.client_id,
-            type: 'lead_created',
-            data: {
-              leadName,
-              source: `capture:${slug}`,
-              clientName: clientDisplayName,
-              leadId: newLeadId,
-            },
+        calls.push(
+          fetch(`${appUrl}/api/notifications/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientId: page.client_id,
+              type: 'lead_created',
+              data: {
+                leadName,
+                source: `capture:${slug}`,
+                clientName: clientDisplayName,
+                leadId: newLeadId,
+              },
+            }),
           }),
-        }).catch((e) => console.error('in-app lead notification failed:', e))
+        )
       }
 
-      // Capture-submission notification - lets the Inbox open the
-      // submission detail modal for this exact row.
       if (submissionId) {
-        void fetch(`${appUrl}/api/notifications/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: page.client_id,
-            type: 'capture_submission',
-            data: {
-              pageName: page.name || slug,
-              slug,
-              clientName: clientDisplayName,
-              submissionId,
-              capturePageId: page.id,
-            },
+        calls.push(
+          fetch(`${appUrl}/api/notifications/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientId: page.client_id,
+              type: 'capture_submission',
+              data: {
+                pageName: page.name || slug,
+                slug,
+                clientName: clientDisplayName,
+                submissionId,
+                capturePageId: page.id,
+              },
+            }),
           }),
-        }).catch((e) => console.error('in-app submission notification failed:', e))
+        )
+      }
+
+      const results = await Promise.allSettled(calls)
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          console.error('in-app notification call failed:', r.reason)
+        }
       }
     } catch (inAppErr) {
       console.error('Capture in-app notifications error:', inAppErr)

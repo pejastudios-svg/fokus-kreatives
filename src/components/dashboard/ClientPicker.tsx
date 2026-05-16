@@ -103,7 +103,11 @@ export function ClientPicker({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg">
+        // z-50 (not z-30) so the dropdown stacks above sibling
+        // sections that come later in the source order, like the
+        // "Content Type" cards below this picker on the Content
+        // Creation Engine page.
+        <div className="absolute z-50 mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-lg">
           <div className="sticky top-0 bg-[var(--bg-card)] border-b border-[var(--border-primary)] p-2">
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-tertiary)]">
               <Search className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
