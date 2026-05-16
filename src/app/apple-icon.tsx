@@ -31,20 +31,20 @@ export default async function AppleIcon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          // Brand blue. iOS rounds the corners itself; we draw a
+          // White. iOS rounds the corners itself; we draw a
           // square. Setting a solid background prevents the
           // "transparent + black fallback" look entirely.
-          background: '#2B79F7',
+          background: '#ffffff',
         }}
       >
-        {/* Logo at ~66% of the canvas leaves a comfortable margin
+        {/* Logo at ~50% of the canvas leaves a comfortable margin
             so iOS' corner-radius mask doesn't clip into it. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={LOGO_URL}
           alt=""
-          width={120}
-          height={120}
+          width={90}
+          height={90}
           style={{ objectFit: 'contain' }}
         />
       </div>
