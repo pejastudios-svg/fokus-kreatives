@@ -28,6 +28,15 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
 })
 
+// iOS Safari ignores the icons in manifest.webmanifest. It needs an
+// explicit <link rel="apple-touch-icon" ...> tag in the head, ideally
+// pointing at a 180x180 PNG. Without one, Add-to-Home-Screen falls
+// back to a screenshot of the first paint - which is why iOS users
+// were seeing a plain "F" instead of the logo. Listing it via
+// Next.js' `icons.apple` emits the right <link> at build time.
+const LOGO_URL =
+  'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
+
 export const metadata: Metadata = {
   title: 'Fokus Kreatives',
   description: 'Content Creation & Lead Generation Platform',
@@ -39,6 +48,23 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Fokus',
+    // `apple-mobile-web-app-status-bar-style` + this list of icons
+    // are what iOS actually reads when the user taps "Add to Home
+    // Screen". Listing several sizes covers different iPhone /
+    // iPad icon slots so iOS picks the closest fit.
+    startupImage: undefined,
+  },
+  icons: {
+    icon: [
+      { url: LOGO_URL, type: 'image/png' },
+    ],
+    shortcut: [LOGO_URL],
+    apple: [
+      { url: LOGO_URL, sizes: '180x180', type: 'image/png' },
+      { url: LOGO_URL, sizes: '167x167', type: 'image/png' },
+      { url: LOGO_URL, sizes: '152x152', type: 'image/png' },
+      { url: LOGO_URL, sizes: '120x120', type: 'image/png' },
+    ],
   },
 }
 

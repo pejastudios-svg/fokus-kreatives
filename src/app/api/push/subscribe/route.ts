@@ -51,6 +51,25 @@ export async function POST(req: NextRequest) {
 
   const userAgent = req.headers.get('user-agent') || null
 
+  // Purge any older subscription rows belonging to this user from the
+  // same browser (same user-agent string). Browsers re-issue a new
+  // endpoint when:
+  //  - VAPID public key rotates
+  //  - User clears site data
+  //  - Push service marks the old subscription stale
+  //  - The user toggles off and back on
+  // Without this cleanup, every re-link added a new row while the
+  // old one sat orphaned forever - test pushes were going to 11
+  // dead endpoints. We keep ONLY the row we're about to upsert.
+  if (userAgent) {
+    await admin
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('user_agent', userAgent)
+      .neq('endpoint', endpoint)
+  }
+
   const { error } = await admin
     .from('push_subscriptions')
     .upsert(

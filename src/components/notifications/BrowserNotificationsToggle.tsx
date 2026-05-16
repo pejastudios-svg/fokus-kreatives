@@ -162,14 +162,35 @@ export function BrowserNotificationsToggle() {
                       'No subscriptions registered for your account on any device yet. Tap "Re-link this device" below.',
                     )
                   } else {
-                    const services = list
-                      .map(
-                        (s) =>
-                          `${s.pushService}${s.userAgent ? ` · ${s.userAgent}` : ''}`,
-                      )
-                      .join('  |  ')
+                    // Map endpoints to friendly platform names so the
+                    // output is readable instead of a wall of UA strings.
+                    // Example: "fcm.googleapis.com" => "Android / Chrome".
+                    const labelFor = (host: string, ua: string) => {
+                      const lc = ua.toLowerCase()
+                      if (host.includes('apple.com')) return 'Apple (iOS / macOS)'
+                      if (host.includes('mozilla')) return 'Firefox'
+                      if (host.includes('fcm.googleapis')) {
+                        if (lc.includes('android')) return 'Android Chrome'
+                        if (lc.includes('mac')) return 'Mac Chrome'
+                        if (lc.includes('windows')) return 'Windows Chrome'
+                        return 'Chromium browser'
+                      }
+                      return host
+                    }
+                    const grouped = new Map<string, number>()
+                    for (const s of list) {
+                      const k = labelFor(s.pushService, s.userAgent || '')
+                      grouped.set(k, (grouped.get(k) || 0) + 1)
+                    }
+                    const summary = Array.from(grouped.entries())
+                      .map(([k, c]) => (c > 1 ? `${c}× ${k}` : k))
+                      .join(', ')
                     setTestResult(
-                      `Sent to ${n} device${n === 1 ? '' : 's'}: ${services}. If you don't see the toast within a few seconds, your OS / browser is suppressing it (DND, battery saver, blocked permission).`,
+                      `Sent to ${n} device${n === 1 ? '' : 's'}: ${summary}.${
+                        n > 5
+                          ? ' Quite a few stale subscriptions - tap "Forget other devices" to clean up.'
+                          : ''
+                      } If you don't see the toast in a few seconds, OS-level DND / battery saver / blocked permission is suppressing it.`,
                     )
                   }
                 } catch (err) {
@@ -209,6 +230,45 @@ export function BrowserNotificationsToggle() {
               className="text-xs px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
             >
               Re-link this device
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    'Remove every push subscription EXCEPT this device? Other devices will need to re-link to receive push.',
+                  )
+                )
+                  return
+                setBusy(true)
+                setTestResult(null)
+                try {
+                  // Send the current device's endpoint so the server
+                  // can preserve this row and nuke the rest.
+                  let endpoint: string | null = null
+                  if ('serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+                    const sub = await reg?.pushManager.getSubscription()
+                    endpoint = sub?.endpoint ?? null
+                  }
+                  const res = await fetch('/api/push/forget-others', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endpoint }),
+                  })
+                  const data = await res.json()
+                  if (data?.success) {
+                    setTestResult(`Removed ${data.removed ?? 0} other subscription(s).`)
+                  } else {
+                    setTestResult(`Cleanup failed: ${data?.error || res.statusText}`)
+                  }
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              className="text-xs px-3 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
+            >
+              Forget other devices
             </button>
           </div>
           {testResult && (
