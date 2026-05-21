@@ -7,8 +7,24 @@ import {
   createClickUpList,
   createClickUpTask,
   createClickUpSubtask,
+  deleteClickUpTask,
   fetchClickUpTaskStatus,
 } from '@/app/api/clickup/helpers'
+
+// ClickUp returns ACCESS_100 ("List deleted") or 404-style "not found" errors
+// when our cached folder/list IDs point at resources that were deleted in
+// ClickUp or live in a different workspace than the current token. We treat
+// any of these as "stale cache - rebuild it" rather than a hard failure.
+function isStaleClickupResourceError(err: string | undefined | null): boolean {
+  if (!err) return false
+  const lower = err.toLowerCase()
+  return (
+    lower.includes('access_100') ||
+    lower.includes('deleted') ||
+    lower.includes('not found') ||
+    lower.includes('no access')
+  )
+}
 
 // Generic guidelines that go on every campaign's main-task description. The
 // per-deliverable instructions live on the subtasks themselves, and the
@@ -79,6 +95,13 @@ interface CreateBody {
   name?: string
   campaignNumber?: number
   monthNumber?: number
+  // What to do if a campaign with the same name already exists for this
+  // client. Omit on the first attempt - the server returns 409 with
+  // requiresConfirmation:true and the UI re-sends with one of these.
+  //   'create'  - create the new campaign anyway, accepting the duplicate
+  //   'replace' - delete the existing same-name campaign(s) (and their
+  //               ClickUp tasks) first, then create the new one
+  onDuplicate?: 'create' | 'replace'
 }
 
 interface CampaignRow {
@@ -191,14 +214,57 @@ interface ClientRow {
 }
 
 /**
+ * Ensure the client has a live ClickUp folder + list. If `forceRebuild` is
+ * set, the cached IDs are ignored and a fresh folder/list pair is created;
+ * this is the recovery path after a stale-resource error. Returns the IDs
+ * (newly cached if we created them) or an error string.
+ */
+async function ensureClickupListForClient(
+  sb: ReturnType<typeof admin>,
+  client: ClientRow,
+  opts: { forceRebuild?: boolean } = {},
+): Promise<{ folderId?: string; listId?: string; error?: string }> {
+  if (!opts.forceRebuild && client.clickup_folder_id && client.clickup_list_id) {
+    return {
+      folderId: client.clickup_folder_id,
+      listId: client.clickup_list_id,
+    }
+  }
+
+  const folderName = client.business_name || client.name || 'Untitled client'
+  const folderRes = await createClickUpFolder(folderName)
+  if (!folderRes.folderId) {
+    return { error: folderRes.error || 'failed to create ClickUp folder' }
+  }
+  const listRes = await createClickUpList(folderRes.folderId, 'Campaigns')
+  if (!listRes.listId) {
+    return { error: listRes.error || 'failed to create ClickUp list' }
+  }
+  await sb
+    .from('clients')
+    .update({ clickup_folder_id: folderRes.folderId, clickup_list_id: listRes.listId })
+    .eq('id', client.id)
+  return { folderId: folderRes.folderId, listId: listRes.listId }
+}
+
+/**
  * Create a campaign for a client. Side-effects in ClickUp:
  *   - if the client doesn't have a folder yet, create one in CLICKUP_SPACE_ID
  *     and a default "Campaigns" list inside it; stamp both IDs on `clients`
+ *   - if the cached folder/list pair was deleted in ClickUp (ACCESS_100 /
+ *     "List deleted"), null the cache and rebuild it once before retrying
  *   - create a task in that list named after the campaign, with a description
  *     listing the deliverable counts the agency should produce
  *
  * The ClickUp side is best-effort - if anything fails we still return the
  * created campaign row so the agency can wire ClickUp manually later.
+ *
+ * Duplicate-name guard:
+ *   - If a campaign with the same trimmed name already exists for this
+ *     client, the first POST returns 409 with requiresConfirmation:true.
+ *   - The UI then re-sends with onDuplicate='create' (allow duplicate) or
+ *     onDuplicate='replace' (delete the existing same-name campaign(s) +
+ *     their ClickUp tasks before creating the new one).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -230,6 +296,49 @@ export async function POST(req: NextRequest) {
     const name =
       (body.name || '').trim() || `Campaign ${campaignNumber} | Month ${monthNumber}`
 
+    // ----- Duplicate-name guard --------------------------------------------
+    // Same-name campaigns under the same client trigger a confirmation
+    // round-trip. ClickUp itself accepts duplicate task names, but we want
+    // the agency to make the call deliberately - usually the duplicate
+    // means someone created the wrong month/number and wants to replace.
+    const { data: existingDupes } = await sb
+      .from('campaigns')
+      .select('id, clickup_task_id, name')
+      .eq('client_id', clientId)
+      .ilike('name', name)
+    const duplicates = (existingDupes || []).filter(
+      (r) => (r.name as string).trim().toLowerCase() === name.toLowerCase(),
+    )
+
+    if (duplicates.length > 0 && !body.onDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          requiresConfirmation: true,
+          duplicateName: name,
+          existingCount: duplicates.length,
+          error: `${duplicates.length} campaign(s) with this name already exist for this client.`,
+        },
+        { status: 409 },
+      )
+    }
+
+    if (duplicates.length > 0 && body.onDuplicate === 'replace') {
+      // Delete the existing same-name campaigns (and their ClickUp tasks)
+      // before continuing. Best-effort on the ClickUp side - the row
+      // deletion is what makes the duplicate-name check pass on the next
+      // step, so we don't bail if ClickUp returns an error.
+      for (const dupe of duplicates) {
+        if (dupe.clickup_task_id && clickupConfigured()) {
+          const res = await deleteClickUpTask(dupe.clickup_task_id as string)
+          if (!res.ok) {
+            console.warn('replace-duplicate ClickUp delete failed:', dupe.id, res.error)
+          }
+        }
+        await sb.from('campaigns').delete().eq('id', dupe.id as string)
+      }
+    }
+
     // ----- ClickUp side (best-effort) ---------------------------------------
     let folderId = client.clickup_folder_id
     let listId = client.clickup_list_id
@@ -238,33 +347,50 @@ export async function POST(req: NextRequest) {
 
     if (clickupConfigured()) {
       // Create the per-client folder + default list once, then reuse for
-      // every later campaign.
-      if (!folderId || !listId) {
-        const folderName = client.business_name || client.name || 'Untitled client'
-        const folderRes = await createClickUpFolder(folderName)
-        if (folderRes.folderId) {
-          folderId = folderRes.folderId
-          const listRes = await createClickUpList(folderRes.folderId, 'Campaigns')
-          if (listRes.listId) {
-            listId = listRes.listId
-            await sb
-              .from('clients')
-              .update({ clickup_folder_id: folderId, clickup_list_id: listId })
-              .eq('id', clientId)
-          } else {
-            clickupError = listRes.error || 'failed to create ClickUp list'
-          }
-        } else {
-          clickupError = folderRes.error || 'failed to create ClickUp folder'
-        }
+      // every later campaign. ensureClickupListForClient handles both the
+      // first-time path (cached IDs null) and the recovery path (forceRebuild
+      // after a stale-resource error from ClickUp).
+      const ensured = await ensureClickupListForClient(sb, client)
+      if (ensured.error) {
+        clickupError = ensured.error
+      } else {
+        folderId = ensured.folderId || folderId
+        listId = ensured.listId || listId
       }
 
       if (listId && !clickupError) {
-        const taskRes = await createClickUpTask({
+        let taskRes = await createClickUpTask({
           listId,
           name,
           description: CAMPAIGN_BRIEF,
         })
+
+        // Self-heal: if ClickUp says the list/folder is gone (deleted in the
+        // UI, or living in a different workspace than the current token),
+        // wipe the cache, recreate folder+list, retry the task once.
+        if (!taskRes.taskId && isStaleClickupResourceError(taskRes.error)) {
+          console.warn(
+            'campaigns: stale ClickUp list detected, rebuilding folder+list',
+            { clientId, error: taskRes.error },
+          )
+          const rebuilt = await ensureClickupListForClient(
+            sb,
+            { ...client, clickup_folder_id: null, clickup_list_id: null },
+            { forceRebuild: true },
+          )
+          if (rebuilt.listId) {
+            listId = rebuilt.listId
+            folderId = rebuilt.folderId || folderId
+            taskRes = await createClickUpTask({
+              listId,
+              name,
+              description: CAMPAIGN_BRIEF,
+            })
+          } else if (rebuilt.error) {
+            clickupError = rebuilt.error
+          }
+        }
+
         if (taskRes.taskId) {
           clickupTaskId = taskRes.taskId
 

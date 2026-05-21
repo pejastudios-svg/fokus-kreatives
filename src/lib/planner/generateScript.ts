@@ -57,6 +57,7 @@ import type { BrandProfile } from '@/components/clients/brandProfile'
 import type { ContentFormat } from '@/lib/contentFormats/types'
 
 import { plannerAdmin } from './db'
+import { logDbError } from '@/lib/db/logError'
 import type { SlotStream } from './types'
 
 export interface ScriptForSlotResult {
@@ -132,33 +133,39 @@ export async function generateScriptForSlot(
   //    Generate / Regenerate from firing two simultaneous Pro generations
   //    on the same slot. Stale-lock TTL is 3 minutes (max worst-case
   //    pipeline duration). Released in finally below.
+  //
+  // The acquire+release run as Postgres RPCs (acquire_slot_generation_lock /
+  // release_slot_generation_lock). Doing the atomic check-and-set in a
+  // function avoids a PostgREST filter-parsing edge case where the .or()
+  // filter with an ISO timestamp value would error with "column does not
+  // exist" even though the column was present. See the matching migration
+  // 20260521_slot_generation_lock_rpcs.sql.
   const lockToken = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-  const { data: lockRows, error: lockErr } = await supabase
-    .from('content_plan_slots')
-    .update({ generation_lock_at: new Date().toISOString(), generation_lock_token: lockToken })
-    .eq('id', slotId)
-    .or(
-      `generation_lock_at.is.null,generation_lock_at.lt.${new Date(Date.now() - 3 * 60 * 1000).toISOString()}`,
-    )
-    .select('id')
+  const { data: acquiredId, error: lockErr } = await supabase.rpc(
+    'acquire_slot_generation_lock',
+    { p_slot_id: slotId, p_token: lockToken },
+  )
   if (lockErr) {
-    console.error('[generateScriptForSlot] lock acquire failed:', lockErr)
+    logDbError(lockErr, {
+      op: 'rpc',
+      table: 'acquire_slot_generation_lock',
+      context: { slotId, lockToken },
+    })
     throw new Error(`Failed to acquire generation lock: ${lockErr.message}`)
   }
-  if (!lockRows || lockRows.length === 0) {
+  if (!acquiredId) {
     throw new GenerationLockedError(slotId)
   }
 
   try {
     return await generateScriptForSlotInner(slotId, supabase)
   } finally {
-    // Release the lock - token-matched so a stale lock that we replaced
-    // doesn't get cleared by the wrong caller.
-    await supabase
-      .from('content_plan_slots')
-      .update({ generation_lock_at: null, generation_lock_token: null })
-      .eq('id', slotId)
-      .eq('generation_lock_token', lockToken)
+    // Release the lock - token-matched server-side so a stale lock that
+    // we replaced doesn't get cleared by the wrong caller.
+    await supabase.rpc('release_slot_generation_lock', {
+      p_slot_id: slotId,
+      p_token: lockToken,
+    })
   }
 }
 

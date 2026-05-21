@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { CalendarRange, Loader2, Sparkles } from 'lucide-react'
+import { CalendarRange, Loader2, Search, Sparkles, X } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -37,11 +37,29 @@ const TIER_TONE: Record<NonNullable<ClientRow['package_tier']>, 'success' | 'inf
   lower: 'warning',
 }
 
+interface SearchResult {
+  slot_id: string
+  client_id: string
+  client_name: string
+  scheduled_date: string
+  stream: string
+  format_slug: string | null
+  hook_preview: string | null
+  status: string
+}
+
 export default function PlannerIndexPage() {
   const supabase = useMemo(() => createClient(), [])
   const { role, id: userId } = useAgencyUser()
   const [rows, setRows] = useState<ClientWithStats[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Cross-client slot search. The input drives a debounced fetch to
+  // /api/planner/search; when there's an active query we render results
+  // in place of the client grid. Empty query => default client grid.
+  const [search, setSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -129,11 +147,130 @@ export default function PlannerIndexPage() {
     })()
   }, [supabase, role, userId])
 
+  // Debounced cross-client search. Fires 300ms after the user stops
+  // typing to avoid a request per keystroke. clientIds = the ids
+  // currently in `rows`, which already respect role-based access.
+  useEffect(() => {
+    const q = search.trim()
+    if (!q) {
+      setSearchResults(null)
+      setSearching(false)
+      return
+    }
+    const allowedIds = rows.map((r) => r.id)
+    if (allowedIds.length === 0) {
+      setSearchResults([])
+      return
+    }
+    setSearching(true)
+    const handle = window.setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `/api/planner/search?q=${encodeURIComponent(q)}&clientIds=${encodeURIComponent(allowedIds.join(','))}`,
+          { cache: 'no-store' },
+        )
+        const json = (await r.json()) as { success?: boolean; results?: SearchResult[] }
+        setSearchResults(json.success ? (json.results ?? []) : [])
+      } catch (err) {
+        console.warn('[planner search] failed:', err)
+        setSearchResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [search, rows])
+
   return (
     <>
       <Header title="Planner" subtitle="Pick a client to open their content calendar" />
       <div className="p-4 md:p-6 space-y-4">
-        {loading ? (
+        {/* Cross-client search. Searches slot hooks, scheduled dates
+            (YYYY-MM-DD format matches exactly), and client names. */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)] pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search slots by hook, client, or date (YYYY-MM-DD)…"
+            className="w-full pl-9 pr-9 py-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[#2B79F7]"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {searchResults !== null ? (
+          <Card>
+            <CardContent className="p-0">
+              {searching ? (
+                <div className="py-8 flex items-center justify-center text-[var(--text-tertiary)] text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Searching…
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="py-8 text-center text-[var(--text-tertiary)] text-sm">
+                  No slots matched <span className="text-[var(--text-secondary)]">&ldquo;{search}&rdquo;</span>.
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--border-primary)]">
+                  {searchResults.map((r) => (
+                    <li key={r.slot_id}>
+                      <Link
+                        href={`/clients/${r.client_id}/planner`}
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-[var(--bg-tertiary)] transition-colors"
+                      >
+                        <div className="shrink-0 mt-0.5">
+                          <CalendarRange className="h-4 w-4 text-[var(--text-tertiary)]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
+                            <span className="font-medium text-[var(--text-secondary)] normal-case tracking-normal text-xs">
+                              {r.client_name}
+                            </span>
+                            <span>·</span>
+                            <span>{r.stream.replace('_', '-')}</span>
+                            {r.format_slug && (
+                              <>
+                                <span>·</span>
+                                <span>{r.format_slug.replace('short_form.', '').replace('long_form.', '').replace(/_/g, ' ')}</span>
+                              </>
+                            )}
+                            <span>·</span>
+                            <span className="tabular-nums">{r.scheduled_date}</span>
+                          </div>
+                          {r.hook_preview && (
+                            <div className="mt-1 text-sm text-[var(--text-primary)] line-clamp-2">
+                              {r.hook_preview}
+                            </div>
+                          )}
+                        </div>
+                        <StatusPill
+                          tone={
+                            r.status === 'approved'
+                              ? 'success'
+                              : r.status === 'planned'
+                                ? 'info'
+                                : 'warning'
+                          }
+                        >
+                          {r.status}
+                        </StatusPill>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        ) : loading ? (
           <Card>
             <CardContent className="py-10 flex items-center justify-center text-[var(--text-tertiary)]">
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading clients...

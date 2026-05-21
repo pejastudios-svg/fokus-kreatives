@@ -121,6 +121,15 @@ export default function CampaignsPage() {
   const [pendingDelete, setPendingDelete] = useState<CampaignRow | null>(null)
   const [deleteMode, setDeleteMode] = useState<'app' | 'app+clickup' | null>(null)
 
+  // Duplicate-name modal state. Shown when the server returns 409 because
+  // a campaign with the same name already exists for this client. mode=null
+  // = the chooser is showing; mode set = we're running the resolve action.
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    name: string
+    existingCount: number
+  } | null>(null)
+  const [duplicateMode, setDuplicateMode] = useState<'create' | 'replace' | null>(null)
+
   const [notification, setNotification] = useState<{
     type: 'success' | 'error'
     message: string
@@ -225,45 +234,82 @@ export default function CampaignsPage() {
     setCampaignName(`Campaign ${campaignNumber} | Month ${monthNumber}`)
   }, [campaignNumber, monthNumber, selectedClientId, nameDirty])
 
+  // Core POST. If the server flags a duplicate name (409 +
+  // requiresConfirmation), we surface the modal and return - the modal's
+  // buttons re-call this with onDuplicate set to the chosen action.
+  const submitCreate = async (
+    onDuplicate?: 'create' | 'replace',
+  ): Promise<'ok' | 'duplicate' | 'error'> => {
+    if (!selectedClientId) return 'error'
+    const res = await fetch('/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: selectedClientId,
+        name: campaignName.trim() || undefined,
+        campaignNumber,
+        monthNumber,
+        ...(onDuplicate ? { onDuplicate } : {}),
+      }),
+    })
+    const data = await res.json().catch(() => null)
+
+    if (res.status === 409 && data?.requiresConfirmation) {
+      setPendingDuplicate({
+        name: data.duplicateName || campaignName.trim(),
+        existingCount: Number(data.existingCount) || 1,
+      })
+      return 'duplicate'
+    }
+
+    if (!data?.success) {
+      setNotification({ type: 'error', message: data?.error || 'Failed to create campaign' })
+      return 'error'
+    }
+
+    setNotification({
+      type: 'success',
+      message: data.clickupError
+        ? `Campaign created. ClickUp warning: ${data.clickupError}`
+        : 'Campaign created and pushed to ClickUp.',
+    })
+    await loadCampaigns(selectedClientId)
+    // Refresh the next-slot suggestion so the next create increments.
+    const slotRes = await fetch(
+      `/api/campaigns/next-slot?clientId=${encodeURIComponent(selectedClientId)}`,
+      { cache: 'no-store' },
+    )
+    const slot = await slotRes.json().catch(() => null)
+    if (slot?.success) {
+      setCampaignNumber(slot.campaignNumber as number)
+      setMonthNumber(slot.monthNumber as number)
+      setNameDirty(false)
+    }
+    return 'ok'
+  }
+
   const handleCreate = async () => {
     if (!selectedClientId || isCreating) return
     setIsCreating(true)
     try {
-      const res = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: selectedClientId,
-          name: campaignName.trim() || undefined,
-          campaignNumber,
-          monthNumber,
-        }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!data?.success) {
-        setNotification({ type: 'error', message: data?.error || 'Failed to create campaign' })
-        return
-      }
-      setNotification({
-        type: 'success',
-        message: data.clickupError
-          ? `Campaign created. ClickUp warning: ${data.clickupError}`
-          : 'Campaign created and pushed to ClickUp.',
-      })
-      await loadCampaigns(selectedClientId)
-      // Refresh the next-slot suggestion so the next create increments.
-      const slotRes = await fetch(
-        `/api/campaigns/next-slot?clientId=${encodeURIComponent(selectedClientId)}`,
-        { cache: 'no-store' },
-      )
-      const slot = await slotRes.json().catch(() => null)
-      if (slot?.success) {
-        setCampaignNumber(slot.campaignNumber as number)
-        setMonthNumber(slot.monthNumber as number)
-        setNameDirty(false)
-      }
+      await submitCreate()
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  // Resolve the duplicate-name modal. 'create' allows the duplicate;
+  // 'replace' deletes existing same-name campaigns server-side first.
+  const resolveDuplicate = async (mode: 'create' | 'replace') => {
+    if (!pendingDuplicate) return
+    setDuplicateMode(mode)
+    try {
+      const outcome = await submitCreate(mode)
+      if (outcome === 'ok') {
+        setPendingDuplicate(null)
+      }
+    } finally {
+      setDuplicateMode(null)
     }
   }
 
@@ -562,6 +608,104 @@ export default function CampaignsPage() {
                       </div>
                     )}
                   </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate-name chooser. Surfaces when the server returns 409
+          because a campaign with the same name already exists for this
+          client. Three options: create the duplicate, replace the existing
+          same-name campaign(s), or cancel. Modeled like the delete modal. */}
+      {pendingDuplicate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => duplicateMode == null && setPendingDuplicate(null)}
+        >
+          <div
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              onClick={() => setPendingDuplicate(null)}
+              disabled={duplicateMode !== null}
+              className="absolute top-3 right-3 p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                Campaign with this name already exists
+              </h3>
+              <p className="mt-1 text-sm text-[var(--text-tertiary)]">
+                {pendingDuplicate.existingCount === 1 ? 'A campaign' : `${pendingDuplicate.existingCount} campaigns`}{' '}
+                named{' '}
+                <span className="font-medium text-[var(--text-secondary)]">
+                  {pendingDuplicate.name}
+                </span>
+                {' '}
+                already exist for this client. How do you want to proceed?
+              </p>
+
+              <div className="mt-5 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => void resolveDuplicate('create')}
+                  disabled={duplicateMode !== null}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--border-primary)] hover:border-[#2B79F7] hover:bg-blue-50 dark:hover:bg-[#1E3A6F]/40 text-left transition-colors disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4 mt-0.5 text-[var(--text-tertiary)] shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">
+                      Create duplicate
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                      Both campaigns will exist side by side. ClickUp accepts duplicate task names.
+                    </div>
+                    {duplicateMode === 'create' && (
+                      <div className="mt-1 text-xs text-[#2B79F7] inline-flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Creating…
+                      </div>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void resolveDuplicate('replace')}
+                  disabled={duplicateMode !== null}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-red-200 hover:border-red-500 hover:bg-red-500/10 text-left transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4 mt-0.5 text-red-600 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium text-red-700">
+                      Replace existing
+                    </div>
+                    <div className="text-xs text-red-500/80 mt-0.5">
+                      Permanently deletes the existing same-name campaign{pendingDuplicate.existingCount > 1 ? 's' : ''}{' '}
+                      and {pendingDuplicate.existingCount > 1 ? 'their' : 'its'} ClickUp task{pendingDuplicate.existingCount > 1 ? 's' : ''} before creating the new one. Cannot be undone.
+                    </div>
+                    {duplicateMode === 'replace' && (
+                      <div className="mt-1 text-xs text-red-600 inline-flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Replacing…
+                      </div>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPendingDuplicate(null)}
+                  disabled={duplicateMode !== null}
+                  className="w-full p-3 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] disabled:opacity-50"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

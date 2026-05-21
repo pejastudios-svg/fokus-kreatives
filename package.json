@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
+    "db:migrate:status": "tsx --env-file=.env.local scripts/migrate.ts status",
+    "db:migrate:baseline": "tsx --env-file=.env.local scripts/migrate.ts baseline"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",
@@ -37,7 +40,9 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
+    "postgres": "^3.4.9",
     "tailwindcss": "^4",
+    "tsx": "^4.22.3",
     "typescript": "^5"
   },
   "optionalDependencies": {
