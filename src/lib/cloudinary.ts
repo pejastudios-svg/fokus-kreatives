@@ -15,7 +15,7 @@
  * heavy and slow). Cloudinary handles video compression on ingest.
  */
 
-import { uploadWithProgress } from './uploadWithProgress'
+import { uploadCloudinaryChunked } from './chunkedCloudinaryUpload'
 
 export interface CloudinaryAsset {
   public_id: string
@@ -146,41 +146,33 @@ export async function uploadToCloudinary(
 
   // 2) Optionally resize images.
   const blob = kind === 'image' ? await resizeImageIfLarge(file) : file
-
-  // 3) Build the multipart POST.
-  const form = new FormData()
-  form.append('file', blob, file.name)
-  form.append('api_key', sign.api_key)
-  form.append('timestamp', String(sign.timestamp))
-  form.append('signature', sign.signature)
-  form.append('folder', sign.folder)
+  // Carry the original filename onto the resized blob so the chunked
+  // uploader's FormData.append(file, blob, name) still has it.
+  const fileForUpload =
+    blob instanceof File
+      ? blob
+      : new File([blob], file.name, { type: blob.type || file.type })
 
   // Cloudinary's resource-type goes in the URL path, not the body. Use
   // 'auto' so videos and images both work through the same flow without
   // having to re-resolve type here.
   const url = `https://api.cloudinary.com/v1_1/${sign.cloud_name}/auto/upload`
 
-  const res = await uploadWithProgress({
-    url,
-    body: form,
+  // 3) Chunked upload with per-chunk retry. Single-shot uploads die on
+  // any mid-flight network blip on slow connections; chunks recover from
+  // disconnects with minimal lost progress.
+  const data = await uploadCloudinaryChunked({
+    uploadUrl: url,
+    file: fileForUpload,
+    signedFields: {
+      api_key: sign.api_key,
+      timestamp: String(sign.timestamp),
+      signature: sign.signature,
+      folder: sign.folder,
+    },
     onProgress: opts.onProgress,
     signal: opts.signal,
   })
-
-  if (!res.ok) {
-    throw new Error(`Cloudinary upload failed (${res.status}): ${res.text}`)
-  }
-
-  const data = res.json() as {
-    public_id: string
-    secure_url: string
-    resource_type: 'image' | 'video'
-    format: string
-    width: number
-    height: number
-    duration?: number
-    bytes: number
-  }
 
   return {
     public_id: data.public_id,

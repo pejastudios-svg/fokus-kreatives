@@ -58,7 +58,12 @@ export function uploadWithProgress(opts: UploadProgressOpts): Promise<UploadResu
       })
     }
 
-    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          'Network connection dropped during upload. Check your connection and try again.',
+        ),
+      )
     xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'))
 
     if (opts.signal) {
