@@ -43,10 +43,19 @@ const MAX_IMAGE_DIMENSION = 2048
 // Above this we'll resize. Below it we send the original bytes.
 const RESIZE_THRESHOLD_BYTES = 1024 * 1024 // 1 MB
 
-/** Hard cap on a single approval asset upload. Cloudinary will compress
- *  videos heavily on its end, but we still don't want a 5GB raw file
- *  saturating someone's data plan to find out. */
-export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024 // 500 MB
+/** Hard cap on a single approval asset upload.
+ *
+ *  Defaults to 100 MB to match Cloudinary's free/Plus plan video limit.
+ *  Override with NEXT_PUBLIC_CLOUDINARY_MAX_UPLOAD_MB if you're on a plan
+ *  that allows larger uploads (Advanced = 300, Custom = up to 5000).
+ *
+ *  Cloudinary itself rejects uploads above the plan limit AT THE FIRST
+ *  CHUNK with a 400 - so users would otherwise wait through the upload
+ *  spinner only to fail. Validating client-side matches Cloudinary's cap. */
+const CLOUDINARY_MAX_UPLOAD_MB = Number(
+  process.env.NEXT_PUBLIC_CLOUDINARY_MAX_UPLOAD_MB ?? 100,
+)
+export const MAX_UPLOAD_BYTES = CLOUDINARY_MAX_UPLOAD_MB * 1024 * 1024
 
 const IMAGE_PREFIXES = ['image/']
 const VIDEO_PREFIXES = ['video/']
@@ -126,7 +135,7 @@ export async function uploadToCloudinary(
   if (file.size > MAX_UPLOAD_BYTES) {
     const mb = Math.round(file.size / (1024 * 1024))
     throw new Error(
-      `${file.name} is ${mb} MB. Max upload size is 500 MB.`,
+      `${file.name} is ${mb} MB. Max upload size is ${CLOUDINARY_MAX_UPLOAD_MB} MB - compress the video (e.g. lower bitrate / shorter clip) and try again.`,
     )
   }
 

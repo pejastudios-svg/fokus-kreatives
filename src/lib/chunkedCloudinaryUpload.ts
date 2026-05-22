@@ -72,6 +72,44 @@ function isPermanentError(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429
 }
 
+/** Custom error subclass we throw for 4xx upload rejections so the
+ *  retry loop can detect them by identity instead of pattern-matching
+ *  the message string. */
+class PermanentUploadError extends Error {
+  readonly permanent = true
+  constructor(message: string) {
+    super(message)
+    this.name = 'PermanentUploadError'
+  }
+}
+
+/** Parse a Cloudinary 4xx body and rewrite it into a clean user-facing
+ *  message. Cloudinary returns errors as { error: { message: string } }.
+ *  We special-case "File size too large" so the user gets a sentence,
+ *  not raw JSON with byte counts. */
+function formatPermanentError(status: number, text: string): string {
+  let cloudMsg = ''
+  try {
+    const parsed = JSON.parse(text) as { error?: { message?: string } }
+    cloudMsg = parsed?.error?.message ?? ''
+  } catch {
+    cloudMsg = text.slice(0, 200)
+  }
+
+  // "File size too large. Got 158530402. Maximum is 104857600."
+  const sizeMatch = cloudMsg.match(/File size too large\.\s*Got\s+(\d+)\.\s*Maximum is\s+(\d+)\.?/i)
+  if (sizeMatch) {
+    const gotMb = Math.round(Number(sizeMatch[1]) / (1024 * 1024))
+    const maxMb = Math.round(Number(sizeMatch[2]) / (1024 * 1024))
+    return `This file is ${gotMb} MB. The upload limit is ${maxMb} MB. Please compress the video (lower bitrate or shorter clip) and try again.`
+  }
+
+  // Other Cloudinary errors: surface their message as-is, no status code,
+  // no JSON wrapper.
+  if (cloudMsg) return cloudMsg
+  return `Upload rejected (${status}). Please try again or contact support.`
+}
+
 async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(resolve, ms)
@@ -146,7 +184,7 @@ export async function uploadCloudinaryChunked(
 
         if (!res.ok) {
           if (isPermanentError(res.status)) {
-            throw new Error(`Upload rejected (${res.status}): ${res.text.slice(0, 200)}`)
+            throw new PermanentUploadError(formatPermanentError(res.status, res.text))
           }
           throw new Error(`Upload server error (${res.status})`)
         }
@@ -165,8 +203,10 @@ export async function uploadCloudinaryChunked(
         // Abort propagates immediately, never retries.
         if (lastError.name === 'AbortError') throw lastError
 
-        // Permanent errors propagate immediately.
-        if (/Upload rejected \(/.test(lastError.message)) throw lastError
+        // Permanent errors (file too large, bad signature, expired
+        // timestamp, etc) propagate immediately - retrying wastes time
+        // and shows three spinner cycles before the same failure surfaces.
+        if (lastError instanceof PermanentUploadError) throw lastError
 
         // Out of retries: bubble up.
         if (attempt === maxRetries) throw lastError

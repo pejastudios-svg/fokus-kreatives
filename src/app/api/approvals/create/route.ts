@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
+  addClickUpTaskComment,
   fetchClickUpTaskName,
   setClickUpCustomFieldByName,
   updateClickUpStatus,
@@ -138,10 +139,12 @@ export async function POST(req: NextRequest) {
 
     const approvalId = approvalRow.id as string
 
-    // 1.5) Push the client-portal approval link into the ClickUp task's
-    //      "Approval Link" custom field so the team can click straight
-    //      through from ClickUp without hunting for the URL. Best-effort:
-    //      a failure here logs but doesn't break approval creation.
+    // 1.5) Push the client-portal approval link onto the ClickUp task.
+    //      Preferred path: set the "Approval Link" custom field. Fallback
+    //      when the ClickUp plan's custom-field usage cap is hit
+    //      (FIELD_033): post the link as a task comment so it still
+    //      surfaces in ClickUp without consuming a field usage.
+    //      Best-effort throughout - failures log but don't break creation.
     if (clickupTaskId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
       const approvalUrl = `${appUrl}/portal/approvals/${approvalId}`
@@ -151,7 +154,20 @@ export async function POST(req: NextRequest) {
         approvalUrl,
       )
       if (!fieldRes.ok) {
-        console.warn('Approval Link field set failed:', fieldRes.error)
+        if (fieldRes.planLimitReached) {
+          console.warn(
+            'ClickUp custom-field cap reached (FIELD_033) - falling back to a task comment.',
+          )
+          const commentRes = await addClickUpTaskComment(
+            clickupTaskId,
+            `Approval link: ${approvalUrl}`,
+          )
+          if (!commentRes.ok) {
+            console.warn('Approval link comment fallback failed:', commentRes.error)
+          }
+        } else {
+          console.warn('Approval Link field set failed:', fieldRes.error)
+        }
       }
     }
 

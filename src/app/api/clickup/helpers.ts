@@ -262,7 +262,13 @@ async function resolveListFieldId(
 
   const match = byName.get(fieldName.toLowerCase())
   if (!match) {
-    return { error: `custom field "${fieldName}" not found on list ${listId}` }
+    // Log every field name we DID find so a missing-by-name case can be
+    // diagnosed instantly: usually it's a "Approval URL" vs "Approval Link"
+    // mismatch or the field lives at workspace-level rather than list-level.
+    const allNames = res.data.fields.map((f) => `"${f.name}"`).join(', ')
+    return {
+      error: `custom field "${fieldName}" not found on list ${listId}. Found: ${allNames || '(none)'}`,
+    }
   }
   return { fieldId: match }
 }
@@ -275,12 +281,16 @@ async function resolveListFieldId(
  *
  * `value` is passed through as-is. For URL-type fields, pass the URL string.
  * For text fields, a string. For dropdown fields, the option id.
+ *
+ * If the field set fails with FIELD_033 ("Custom field usages exceeded for
+ * your plan"), the caller can use addClickUpTaskComment() as a fallback so
+ * the data still surfaces on the task without consuming a usage.
  */
 export async function setClickUpCustomFieldByName(
   taskId: string,
   fieldName: string,
   value: unknown,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; planLimitReached?: boolean }> {
   if (!CLICKUP_API_TOKEN) return { ok: false, error: 'CLICKUP_API_TOKEN missing' }
   if (!taskId) return { ok: false, error: 'taskId missing' }
 
@@ -295,6 +305,28 @@ export async function setClickUpCustomFieldByName(
   const res = await clickupFetch(
     `/task/${encodeURIComponent(taskId)}/field/${encodeURIComponent(fieldId)}`,
     { method: 'POST', body: JSON.stringify({ value }) },
+  )
+  const planLimitReached = !res.ok && !!res.error && /FIELD_033/.test(res.error)
+  return { ok: res.ok, error: res.error, planLimitReached }
+}
+
+/**
+ * Post a comment on a ClickUp task. Used as a fallback when the custom
+ * field set hits the plan's usage cap (FIELD_033) - we still get the data
+ * (e.g. approval link) onto the task, just in the comment stream instead.
+ */
+export async function addClickUpTaskComment(
+  taskId: string,
+  commentText: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!CLICKUP_API_TOKEN) return { ok: false, error: 'CLICKUP_API_TOKEN missing' }
+  if (!taskId) return { ok: false, error: 'taskId missing' }
+  const res = await clickupFetch(
+    `/task/${encodeURIComponent(taskId)}/comment`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ comment_text: commentText, notify_all: false }),
+    },
   )
   return { ok: res.ok, error: res.error }
 }
