@@ -23,6 +23,7 @@ type ApprovalRow = {
   id: string
   title: string
   client_id: string
+  share_token: string | null
   auto_approve_at: string | null
   auto_approve_minutes: number | null
   reminder_3day_sent_at: string | null
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('approvals')
     .select(
-      'id, title, client_id, auto_approve_at, auto_approve_minutes, reminder_3day_sent_at, reminder_1day_sent_at, clients(name, business_name)'
+      'id, title, client_id, share_token, auto_approve_at, auto_approve_minutes, reminder_3day_sent_at, reminder_1day_sent_at, clients(name, business_name)'
     )
     .eq('status', 'pending')
     .not('auto_approve_at', 'is', null)
@@ -105,7 +106,11 @@ export async function GET(req: NextRequest) {
 
       if (userIds.length === 0) return
 
-      const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      // Clients get the magic-link /review/<share_token> URL so they
+      // don't need a portal account. Team gets the agency dashboard URL.
+      const clientUrl = a.share_token
+        ? `${appUrl}/review/${a.share_token}`
+        : `${appUrl}/portal/approvals/${approvalId}`
       const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
       // Create in-app notification rows so popup+sound triggers
@@ -151,7 +156,7 @@ export async function GET(req: NextRequest) {
             approvalTitle: a.title,
             approvalId,
             reminderLabel: label,
-            url: portalUrl,
+            url: clientUrl,
           },
           idempotencyKey: `remind:${approvalId}:${setField}:client`,
         })

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     const { data: approvals, error } = await supabase
       .from('approvals')
-      .select('id, clickup_task_id, title, client_id, clients(name, business_name)')
+      .select('id, clickup_task_id, title, client_id, share_token, clients(name, business_name)')
       .eq('status', 'pending')
       .not('auto_approve_at', 'is', null)
       .lte('auto_approve_at', nowIso)
@@ -111,7 +111,12 @@ export async function GET(req: NextRequest) {
         const clientEmails = (users || []).filter((u: UserRow) => u.role === 'client').map((u: UserRow) => u.email).filter(Boolean) as string[]
         const teamEmails = (users || []).filter((u: UserRow) => u.role !== 'client').map((u: UserRow) => u.email).filter(Boolean) as string[]
 
-        const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+        // Clients get the magic-link /review/<share_token> URL so they
+        // don't need a portal account. Team gets the agency dashboard URL.
+        const shareToken = (a as { share_token?: string }).share_token
+        const clientUrl = shareToken
+          ? `${appUrl}/review/${shareToken}`
+          : `${appUrl}/portal/approvals/${approvalId}`
         const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
         if (clientEmails.length) {
@@ -122,7 +127,7 @@ export async function GET(req: NextRequest) {
               clientName,
               approvalTitle: a.title,
               approvalId,
-              url: portalUrl,
+              url: clientUrl,
             },
             // Idempotency key tied to (approval, kind) so the cron firing
             // twice for the same auto-approval can't double-send.

@@ -139,15 +139,21 @@ export async function POST(req: NextRequest) {
 
     const approvalId = approvalRow.id as string
 
-    // 1.5) Push the client-portal approval link onto the ClickUp task.
-    //      Preferred path: set the "Approval Link" custom field. Fallback
-    //      when the ClickUp plan's custom-field usage cap is hit
+    // 1.5) Push the client review link onto the ClickUp task. Use the
+    //      magic-link /review/<share_token> URL so anyone who clicks from
+    //      ClickUp (QA, AM, or even the client if they were copied) lands
+    //      on the same client-facing review page without needing a portal
+    //      account. Preferred path: set the "Approval Link" custom field.
+    //      Fallback when the ClickUp plan's custom-field usage cap is hit
     //      (FIELD_033): post the link as a task comment so it still
     //      surfaces in ClickUp without consuming a field usage.
     //      Best-effort throughout - failures log but don't break creation.
     if (clickupTaskId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-      const approvalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      const shareTokenForClickup = (approvalRow as { share_token?: string }).share_token
+      const approvalUrl = shareTokenForClickup
+        ? `${appUrl}/review/${shareTokenForClickup}`
+        : `${appUrl}/portal/approvals/${approvalId}`
       const fieldRes = await setClickUpCustomFieldByName(
         clickupTaskId,
         'Approval Link',
@@ -293,7 +299,16 @@ export async function POST(req: NextRequest) {
         .map((u: UserRow) => u.email)
         .filter(Boolean) as string[]
 
-      const portalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      // Client gets the token-based magic-link URL (/review/<share_token>)
+      // so they don't need a portal account to open the approval - the
+      // review page handles auth via email confirmation. The portal URL
+      // (/portal/approvals/<id>) requires a logged-in client account and
+      // bounces unauthenticated clicks to /login, which is wrong for
+      // clients who haven't set up a portal login.
+      const shareToken = (approvalRow as { share_token?: string }).share_token
+      const reviewUrl = shareToken
+        ? `${appUrl}/review/${shareToken}`
+        : `${appUrl}/portal/approvals/${approvalId}` // fallback if token is missing
       const agencyUrl = `${appUrl}/approvals/${approvalId}`
 
       if (clientEmails.length > 0) {
@@ -304,7 +319,7 @@ export async function POST(req: NextRequest) {
             clientName: clientDisplayName,
             approvalTitle: title,
             approvalId,
-            url: portalUrl,
+            url: reviewUrl,
           },
           idempotencyKey: `created:${approvalId}:client`,
         })
