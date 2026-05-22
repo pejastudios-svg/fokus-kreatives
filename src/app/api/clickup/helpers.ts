@@ -212,6 +212,93 @@ export async function deleteClickUpTask(
   return { ok: res.ok, error: res.error }
 }
 
+// ============================================================================
+// Custom fields.
+//
+// ClickUp custom fields are defined per list and referenced by uuid, not by
+// name. To set one programmatically we have to (1) resolve the task's list,
+// (2) find the field by display name in that list's field catalog, then
+// (3) POST the value to /task/{taskId}/field/{fieldId}.
+//
+// The list -> field-id mapping is cached in memory per server instance so
+// we don't hammer ClickUp's field catalog endpoint on every approval.
+// ============================================================================
+
+const listFieldCache = new Map<string, Map<string, string>>()
+
+interface ClickUpListField {
+  id: string
+  name: string
+}
+
+export async function fetchClickUpTaskListId(taskId: string): Promise<string | null> {
+  if (!CLICKUP_API_TOKEN || !taskId) return null
+  const res = await clickupFetch<{ list?: { id: string } }>(
+    `/task/${encodeURIComponent(taskId)}`,
+    { method: 'GET' },
+  )
+  if (!res.ok || !res.data?.list?.id) return null
+  return res.data.list.id
+}
+
+async function resolveListFieldId(
+  listId: string,
+  fieldName: string,
+): Promise<{ fieldId?: string; error?: string }> {
+  const cached = listFieldCache.get(listId)?.get(fieldName.toLowerCase())
+  if (cached) return { fieldId: cached }
+
+  const res = await clickupFetch<{ fields: ClickUpListField[] }>(
+    `/list/${encodeURIComponent(listId)}/field`,
+    { method: 'GET' },
+  )
+  if (!res.ok || !res.data?.fields) {
+    return { error: res.error || 'failed to load list fields' }
+  }
+
+  const byName = new Map<string, string>()
+  for (const f of res.data.fields) byName.set(f.name.toLowerCase(), f.id)
+  listFieldCache.set(listId, byName)
+
+  const match = byName.get(fieldName.toLowerCase())
+  if (!match) {
+    return { error: `custom field "${fieldName}" not found on list ${listId}` }
+  }
+  return { fieldId: match }
+}
+
+/**
+ * Set a custom field on a ClickUp task by the field's display name.
+ * Best-effort: looks up the task's list, finds the field by name, and POSTs
+ * the value. Returns { ok: false, error } if any step fails so callers can
+ * log/warn without breaking the request.
+ *
+ * `value` is passed through as-is. For URL-type fields, pass the URL string.
+ * For text fields, a string. For dropdown fields, the option id.
+ */
+export async function setClickUpCustomFieldByName(
+  taskId: string,
+  fieldName: string,
+  value: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!CLICKUP_API_TOKEN) return { ok: false, error: 'CLICKUP_API_TOKEN missing' }
+  if (!taskId) return { ok: false, error: 'taskId missing' }
+
+  const listId = await fetchClickUpTaskListId(taskId)
+  if (!listId) {
+    return { ok: false, error: `could not resolve list for task ${taskId}` }
+  }
+
+  const { fieldId, error } = await resolveListFieldId(listId, fieldName)
+  if (!fieldId) return { ok: false, error: error || `field "${fieldName}" not found` }
+
+  const res = await clickupFetch(
+    `/task/${encodeURIComponent(taskId)}/field/${encodeURIComponent(fieldId)}`,
+    { method: 'POST', body: JSON.stringify({ value }) },
+  )
+  return { ok: res.ok, error: res.error }
+}
+
 /**
  * Fetch a task's current status string for the sync layer. Returns the raw
  * `status.status` field from ClickUp; the campaigns route maps that to our

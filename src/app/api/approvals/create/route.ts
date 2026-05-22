@@ -1,7 +1,11 @@
 // src/app/api/approvals/create/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchClickUpTaskName, updateClickUpStatus } from '@/app/api/clickup/helpers'
+import {
+  fetchClickUpTaskName,
+  setClickUpCustomFieldByName,
+  updateClickUpStatus,
+} from '@/app/api/clickup/helpers'
 import { enqueueEmail } from '@/lib/emailOutbox'
 
 interface AssigneeInsert {
@@ -133,6 +137,23 @@ export async function POST(req: NextRequest) {
     }
 
     const approvalId = approvalRow.id as string
+
+    // 1.5) Push the client-portal approval link into the ClickUp task's
+    //      "Approval Link" custom field so the team can click straight
+    //      through from ClickUp without hunting for the URL. Best-effort:
+    //      a failure here logs but doesn't break approval creation.
+    if (clickupTaskId) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+      const approvalUrl = `${appUrl}/portal/approvals/${approvalId}`
+      const fieldRes = await setClickUpCustomFieldByName(
+        clickupTaskId,
+        'Approval Link',
+        approvalUrl,
+      )
+      if (!fieldRes.ok) {
+        console.warn('Approval Link field set failed:', fieldRes.error)
+      }
+    }
 
     // 2) Insert items. Each item can be EITHER a legacy URL link, OR one or
     // more uploaded Cloudinary attachments. When attachments are present we
