@@ -1145,8 +1145,16 @@ function ReviewItemCard({
               return (
                 <li
                   key={c.id}
-                  className={`flex items-start gap-2 rounded-lg p-2 -mx-2 transition-colors ${
-                    c.resolved ? 'bg-green-50' : ''
+                  className={`flex items-start gap-2 rounded-lg border p-2 transition-colors ${
+                    // Match the agency-side comment card: every comment
+                    // sits in a bordered, rounded card with a subtle
+                    // background. Resolved swaps the bg to a 10% green
+                    // tint (legible in both themes) but keeps the same
+                    // shape so the rounding stays visible regardless of
+                    // resolution state.
+                    c.resolved
+                      ? 'border-emerald-500/40 bg-green-50 dark:bg-emerald-500/10'
+                      : 'border-[var(--border-primary)] bg-[var(--bg-tertiary)]'
                   }`}
                 >
                   {c.users?.profile_picture_url ? (
@@ -1290,7 +1298,7 @@ function ReviewItemCard({
                           disabled={resolvingCommentId === c.id}
                           className={`px-2 py-0.5 rounded-full border transition-colors ${
                             c.resolved
-                              ? 'border-green-500 text-green-600 bg-green-50'
+                              ? 'border-green-500 text-green-600 dark:text-emerald-400 bg-green-50 dark:bg-emerald-500/15'
                               : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7]'
                           } disabled:opacity-50`}
                         >

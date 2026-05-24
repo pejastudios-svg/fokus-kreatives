@@ -1097,7 +1097,14 @@ await loadApproval()
                             <div
                               key={c.id}
                               className={`flex items-start gap-2 text-xs border border-[var(--border-primary)] rounded-lg p-2 ${
-                                c.resolved ? 'bg-green-50' : 'bg-[var(--bg-tertiary)]'
+                                // bg-green-50 alone becomes a near-white
+                                // wash in dark mode and hides the
+                                // comment text. dark: variant uses a
+                                // subtle 10% green tint so the light
+                                // text stays legible.
+                                c.resolved
+                                  ? 'bg-green-50 dark:bg-emerald-500/10'
+                                  : 'bg-[var(--bg-tertiary)]'
                               }`}
                             >
                               <div className="mt-0.5">
@@ -1270,7 +1277,7 @@ await loadApproval()
                                         onClick={() => toggleResolveComment(c)}
                                         className={`px-2 py-0.5 rounded-full border ${
                                           c.resolved
-                                            ? 'border-green-500 text-green-600 bg-green-50'
+                                            ? 'border-green-500 text-green-600 dark:text-emerald-400 bg-green-50 dark:bg-emerald-500/15'
                                             : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7]'
                                         }`}
                                         disabled={resolvingCommentId === c.id}
