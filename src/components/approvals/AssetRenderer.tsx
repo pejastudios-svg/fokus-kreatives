@@ -77,28 +77,30 @@ const SWIPE_THRESHOLD_PX = 50
 /**
  * Renders one or more uploaded Cloudinary assets in an approval item.
  *
- *   1 asset                → just the asset
- *   N assets, isCarousel   → sliding carousel (track of all slides, CSS
- *                            transform animates between them; touch + buttons
- *                            both work). Videos display Cloudinary's
- *                            poster-frame instantly while the video itself
- *                            only preloads metadata for the active slide.
- *   N assets, !isCarousel  → grid of thumbnails (each clickable to open).
+ *   1 asset   → just the asset
+ *   N assets  → sliding carousel (CSS-transform animated; touch + buttons
+ *               both work). Videos show Cloudinary's poster-frame instantly
+ *               while the actual video only preloads metadata for the
+ *               active slide.
  *
  * Cloudinary's `f_auto,q_auto` transforms keep delivery size small while
  * preserving visible quality.
  */
 export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>(
   function AssetRenderer(
+    // isCarousel is accepted by the prop interface for API compat with
+    // stored data but no longer drives layout - multi-asset items always
+    // render as a carousel now (the old "grid" view cropped to squares
+    // and broke portrait clips). Don't destructure it.
     {
       attachments,
-      isCarousel,
       onImageClick,
       videoMarkersByIndex,
       onVideoMarkerClick,
     },
     ref,
   ) {
+    const isCarousel = attachments.length > 1
     const [active, setActive] = useState(0)
     const [dragOffset, setDragOffset] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
@@ -334,7 +336,13 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       )
     }
 
-    if (isCarousel) {
+    // Multiple attachments always render as a carousel. The legacy "grid"
+    // mode (driven by isCarousel=false) cropped every asset to a square via
+    // object-cover, which mangled portrait and landscape clips alike - users
+    // want to see each clip at its true aspect, one at a time. The
+    // is_carousel flag is kept on the type for back-compat with stored data
+    // but no longer changes the layout here.
+    {
       const safeIndex = Math.max(0, Math.min(active, attachments.length - 1))
 
       // While the draw canvas is open we ignore swipes on the carousel so a
@@ -390,7 +398,13 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
           onTouchEnd={handleTouchEnd}
         >
           <div
-            className={`flex ${isDragging ? '' : 'transition-transform duration-300 ease-out'}`}
+            // items-center prevents shorter slides (e.g. a 16:9 clip
+            // sitting next to a 9:16 in the same carousel) from being
+            // stretched vertically to match the tallest slide's height,
+            // which leaves a black tail under the shorter one. Slides
+            // now keep their natural height and center inside the
+            // carousel's track height.
+            className={`flex items-center ${isDragging ? '' : 'transition-transform duration-300 ease-out'}`}
             style={{ transform }}
           >
             {attachments.map((a, i) => (
@@ -460,37 +474,6 @@ export const AssetRenderer = forwardRef<AssetRendererHandle, AssetRendererProps>
       )
     }
 
-    // Multi, not carousel → grid.
-    return (
-      <div ref={containerRef} className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        {attachments.map((a, i) => (
-          <div
-            key={`${a.public_id}-${i}`}
-            className="aspect-square rounded-lg overflow-hidden border border-[var(--border-primary)] bg-[var(--bg-tertiary)] relative"
-          >
-            <AssetView
-              asset={a}
-              onImageClick={onImageClick}
-              fill
-              isActive
-              videoRef={setVideoRefByIndex[i]}
-              assetElRef={setAssetElByIndex[i]}
-              onVideoInteract={() => {
-                lastInteractedVideoIndexRef.current = i
-              }}
-              onVideoPlay={onAnyVideoPlay}
-              hideVideoControls={
-                drawingMode !== null && drawingMode.targetSlide === i
-              }
-              videoMarkers={videoMarkersByIndex?.[i]}
-              onVideoMarkerClick={onVideoMarkerClick}
-            />
-            {flashOverlayFor(i)}
-            {drawingMode && drawingMode.targetSlide === i && drawCanvasNode}
-          </div>
-        ))}
-      </div>
-    )
   },
 )
 
@@ -553,6 +536,9 @@ function AssetView({
       <VideoPlayer
         src={cldUrl(asset, { w: 1200 })}
         poster={poster}
+        sourceWidth={asset.width}
+        sourceHeight={asset.height}
+        sourceDuration={asset.duration}
         videoRef={setVideoRefs}
         isActive={isActive}
         fill={fill}

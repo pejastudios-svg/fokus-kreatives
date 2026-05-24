@@ -139,21 +139,19 @@ export async function POST(req: NextRequest) {
 
     const approvalId = approvalRow.id as string
 
-    // 1.5) Push the client review link onto the ClickUp task. Use the
-    //      magic-link /review/<share_token> URL so anyone who clicks from
-    //      ClickUp (QA, AM, or even the client if they were copied) lands
-    //      on the same client-facing review page without needing a portal
-    //      account. Preferred path: set the "Approval Link" custom field.
-    //      Fallback when the ClickUp plan's custom-field usage cap is hit
-    //      (FIELD_033): post the link as a task comment so it still
-    //      surfaces in ClickUp without consuming a field usage.
-    //      Best-effort throughout - failures log but don't break creation.
+    // 1.5) Push the agency approval link onto the ClickUp task. ClickUp
+    //      is an internal tool - the people clicking that link are agency
+    //      staff who need the dashboard view (assignees, status, sidebar),
+    //      not the client review page. (The review link goes in the
+    //      client's email instead.) Preferred path: set the "Approval
+    //      Link" custom field. Fallback when the ClickUp plan's
+    //      custom-field usage cap is hit (FIELD_033): post the link as a
+    //      task comment so it still surfaces in ClickUp without consuming
+    //      a field usage. Best-effort throughout - failures log but don't
+    //      break creation.
     if (clickupTaskId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-      const shareTokenForClickup = (approvalRow as { share_token?: string }).share_token
-      const approvalUrl = shareTokenForClickup
-        ? `${appUrl}/review/${shareTokenForClickup}`
-        : `${appUrl}/portal/approvals/${approvalId}`
+      const approvalUrl = `${appUrl}/approvals/${approvalId}`
       const fieldRes = await setClickUpCustomFieldByName(
         clickupTaskId,
         'Approval Link',

@@ -2243,6 +2243,22 @@ export default function ApprovalDetailPage() {
       onChange={(e) =>
         handleNewCommentChange(item.id, e.target.value)
       }
+      onKeyDown={(e) => {
+        // Enter sends, Shift+Enter inserts a newline. Skip while the
+        // user is mid-IME composition (so Asian-language input doesn't
+        // submit on commit) and while the @-mention dropdown is open
+        // for this item (so the user can finish typing the mention
+        // without firing an empty send).
+        if (
+          e.key === 'Enter' &&
+          !e.shiftKey &&
+          !e.nativeEvent.isComposing &&
+          mentionTargetItemId !== item.id
+        ) {
+          e.preventDefault()
+          void sendComment(item.id)
+        }
+      }}
       rows={2}
       onFocus={() => {
         // Mobile keyboard fix: re-scroll into view once the keyboard

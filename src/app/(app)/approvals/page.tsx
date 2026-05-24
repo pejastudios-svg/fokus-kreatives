@@ -104,7 +104,7 @@ export default function ApprovalsPage() {
   const [isFetchingClickup, setIsFetchingClickup] = useState(false)
   const [autoApproveMinutes, setAutoApproveMinutes] = useState<number | null>(7 * 24 * 60)
   const [items, setItems] = useState<ApprovalItemDraft[]>([
-    { title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] },
+    { title: '', url: '', initialComment: '', attachments: [], isCarousel: true, uploads: [] },
   ])
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([])
   const [assigneeSearchOpen, setAssigneeSearchOpen] = useState(false)
@@ -294,10 +294,15 @@ export default function ApprovalsPage() {
 
       setClients((clientsData || []) as Client[])
 
-      // Team users (non-client roles)
+      // Team users (non-client roles). Match the Team page filters
+      // exactly - is_agency_user=true + client_id IS NULL + role in
+      // (admin,manager,employee) - so the assignee dropdown can't surface
+      // users who don't appear on the Team page. Without this, partially-
+      // invited users (is_agency_user=false) leak into assignments.
       const { data: usersData } = await supabase
         .from('users')
         .select('id, name, email, role, profile_picture_url')
+        .eq('is_agency_user', true)
         .is('client_id', null)
         .in('role', ['admin', 'manager', 'employee'])
 
@@ -487,7 +492,7 @@ const searchResults = assigneeSearchOpen
   })
 
   const handleAddItem = () => {
-    setItems((prev) => [...prev, { title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] }])
+    setItems((prev) => [...prev, { title: '', url: '', initialComment: '', attachments: [], isCarousel: true, uploads: [] }])
   }
 
   const handleRemoveItem = (index: number) => {
@@ -729,15 +734,21 @@ const searchResults = assigneeSearchOpen
       setClickupTaskName(null)
       setClickupLookupError(null)
       setAutoApproveMinutes(7 * 24 * 60)
-      setItems([{ title: '', url: '', initialComment: '', attachments: [], isCarousel: false, uploads: [] }])
+      setItems([{ title: '', url: '', initialComment: '', attachments: [], isCarousel: true, uploads: [] }])
       setSelectedAssigneeIds([])
 
-      // Make the new approval visible immediately by switching the list filter
-      // to the modal's client. (If the user had filtered by a different client
-      // before opening the modal, the new approval would otherwise look like
-      // it failed to create.)
-      setSelectedClientId(createdForClient)
-      await loadApprovals(createdForClient)
+      // Reload visible approvals. Only switch the client filter if the user
+      // was already filtering by a DIFFERENT client - otherwise we'd narrow
+      // an "all clients" view down to just the one we just uploaded for,
+      // which makes the rest of the list look like it disappeared.
+      const needsFilterSwitch =
+        selectedClientId !== '' && selectedClientId !== createdForClient
+      if (needsFilterSwitch) {
+        setSelectedClientId(createdForClient)
+        await loadApprovals(createdForClient)
+      } else {
+        await loadApprovals(selectedClientId || undefined)
+      }
       showToast('success', 'Approval created')
     } catch (err) {
       console.error('Create approval exception:', err)

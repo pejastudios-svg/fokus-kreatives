@@ -1784,14 +1784,21 @@ function AssetEmbed({ url, title }: { url: string; title: string }) {
   }
 
   if (isVideo) {
+    // Center the video and let its natural aspect ratio drive the size.
+    // - max-h-[70vh] keeps it from dominating the viewport on landscape clips
+    // - max-w-full keeps it from overflowing the container on portrait clips
+    //   at very tall viewports
+    // - the wrapping flex centers portrait clips so 9:16 videos sit in the
+    //   middle with letterbox space on the sides instead of stretching
+    //   across the whole card width
     return (
-      <div className="rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black">
+      <div className="flex justify-center rounded-xl overflow-hidden border border-[var(--border-primary)] bg-black">
         <video
           src={url}
           controls
           playsInline
           preload="metadata"
-          className="w-full h-auto max-h-[70vh]"
+          className="max-h-[70vh] max-w-full h-auto"
         >
           Your browser doesn&rsquo;t support inline video. Use &ldquo;Open in new tab&rdquo;.
         </video>

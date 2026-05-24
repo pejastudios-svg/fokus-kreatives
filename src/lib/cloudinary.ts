@@ -217,7 +217,20 @@ export function cldUrl(
   const t: string[] = ['f_auto', 'q_auto']
   if (opts.w) t.push(`w_${opts.w}`)
   if (opts.h) t.push(`h_${opts.h}`)
-  if (opts.crop) t.push(`c_${opts.crop}`)
+  if (opts.crop) {
+    t.push(`c_${opts.crop}`)
+  } else if (opts.w || opts.h) {
+    // Default to c_limit when sizing is specified. For videos this is
+    // critical: a sizing-only transformation (w_X with no crop mode)
+    // can be served straight from the source without re-encoding, which
+    // means any rotation metadata stays in the container and the
+    // browser is on its own to honor it. HandBrake-compressed clips
+    // often have rotation flags that some browsers ignore, producing
+    // sideways or stretched playback. c_limit forces a re-encode, which
+    // bakes the rotation into the output bitstream so the browser only
+    // ever sees correctly-oriented frames.
+    t.push('c_limit')
+  }
   const tx = t.join(',')
 
   return `https://res.cloudinary.com/${cloudName}/${asset.resource_type}/upload/${tx}/${asset.public_id}.${asset.format}`

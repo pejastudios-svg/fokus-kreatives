@@ -59,6 +59,17 @@ export interface VideoPlayerProps {
   isActive?: boolean
   // Cover the full container instead of respecting aspect ratio.
   fill?: boolean
+  // Cloudinary's stored source dimensions. We use these as an
+  // additional aspect-ratio signal so we can cross-check what the
+  // browser reports vs what the poster reports vs what Cloudinary
+  // claims the source is.
+  sourceWidth?: number
+  sourceHeight?: number
+  // Cloudinary's stored duration (seconds, from upload metadata).
+  // Used as the ground truth for the "total" time display so a file
+  // that's served progressively can't fool the player into showing
+  // a duration that grows with currentTime.
+  sourceDuration?: number
 }
 
 const HIDE_DELAY_MS = 1800
@@ -92,6 +103,9 @@ export function VideoPlayer({
   onLoadedMetadata,
   isActive = true,
   fill = false,
+  sourceWidth,
+  sourceHeight,
+  sourceDuration,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const videoElRef = useRef<HTMLVideoElement | null>(null)
@@ -99,7 +113,15 @@ export function VideoPlayer({
   const wasPlayingBeforeScrubRef = useRef(false)
 
   const [playing, setPlaying] = useState(false)
-  const [duration, setDuration] = useState(0)
+  // Duration is seeded from Cloudinary's upload metadata (sourceDuration)
+  // when available. This is the ground truth - the <video> element's
+  // own .duration can grow with currentTime for progressively-served
+  // files, which made the "total" half of the time display march
+  // forward in lock-step with playback. If we have sourceDuration we
+  // refuse to overwrite it from media events.
+  const [duration, setDuration] = useState(
+    sourceDuration && sourceDuration > 0 ? sourceDuration : 0,
+  )
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
   const [muted, setMuted] = useState(false)
@@ -109,6 +131,91 @@ export function VideoPlayer({
   const [chromeVisible, setChromeVisible] = useState(true)
   const [scrubbing, setScrubbing] = useState(false)
   const [scrubPreview, setScrubPreview] = useState<number | null>(null)
+  // Perceived aspect ratio, learned from the poster image.
+  //
+  // For most files we'd happily trust the <video> element's intrinsic
+  // dimensions, but HandBrake-encoded clips often carry rotation metadata
+  // in a form Cloudinary doesn't bake out during transcode AND the
+  // browser doesn't honor when laying out the element - so videoWidth /
+  // videoHeight come back as the raw (landscape) frame, the CSS box is
+  // landscape, the browser still paints the rotated portrait content,
+  // and object-fit:fill (the <video> default) stretches it.
+  //
+  // The poster JPEG is the one signal that's reliably correct: Cloudinary
+  // bakes rotation into the extracted frame, so naturalWidth /
+  // naturalHeight on the loaded poster are the user-perceived aspect.
+  // We lock the player frame to that and use object-contain on the
+  // <video> so even if browser-rendered video disagrees, the content
+  // letterboxes inside the right-shape frame instead of being squashed.
+  const [posterAspect, setPosterAspect] = useState<number | null>(null)
+  const [videoAspect, setVideoAspect] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!poster) {
+      setPosterAspect(null)
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.onload = () => {
+      if (cancelled) return
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setPosterAspect(img.naturalWidth / img.naturalHeight)
+      }
+    }
+    img.src = poster
+    return () => {
+      cancelled = true
+    }
+  }, [poster])
+
+  // Best-of-three aspect detection.
+  //
+  // For HandBrake-encoded clips each individual signal (asset dims from
+  // Cloudinary upload metadata, the poster JPEG's natural dims, and the
+  // video element's videoWidth/videoHeight) can lie - rotation flags
+  // get dropped during transcode, posters get extracted from the wrong
+  // dimension, browsers honor rotation inconsistently. But what tends
+  // to happen when a signal is wrong is that it collapses to "square"
+  // (aspect ≈ 1.0). A signal that's strongly portrait or landscape is
+  // much more likely to be correct than a square one.
+  //
+  // So we pick the signal furthest from 1.0 - measured in log-space so
+  // 9:16 (0.56) and 16:9 (1.78) are treated symmetrically. If a signal
+  // doesn't exist or returns 0, it doesn't compete.
+  const sourceAspect =
+    sourceWidth && sourceHeight && sourceWidth > 0 && sourceHeight > 0
+      ? sourceWidth / sourceHeight
+      : null
+
+  const extremeness = (a: number | null) =>
+    a && a > 0 ? Math.abs(Math.log(a)) : -1
+
+  const aspectCandidates = [
+    { name: 'video', value: videoAspect },
+    { name: 'poster', value: posterAspect },
+    { name: 'source', value: sourceAspect },
+  ]
+  const bestAspect =
+    aspectCandidates.reduce((acc, c) =>
+      extremeness(c.value) > extremeness(acc.value) ? c : acc,
+    ).value
+
+  // Diagnostic: log every time any aspect signal updates so we can see
+  // which sources agreed/disagreed for a broken file. console.log
+  // (not console.debug) because Chrome hides debug-level by default.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    console.log('[VideoPlayer] aspect signals', {
+      src,
+      poster,
+      sourceAspect,
+      posterAspect,
+      videoAspect,
+      bestAspect,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, posterAspect, videoAspect, sourceAspect])
 
   const setMergedRef = useCallback(
     (el: HTMLVideoElement | null) => {
@@ -186,11 +293,48 @@ export function VideoPlayer({
 
   // ---- Play / pause -----------------------------------------------------
 
+  // play() returns a promise; if a pause() lands before it resolves the
+  // browser rejects with AbortError ("interrupted by a call to pause()").
+  // We swallow that specific error because it's expected user interaction,
+  // not a real failure. Other rejections (autoplay block, decode error)
+  // still surface so they're visible during development.
+  const safePlay = (v: HTMLVideoElement) => {
+    const p = v.play()
+    if (p && typeof p.catch === 'function') {
+      p.catch((err) => {
+        if (err?.name !== 'AbortError') console.error('Video play failed:', err)
+      })
+    }
+  }
+
   const togglePlay = useCallback(() => {
     const v = videoElRef.current
     if (!v) return
     if (v.paused) {
-      void v.play()
+      // Restart-after-end. v.ended is the primary signal because for
+      // some HandBrake clips v.duration is Infinity and a pure
+      // (currentTime >= duration) check never triggers.
+      const atEnd =
+        v.ended ||
+        (Number.isFinite(v.duration) &&
+          v.duration > 0 &&
+          v.currentTime >= v.duration - 0.05)
+      if (atEnd) {
+        // Don't call play() until the seek has actually completed.
+        // If we set currentTime = 0 and immediately call play(),
+        // some browsers (Chrome in particular) still see the element
+        // as "ended" until the seek lands, and play() is a no-op -
+        // the button flips to "playing" but the frame stays parked
+        // at the end. Wait for the seeked event, then play.
+        const onSeek = () => {
+          v.removeEventListener('seeked', onSeek)
+          safePlay(v)
+        }
+        v.addEventListener('seeked', onSeek)
+        v.currentTime = 0
+      } else {
+        safePlay(v)
+      }
     } else {
       v.pause()
     }
@@ -242,7 +386,8 @@ export function VideoPlayer({
     if (scrubPreview != null) seekTo(scrubPreview)
     setScrubPreview(null)
     if (wasPlayingBeforeScrubRef.current) {
-      void videoElRef.current?.play()
+      const v = videoElRef.current
+      if (v) safePlay(v)
     }
   }
   const handleScrubMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -371,9 +516,30 @@ export function VideoPlayer({
   // While annotating, force chrome hidden + don't react to mouse moves.
   const chromeShown = !hideControls && chromeVisible
   const displayedTime = scrubPreview ?? currentTime
-  const progressPct = duration > 0 ? (displayedTime / duration) * 100 : 0
+  // Cap at 100 so a stale-small duration (e.g. HandBrake clip whose real
+  // length hasn't arrived via durationchange yet) can't paint the
+  // playhead off the right edge of the track.
+  const progressPct =
+    duration > 0 ? Math.min(100, (displayedTime / duration) * 100) : 0
 
-  // Time-display in top-right of chrome bar; markers under scrubber.
+  // Layout strategy:
+  //
+  //   - The outer wrapper (containerRef) handles input, fullscreen, and
+  //     horizontal centering. It does NOT have its own aspect ratio.
+  //   - The inner "frame" sizes itself to whatever the video naturally
+  //     renders at (browser-decided), via inline-block + max constraints
+  //     on the <video> element. The browser is the only thing that
+  //     actually knows the true displayed aspect (it decoded the file
+  //     and is rendering frames), so we let it drive.
+  //   - All chrome (scrubber, buttons, play button) is positioned
+  //     absolutely inside the frame, so it always matches the video's
+  //     real bounds - including after the asset is edited/replaced
+  //     and re-renders at a new size.
+  //
+  // This approach is robust to mangled metadata (e.g. HandBrake-
+  // compressed clips whose stored width/height don't match what the
+  // browser actually paints): we never trust a number, we just use
+  // whatever the video element rendered.
   return (
     <div
       ref={containerRef}
@@ -388,10 +554,45 @@ export function VideoPlayer({
           ? 'h-screen w-screen bg-black overflow-hidden flex items-center justify-center'
           : fill
           ? 'h-full w-full bg-black overflow-hidden'
-          : 'w-full max-h-[70vh] rounded-lg bg-black overflow-hidden'
+          : // items-center stops the inner frame from stretching down
+            // to fill the parent's cross-axis - which is what was
+            // leaving empty black space below 16:9 clips when the
+            // surrounding section happened to be taller than the
+            // player.
+            'w-full flex justify-center items-center'
       } ${className}`}
     >
+      <div
+        className={
+          isFullscreen
+            ? 'relative h-full w-full'
+            : fill
+            ? 'relative h-full w-full'
+            : 'relative bg-black rounded-lg overflow-hidden max-w-full'
+        }
+        style={
+          !isFullscreen && !fill && bestAspect
+            ? {
+                // Lock the frame to the best-of-three aspect ratio
+                // (see bestAspect computation). Width follows from
+                // aspect, capped by parent (max-w:100%) and 70vh tall.
+                aspectRatio: `${bestAspect}`,
+                width: `calc(70vh * ${bestAspect})`,
+                maxWidth: '100%',
+                maxHeight: '70vh',
+              }
+            : undefined
+        }
+      >
       <video
+        // key={src} forces a clean remount when the asset is swapped.
+        // Without it, React keeps the same <video> element across src
+        // changes and the element's internal state (.ended, .currentTime
+        // parked at duration, sometimes a sticky paused-at-end state)
+        // bleeds over from the previous clip - which is why "replace
+        // a video, watch it once, click play again" was a no-op until
+        // the page was reloaded.
+        key={src}
         ref={setMergedRef}
         src={src}
         poster={poster}
@@ -413,10 +614,34 @@ export function VideoPlayer({
         }}
         onLoadedMetadata={(e: SyntheticEvent<HTMLVideoElement>) => {
           const t = e.target as HTMLVideoElement
-          setDuration(t.duration)
+          // Only fall back to the <video> element's reported duration
+          // if we don't already have one from Cloudinary's upload
+          // metadata. For progressively-served files the element's
+          // .duration grows alongside currentTime, which would make
+          // the displayed "total" walk forward with playback.
+          if (
+            !(sourceDuration && sourceDuration > 0) &&
+            Number.isFinite(t.duration) &&
+            t.duration > 0
+          ) {
+            setDuration(t.duration)
+          }
+          if (t.videoWidth > 0 && t.videoHeight > 0) {
+            setVideoAspect(t.videoWidth / t.videoHeight)
+          }
           setVolume(t.volume)
           setMuted(t.muted)
           onLoadedMetadata?.()
+        }}
+        onDurationChange={(e: SyntheticEvent<HTMLVideoElement>) => {
+          const t = e.target as HTMLVideoElement
+          if (
+            !(sourceDuration && sourceDuration > 0) &&
+            Number.isFinite(t.duration) &&
+            t.duration > 0
+          ) {
+            setDuration(t.duration)
+          }
         }}
         onSeeked={() => onSeeked?.()}
         onVolumeChange={(e: SyntheticEvent<HTMLVideoElement>) => {
@@ -429,7 +654,23 @@ export function VideoPlayer({
             ? 'h-full w-full object-contain'
             : fill
             ? 'h-full w-full object-cover'
-            : 'w-full max-h-[70vh] object-contain'
+            : bestAspect
+            ? // Frame is locked to the perceived aspect (bestAspect).
+              // We deliberately use object-fill (not -contain) so when
+              // the video's intrinsic aspect DISAGREES with the frame
+              // - which is what happens with HandBrake-encoded clips
+              // whose 9:16 content has been squished into a 1:1 frame
+              // buffer (file says 1080x1080, poster says 9:16) - the
+              // browser stretches the squished buffer asymmetrically
+              // back into the right-aspect box, un-squishing the
+              // content. When all signals agree (every non-HandBrake
+              // file), there's no aspect mismatch and fill behaves
+              // identically to contain.
+              'block h-full w-full object-fill'
+            : // No aspect signal yet - fall back to natural sizing
+              // capped by 70vh so the player still has the right shape
+              // during the brief window before signals arrive.
+              'block max-h-[70vh] max-w-full object-contain'
         }
       />
 
@@ -628,6 +869,7 @@ export function VideoPlayer({
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
