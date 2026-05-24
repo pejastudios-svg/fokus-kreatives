@@ -236,10 +236,14 @@ export default function ClientsPage() {
     const originalClients = clients
     setClients((prev) => prev.filter((c) => c.id !== clientId))
 
-    const { error } = await supabase
+    // .select('id') forces the update to return affected rows so we can
+    // detect a silent RLS block (error: null, 0 rows touched) and roll
+    // back the optimistic removal.
+    const { data: updatedRows, error } = await supabase
       .from('clients')
       .update({ archived_at: new Date().toISOString() })
       .eq('id', clientId)
+      .select('id')
 
     setPendingActions((prev) => {
       const next = new Set(prev)
@@ -247,10 +251,12 @@ export default function ClientsPage() {
       return next
     })
 
-    if (error) {
+    if (error || !updatedRows || updatedRows.length === 0) {
       console.error('Archive error:', error)
       setClients(originalClients)
-      showNotification('Failed to archive client')
+      showNotification(
+        error?.message || 'Archive was blocked - no rows affected.',
+      )
       return
     }
 
@@ -263,7 +269,11 @@ export default function ClientsPage() {
     const originalClients = clients
     setClients((prev) => prev.filter((c) => c.id !== clientId))
 
-    const { error } = await supabase.from('clients').update({ archived_at: null }).eq('id', clientId)
+    const { data: updatedRows, error } = await supabase
+      .from('clients')
+      .update({ archived_at: null })
+      .eq('id', clientId)
+      .select('id')
 
     setPendingActions((prev) => {
       const next = new Set(prev)
@@ -271,10 +281,12 @@ export default function ClientsPage() {
       return next
     })
 
-    if (error) {
+    if (error || !updatedRows || updatedRows.length === 0) {
       console.error('Unarchive error:', error)
       setClients(originalClients)
-      showNotification('Failed to unarchive client')
+      showNotification(
+        error?.message || 'Unarchive was blocked - no rows affected.',
+      )
       return
     }
 
@@ -315,15 +327,35 @@ export default function ClientsPage() {
       await supabase.from('automations').delete().eq('client_id', clientId)
       await supabase.from('competitors').delete().eq('client_id', clientId)
 
-      const { error } = await supabase.from('clients').delete().eq('id', clientId)
+      // .select() forces the delete to return the affected rows.
+      // Without this, a delete that's silently blocked by RLS (or that
+      // matches zero rows for any reason) comes back with error: null
+      // and the optimistic update sticks - the UI claims the client
+      // was deleted but the row is still on the server and reappears
+      // on the next page load. Treating an empty result as a failure
+      // forces the rollback we already wired up for the error path.
+      const { data: deletedRows, error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+        .select('id')
       if (error) throw error
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error(
+          'Delete was blocked by the database (no permission, or a related row prevented it).',
+        )
+      }
 
       showNotification('Client deleted successfully')
       refreshCounts()
     } catch (err) {
       console.error('Delete error:', err)
       setClients(originalClients)
-      showNotification('Failed to delete client')
+      showNotification(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to delete client',
+      )
       throw err instanceof Error ? err : new Error('Failed to delete client')
     } finally {
       setPendingActions((prev) => {

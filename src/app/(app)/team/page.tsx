@@ -178,7 +178,6 @@ export default function TeamPage() {
       // Managers cannot create admins
       const finalRole: AgencyRole = (currentUserRole === 'admin') ? inviteRole : (inviteRole === 'admin' ? 'employee' : inviteRole)
 
-      let token = existingUser?.invitation_token || null
       // Stamp every fresh agency invite with a 7-day expiration so the
       // accept route can reject stale links. Without this, invites
       // never time out and admins can't tell which are still valid.
@@ -186,29 +185,62 @@ export default function TeamPage() {
         Date.now() + 7 * 24 * 60 * 60 * 1000,
       ).toISOString()
 
+      // Branch on what kind of "invite" this actually is:
+      //
+      //   1. Existing user, already accepted (e.g. they were removed
+      //      and we're adding them back). Don't issue a new token -
+      //      the accept route would null the old token AND we'd be
+      //      sending /invite/null because invitation_token was wiped
+      //      when they originally accepted. Just flip is_agency_user
+      //      back on and let them in.
+      //
+      //   2. Existing user, never accepted. Generate a fresh token
+      //      (rotate any old one) and send the invite email.
+      //
+      //   3. Brand-new user. Insert + token + email.
+      const isReadd = !!existingUser?.id && existingUser.invitation_accepted
+
+      let token: string | null = null
       if (existingUser?.id) {
-        // Existing user: make them agency user
-        if (!existingUser.invitation_accepted) {
+        if (isReadd) {
+          // Re-add path. Keep invitation_token alone (it's null on
+          // accepted users, but writing null over null is fine).
+          const { error: updErr } = await supabase
+            .from('users')
+            .update({
+              name: inviteName,
+              role: finalRole,
+              is_agency_user: true,
+            })
+            .eq('id', existingUser.id)
+
+          if (updErr) {
+            console.error('Agency re-add update error:', updErr)
+            setNotification({ type: 'error', message: updErr.message || 'Failed to re-add user' })
+            return
+          }
+        } else {
+          // Pending-invite path. Fresh token replaces any stale one.
           token = crypto.randomUUID()
-        }
+          const { error: updErr } = await supabase
+            .from('users')
+            .update({
+              name: inviteName,
+              role: finalRole,
+              is_agency_user: true,
+              invitation_token: token,
+              invitation_expires_at: expiresAt,
+            })
+            .eq('id', existingUser.id)
 
-        const { error: updErr } = await supabase
-          .from('users')
-          .update({
-            name: inviteName,
-            role: finalRole,
-            is_agency_user: true,
-            invitation_token: token,
-            invitation_expires_at: expiresAt,
-          })
-          .eq('id', existingUser.id)
-
-        if (updErr) {
-          console.error('Agency invite update error:', updErr)
-          setNotification({ type: 'error', message: updErr.message || 'Failed to update user' })
-          return
+          if (updErr) {
+            console.error('Agency invite update error:', updErr)
+            setNotification({ type: 'error', message: updErr.message || 'Failed to update user' })
+            return
+          }
         }
       } else {
+        // Brand-new user.
         token = crypto.randomUUID()
         const { error: insErr } = await supabase
           .from('users')
@@ -228,6 +260,22 @@ export default function TeamPage() {
           setNotification({ type: 'error', message: insErr.message || 'Failed to create invite' })
           return
         }
+      }
+
+      // Re-add path doesn't need an invite link or email - they've
+      // already accepted at some point and they're just being added
+      // back to the team. Show a different success message.
+      if (isReadd) {
+        setNotification({
+          type: 'success',
+          message: `${inviteName} added back to the team.`,
+        })
+        setShowInviteModal(false)
+        setInviteEmail('')
+        setInviteName('')
+        setInviteRole('employee')
+        await fetchTeam()
+        return
       }
 
       const inviteLink = `${origin}/invite/${token}`
