@@ -27,6 +27,7 @@ import {
   ListChecks,
   FileDown,
   Info,
+  RotateCcw,
 } from 'lucide-react'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -114,6 +115,11 @@ interface SubmissionRow {
    *  this column existed have null here and fall back to the page's
    *  current fields. */
   field_labels: Record<string, string> | null
+  /** The visit (capture_sessions row) that produced this submission.
+   *  Null for legacy submissions captured before the link existed, or
+   *  when the visitor had no session. Deleting the submission also
+   *  deletes this session so analytics stays truthful. */
+  session_id: string | null
   created_at: string
 }
 
@@ -251,6 +257,11 @@ export default function CRMCapturePages() {
   const [subSearch, setSubSearch] = useState('')
   const [subPageId, setSubPageId] = useState<string>('') // filter by page
   const [stats, setStats] = useState({ submissions: 0, leads: 0, meetings: 0 })
+  // Bumped after a delete / reset so the advanced analytics panel refetches
+  // its session-derived metrics instead of showing the pre-delete numbers.
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0)
+  const [confirmResetAnalytics, setConfirmResetAnalytics] = useState(false)
+  const [resettingAnalytics, setResettingAnalytics] = useState(false)
 
   // Public capture URL base. On localhost we ALWAYS use the current
   // window origin so dev links open the local dev server (e.g.
@@ -825,6 +836,7 @@ const deleteSubmission = async () => {
   setDeletingSubmission(true)
 
   const id = submissionToDelete.id
+  const sessionId = submissionToDelete.session_id
   const prev = submissions
   setSubmissions((s) => s.filter((x) => x.id !== id))
 
@@ -837,10 +849,50 @@ const deleteSubmission = async () => {
     if (error) {
       console.error('Delete submission error:', error)
       setSubmissions(prev) // rollback
+    } else {
+      // Full cascade: remove the visit that produced this submission so
+      // Visits / Unique Visitors / Avg Time / conversion drop with it.
+      // Best-effort - legacy rows have no session_id, nothing to clean up.
+      if (sessionId) {
+        const { error: sessErr } = await supabase
+          .from('capture_sessions')
+          .delete()
+          .eq('id', sessionId)
+        if (sessErr) console.error('Delete linked session error:', sessErr)
+      }
+
+      // Refresh stats either way: removing the row changes the submission
+      // count + trend even when there's no linked session to delete.
+      setAnalyticsRefreshKey((k) => k + 1)
+      if (subPageId) loadStatsForPage(subPageId)
     }
   } finally {
     setDeletingSubmission(false)
     setSubmissionToDelete(null)
+  }
+}
+
+// Wipe the visit analytics (capture_sessions) for the current page. Used
+// to zero out legacy data that predates the submission<->session link, or
+// to clear a clean slate. Leaves submission rows (captured leads) intact -
+// once sessions are gone the Submissions stat reflects the actual rows.
+const resetAnalytics = async () => {
+  if (!subPageId || !canEditCapture) return
+  setResettingAnalytics(true)
+  try {
+    const { error } = await supabase
+      .from('capture_sessions')
+      .delete()
+      .eq('capture_page_id', subPageId)
+    if (error) {
+      console.error('Reset analytics error:', error)
+    } else {
+      setAnalyticsRefreshKey((k) => k + 1)
+      loadStatsForPage(subPageId)
+    }
+  } finally {
+    setResettingAnalytics(false)
+    setConfirmResetAnalytics(false)
   }
 }
 
@@ -1184,7 +1236,7 @@ function CaptureSkeleton() {
 
                 {/* Advanced toggle + panel. Drops below the basic
                     stats so the simple view stays at the top. */}
-                <div>
+                <div className="flex items-center justify-between gap-3">
                   <button
                     type="button"
                     onClick={() => setShowAdvanced((v) => !v)}
@@ -1195,12 +1247,23 @@ function CaptureSkeleton() {
                       Beta
                     </span>
                   </button>
+                  {canEditCapture && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmResetAnalytics(true)}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-tertiary)] hover:text-red-500 transition-colors"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Reset analytics
+                    </button>
+                  )}
                 </div>
 
                 {showAdvanced && (
                   <CaptureAdvancedAnalytics
                     clientId={clientId}
                     pageId={subPageId}
+                    refreshKey={analyticsRefreshKey}
                   />
                 )}
               </>
@@ -1927,5 +1990,40 @@ function CaptureSkeleton() {
     </div>
   </div>
 )}
-</div>  
+
+{confirmResetAnalytics && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">Reset analytics</h3>
+        <button
+          onClick={() => setConfirmResetAnalytics(false)}
+          className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+        This clears all visit analytics for this page: Visits, Unique Visitors,
+        Avg Time, conversion, and the trend chart all reset to zero. Your
+        submissions (captured leads) are kept. This cannot be undone.
+      </div>
+
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-primary)]">
+        <Button variant="outline" onClick={() => setConfirmResetAnalytics(false)} disabled={resettingAnalytics}>
+          Cancel
+        </Button>
+        <Button
+          onClick={resetAnalytics}
+          isLoading={resettingAnalytics}
+          className="bg-red-600 hover:bg-red-500"
+        >
+          Reset analytics
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+</div>
 }

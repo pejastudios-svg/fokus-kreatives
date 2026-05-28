@@ -68,7 +68,7 @@ export default function ApprovalV2ListPage() {
     <>
       <Header
         title="Approvals v2"
-        subtitle="Rebuilt renderer — same data, fixed video pipeline"
+        subtitle="Rebuilt renderer: same data, fixed video pipeline"
       />
 
       <div className="p-4 md:p-8">

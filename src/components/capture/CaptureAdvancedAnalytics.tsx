@@ -85,6 +85,9 @@ interface AnalyticsResponse {
 interface Props {
   clientId: string
   pageId: string
+  /** Bump from the parent to force a refetch (e.g. after a submission
+   *  delete or an analytics reset changes the underlying sessions). */
+  refreshKey?: number
 }
 
 function formatDuration(seconds: number): string {
@@ -100,7 +103,7 @@ function formatDayLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export function CaptureAdvancedAnalytics({ clientId, pageId }: Props) {
+export function CaptureAdvancedAnalytics({ clientId, pageId, refreshKey }: Props) {
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -137,7 +140,7 @@ export function CaptureAdvancedAnalytics({ clientId, pageId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [clientId, pageId])
+  }, [clientId, pageId, refreshKey])
 
   if (loading) {
     return (

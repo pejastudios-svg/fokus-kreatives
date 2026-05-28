@@ -218,6 +218,10 @@ const submissionData = {
       .insert({
   capture_page_id: page.id,
   client_id: clientId,
+  // Link to the visit that produced this submission so deleting it can
+  // also remove that visit from the analytics funnel. Null when the
+  // visitor had no session (e.g. localStorage disabled).
+  session_id: session_id || null,
   name: submissionData.name,
   email: submissionData.email,
   phone: submissionData.phone,

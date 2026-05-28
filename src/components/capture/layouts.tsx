@@ -415,7 +415,7 @@ export const LAYOUT_TEMPLATES: Array<{
     key: 'minimal',
     label: 'Minimal',
     description: 'No image. Big typography + form.',
-    bannerAspect: '—',
+    bannerAspect: 'N/A',
     bannerSize: 'Not used',
     usesBanner: false,
   },
