@@ -53,17 +53,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Update failed' }, { status: 500 })
     }
 
-    // Reuse the existing recompute path (rolls up approval status + ClickUp +
-    // notifications). Not awaiting - fire-and-forget keeps the response fast.
+    // Roll up item statuses into the approval's aggregate status (and fire
+    // ClickUp + status notifications). This MUST be awaited: a fire-and-forget
+    // call is killed when this response returns on serverless, which left
+    // approvals.status stuck at 'pending' even after the client approved here -
+    // the approvals page kept showing it un-approved and reminder emails kept
+    // going out. Awaiting keeps the function alive until the rollup commits.
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
-      void fetch(`${appUrl}/api/approvals/recompute`, {
+      const recomputeRes = await fetch(`${appUrl}/api/approvals/recompute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approvalId: approval.id, actorId: null }),
-      }).catch((e) => console.error('review approve recompute error:', e))
+      })
+      if (!recomputeRes.ok) {
+        console.error(
+          'review approve recompute failed:',
+          recomputeRes.status,
+          await recomputeRes.text().catch(() => ''),
+        )
+      }
     } catch (e) {
-      console.error('review approve recompute trigger error:', e)
+      console.error('review approve recompute error:', e)
     }
 
     return NextResponse.json({ success: true })
