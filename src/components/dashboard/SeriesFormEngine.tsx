@@ -74,6 +74,16 @@ const BEAT_TYPES: SeriesBeatType[] = [
   'belief',
 ]
 
+// Renumber the per-day entries 1..N while keeping any intro question pinned to
+// the front at entry_index 0.
+function renumberPreservingIntro(list: SeriesQuestion[]): SeriesQuestion[] {
+  const intro = list.find((q) => q.is_intro)
+  const days = list
+    .filter((q) => !q.is_intro)
+    .map((q, idx) => ({ ...q, entry_index: idx + 1 }))
+  return intro ? [{ ...intro, entry_index: 0 }, ...days] : days
+}
+
 function buildProfileForClient(c: ClientRow): BrandProfile {
   if (c.brand_profile) return normalizeBrandProfile(c.brand_profile)
   const base = defaultBrandProfile()
@@ -211,30 +221,29 @@ export function SeriesFormEngine() {
   }
 
   const removeQuestion = (id: string) => {
-    setDraft((prev) =>
-      prev.filter((q) => q.id !== id).map((q, idx) => ({ ...q, entry_index: idx + 1 })),
-    )
+    setDraft((prev) => renumberPreservingIntro(prev.filter((q) => q.id !== id)))
   }
 
   const addBlankQuestion = () => {
-    setDraft((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        text: '',
-        entry_index: prev.length + 1,
-        beat_type: 'story',
-      },
-    ])
+    setDraft((prev) =>
+      renumberPreservingIntro([
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          text: '',
+          entry_index: prev.length + 1,
+          beat_type: 'story',
+        },
+      ]),
+    )
   }
 
   const handleSaveAndShare = async () => {
     if (!selectedClient) return
-    const cleaned = draft
-      .filter((q) => q.text.trim())
-      .map((q, idx) => ({ ...q, entry_index: idx + 1 }))
-    if (!cleaned.length) {
-      setError('Add at least one question with text.')
+    const cleaned = renumberPreservingIntro(draft.filter((q) => q.text.trim()))
+    const dayCount = cleaned.filter((q) => !q.is_intro).length
+    if (!dayCount) {
+      setError('Add at least one day question with text.')
       return
     }
     setSaving(true)
@@ -247,7 +256,7 @@ export function SeriesFormEngine() {
           clientId: selectedClient.id,
           title: title.trim(),
           seriesLabel,
-          seriesLength: cleaned.length,
+          seriesLength: dayCount,
           format,
           framing,
           brandLine: brandLine.trim() || null,
@@ -527,15 +536,23 @@ export function SeriesFormEngine() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {draft.map((q, idx) => (
+            {draft.map((q) => (
               <div
                 key={q.id}
-                className="p-3 rounded-lg border border-theme-primary bg-theme-card space-y-2"
+                className={`p-3 rounded-lg border bg-theme-card space-y-2 ${
+                  q.is_intro ? 'border-[#2B79F7]/40 bg-[#E8F1FF]/30 dark:bg-[#1E3A6F]/20' : 'border-theme-primary'
+                }`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
-                    {idx + 1}
-                  </span>
+                  {q.is_intro ? (
+                    <span className="shrink-0 h-7 px-2 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold uppercase tracking-wide flex items-center justify-center">
+                      Intro
+                    </span>
+                  ) : (
+                    <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
+                      {q.entry_index}
+                    </span>
+                  )}
                   <div className="flex-1 space-y-2">
                     <textarea
                       value={q.text}
@@ -544,36 +561,43 @@ export function SeriesFormEngine() {
                       placeholder="Question text..."
                       className="w-full px-3 py-2 rounded-lg border border-theme-primary bg-theme-bg text-sm text-theme-primary resize-none focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-wide text-theme-secondary mb-1">
-                          Beat type
-                        </label>
-                        <select
-                          value={q.beat_type}
-                          onChange={(e) =>
-                            updateQuestion(q.id, { beat_type: e.target.value as SeriesBeatType })
-                          }
-                          className="w-full px-2 py-1.5 rounded-md border border-theme-primary bg-theme-bg text-xs text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                        >
-                          {BEAT_TYPES.map((b) => (
-                            <option key={b} value={b}>
-                              {b}
-                            </option>
-                          ))}
-                        </select>
+                    {q.is_intro ? (
+                      <p className="text-[11px] text-theme-secondary">
+                        Series intro · sets up what the series is, who they are, why, and the end
+                        result before {seriesLabel} 1. The CTA you set above is folded in here.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wide text-theme-secondary mb-1">
+                            Beat type
+                          </label>
+                          <select
+                            value={q.beat_type}
+                            onChange={(e) =>
+                              updateQuestion(q.id, { beat_type: e.target.value as SeriesBeatType })
+                            }
+                            className="w-full px-2 py-1.5 rounded-md border border-theme-primary bg-theme-bg text-xs text-theme-primary focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          >
+                            {BEAT_TYPES.map((b) => (
+                              <option key={b} value={b}>
+                                {b}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wide text-theme-secondary mb-1">
+                            Anchor (read-only)
+                          </label>
+                          <p className="text-[11px] text-theme-secondary truncate px-2 py-1.5 bg-theme-bg rounded-md">
+                            {q.anchor_field
+                              ? `${q.anchor_field}${q.anchor_value ? ` · ${q.anchor_value}` : ''}`
+                              : 'no anchor'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-wide text-theme-secondary mb-1">
-                          Anchor (read-only)
-                        </label>
-                        <p className="text-[11px] text-theme-secondary truncate px-2 py-1.5 bg-theme-bg rounded-md">
-                          {q.anchor_field
-                            ? `${q.anchor_field}${q.anchor_value ? ` · ${q.anchor_value}` : ''}`
-                            : 'no anchor'}
-                        </p>
-                      </div>
-                    </div>
+                    )}
                     {q.placeholder && (
                       <p className="text-[10px] text-theme-secondary italic">
                         Placeholder: {q.placeholder}

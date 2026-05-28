@@ -18,6 +18,10 @@ export interface SeriesQuestion {
   anchor_field?: string
   anchor_value?: string
   placeholder?: string
+  /** True for the single framing question that becomes the series INTRO.
+   *  The intro sits at entry_index 0, has no beat/anchor, and is rendered and
+   *  prompted differently from the per-day entries. */
+  is_intro?: boolean
 }
 
 export interface SeriesForm {

@@ -66,8 +66,10 @@ function sanitizeQuestions(raw: unknown): SeriesQuestion[] {
     const beat: SeriesBeatType = (VALID_BEAT_TYPES as string[]).includes(rawBeat)
       ? (rawBeat as SeriesBeatType)
       : 'story'
-    const entryIndex =
-      typeof q.entry_index === 'number' && Number.isFinite(q.entry_index)
+    const isIntro = q.is_intro === true
+    const entryIndex = isIntro
+      ? 0
+      : typeof q.entry_index === 'number' && Number.isFinite(q.entry_index)
         ? Math.max(1, Math.floor(q.entry_index))
         : out.length + 1
     out.push({
@@ -78,6 +80,7 @@ function sanitizeQuestions(raw: unknown): SeriesQuestion[] {
       anchor_field: typeof q.anchor_field === 'string' ? q.anchor_field : undefined,
       anchor_value: typeof q.anchor_value === 'string' ? q.anchor_value : undefined,
       placeholder: typeof q.placeholder === 'string' ? q.placeholder : undefined,
+      ...(isIntro ? { is_intro: true } : {}),
     })
   }
   return out
@@ -130,9 +133,11 @@ export async function POST(req: NextRequest) {
       ? (body.framing as SeriesFraming)
       : 'freeform'
 
+    // series_length counts the per-day entries only - the intro is separate.
+    const dayCount = questions.filter((q) => !q.is_intro).length
     const seriesLength = Math.max(
       1,
-      Math.min(60, body.seriesLength ?? questions.length),
+      Math.min(60, body.seriesLength ?? dayCount),
     )
 
     const token = randomUUID()

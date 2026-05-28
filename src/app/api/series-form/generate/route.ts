@@ -87,6 +87,23 @@ function framingGuidance(framing: SeriesFraming): string {
   }
 }
 
+function buildIntroQuestion(
+  title: string,
+  length: number,
+  label: SeriesLabel,
+): SeriesQuestion {
+  const unit = label.toLowerCase()
+  return {
+    id: crypto.randomUUID(),
+    text: `Before we get into the individual ${unit}s, set up the whole series in your own words. In a few sentences: what are you covering ${length === 1 ? `in this one ${unit}` : `across these ${length} ${unit}s`}, who are you and who is this series for, why are you doing this right now, and what should someone be able to do or feel by the time they reach the end?`,
+    entry_index: 0,
+    beat_type: 'belief',
+    is_intro: true,
+    placeholder:
+      "Who you are, what the series covers, why now, and where you want viewers to end up.",
+  }
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
@@ -235,9 +252,16 @@ Generate questions for entry_index 1 through ${length}.`
       )
     }
 
+    // Prepend a single combined intro question (entry_index 0). It becomes the
+    // series INTRO - what the series is about, who they are, why, the end result.
+    const withIntro: SeriesQuestion[] = [
+      buildIntroQuestion(title, length, seriesLabel),
+      ...questions,
+    ]
+
     return NextResponse.json({
       success: true,
-      questions,
+      questions: withIntro,
       shortfall: questions.length < length ? length - questions.length : 0,
     })
   } catch (err) {

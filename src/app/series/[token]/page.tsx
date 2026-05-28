@@ -230,17 +230,29 @@ export default function SeriesFormPage() {
         </Card>
 
         {sortedQuestions.map((q) => (
-          <Card key={q.id}>
+          <Card key={q.id} className={q.is_intro ? 'border-2 border-[#2B79F7]/40' : undefined}>
             <CardHeader>
               <div className="flex items-start gap-3">
-                <span className="shrink-0 h-8 w-8 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
-                  {q.entry_index}
-                </span>
+                {q.is_intro ? (
+                  <span className="shrink-0 h-8 px-2.5 rounded-full bg-[#2B79F7] text-white text-[10px] font-semibold uppercase tracking-wide flex items-center justify-center">
+                    Intro
+                  </span>
+                ) : (
+                  <span className="shrink-0 h-8 w-8 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
+                    {q.entry_index}
+                  </span>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">
-                    {form.series_label} {q.entry_index}
-                    {q.beat_type && (
-                      <span className="ml-2 text-[var(--text-tertiary)]">· {BEAT_LABEL[q.beat_type] || q.beat_type}</span>
+                    {q.is_intro ? (
+                      'Intro · sets up the series'
+                    ) : (
+                      <>
+                        {form.series_label} {q.entry_index}
+                        {q.beat_type && (
+                          <span className="ml-2 text-[var(--text-tertiary)]">· {BEAT_LABEL[q.beat_type] || q.beat_type}</span>
+                        )}
+                      </>
                     )}
                   </p>
                   <h3 className="text-base font-semibold text-[var(--text-primary)]">{q.text}</h3>

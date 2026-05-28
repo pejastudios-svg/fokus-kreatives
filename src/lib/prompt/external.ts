@@ -28,6 +28,8 @@ export interface SeriesAnswerForPrompt {
   beat_type?: string
   anchor_field?: string
   anchor_value?: string
+  /** True for the framing answer that becomes the series INTRO (entry_index 0). */
+  is_intro?: boolean
 }
 
 export interface BuildExternalPromptInput {
@@ -165,6 +167,8 @@ const CRITICAL_BANS_TOP = `CRITICAL HARD RULES - obey on EVERY line, EVERY entry
 
 5. NO forced metaphors that say nothing literal ("panic attack with a ring light", "the hook isn't the seasoning, it's the meal", "wing it kills your follower count"). State the literal observation in plain language.
 
+6. NO sentence may begin with "Here's" or "Here is" ("Here's what changed it for me", "Here's the truth", "Here's the thing", "Here's why", "Here's how", "Here's what I learned"). This opener is one of the loudest AI tells there is. Delete the opener and state the point directly. "What changed it for me was writing the outline first." Not "Here's what changed it for me."
+
 If you find yourself unable to write an entry without violating one of these, write a SHORTER entry, or fewer entries, or stop and tell me the client profile does not support what was asked. Quality and specificity beat volume. Always.`
 
 const FAILURE_EXAMPLES = `FAILURE EXAMPLES - the model has produced these exact patterns before on this prompt. Do not repeat them.
@@ -191,7 +195,11 @@ WHY: Generic creator advice. Could close any random account's video.
 
 ✗ WRONG: "Wing it kills your follower count."
 WHY: Cringe one-liner. Sounds like AI trying to sound punchy.
-✓ RIGHT: Drop the punchline. State the consequence in plain language.`
+✓ RIGHT: Drop the punchline. State the consequence in plain language.
+
+✗ WRONG: "Here's what changed it for me. I started writing the outline first."
+WHY: Sentence begins with "Here's" - a top AI tell. The opener adds nothing.
+✓ RIGHT: "What changed it for me was writing the outline first." State it directly, no "Here's" runway.`
 
 const FINAL_CHECK = `FINAL CHECK BEFORE YOU WRITE EACH ENTRY (run this checklist mentally on every line):
 
@@ -201,6 +209,7 @@ const FINAL_CHECK = `FINAL CHECK BEFORE YOU WRITE EACH ENTRY (run this checklist
 □ Does every body line anchor to a SPECIFIC item from the CLIENT PROFILE (named pain point, fear, evergreen topic, hot take, signature offer, differentiation, audience role)? → cut every line that doesn't.
 □ Is any sentence the kind of generic creator-coach advice ("plan the month", "build buckets", "stop reinventing the wheel", "the hook is everything") that could appear on any random account? → cut it.
 □ Did I write a forced metaphor that doesn't literally describe anything? → drop the metaphor, state the literal observation.
+□ Does any sentence begin with "Here's" or "Here is"? → delete the opener and state the point directly.
 □ Is the entry shorter as a result? → Good. Short and specific beats long and generic. Always.
 
 Only after you have passed this checklist do you finalize the entry.`
@@ -218,6 +227,7 @@ BANNED PHRASES (never appear, even as transitions):
 "the result?", "the kicker?", "honestly?", "look,", "here's the thing", "plot twist?", "the truth is", "let me explain", "let that sink in", "here's the deal", "the reality is", "spoiler alert", "the fact is", "to be honest", "in essence", "ultimately", "fundamentally", "in conclusion", "moving forward", "at the end of the day", "needless to say", "so basically", "in other words"
 
 BANNED CONSTRUCTIONS:
+- NO sentence begins with "Here's" or "Here is" in any form ("Here's the truth", "Here's what changed it for me", "Here's the thing", "Here's why", "Here's how", "Here's what I learned", "Here's the deal"). This is one of the most recognizable AI tells. Cut the opener and state the point directly.
 - Declarative statements with a question mark on the end ("Want more weird tricks." not "Want more weird tricks?" - unless it's an actual question to the viewer like "Ever felt that?").
 - Empty quotes around emphasized phrases. If you mean it, just say it.
 - "I'm excited to see", "I'm sure you want to know", "let me know what you think", or any feedback-bait closer.
@@ -233,9 +243,9 @@ Bracket tags ([TITLE], [INTRO], [BODY], [CTA], etc.) are headers, not punctuatio
 
 const HUMAN_VOICE_EXAMPLE = `HUMAN-VOICE EXAMPLE (read this once before writing - this is the tone target):
 
-"Most people pick a topic, sit down, and try to write the whole script in one go. That's why their hooks are weak. Here's what changed it for me. I started writing the outline FIRST. Just bullet points. What I'm teaching, why it matters, how it lands. Then I wrote the intro. Then the body, in 2-1-3-4 order. Five minutes of outlining saved me an hour of rewrites. Try it on your next video and you'll feel the difference in the first 30 seconds."
+"Most people pick a topic, sit down, and try to write the whole script in one go. That's why their hooks are weak. What finally fixed it for me was writing the outline FIRST. Just bullet points. What I'm teaching, why it matters, how it lands. Then I wrote the intro. Then the body, in 2-1-3-4 order. Five minutes of outlining saved me an hour of rewrites. Try it on your next video and you'll feel the difference in the first 30 seconds."
 
-Notice: contractions throughout. Short and long sentences mixed. Concrete instruction. No em-dashes. No "the result?". No "this isn't X, it's Y". No empty quotes. The framework name ("2-1-3-4") appears verbatim because it's the taught concept.`
+Notice: contractions throughout. Short and long sentences mixed. Concrete instruction. No em-dashes. No "the result?". No "this isn't X, it's Y". No sentence starts with "Here's". No empty quotes. The framework name ("2-1-3-4") appears verbatim because it's the taught concept.`
 
 function bp(label: string, value: unknown): string | null {
   const v = typeof value === 'string' ? value.trim() : value
@@ -384,7 +394,7 @@ Each entry must map to a DISTINCT profile item where possible. If the profile yi
 - This is a ${length}-entry series, numbered "${label} 1" through "${totalLabel}".
 - Every entry uses the same FORMAT: ${FORMAT_LABEL[format]}.
 - Every entry opens with the literal label "${label} N." in its first line. No "welcome back", no recap.
-- Every entry ends by teasing the SPECIFIC beat of the next entry, not a vague "see you tomorrow".
+- Every entry EXCEPT the last ends by teasing the SPECIFIC beat of the next entry, not a vague "see you tomorrow". The final entry (${totalLabel}) does NOT tease a next entry and does NOT invent a ${label} ${length + 1}; it closes on the CTA from the ## CTA section instead.
 - Maintain a single throughline across the arc. Earlier entries set up later entries.
 
 ${topicsBlock}
@@ -426,8 +436,20 @@ function seriesFromAnswersBlock(
   brandLine: string | null | undefined,
   framing: string | null | undefined,
 ): string {
-  const sorted = [...answers].sort((a, b) => a.entry_index - b.entry_index)
+  // The intro (entry_index 0 / is_intro) is structurally different from a day
+  // entry: it sets up the whole series and is written WITHOUT the "Day N." open.
+  const introAnswer = answers.find((a) => a.is_intro || a.entry_index === 0) || null
+  const dayAnswers = answers.filter((a) => a !== introAnswer)
+  const sorted = [...dayAnswers].sort((a, b) => a.entry_index - b.entry_index)
   const totalLabel = `${label} ${length}`
+  const unit = label.toLowerCase()
+  const isSingle = length <= 1
+  const rangePhrase = isSingle
+    ? `1 entry, numbered "${label} 1"`
+    : `${length} entries, numbered "${label} 1" through "${totalLabel}"`
+  const promisePhrase = isSingle ? `in this one ${unit}` : `over the next ${length} ${unit}s`
+  const batch1End = Math.min(10, length)
+  const batch1Range = batch1End <= 1 ? `${label} 1` : `${label} 1 through ${label} ${batch1End}`
 
   const rawMaterialLines = sorted
     .map((a) => {
@@ -444,13 +466,41 @@ CLIENT ANSWER (verbatim): ${a.answer}`
     })
     .join('\n\n---\n\n')
 
+  const introBlock = introAnswer
+    ? `
+==================================================================
+INTRO (write this FIRST, before ${label} 1 - this is the series opener):
+==================================================================
+
+The client answered a framing question to set up the whole series. Write a standalone INTRO entry in the same FORMAT (${FORMAT_LABEL[format]}) that is PERSONAL and feels like the creator talking straight to camera. Build it in this order, drawn ONLY from their answer below + the CLIENT PROFILE:
+
+1. HOOK (1-2 lines): open with the single most compelling reason to watch this whole series - the payoff, the stakes, or the surprising promise. Specific, not generic. No "Here's..." opener.
+2. PERSONAL INTRO (one natural line): the creator introduces themselves by name and what they do, e.g. "Hey, I'm [client's name from the CLIENT PROFILE], I [what they do / who they help]." This is a REQUIRED beat, but phrase it naturally in the client's own voice and vary the wording - do NOT use a robotic "My name is X and I am a Y" template, and do NOT write "hey friend" / "hi friends".
+3. THE PROMISE: roll straight into what they're doing, e.g. "...and ${promisePhrase} I'm going to [the end result / what someone will be able to do or feel by the end]."
+4. WHY (brief): one line on why they're doing this / why now, in their words.
+5. LEAD-IN: end by leading directly into ${label} 1, teasing what the first entry covers (drawn from ${label} 1's CLIENT ANSWER).
+6. CTA: close with the CTA from the ## CTA section, if one is provided.
+
+INTRO RULES:
+- Do NOT open the intro with "${label} 0" or "${label} 1." It is the series opener, not a numbered entry.${
+        brandLine ? ` You MAY open it with the brand line "${brandLine}" if it reads naturally, but without an entry number.` : ''
+      }
+- Use the client's own words and reasons, and their real name from the CLIENT PROFILE. Do NOT invent a backstory, a name, stats, or results they didn't give.
+- Keep it tight and human. The intro sets the table; it does not teach ${label} 1's lesson early.
+
+INTRO CLIENT ANSWER (verbatim - this is the source of truth for the intro):
+QUESTION: ${introAnswer.question}
+CLIENT ANSWER (verbatim): ${introAnswer.answer}
+`
+    : ''
+
   return `SERIES SPEC (FROM CLIENT INTERVIEW - the client filled out a per-entry questionnaire):
 
 - Series title: "${title || 'Untitled series'}"
-- ${length} entries, numbered "${label} 1" through "${totalLabel}"
+- ${introAnswer ? 'An INTRO opener (see below) followed by ' : ''}${rangePhrase}
 - Format: ${FORMAT_LABEL[format]}${framing ? `\n- Framing: ${framing}` : ''}${
     brandLine
-      ? `\n- Brand line (open EVERY entry with this exact phrase, then state the entry number): "${brandLine}"`
+      ? `\n- Brand line (open EVERY numbered entry with this exact phrase, then state the entry number): "${brandLine}"`
       : ''
   }
 
@@ -472,7 +522,8 @@ OPEN AND CLOSE OF EACH ENTRY:
       ? `the literal brand line "${brandLine}, ${label.toLowerCase()} N." (e.g. "${brandLine}, ${label.toLowerCase()} 1.")`
       : `the literal "${label} N." in the first 2 seconds`
   }. This repetition is non-negotiable - it's what makes the series brandable. (See the "30 lessons by 30, lesson 18" / "Day 37 of 75" pattern.)
-- Close: a one-line tease pointing at the SPECIFIC topic of the next entry, drawn from the next entry's CLIENT ANSWER below. Not a vague "see you tomorrow." If you're writing ${label} 1, the tease must reference what ${label} 2's answer is actually about.
+- Close (every entry EXCEPT the last): a one-line tease pointing at the SPECIFIC topic of the NEXT entry, drawn from that next entry's CLIENT ANSWER below. Name what the next entry is actually about, not a vague "see you next time."
+- Close (the LAST entry${isSingle ? ', which is the only entry here' : `, ${totalLabel}`}): there is NO next entry, so do NOT tease one and do NOT invent a ${label} ${length + 1}. Close on the CTA from the ## CTA section instead (use it verbatim).
 
 ==================================================================
 RAW MATERIAL (one block per entry - this is the source of truth):
@@ -483,10 +534,10 @@ ${rawMaterialLines}
 ==================================================================
 END RAW MATERIAL
 ==================================================================
-
+${introBlock}
 DELIVERY INSTRUCTIONS:
 Output entries in BATCHES OF 10. After each batch, STOP and wait for me to type "continue" before generating the next batch.
-- Batch 1: ${label} 1 through ${label} ${Math.min(10, length)}.${
+- Batch 1: ${introAnswer ? 'the INTRO, then ' : ''}${batch1Range}.${
     length > 10 ? `\n- Batch 2: ${label} 11 through ${label} ${Math.min(20, length)}.` : ''
   }${
     length > 20 ? `\n- Batch 3: ${label} 21 through ${label} ${Math.min(30, length)}.` : ''
@@ -534,6 +585,13 @@ export function buildExternalPrompt(input: BuildExternalPromptInput): string {
   } = input
 
   const hasSeriesAnswers = Array.isArray(seriesAnswers) && seriesAnswers.length > 0
+  const hasSeriesIntro =
+    hasSeriesAnswers && seriesAnswers!.some((a) => a.is_intro || a.entry_index === 0)
+  const seriesBatch1End = Math.min(10, seriesLength)
+  const seriesBatch1 =
+    seriesBatch1End <= 1
+      ? `${seriesLabel} 1`
+      : `${seriesLabel} 1 through ${seriesLabel} ${seriesBatch1End}`
 
   const sections: string[] = []
 
@@ -621,12 +679,12 @@ ${
     ? hasSeriesAnswers
       ? `The client has supplied raw material in the SERIES SPEC. Skip any topic-planning step - the entries are already defined by the client's answers.
 
-Begin with Batch 1 (${seriesLabel} 1 through ${seriesLabel} ${Math.min(10, seriesLength)}). Each entry's body must trace directly to its CLIENT ANSWER block. Use the client's exact phrasing wherever it's sharp - their voice is the whole point. Separate entries with a line of equals signs (==========). End each batch with: "BATCH COMPLETE. Reply 'continue' for the next batch."
+Begin with Batch 1 (${hasSeriesIntro ? `the INTRO, then ${seriesBatch1}` : seriesBatch1}).${hasSeriesIntro ? ` Write the INTRO first, following the INTRO rules in the SERIES SPEC - it sets up the series and leads into ${seriesLabel} 1, and does NOT use the "${seriesLabel} N." open.` : ''} Each numbered entry's body must trace directly to its CLIENT ANSWER block. Use the client's exact phrasing wherever it's sharp - their voice is the whole point. Separate entries with a line of equals signs (==========). End each batch with: "BATCH COMPLETE. Reply 'continue' for the next batch."
 
 Before writing each entry, run the FINAL CHECK mentally. Cut any line that doesn't trace to the client's answer.`
       : `Step 1: Output the TOPIC PLAN as specified in the SERIES SPEC. Stop and wait for me to type "continue".
 
-Step 2 (after I confirm): Begin with Batch 1 (${seriesLabel} 1 through ${seriesLabel} ${Math.min(10, seriesLength)}). Each entry follows the FORMAT STRUCTURE in full. Every body line must reference its profile anchor from the TOPIC PLAN. Separate entries with a line of equals signs (==========). End each batch with: "BATCH COMPLETE. Reply 'continue' for the next batch."
+Step 2 (after I confirm): Begin with Batch 1 (${seriesBatch1}). Each entry follows the FORMAT STRUCTURE in full. Every body line must reference its profile anchor from the TOPIC PLAN. Separate entries with a line of equals signs (==========). End each batch with: "BATCH COMPLETE. Reply 'continue' for the next batch."
 
 Before writing each entry, run the FINAL CHECK mentally. Cut any line that fails it.`
     : `Write ONE complete piece of content in the FORMAT STRUCTURE above, following every rule. Output the bracketed sections in the exact order specified.

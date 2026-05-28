@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
       beat_type?: string
       anchor_field?: string
       anchor_value?: string
+      is_intro?: boolean
     }
     const questions = (Array.isArray(form.questions) ? form.questions : []) as FormQuestion[]
     const qMap = new Map<string, FormQuestion>()
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
         beat_type: q?.beat_type,
         anchor_field: q?.anchor_field,
         anchor_value: q?.anchor_value,
+        is_intro: q?.is_intro === true || row.entry_index === 0,
       }
     })
 

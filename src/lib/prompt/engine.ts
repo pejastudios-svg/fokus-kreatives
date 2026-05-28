@@ -136,6 +136,16 @@ export const HARD_BANS = [
   // "Here's the thing" - the OG of this whole family.
   "here's the thing",
   'here is the thing',
+  // "Here's what changed it for me" family - standalone transition sentences.
+  // Any sentence-opening "here's" is a top AI tell; these are the most common
+  // forms. The repair regex below strips sentence-initial "here's ..." openers;
+  // these literals are a backstop for surgicalBanRemoval.
+  "here's what changed it for me",
+  'here is what changed it for me',
+  "here's what changed everything",
+  "here's what i learned",
+  "here's what nobody tells you",
+  "here's what i wish i knew",
   // Colon-led label patterns - state the thing instead. Section 9.7.
   "what's actually happening:",
   "what i learned:",
@@ -234,6 +244,14 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   // "Here's what actually works" / "Here's what really works" - same transition-tell family
   { re: /\b(?:but\s+)?here['’]s\s+what\s+(?:actually|really)\s+works\s*[:,.]?\s*/gi, replace: '' },
   { re: /\b(?:but\s+)?here is\s+what\s+(?:actually|really)\s+works\s*[:,.]?\s*/gi, replace: '' },
+  // "Here's what changed it for me" family - strip the whole opener even at end of text.
+  { re: /\bhere(?:['’]s| is)\s+what\s+(?:changed|fixed)\s+(?:it|everything)\s+for\s+me\s*[:,.]?\s*/gi, replace: '' },
+  // General sentence-initial "Here's <short clause>." transition. Only fires when
+  // the opener is a SHORT standalone sentence (no colon, <=45 chars) followed by
+  // another sentence, so we strip the runway without eating content sentences or
+  // colon-led "here's why:" patterns (handled above). Capitalization of the next
+  // sentence is restored by the post-repair capitalization pass below.
+  { re: /(^|[.!?]['’"”)\]]*\s+|\n\s*)here(?:['’]s| is)\s+[^.!?:\n]{0,45}[.!?]\s+/gi, replace: '$1' },
   // Meta-writing jargon leaking into the script voice (soft-rewrite, keeps sentence flow)
   { re: /\bclick[-\s]?confirm(?:ing|ed|s)?\s+the\s+(title|video|topic)\b/gi, replace: 'confirm what the $1 promises' },
   { re: /\bclick[-\s]?confirm(?:ing|ed|s)?\b/gi, replace: 'confirm' },
@@ -920,7 +938,7 @@ export function buildPrompt(input: BuildInput): BuiltPrompt {
 - No em-dashes (-) or en-dashes (–). Plain hyphens in compound modifiers (5-part, lead-generating, not-so-simple) ARE allowed.
 - ABSOLUTELY no "<subject> isn't X, it's Y" / "you're not just X, you're Y" / "it's not about X, but Y" pivots. State the positive claim directly. Single biggest AI tell.
 - No rhetorical fragment-questions used as transitions: "The result?", "The kicker?", "The catch?", "The truth?", "Plot twist?", "Spoiler:", "Here's the thing,", "Honestly?", "Look,". Just say the next sentence.
-- No "here's the truth" / "here's the wild truth" / "here's the secret" / "here's what actually works" family.
+- NO sentence may begin with "Here's" or "Here is" in any form ("here's the truth", "here's what changed it for me", "here's the thing", "here's why", "here's how", "here's what I learned", "here's the secret", "here's what actually works"). It's a top AI tell. Delete the opener and state the point directly.
 - No "and the result?", "and the best part?", "what if I told you", "you read that right", "in this video".
 - Speak like a real person talking out loud, not a writer trying to sound smart. School-voice is banned. If a sentence sounds like a LinkedIn post, kill it.
 - Use contractions always. Sentence fragments are encouraged. Start sentences with And / But / So / Because.
