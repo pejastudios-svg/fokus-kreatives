@@ -240,9 +240,15 @@ function HeroOverlayLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Ca
 
 function BannerTopLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: CaptureLayoutProps) {
   return (
-    <div className={`min-h-screen ${fontClass}`} style={bgStyle}>
+    // Center the banner+card+footer as one block. On tall viewports the
+    // form is shorter than the screen; without centering, all the leftover
+    // height piled up below "Powered by" as dead space. min-h-screen still
+    // fills short pages, and because it grows (not a fixed height) a form
+    // taller than the viewport just flows from the top and scrolls -
+    // justify-center becomes a no-op, so nothing clips.
+    <div className={`min-h-screen flex flex-col justify-center ${fontClass}`} style={bgStyle}>
       {pageInfo.banner_url && (
-        <div className="relative w-full h-44 sm:h-64 md:h-80 overflow-hidden">
+        <div className="relative w-full h-44 sm:h-64 md:h-80 overflow-hidden shrink-0">
           <img
             src={pageInfo.banner_url}
             alt={pageInfo.name || 'Banner'}
@@ -250,7 +256,7 @@ function BannerTopLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Capt
           />
         </div>
       )}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 mt-10 sm:mt-14 relative z-10">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 mt-10 sm:mt-14 pb-12 sm:pb-16 relative z-10">
         {/* Card sits BELOW the banner with a comfortable gap. The
             logo floats in that gap, half above the card / half on it,
             so it bridges banner → card without obstructing either. */}
@@ -277,7 +283,7 @@ function BannerTopLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Capt
           </div>
           <CaptureFormBody pageInfo={pageInfo} {...form} />
         </div>
-        <p className="mt-6 mb-12 text-xs text-[var(--text-tertiary)] text-center">
+        <p className="mt-6 text-xs text-[var(--text-tertiary)] text-center">
           Powered by Fokus Kreativez
         </p>
       </div>
