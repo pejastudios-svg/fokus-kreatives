@@ -481,14 +481,15 @@ export default function CRMLeads() {
     if (!lead) return
 
     const updatedData = { ...lead.data, [fieldKey]: value }
-    
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, data: updatedData } : l))
+    const updatedAt = new Date().toISOString()
+
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, data: updatedData, updated_at: updatedAt } : l))
     setPendingLeads(prev => new Set(prev).add(leadId))
 
     try {
       const { error } = await supabase
         .from('leads')
-        .update({ data: updatedData, updated_at: new Date().toISOString() })
+        .update({ data: updatedData, updated_at: updatedAt })
         .eq('id', leadId)
 
       if (error) throw error
@@ -780,8 +781,9 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
   const handleDrop = (e: React.DragEvent, status: string) => {
     e.preventDefault()
-    if (draggedLead && draggedLead.data?.status !== status) {
-      handleUpdateLead(draggedLead.id, 'status', status)
+    const statusKey = fields.find(f => f.field_type === 'status')?.field_key || 'status'
+    if (draggedLead && draggedLead.data?.[statusKey] !== status) {
+      handleUpdateLead(draggedLead.id, statusKey, status)
     }
     setDraggedLead(null)
     setDragOverStatus(null)
@@ -1001,12 +1003,13 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
   // Get status field and its options safely
   const statusField = fields.find(f => f.field_type === 'status')
+  const statusFieldKey = statusField?.field_key || 'status'
   const statusOptions = statusField ? getFieldOptions(statusField) : []
 
   // Chart data with null safety
   const chartData = statusOptions.map(status => ({
     ...status,
-    count: filteredLeads.filter(l => l.data?.status === status.value).length,
+    count: filteredLeads.filter(l => l.data?.[statusFieldKey] === status.value).length,
   }))
 
   // ---- PDF export -------------------------------------------------------
@@ -1086,7 +1089,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           (typeof data.email === 'string' && data.email) ||
           'Unnamed lead'
         const email = typeof data.email === 'string' ? data.email : null
-        const raw = data.status
+        const raw = data[statusFieldKey]
         const sk =
           typeof raw === 'string' && raw && knownStatuses.has(raw)
             ? raw
@@ -1736,7 +1739,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
               </div>
             ) : (
               statusOptions.map((status, statusIndex) => {
-                const statusLeads = filteredLeads.filter(l => l.data?.status === status.value)
+                const statusLeads = filteredLeads.filter(l => l.data?.[statusFieldKey] === status.value)
                 const isDragOver = dragOverStatus === status.value
 
                 return (
@@ -1772,7 +1775,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           const leadName = (lead.data?.name as string) || 'Unnamed Lead'
                           const leadEmail = (lead.data?.email as string) || ''
                           const leadPhone = (lead.data?.phone as string) || ''
-                          const dateAdded = (lead.data?.date_added as string) || ''
+                          const lastUpdated = lead.updated_at || lead.created_at || (lead.data?.date_added as string) || ''
                           const initial = leadName.charAt(0).toUpperCase()
                           return (
                             <div
@@ -1793,15 +1796,15 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                     {leadName}
                                   </p>
                                   {leadEmail && (
-                                    <p className="text-[11px] text-[var(--text-tertiary)] truncate flex items-center gap-1 mt-0.5">
+                                    <p className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-1 mt-0.5 min-w-0">
                                       <Mail className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{leadEmail}</span>
+                                      <span className="truncate min-w-0">{leadEmail}</span>
                                     </p>
                                   )}
                                   {leadPhone && (
-                                    <p className="text-[11px] text-[var(--text-tertiary)] truncate flex items-center gap-1 mt-0.5">
+                                    <p className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-1 mt-0.5 min-w-0">
                                       <Phone className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{leadPhone}</span>
+                                      <span className="truncate min-w-0">{leadPhone}</span>
                                     </p>
                                   )}
                                 </div>
@@ -1815,9 +1818,10 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
-                              {dateAdded && (
+                              {lastUpdated && (
                                 <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5 ml-9">
-                                  {new Date(dateAdded).toLocaleDateString(undefined, {
+                                  Updated{' '}
+                                  {new Date(lastUpdated).toLocaleDateString(undefined, {
                                     month: 'short',
                                     day: 'numeric',
                                   })}
@@ -1832,7 +1836,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       <div className="p-2 pt-0">
                         <button
                           onClick={() => {
-                            setNewLead({ status: status.value })
+                            setNewLead({ [statusFieldKey]: status.value })
                             setShowAddLead(true)
                           }}
                           className="w-full px-3 py-2 border border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] hover:bg-[var(--bg-card-hover)] transition-all flex items-center justify-center gap-1.5"
@@ -1855,7 +1859,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           const totalLeads = leads.length
           const closedLabels = ['closed', 'won', 'paid']
           const closed = leads.filter((l) =>
-            closedLabels.some((c) => String(l.data?.status || '').toLowerCase().includes(c)),
+            closedLabels.some((c) => String(l.data?.[statusFieldKey] || '').toLowerCase().includes(c)),
           ).length
           const conversion = totalLeads === 0 ? 0 : Math.round((closed / totalLeads) * 100)
 
@@ -2312,7 +2316,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         {/* Lead Detail Modal */}
         {showLeadDetail && (
           <LeadDetailModal
-            lead={showLeadDetail}
+            lead={leads.find(l => l.id === showLeadDetail.id) || showLeadDetail}
             fields={fields}
             isPending={pendingLeads.has(showLeadDetail.id)}
             onClose={() => setShowLeadDetail(null)}
@@ -3011,7 +3015,7 @@ function LeadDetailModal({
         </div>
 
         {/* BODY - 2-col on desktop: properties rail + notes/activity */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr]">
             {/* LEFT: Properties rail */}
             <div className="p-5 sm:p-6 md:border-r border-b md:border-b-0 border-[var(--border-primary)]">
@@ -3279,7 +3283,7 @@ function LeadPropertyRow({
                 fieldDefaultUrl={getFieldUrlDefault(field)}
               />
             ) : value ? (
-              <span className="text-sm text-[var(--text-primary)]">
+              <span className="block text-sm text-[var(--text-primary)] break-all">
                 {value}
               </span>
             ) : (

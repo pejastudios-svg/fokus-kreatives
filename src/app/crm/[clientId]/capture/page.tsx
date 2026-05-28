@@ -1233,7 +1233,7 @@ function CaptureSkeleton() {
                           return (
                             <tr
                             key={s.id}
-                            className="hover:bg-[#24324A] cursor-pointer"
+                            className="hover:bg-[var(--bg-card-hover)] cursor-pointer transition-colors"
                             onClick={() => setSelectedSubmission(s)}
                             >
                               <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">

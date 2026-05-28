@@ -15,6 +15,7 @@ interface TooltipProps {
 }
 
 const VIEWPORT_PADDING = 8
+const GAP = 8
 
 export function Tooltip({
   children,
@@ -24,43 +25,28 @@ export function Tooltip({
   maxWidth,
 }: TooltipProps) {
   const [show, setShow] = useState(false)
-  const [coords, setCoords] = useState({ top: 0, left: 0 })
+  // `coords` is null until we've measured the rendered tooltip and
+  // computed its final on-screen position. We keep the bubble at
+  // opacity 0 until then so it never flashes at the wrong spot.
+  const [coords, setCoords] = useState<{
+    top: number
+    left: number
+    arrow: number
+  } | null>(null)
+  const [visible, setVisible] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = () => {
-    timeoutRef.current = setTimeout(() => {
-      if (!triggerRef.current) return
-      const rect = triggerRef.current.getBoundingClientRect()
-      let top = 0
-      let left = 0
-      switch (position) {
-        case 'top':
-          top = rect.top - 8
-          left = rect.left + rect.width / 2
-          break
-        case 'bottom':
-          top = rect.bottom + 8
-          left = rect.left + rect.width / 2
-          break
-        case 'left':
-          top = rect.top + rect.height / 2
-          left = rect.left - 8
-          break
-        case 'right':
-          top = rect.top + rect.height / 2
-          left = rect.right + 8
-          break
-      }
-      setCoords({ top, left })
-      setShow(true)
-    }, delay)
+    timeoutRef.current = setTimeout(() => setShow(true), delay)
   }
 
   const handleMouseLeave = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     setShow(false)
+    setCoords(null)
+    setVisible(false)
   }
 
   useEffect(() => {
@@ -69,49 +55,82 @@ export function Tooltip({
     }
   }, [])
 
-  // After the tooltip mounts, measure its rendered bounding box and
-  // shift it back into the viewport if it overflows. We mutate the
-  // DOM `transform` directly (no state) so the clamp doesn't cause a
-  // re-render - that re-render is what was making the tooltip flicker
-  // / disappear in the previous version.
+  // Position the tooltip once it's mounted. We anchor it to the
+  // requested side of the trigger, then clamp it inside the viewport.
+  // Positioning is done purely with top/left (no CSS transform) so the
+  // open animation can own the `transform` property without the two
+  // fighting - that conflict was previously defeating the clamp and
+  // leaving edge tooltips clipped off-screen.
   useEffect(() => {
     if (!show) return
+    const trigger = triggerRef.current
     const tip = tooltipRef.current
-    if (!tip) return
-    // Read the baseline transform (set by Tailwind's translate
-    // classes) so our shift is additive, not overwriting.
-    const baseTransform = window.getComputedStyle(tip).transform
-    const baseChain = baseTransform === 'none' ? '' : baseTransform
+    if (!trigger || !tip) return
 
-    const rect = tip.getBoundingClientRect()
+    const t = trigger.getBoundingClientRect()
+    const w = tip.offsetWidth
+    const h = tip.offsetHeight
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const centerX = t.left + t.width / 2
+    const centerY = t.top + t.height / 2
 
-    let dx = 0
-    let dy = 0
-    if (rect.left < VIEWPORT_PADDING) dx = VIEWPORT_PADDING - rect.left
-    if (rect.right > vw - VIEWPORT_PADDING) dx = vw - VIEWPORT_PADDING - rect.right
-    if (rect.top < VIEWPORT_PADDING) dy = VIEWPORT_PADDING - rect.top
-    if (rect.bottom > vh - VIEWPORT_PADDING) dy = vh - VIEWPORT_PADDING - rect.bottom
-
-    if (dx !== 0 || dy !== 0) {
-      tip.style.transform = `${baseChain} translate(${dx}px, ${dy}px)`
+    let top = 0
+    let left = 0
+    switch (position) {
+      case 'top':
+        top = t.top - GAP - h
+        left = centerX - w / 2
+        break
+      case 'bottom':
+        top = t.bottom + GAP
+        left = centerX - w / 2
+        break
+      case 'left':
+        top = centerY - h / 2
+        left = t.left - GAP - w
+        break
+      case 'right':
+        top = centerY - h / 2
+        left = t.right + GAP
+        break
     }
-  }, [show, coords])
 
-  const positionClasses = {
-    top: '-translate-x-1/2 -translate-y-full',
-    bottom: '-translate-x-1/2',
-    left: '-translate-x-full -translate-y-1/2',
-    right: '-translate-y-1/2',
-  }
+    // Clamp into the viewport so nothing spills past an edge.
+    left = Math.min(Math.max(left, VIEWPORT_PADDING), vw - VIEWPORT_PADDING - w)
+    top = Math.min(Math.max(top, VIEWPORT_PADDING), vh - VIEWPORT_PADDING - h)
+
+    // Keep the arrow pointing at the trigger's center even after the
+    // bubble has been clamped sideways. The offset is measured along
+    // the bubble's edge and kept a little inside its rounded corners.
+    let arrow: number
+    if (position === 'top' || position === 'bottom') {
+      arrow = Math.min(Math.max(centerX - left, 12), w - 12)
+    } else {
+      arrow = Math.min(Math.max(centerY - top, 12), h - 12)
+    }
+
+    setCoords({ top, left, arrow })
+  }, [show, position, content])
+
+  // Fade in only after the position is settled.
+  useEffect(() => {
+    if (!coords) return
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [coords])
 
   const arrowClasses = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-t-[var(--bg-tertiary)] border-x-transparent border-b-transparent',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-[var(--bg-tertiary)] border-x-transparent border-t-transparent',
-    left: 'left-full top-1/2 -translate-y-1/2 border-l-[var(--bg-tertiary)] border-y-transparent border-r-transparent',
-    right: 'right-full top-1/2 -translate-y-1/2 border-r-[var(--bg-tertiary)] border-y-transparent border-l-transparent',
+    top: 'top-full -translate-x-1/2 border-t-[var(--bg-tertiary)] border-x-transparent border-b-transparent',
+    bottom: 'bottom-full -translate-x-1/2 border-b-[var(--bg-tertiary)] border-x-transparent border-t-transparent',
+    left: 'left-full -translate-y-1/2 border-l-[var(--bg-tertiary)] border-y-transparent border-r-transparent',
+    right: 'right-full -translate-y-1/2 border-r-[var(--bg-tertiary)] border-y-transparent border-l-transparent',
   }
+
+  const arrowStyle =
+    position === 'top' || position === 'bottom'
+      ? { left: coords?.arrow ?? 0 }
+      : { top: coords?.arrow ?? 0 }
 
   return (
     <>
@@ -126,17 +145,22 @@ export function Tooltip({
       {show && typeof window !== 'undefined' && createPortal(
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] px-3 py-1.5 text-xs font-medium rounded-lg shadow-lg ${
+          className={`fixed z-[9999] px-3 py-1.5 text-xs font-medium rounded-lg shadow-lg transition-opacity duration-150 ${
             maxWidth ? 'whitespace-normal leading-snug' : 'whitespace-nowrap'
-          } animate-in fade-in zoom-in duration-150 bg-theme-tertiary text-theme-primary border border-theme-primary ${positionClasses[position]}`}
+          } bg-theme-tertiary text-theme-primary border border-theme-primary ${
+            visible ? 'opacity-100' : 'opacity-0'
+          }`}
           style={{
-            top: coords.top,
-            left: coords.left,
+            top: coords?.top ?? 0,
+            left: coords?.left ?? 0,
             maxWidth: maxWidth ? `${maxWidth}px` : undefined,
           }}
         >
           {content}
-          <div className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`} />
+          <div
+            className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
+            style={arrowStyle}
+          />
         </div>,
         document.body,
       )}
