@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('capture_pages')
     .select(
-      'id, client_id, name, slug, headline, description, lead_magnet_url, is_active, logo_url, banner_url, include_meeting, calendly_url, meeting_integration, success_button_text, success_message, accent_color, fields, theme, layout_template',
+      'id, client_id, name, slug, headline, description, lead_magnet_url, is_active, logo_url, banner_url, include_meeting, calendly_url, meeting_integration, success_button_text, success_message, accent_color, fields, sections, theme, layout_template',
     )
     .eq('slug', slug)
     .maybeSingle()

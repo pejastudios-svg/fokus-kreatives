@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { KebabMenu } from '@/components/ui/KebabMenu'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { DonutChart, ChartLegend } from '@/components/charts/MiniCharts'
 import {
   StatusStackedBar,
@@ -1116,6 +1117,12 @@ function RevenueSkeleton() {
         <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
           <DollarSign className="h-10 w-10 mx-auto mb-3" />
           <p className="text-sm">No payments found.</p>
+          <div className="mt-4 flex justify-center">
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Payment
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden divide-y divide-[var(--border-primary)]">
@@ -1315,13 +1322,10 @@ function RevenueSkeleton() {
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Due Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={newPayment.due_date}
-                  onChange={(e) =>
-                    setNewPayment({ ...newPayment, due_date: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  onChange={(d) => setNewPayment({ ...newPayment, due_date: d })}
+                  placeholder="Pick a due date"
                 />
               </div>
             </div>

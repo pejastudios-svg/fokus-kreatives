@@ -12,6 +12,7 @@ import { CaptureLayout } from './layouts'
 import { isColorDark, buildCaptureThemeVars } from './colorUtils'
 import type {
   CaptureField,
+  CaptureSection,
   CapturePageInfo,
   CaptureFormBag,
   CaptureTheme,
@@ -33,6 +34,7 @@ interface FormShape {
   success_message?: string
   accent_color?: string
   fields: CaptureField[]
+  sections?: CaptureSection[]
   theme: CaptureTheme
   layout_template: LayoutTemplate
 }
@@ -55,6 +57,7 @@ export function CapturePagePreview({ form }: Props) {
     success_message: form.success_message || null,
     accent_color: form.accent_color || null,
     fields: form.fields,
+    sections: form.sections || null,
     theme: form.theme,
     layout_template: form.layout_template,
   }
@@ -75,6 +78,7 @@ export function CapturePagePreview({ form }: Props) {
     isSubmitting: false,
     leadMagnetUrl: null,
     onSubmit: (e) => e.preventDefault(),
+    preview: true,
   }
 
   const bgStyle: React.CSSProperties = (() => {
@@ -123,10 +127,12 @@ export function CapturePagePreview({ form }: Props) {
         zoom: SCALE,
         ...bgStyle,
       }}
-      // Disable all interactivity inside the preview - it's purely
-      // visual. Clicks shouldn't navigate, scroll-anchor, or focus
-      // fields in the iframe-style sandbox.
+      // Disable interactivity inside the preview - it's purely visual -
+      // EXCEPT the section Next/Back buttons, so the builder can step
+      // through the sections they're editing.
       onClickCapture={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('[data-preview-nav]')) return
         e.preventDefault()
         e.stopPropagation()
       }}

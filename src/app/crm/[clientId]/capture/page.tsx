@@ -56,6 +56,47 @@ type CaptureField = {
   options?: string[]
   embedUrl?: string
   embedHeight?: number
+  sectionId?: string
+}
+
+type CaptureSection = {
+  id: string
+  title?: string
+  description?: string
+}
+
+const DEFAULT_SECTION_ID = 'section-1'
+const MAX_SECTIONS = 10
+const makeDefaultSections = (): CaptureSection[] => [
+  { id: DEFAULT_SECTION_ID, title: '', description: '' },
+]
+
+function normalizeSections(raw: unknown): CaptureSection[] {
+  if (Array.isArray(raw) && raw.length) {
+    return raw.map((s, i) => {
+      const o = (s ?? {}) as Record<string, unknown>
+      return {
+        id: String(o.id || `section-${i + 1}`),
+        title: o.title ? String(o.title) : '',
+        description: o.description ? String(o.description) : '',
+      }
+    })
+  }
+  return makeDefaultSections()
+}
+
+// Make sure every field belongs to a section that exists; orphans land in
+// the first section so nothing disappears from the form.
+function assignFieldsToSections(
+  fields: CaptureField[],
+  sections: CaptureSection[],
+): CaptureField[] {
+  const known = new Set(sections.map((s) => s.id))
+  const fallback = sections[0]?.id || DEFAULT_SECTION_ID
+  return fields.map((f) => ({
+    ...f,
+    sectionId: f.sectionId && known.has(f.sectionId) ? f.sectionId : fallback,
+  }))
 }
 
 type CaptureTheme = {
@@ -95,6 +136,7 @@ interface CapturePage {
    *  Drives slot generation in the availability picker. */
   meeting_duration_minutes: number
   fields: CaptureField[] | null
+  sections: CaptureSection[] | null
   theme: CaptureTheme | null
   layout_template: LayoutTemplate | null
   created_at: string
@@ -185,6 +227,7 @@ interface RawField {
   options?: unknown;
   embedUrl?: unknown;
   embedHeight?: unknown;
+  sectionId?: unknown;
 }
 
 function normalizeFields(f: unknown): CaptureField[] {
@@ -202,6 +245,7 @@ function normalizeFields(f: unknown): CaptureField[] {
     options: Array.isArray(x.options) ? (x.options as unknown[]).map(String) : undefined,
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
+    sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
 }
 
@@ -294,6 +338,7 @@ export default function CRMCapturePages() {
     block_duplicate_emails: boolean
     meeting_duration_minutes: number
     fields: CaptureField[]
+    sections: CaptureSection[]
     theme: CaptureTheme
     layout_template: LayoutTemplate
   }>({
@@ -313,7 +358,8 @@ export default function CRMCapturePages() {
     accent_color: '',
     block_duplicate_emails: false,
     meeting_duration_minutes: 30,
-    fields: normalizeFields(makeDefaultFields()),
+    fields: assignFieldsToSections(normalizeFields(makeDefaultFields()), makeDefaultSections()),
+    sections: makeDefaultSections(),
     theme: normalizeTheme(makeDefaultTheme()),
     layout_template: 'compact',
   })
@@ -446,7 +492,8 @@ export default function CRMCapturePages() {
       accent_color: '',
       block_duplicate_emails: false,
       meeting_duration_minutes: 30,
-      fields: makeDefaultFields(),
+      fields: assignFieldsToSections(makeDefaultFields(), makeDefaultSections()),
+      sections: makeDefaultSections(),
       theme: makeDefaultTheme(),
       layout_template: 'compact',
     })
@@ -476,7 +523,8 @@ export default function CRMCapturePages() {
         typeof page.meeting_duration_minutes === 'number'
           ? page.meeting_duration_minutes
           : 30,
-      fields: normalizeFields(page.fields),
+      fields: assignFieldsToSections(normalizeFields(page.fields), normalizeSections(page.sections)),
+      sections: normalizeSections(page.sections),
       theme: normalizeTheme(page.theme),
       layout_template: (page.layout_template ?? 'compact') as LayoutTemplate,
     })
@@ -499,7 +547,7 @@ export default function CRMCapturePages() {
   }
 
   // ----- Field builder helpers -----
-  const addField = (type: FieldType) => {
+  const addField = (type: FieldType, sectionId: string) => {
     const id = `field-${Date.now()}`
     const base: CaptureField = {
       id,
@@ -517,11 +565,49 @@ export default function CRMCapturePages() {
       required: false,
       placeholder: type === 'textarea' ? 'Type here…' : 'Type here…',
       options: (type === 'select' || type === 'radio') ? ['Option 1', 'Option 2'] : undefined,
-      embedUrl: type === 'embed' ? 'https://calendly.com/your-link' : undefined,
+      embedUrl: type === 'embed' ? 'https://www.loom.com/share/your-video-id' : undefined,
       embedHeight: type === 'embed' ? 520 : undefined,
+      sectionId,
     }
 
     setForm((prev) => ({ ...prev, fields: [...prev.fields, base] }))
+  }
+
+  // ----- Section helpers -----
+  const addSection = () => {
+    setForm((prev) => {
+      if (prev.sections.length >= MAX_SECTIONS) return prev
+      const id = `section-${Date.now()}`
+      return { ...prev, sections: [...prev.sections, { id, title: '', description: '' }] }
+    })
+  }
+
+  const updateSection = (id: string, patch: Partial<CaptureSection>) => {
+    setForm((prev) => ({
+      ...prev,
+      sections: prev.sections.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    }))
+  }
+
+  const removeSection = (id: string) => {
+    setForm((prev) => {
+      if (prev.sections.length <= 1) return prev
+      const idx = prev.sections.findIndex((s) => s.id === id)
+      // Move this section's fields into a neighbour so nothing is lost.
+      const fallback = (prev.sections[idx === 0 ? 1 : idx - 1] ?? prev.sections[0]).id
+      return {
+        ...prev,
+        sections: prev.sections.filter((s) => s.id !== id),
+        fields: prev.fields.map((f) => (f.sectionId === id ? { ...f, sectionId: fallback } : f)),
+      }
+    })
+  }
+
+  const moveFieldToSection = (fieldId: string, sectionId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      fields: prev.fields.map((f) => (f.id === fieldId ? { ...f, sectionId } : f)),
+    }))
   }
 
   const updateField = (id: string, patch: Partial<CaptureField>) => {
@@ -539,11 +625,14 @@ export default function CRMCapturePages() {
     setForm((prev) => {
       const idx = prev.fields.findIndex((f) => f.id === id)
       if (idx < 0) return prev
-      const next = idx + dir
-      if (next < 0 || next >= prev.fields.length) return prev
+      // Swap with the nearest field in the SAME section so reordering stays
+      // inside the step the field belongs to.
+      const sec = prev.fields[idx].sectionId
+      let j = idx + dir
+      while (j >= 0 && j < prev.fields.length && prev.fields[j].sectionId !== sec) j += dir
+      if (j < 0 || j >= prev.fields.length) return prev
       const copy = [...prev.fields]
-      const [picked] = copy.splice(idx, 1)
-      copy.splice(next, 0, picked)
+      ;[copy[idx], copy[j]] = [copy[j], copy[idx]]
       return { ...prev, fields: copy }
     })
   }
@@ -613,6 +702,7 @@ export default function CRMCapturePages() {
             block_duplicate_emails: form.block_duplicate_emails,
             meeting_duration_minutes: form.meeting_duration_minutes || 30,
             fields: form.fields,
+            sections: form.sections,
             theme: form.theme,
             layout_template: form.layout_template,
           })
@@ -674,6 +764,7 @@ export default function CRMCapturePages() {
           block_duplicate_emails: form.block_duplicate_emails,
           meeting_duration_minutes: form.meeting_duration_minutes || 30,
           fields: form.fields,
+          sections: form.sections,
           theme: form.theme,
           layout_template: form.layout_template,
         })
@@ -1076,7 +1167,15 @@ function CaptureSkeleton() {
             ) : pages.length === 0 ? (
               <Card>
                 <CardContent className="py-10 text-center text-[var(--text-tertiary)]">
-                  No capture pages yet. Create one to start collecting leads.
+                  <p className="text-sm">No capture pages yet. Create one to start collecting leads.</p>
+                  {canEditCapture && (
+                    <div className="mt-4 flex justify-center">
+                      <Button onClick={openNewModal}>
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        New Capture Page
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -1609,45 +1708,134 @@ function CaptureSkeleton() {
                     <span className="text-sm font-semibold text-[var(--text-primary)]">Form fields</span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { type: 'text' as FieldType, label: 'Text', icon: Type },
-                      { type: 'select' as FieldType, label: 'Dropdown', icon: ChevronDown },
-                      { type: 'radio' as FieldType, label: 'Options', icon: CircleDot },
-                      { type: 'date' as FieldType, label: 'Date', icon: Calendar },
-                      { type: 'embed' as FieldType, label: 'Embed', icon: LinkIcon },
-                    ]).map((opt) => (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        onClick={() => addField(opt.type)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-colors"
-                      >
-                        <opt.icon className="h-3.5 w-3.5" />
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+                  {form.sections.length > 1 && (
+                    <p className="text-xs text-[var(--text-tertiary)]">
+                      Visitors move through one section per step (Next). The last section has the
+                      submit button.
+                    </p>
+                  )}
 
-                  <div className="space-y-2">
-                    {form.fields.map((f, idx) => (
-                      <CaptureFieldRow
-                        key={f.id}
-                        field={f}
-                        index={idx}
-                        total={form.fields.length}
-                        onUpdate={updateField}
-                        onMove={moveField}
-                        onRemove={removeField}
-                        isDragging={draggedFieldId === f.id}
-                        isDragOver={dragOverFieldId === f.id}
-                        onDragStartField={handleFieldDragStart}
-                        onDragOverField={handleFieldDragOver}
-                        onDropOnField={handleFieldDropOn}
-                        onDragEndField={handleFieldDragEnd}
-                      />
-                    ))}
-                  </div>
+                  {form.sections.map((section, sIdx) => {
+                    const sectionFields = form.fields.filter((f) => f.sectionId === section.id)
+                    const multi = form.sections.length > 1
+                    return (
+                      <div
+                        key={section.id}
+                        className={
+                          multi
+                            ? 'rounded-xl border border-[var(--border-primary)] p-3 space-y-3'
+                            : 'space-y-3'
+                        }
+                      >
+                        {multi && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                                Section {sIdx + 1}
+                                {sIdx === form.sections.length - 1 ? ' · has submit' : ''}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeSection(section.id)}
+                                title="Remove section (its fields move to the previous section)"
+                                className="ml-auto p-1 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={section.title || ''}
+                              onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                              placeholder="Section title (optional)"
+                              className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                            />
+                            <input
+                              type="text"
+                              value={section.description || ''}
+                              onChange={(e) => updateSection(section.id, { description: e.target.value })}
+                              placeholder="Section description (optional)"
+                              className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          {sectionFields.map((f, idx) => (
+                            <div key={f.id} className="space-y-1">
+                              {multi && (
+                                <div className="flex justify-end">
+                                  <select
+                                    value={f.sectionId || section.id}
+                                    onChange={(e) => moveFieldToSection(f.id, e.target.value)}
+                                    title="Move this field to another section"
+                                    className="text-[11px] px-2 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-tertiary)] focus:outline-none"
+                                  >
+                                    {form.sections.map((s, i) => (
+                                      <option key={s.id} value={s.id}>
+                                        Section {i + 1}
+                                        {s.title ? `: ${s.title}` : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              <CaptureFieldRow
+                                field={f}
+                                index={idx}
+                                total={sectionFields.length}
+                                onUpdate={updateField}
+                                onMove={moveField}
+                                onRemove={removeField}
+                                isDragging={draggedFieldId === f.id}
+                                isDragOver={dragOverFieldId === f.id}
+                                onDragStartField={handleFieldDragStart}
+                                onDragOverField={handleFieldDragOver}
+                                onDropOnField={handleFieldDropOn}
+                                onDragEndField={handleFieldDragEnd}
+                              />
+                            </div>
+                          ))}
+                          {sectionFields.length === 0 && (
+                            <p className="text-xs text-[var(--text-tertiary)] py-1">
+                              No fields here yet. Add one below.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {([
+                            { type: 'text' as FieldType, label: 'Text', icon: Type },
+                            { type: 'select' as FieldType, label: 'Dropdown', icon: ChevronDown },
+                            { type: 'radio' as FieldType, label: 'Options', icon: CircleDot },
+                            { type: 'date' as FieldType, label: 'Date', icon: Calendar },
+                            { type: 'embed' as FieldType, label: 'Embed', icon: LinkIcon },
+                          ]).map((opt) => (
+                            <button
+                              key={opt.type}
+                              type="button"
+                              onClick={() => addField(opt.type, section.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-colors"
+                            >
+                              <opt.icon className="h-3.5 w-3.5" />
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {form.sections.length < MAX_SECTIONS && (
+                    <button
+                      type="button"
+                      onClick={addSection}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-dashed border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:text-[#2B79F7] transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add section
+                    </button>
+                  )}
                 </div>
 
                 {/* Meeting + Active - proper Toggles instead of native

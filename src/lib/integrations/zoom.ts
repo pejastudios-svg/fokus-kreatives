@@ -180,6 +180,10 @@ export interface CreateZoomMeetingInput {
   startIso: string
   durationMinutes: number
   timeZone?: string
+  /** Optional invitee emails (manual CRM creation). Added to the Zoom
+   *  meeting's invitee list. Note Zoom only emails them automatically
+   *  when the host's account has registration enabled. */
+  attendees?: string[]
 }
 
 export interface CreatedZoomMeeting {
@@ -212,6 +216,9 @@ export async function createZoomMeeting(
       waiting_room: false,
       // Auto-record off; hosts can flip it on per meeting.
       auto_recording: 'none',
+      ...(input.attendees?.length
+        ? { meeting_invitees: input.attendees.map((email) => ({ email })) }
+        : {}),
     },
   }
   const res = await fetch(`${ZOOM_API_BASE}/users/me/meetings`, {
@@ -238,5 +245,27 @@ export async function createZoomMeeting(
     joinUrl: json.join_url,
     startUrl: json.start_url,
     password: json.password,
+  }
+}
+
+/** Delete (cancel) a scheduled Zoom meeting on the host's account.
+ *  `schedule_for_reminder=true` tells Zoom to email registrants that
+ *  the meeting was cancelled. A 404 means the meeting is already gone,
+ *  which we treat as success. `meetingId` is the numeric Zoom meeting
+ *  id we stored as external_id (passed as a string). */
+export async function cancelZoomMeeting(
+  accessToken: string,
+  meetingId: string,
+): Promise<void> {
+  const url = new URL(`${ZOOM_API_BASE}/meetings/${encodeURIComponent(meetingId)}`)
+  url.searchParams.set('schedule_for_reminder', 'true')
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  })
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Zoom meeting delete failed (${res.status}): ${text || 'unknown'}`)
   }
 }

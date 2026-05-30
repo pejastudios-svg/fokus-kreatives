@@ -254,6 +254,25 @@ select:-webkit-autofill {
   height: 0;
 }
 
+/* Keep the attendee-email chip input fully transparent on its tinted
+   wrapper. Force the background (beats any UA/layer override) and repaint
+   Chrome's autofill highlight with the wrapper's surface colour. */
+.email-chip-input {
+  background-color: transparent !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.email-chip-input:-webkit-autofill,
+.email-chip-input:-webkit-autofill:hover,
+.email-chip-input:-webkit-autofill:focus,
+.email-chip-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-secondary) inset !important;
+  box-shadow: 0 0 0 1000px var(--bg-secondary) inset !important;
+  caret-color: var(--text-primary);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Shared modal input style - dark surface, primary text, blue focus
    ring. Used by the team-management modals (invite, remove, cancel)
    so all the form fields render consistently. */
@@ -273,6 +292,52 @@ select:-webkit-autofill {
 }
 .modal-input::placeholder {
   color: var(--text-tertiary);
+}
+
+/* Hide scrollbars on any scroll container INSIDE a modal overlay (the
+   full-screen `fixed inset-0 bg-black/…` backdrop pattern used across the
+   app). The content still scrolls - only the bar is hidden - so long modals
+   stay usable without a visible scrollbar. Scoped to modal descendants so
+   the rest of the app's scrollbars are untouched. */
+.fixed.inset-0[class*='bg-black'] [class*='overflow-y-auto'],
+.fixed.inset-0[class*='bg-black'] [class*='overflow-auto'],
+.fixed.inset-0[class*='bg-black'] [class*='overflow-y-scroll'],
+.fixed.inset-0[class*='bg-black'][class*='overflow-y-auto'],
+.fixed.inset-0[class*='bg-black'][class*='overflow-auto'] {
+  scrollbar-width: none;
+}
+.fixed.inset-0[class*='bg-black'] [class*='overflow-y-auto']::-webkit-scrollbar,
+.fixed.inset-0[class*='bg-black'] [class*='overflow-auto']::-webkit-scrollbar,
+.fixed.inset-0[class*='bg-black'] [class*='overflow-y-scroll']::-webkit-scrollbar,
+.fixed.inset-0[class*='bg-black'][class*='overflow-y-auto']::-webkit-scrollbar,
+.fixed.inset-0[class*='bg-black'][class*='overflow-auto']::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Confetti burst (see components/ui/Confetti.tsx). Each piece pops UP from
+   the bottom edge of the viewport, shooting past the top while spinning and
+   fading. The ease-out timing gives a fast "launch" then slow drift.
+   Randomized position / delay / duration come from inline styles. */
+@keyframes confetti-pop {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-115vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  position: absolute;
+  bottom: 0;
+  border-radius: 2px;
+  animation-name: confetti-pop;
+  animation-timing-function: cubic-bezier(0.15, 0.6, 0.35, 1);
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
 }
 
 /* Theme-aware utility classes */

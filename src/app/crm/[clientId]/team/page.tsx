@@ -763,6 +763,14 @@ export default function CRMTeamPage() {
           <div className="p-10 text-center text-[var(--text-tertiary)]">
             <Users className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
             <p className="text-sm">No active members yet.</p>
+            {canManage && (
+              <div className="mt-4 flex justify-center">
+                <Button onClick={() => setShowInviteModal(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Invite Member
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

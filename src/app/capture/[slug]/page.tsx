@@ -36,6 +36,7 @@ interface RawFieldData {
   options?: unknown
   embedUrl?: unknown
   embedHeight?: unknown
+  sectionId?: unknown
 }
 
 function normalizeFields(f: unknown): CaptureField[] {
@@ -50,6 +51,7 @@ function normalizeFields(f: unknown): CaptureField[] {
     options: Array.isArray(x.options) ? x.options.map(String) : undefined,
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
+    sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
 }
 
@@ -106,6 +108,7 @@ export default function PublicCapturePage() {
             success_message: page.success_message || null,
             accent_color: page.accent_color || null,
             fields: page.fields || null,
+            sections: (page.sections as CapturePageInfo['sections']) || null,
             layout_template: (page.layout_template ?? 'compact') as LayoutTemplate,
             theme: (() => {
               const t = page.theme
@@ -190,7 +193,12 @@ export default function PublicCapturePage() {
         ? 'font-inter'
         : ''
 
-  const setValue = (id: string, val: string) => setValues((prev) => ({ ...prev, [id]: val }))
+  const setValue = (id: string, val: string) => {
+    setValues((prev) => ({ ...prev, [id]: val }))
+    // Clear any lingering submit error as soon as the visitor edits a field,
+    // so a "Please fill: …" message doesn't stick around after they fix it.
+    setError('')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -202,16 +210,11 @@ export default function PublicCapturePage() {
     setLeadMagnetUrl(null)
 
     try {
-      for (const f of fields) {
-        if (f.type === 'embed') continue
-        if (!f.required) continue
-        const v = values[f.id]
-        if (v === undefined || v === null || String(v).trim() === '') {
-          setError(`Please fill: ${f.label}`)
-          setIsSubmitting(false)
-          return
-        }
-      }
+      // Required-field validation lives in CaptureFormBody now (it gates the
+      // message behind an actual submit attempt and jumps to the offending
+      // section). The form only reaches this handler once those pass, so we
+      // don't re-validate fields here - doing so re-introduced a stray
+      // "Please fill: …" banner. Only the meeting block is validated below.
 
       // Meeting date/time are required when the manual picker is
       // visible (i.e. not auto-logged by Calendly). The custom
@@ -311,9 +314,15 @@ export default function PublicCapturePage() {
         values,
         setValue,
         meetingDate: meeting_date,
-        setMeetingDate,
+        setMeetingDate: (v: string) => {
+          setMeetingDate(v)
+          setError('')
+        },
         meetingTime: meeting_time,
-        setMeetingTime,
+        setMeetingTime: (v: string) => {
+          setMeetingTime(v)
+          setError('')
+        },
         success,
         error,
         isSubmitting,

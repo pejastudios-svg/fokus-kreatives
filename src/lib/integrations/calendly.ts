@@ -158,6 +158,41 @@ export async function deleteCalendlyWebhook(
   }
 }
 
+/** Cancel the scheduled event behind a Calendly invitee.
+ *
+ *  `inviteeUri` is the value we store as a meeting's external_id, e.g.
+ *  https://api.calendly.com/scheduled_events/<evt>/invitees/<inv>.
+ *  Calendly's cancel endpoint lives on the scheduled_event resource, so
+ *  we strip the `/invitees/<inv>` suffix to get the event URI and POST a
+ *  cancellation there. The invitee's own `invitee.canceled` webhook will
+ *  fire back to us, but we've already flipped the local row by then.
+ *
+ *  Calendly returns 4xx when the event is already canceled - we treat
+ *  400/403/404 as non-fatal so a double-cancel doesn't hard-fail. */
+export async function cancelCalendlyEvent(
+  token: string,
+  inviteeUri: string,
+  reason = 'Canceled by host',
+): Promise<void> {
+  const eventUri = inviteeUri.replace(/\/invitees\/[^/]+\/?$/, '')
+  if (eventUri === inviteeUri) {
+    throw new Error(`Unexpected Calendly invitee URI shape: ${inviteeUri}`)
+  }
+  const res = await fetch(`${eventUri}/cancellation`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason }),
+    cache: 'no-store',
+  })
+  if (!res.ok && res.status !== 404 && res.status !== 400 && res.status !== 403) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Calendly cancel failed (${res.status}): ${body || 'unknown'}`)
+  }
+}
+
 /** Verify the `Calendly-Webhook-Signature` header against the request
  *  body using the signing key Calendly returned at subscription time.
  *

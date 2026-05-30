@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { Confetti } from '@/components/ui/Confetti'
 import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -179,18 +181,39 @@ export default function CRMInboxPage() {
     [items, callMutate],
   )
 
+  // Celebratory popup shown after a successful "Clear all", plus the
+  // in-app confirm modal that gates it (replaces the browser confirm).
+  const [showCleared, setShowCleared] = useState(false)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
+
   // "Clear all in your inbox" = delete only the rows we're showing here.
-  const clearAllInThisCrm = useCallback(async () => {
-    if (items.length === 0) return
-    if (!confirm('Clear all your notifications?')) return
-    const prev = items
-    setItems([])
-    const results = await Promise.all(
-      prev.map((n) => callMutate({ action: 'delete_one', id: n.id })),
-    )
-    if (results.some((r) => !r)) {
-      setItems(prev)
+  // Runs once the user confirms in the in-app modal. The UI updates
+  // optimistically (no loading state) and the deletes run in the
+  // background; we only restore the list if a delete actually fails.
+  const performClearAll = useCallback(() => {
+    if (items.length === 0) {
+      setConfirmClearOpen(false)
+      return
     }
+    const prev = items
+    // Optimistic: empty the list, close the modal, and celebrate right away.
+    setItems([])
+    setConfirmClearOpen(false)
+    setShowCleared(true)
+    setTimeout(() => setShowCleared(false), 3500)
+
+    void Promise.all(prev.map((n) => callMutate({ action: 'delete_one', id: n.id })))
+      .then((results) => {
+        if (results.some((r) => !r)) {
+          setItems(prev)
+          setShowCleared(false)
+        }
+      })
+      .catch((err) => {
+        console.error('clear all failed:', err)
+        setItems(prev)
+        setShowCleared(false)
+      })
   }, [items, callMutate])
 
   const filtered = useMemo(() => {
@@ -252,7 +275,7 @@ export default function CRMInboxPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={clearAllInThisCrm}
+            onClick={() => setConfirmClearOpen(true)}
             disabled={items.length === 0}
             title="Delete all your notifications"
           >
@@ -352,6 +375,43 @@ export default function CRMInboxPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={confirmClearOpen}
+        tone="danger"
+        title="Clear all notifications?"
+        message="This permanently deletes all your notifications in this inbox. This can't be undone."
+        confirmLabel="Clear all"
+        cancelLabel="Cancel"
+        onConfirm={performClearAll}
+        onClose={() => setConfirmClearOpen(false)}
+      />
+
+      {showCleared && <Confetti />}
+      {showCleared && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in"
+          onClick={() => setShowCleared(false)}
+        >
+          <div
+            className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-2xl px-8 py-8 text-center w-full max-w-sm animate-in zoom-in-95 fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#2B79F7]/10">
+              <span className="text-4xl leading-none" role="img" aria-label="celebration">
+                🎉
+              </span>
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Congratulations!</h3>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              You cleared your notifications 🎉
+            </p>
+            <div className="mt-5 flex justify-center">
+              <Button onClick={() => setShowCleared(false)}>Nice</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

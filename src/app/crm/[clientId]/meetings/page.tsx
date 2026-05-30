@@ -8,6 +8,8 @@ import { Skeleton } from '@/components/ui/Loading'
 import {
   Plus,
   Calendar,
+  CalendarDays,
+  List,
   Clock,
   Video,
   Link as LinkIcon,
@@ -16,10 +18,17 @@ import {
   X,
   Trash2,
   FileDown,
+  AlertCircle,
 } from 'lucide-react'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { useCrmRole } from '@/components/crm/CrmRoleContext'
 import type { MeetingsReportRow } from '@/components/reports/MeetingsReport'
+import { MeetingsCalendar } from '@/components/crm/MeetingsCalendar'
+import { DateTimePicker } from '@/components/crm/DateTimePicker'
+import { EmailChipsInput } from '@/components/crm/EmailChipsInput'
+import { toast } from '@/components/ui/Toast'
+import { buildCalendarMeta } from '@/lib/calendarLinks'
+import { humanizeIntegrationError } from '@/lib/integrations/errorMessages'
 
 type Status = 'scheduled' | 'completed' | 'cancelled'
 type LocationType = 'zoom' | 'google_meet' | 'jitsi' | 'custom'
@@ -64,14 +73,21 @@ export default function CRMMeetingsPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  // Meeting opened from a calendar pill - shows a details/actions sheet.
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
+  // Meeting to ring when jumping from the list into the calendar.
+  const [calendarFocusId, setCalendarFocusId] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [duration, setDuration] = useState(30)
-  const [mode, setMode] = useState<'schedule' | 'start_now'>('schedule')
+  // Attendee emails as chips, plus the recently-used list (persisted per
+  // client) offered as one-tap suggestions in the Add modal.
+  const [attendeeEmails, setAttendeeEmails] = useState<string[]>([])
+  const [recentEmails, setRecentEmails] = useState<string[]>([])
   const [locationType, setLocationType] = useState<LocationType>('custom')
   const [locationUrl, setLocationUrl] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -81,6 +97,14 @@ export default function CRMMeetingsPage() {
 
   // Fix: Wrap functions in useCallback to satisfy useEffect dependencies
   const loadUserAndClient = useCallback(async () => {
+    // Recently-used attendee emails (persisted per client) for the Add modal.
+    try {
+      const stored = localStorage.getItem(`fk:recent-emails:${clientId}`)
+      if (stored) setRecentEmails(JSON.parse(stored))
+    } catch {
+      /* ignore malformed / unavailable storage */
+    }
+
     // Current user for "to" address
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) {
@@ -218,139 +242,211 @@ export default function CRMMeetingsPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
       console.error('Meetings PDF export failed:', err)
-      alert('Could not generate PDF. Check the console for details.')
+      toast.error('Could not generate the PDF. Please try again.')
     } finally {
       setIsExporting(false)
     }
   }
 
   const handleAddMeeting = async () => {
-  if (!title) return
-  setIsSaving(true)
+    if (!title || !date || !time) return
+    setIsSaving(true)
 
-  try {
-    // 1) Decide the meeting time based on mode
-    let dateTime: Date
+    try {
+      const dateTime = new Date(`${date}T${time}:00`)
+      const emails = attendeeEmails
 
-    if (mode === 'start_now') {
-      // Start immediately
-      dateTime = new Date()
-    } else {
-      // Schedule mode - require date & time
-      if (!date || !time) {
-        setIsSaving(false)
+      // Don't let the same slot get booked twice. Server enforces this too,
+      // but checking here avoids spinning up a platform meeting for nothing.
+      const slotTaken = meetings.some(
+        (m) => m.status === 'scheduled' && new Date(m.date_time).getTime() === dateTime.getTime(),
+      )
+      if (slotTaken) {
+        toast.error('You already have a meeting at that date and time. Pick a different slot.')
         return
       }
-      dateTime = new Date(`${date}T${time}:00`)
-    }
 
-    // 2) Decide final location_url based on platform
-    let finalLocationUrl: string | null = null
-
-    if (locationType === 'custom') {
-      // Use whatever URL user entered
-      finalLocationUrl = locationUrl || null
-    } else if (locationType === 'jitsi') {
-      // Unique Jitsi room – clicking this starts/joins the call
-      const safeTitle = (title || 'meeting')
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-      finalLocationUrl = `https://meet.jit.si/fokus-${clientId}-${safeTitle}-${Date.now()}`
-    } else if (locationType === 'zoom') {
-      // Redirect to Zoom's schedule meeting page
-      finalLocationUrl = 'https://zoom.us/meeting/schedule'
-    } else if (locationType === 'google_meet') {
-      // Redirect to Google Calendar new event (includes Meet)
-      finalLocationUrl = 'https://meet.google.com/landing?pli=1'
-    } else {
-      // Fallback
-      finalLocationUrl = locationUrl || null
-    }
-
-    // 3) Insert into Supabase
-    const { data, error } = await supabase
-      .from('meetings')
-      .insert({
-        client_id: clientId,
-        title,
-        description: description || null,
-        date_time: dateTime.toISOString(),
-        duration_minutes: duration,
-        status: 'scheduled',
-        location_type: locationType,
-        location_url: finalLocationUrl,
+      // Create through the server so Google Meet / Zoom meetings are
+      // actually provisioned on the connected platform (real link +
+      // invites). Jitsi / custom links are stored as-is.
+      const res = await fetch('/api/crm/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          title,
+          description: description || null,
+          startIso: dateTime.toISOString(),
+          durationMinutes: duration,
+          locationType,
+          locationUrl: locationType === 'custom' ? locationUrl : null,
+          attendeeEmails: emails,
+        }),
       })
-      .select()
-      .single()
-
-    // 4) Handle result
-          if (error) {
-        console.error('Failed to create meeting:', JSON.stringify(error, null, 2))
-      } else if (data) {
-        // Update local state/UI
-        setMeetings((prev) => [...prev, data as Meeting])
-        setShowAddModal(false)
-        resetForm()
-
-                // Fire-and-forget email notification (respect client settings)
-        try {
-          const meetingsEnabled =
-            (notificationSettings && notificationSettings.meetings !== false)
-
-          if (userEmail && meetingsEnabled) {
-            const dt = new Date(data.date_time)
-            const when = dt.toLocaleString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-
-            await fetch('/api/notify-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'meeting_created',
-                payload: {
-                  to: userEmail,
-                  title: data.title,
-                  when,
-                  link: data.location_url,
-                  clientName: clientName || '',
-                },
-              }),
-            })
-          }
-        } catch (notifyErr) {
-          console.error('Failed to send meeting_created email', notifyErr)
-        }
-
-        // In-app notification to every CRM team member (separate from
-        // the email above). Personal `notify_new_meeting` pref gates
-        // it server-side. Fire-and-forget.
-        void fetch('/api/notifications/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId,
-            type: 'meeting_created',
-            data: {
-              meetingTitle: data.title,
-              dateTime: data.date_time,
-              link: data.location_url,
-              clientName: clientName || '',
-            },
-          }),
-        }).catch((e) => console.error('in-app meeting notification failed:', e))
+      // Read as text first so a non-JSON response (e.g. a 500 HTML error
+      // page) still surfaces a useful message instead of "undefined".
+      const raw = await res.text()
+      let json: {
+        success?: boolean
+        error?: string
+        meeting?: Meeting
+        warning?: string | null
+      } = {}
+      try {
+        json = raw ? JSON.parse(raw) : {}
+      } catch {
+        json = {}
       }
-  } catch (err) {
-    console.error('Meeting create exception:', err)
-  } finally {
-    setIsSaving(false)
+
+      if (!res.ok || !json.success) {
+        const detail = json.error || (raw ? raw.slice(0, 300) : '') || `${res.status} ${res.statusText}`
+        console.error('Failed to create meeting:', res.status, detail)
+        toast.error(json.error || `Could not create the meeting (${res.status}).`)
+        return
+      }
+
+      const data = json.meeting as Meeting
+      setMeetings((prev) => [...prev, data])
+      // Remember these recipients (most-recent first) for quick re-add later.
+      if (emails.length) {
+        setRecentEmails((prev) => {
+          const merged = [...emails, ...prev.filter((e) => !emails.includes(e))].slice(0, 15)
+          try {
+            localStorage.setItem(`fk:recent-emails:${clientId}`, JSON.stringify(merged))
+          } catch {
+            /* ignore storage failures */
+          }
+          return merged
+        })
+      }
+      setShowAddModal(false)
+      resetForm()
+      if (json.warning) toast.info(json.warning)
+      else toast.success('Meeting created.')
+
+      // Human-readable meeting time, reused for both the owner notification
+      // and the attendee invites below.
+      const when = new Date(data.date_time).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+
+      // Friendly platform label + a calendar block (add-to-calendar buttons
+      // and an .ics) the email templates render.
+      const platformLabel =
+        data.location_type === 'zoom'
+          ? 'Zoom'
+          : data.location_type === 'jitsi'
+          ? 'Jitsi'
+          : data.location_type === 'google_meet'
+          ? 'Google Meet'
+          : ''
+      const endIso = new Date(
+        new Date(data.date_time).getTime() + (data.duration_minutes || duration) * 60000,
+      ).toISOString()
+      const calendar = buildCalendarMeta({
+        title: data.title,
+        description: data.description || '',
+        startIso: data.date_time,
+        endIso,
+        location: data.location_url || undefined,
+      })
+
+      // Notify the CRM user (respects their notification setting). This is
+      // the team-facing "New Meeting Scheduled" template.
+      try {
+        const meetingsEnabled =
+          notificationSettings && notificationSettings.meetings !== false
+
+        if (userEmail && meetingsEnabled) {
+          await fetch('/api/notify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'meeting_created',
+              payload: {
+                to: userEmail,
+                title: data.title,
+                when,
+                link: data.location_url,
+                clientName: clientName || '',
+                platform: platformLabel,
+                calendar,
+              },
+            }),
+          })
+        }
+      } catch (notifyErr) {
+        console.error('Failed to send meeting_created email', notifyErr)
+      }
+
+      // Send each attendee the invitee-facing confirmation ("You're booked
+      // in / Join meeting" + add-to-calendar), for any platform or custom
+      // link. Google Meet already emails them Google's calendar invite with
+      // the Meet link, so skip those to avoid a duplicate.
+      const isGoogleInvite =
+        data.location_type === 'google_meet' || data.integration_provider === 'google_meet'
+      if (data.location_url && !isGoogleInvite) {
+        for (const to of emails) {
+          void fetch('/api/notify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'meeting_invitee_confirmation',
+              payload: {
+                to,
+                title: data.title,
+                when,
+                link: data.location_url,
+                clientName: clientName || '',
+                platform: platformLabel,
+                calendar,
+              },
+            }),
+          }).catch((e) => console.error('attendee invite email failed:', e))
+        }
+      }
+
+      // In-app notification to every CRM team member. Fire-and-forget.
+      void fetch('/api/notifications/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          type: 'meeting_created',
+          data: {
+            meetingTitle: data.title,
+            dateTime: data.date_time,
+            link: data.location_url,
+            clientName: clientName || '',
+          },
+        }),
+      }).catch((e) => console.error('in-app meeting notification failed:', e))
+    } catch (err) {
+      console.error('Meeting create exception:', err)
+      toast.error('Could not create the meeting. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
-}
+
+  // Opens the Add modal pre-filled with a specific day (from the calendar
+  // "+" button), defaulting the time to 9:00 AM.
+  const openAddOnDate = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)
+    setTime('09:00')
+    setShowAddModal(true)
+  }
+
+  // Jump from a list row into the calendar with that meeting highlighted.
+  const viewMeetingInCalendar = (m: Meeting) => {
+    setCalendarFocusId(m.id)
+    setViewMode('calendar')
+  }
 
   const resetForm = () => {
     setTitle('')
@@ -358,24 +454,47 @@ export default function CRMMeetingsPage() {
     setDate('')
     setTime('')
     setDuration(30)
+    setAttendeeEmails([])
     setLocationType('custom')
     setLocationUrl('')
   }
 
   const handleStatusChange = async (id: string, status: Status) => {
     const prev = meetings
-    setMeetings((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status } : m))
-    )
+    // Optimistic update for both the list and any open details sheet.
+    setMeetings((cur) => cur.map((m) => (m.id === id ? { ...m, status } : m)))
+    setSelectedMeeting((sm) => (sm && sm.id === id ? { ...sm, status } : sm))
 
-    const { error } = await supabase
-      .from('meetings')
-      .update({ status })
-      .eq('id', id)
+    try {
+      // Route through the server so cancelling also cancels the meeting
+      // on the external platform (Google / Zoom / Calendly).
+      const res = await fetch(`/api/crm/meetings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json().catch(() => ({}))
 
-    if (error) {
-      console.error('Failed to update meeting status:', error)
+      if (!res.ok || !json.success) {
+        console.error('Failed to update meeting status:', json.error)
+        setMeetings(prev) // rollback
+        setSelectedMeeting((sm) => (sm && sm.id === id ? prev.find((m) => m.id === id) ?? sm : sm))
+        toast.error(json.error || 'Could not update the meeting.')
+      } else if (status === 'cancelled' && json.platformError) {
+        // Local cancel succeeded but the platform call didn't - surface a
+        // friendly, actionable reason so the user knows what to fix.
+        console.warn('Meeting cancelled locally but platform cancel failed:', json.platformError)
+        const provider = prev.find((m) => m.id === id)?.integration_provider ?? undefined
+        toast.error(humanizeIntegrationError(json.platformError, provider))
+      } else if (status === 'cancelled') {
+        toast.success('Meeting cancelled.')
+      } else if (status === 'completed') {
+        toast.success('Meeting marked as done.')
+      }
+    } catch (err) {
+      console.error('Status change exception:', err)
       setMeetings(prev) // rollback
+      toast.error('Could not update the meeting.')
     }
   }
 
@@ -419,34 +538,56 @@ export default function CRMMeetingsPage() {
     return <MeetingsSkeleton />
   }
 
-  const handleDeleteMeeting = async () => {
-  if (!meetingToDelete) return
-  setIsDeleting(true)
+  const handleDeleteMeeting = () => {
+    if (!meetingToDelete) return
+    const meeting = meetingToDelete
+    const id = meeting.id
 
-  const id = meetingToDelete.id
-
-  try {
-    // Optimistic UI: remove from list immediately
-    setMeetings(prev => prev.filter(m => m.id !== id))
-
-    const { error } = await supabase
-      .from('meetings')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Failed to delete meeting:', error)
-      // Rollback if needed
-      await loadMeetings()
-    }
-  } catch (err) {
-    console.error('Delete meeting exception:', err)
-    await loadMeetings()
-  } finally {
-    setIsDeleting(false)
+    // Optimistic: remove from the list and close the modals immediately.
+    // The delete + platform cancel happen in the background and only roll
+    // back if the delete itself fails (a platform-cancel hiccup doesn't).
+    setMeetings((cur) => cur.filter((m) => m.id !== id))
     setMeetingToDelete(null)
-  }
+    setSelectedMeeting(null)
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/crm/meetings/${id}`, { method: 'DELETE' })
+        const json = await res.json().catch(() => ({}))
+
+        if (!res.ok || !json.success) {
+          console.error('Failed to delete meeting:', json.error)
+          toast.error('Could not delete the meeting. Restored it.')
+          await loadMeetings()
+        } else if (json.platformError) {
+          console.warn('Meeting deleted locally but platform cancel failed:', json.platformError)
+          toast.error(
+            humanizeIntegrationError(json.platformError, meeting.integration_provider ?? undefined),
+          )
+        } else {
+          toast.success('Meeting deleted.')
+        }
+      } catch (err) {
+        console.error('Delete meeting exception:', err)
+        toast.error('Could not delete the meeting. Restored it.')
+        await loadMeetings()
+      }
+    })()
 }
+
+  // Local YYYY-MM-DD for "today", used to block scheduling in the past.
+  const _now = new Date()
+  const todayYmd = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
+  const isPastDate = !!date && date < todayYmd
+  // Conflict when the picked date + time exactly matches an existing
+  // scheduled meeting. Surfaced inline in the modal before Save is pressed.
+  const selectedSlot = date && time ? new Date(`${date}T${time}:00`) : null
+  const slotConflict =
+    !!selectedSlot &&
+    !Number.isNaN(selectedSlot.getTime()) &&
+    meetings.some(
+      (m) => m.status === 'scheduled' && new Date(m.date_time).getTime() === selectedSlot.getTime(),
+    )
 
   return <div className="p-3 sm:p-4 lg:p-6 min-h-full">
         {/* Header */}
@@ -469,30 +610,100 @@ export default function CRMMeetingsPage() {
           />
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
-          {(['upcoming', 'past', 'all'] as const).map((f) => (
+        {/* View toggle + filters */}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          {/* List / Calendar toggle */}
+          <div className="inline-flex rounded-full bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-1 shrink-0">
             <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors shrink-0 ${
-                statusFilter === f
+              type="button"
+              onClick={() => {
+                setViewMode('list')
+                setCalendarFocusId(null)
+              }}
+              className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full transition-colors ${
+                viewMode === 'list'
                   ? 'bg-[#2B79F7] text-white'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-primary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              <List className="h-3.5 w-3.5" />
+              List
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('calendar')
+                setCalendarFocusId(null)
+              }}
+              className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full transition-colors ${
+                viewMode === 'calendar'
+                  ? 'bg-[#2B79F7] text-white'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Calendar
+            </button>
+          </div>
+
+          {/* Upcoming / Past / All - only meaningful in list view */}
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {(['upcoming', 'past', 'all'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors shrink-0 ${
+                    statusFilter === f
+                      ? 'bg-[#2B79F7] text-white'
+                      : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-primary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                  }`}
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Meetings List - single card with row dividers (no stack of giant
+        {/* Calendar view - month grid populated by every meeting's date_time
+            (not limited by the upcoming/past filter). Pills open the details
+            sheet below. */}
+        {viewMode === 'calendar' ? (
+          meetings.length === 0 ? (
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+              <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
+              <p className="text-sm">No meetings found.</p>
+              <div className="mt-4 flex justify-center">
+                <Button onClick={() => setShowAddModal(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add Meeting
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <MeetingsCalendar
+              meetings={meetings}
+              onSelectMeeting={setSelectedMeeting}
+              onAddOnDate={openAddOnDate}
+              focusMeetingId={calendarFocusId}
+            />
+          )
+        ) : /* Meetings List - single card with row dividers (no stack of giant
             cards). Each row keeps title + meta on the left, status + actions
-            on the right, and collapses cleanly on mobile. */}
-        {filteredMeetings.length === 0 ? (
+            on the right, and collapses cleanly on mobile. */
+        filteredMeetings.length === 0 ? (
           <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
             <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
             <p className="text-sm">No meetings found.</p>
+            {statusFilter !== 'past' && (
+              <div className="mt-4 flex justify-center">
+                <Button onClick={() => setShowAddModal(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add Meeting
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden divide-y divide-[var(--border-primary)]">
@@ -612,6 +823,13 @@ export default function CRMMeetingsPage() {
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => viewMeetingInCalendar(m)}
+                      title="View in calendar"
+                      className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-colors"
+                    >
+                      <CalendarDays className="h-4 w-4" />
+                    </button>
                     {m.status !== 'completed' && (
                       <button
                         onClick={() => handleStatusChange(m.id, 'completed')}
@@ -647,7 +865,7 @@ export default function CRMMeetingsPage() {
         {/* Add Meeting Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-none">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">Add Meeting</h3>
                 <button
@@ -659,33 +877,6 @@ export default function CRMMeetingsPage() {
               </div>
 
               <div className="px-6 py-4 space-y-4">
-                <div className="flex items-center gap-2">
-  <span className="text-xs font-medium text-[var(--text-tertiary)]">Mode:</span>
-  <div className="inline-flex rounded-full bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-1">
-    <button
-      type="button"
-      onClick={() => setMode('schedule')}
-      className={`px-3 py-1 text-xs rounded-full ${
-        mode === 'schedule'
-          ? 'bg-[#2B79F7] text-white'
-          : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      Schedule
-    </button>
-    <button
-      type="button"
-      onClick={() => setMode('start_now')}
-      className={`px-3 py-1 text-xs rounded-full ${
-        mode === 'start_now'
-          ? 'bg-[#2B79F7] text-white'
-          : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      Start now
-    </button>
-  </div>
-</div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                     Title
@@ -710,29 +901,24 @@ export default function CRMMeetingsPage() {
                     className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                      Date
-                    </label>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                      Time
-                    </label>
-                    <input
-                      type="time"
-                      value={time}
-                      onChange={(e) => setTime(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Date &amp; time
+                  </label>
+                  <DateTimePicker
+                    date={date}
+                    time={time}
+                    onChange={({ date: d, time: t }) => {
+                      setDate(d)
+                      setTime(t)
+                    }}
+                  />
+                  {slotConflict && (
+                    <p className="text-[11px] text-amber-500 mt-1.5 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      You already have a meeting at this date and time. Pick a different slot.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
@@ -746,6 +932,26 @@ export default function CRMMeetingsPage() {
                     onChange={(e) => setDuration(Number(e.target.value) || 30)}
                     className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Attendee emails
+                  </label>
+                  <EmailChipsInput
+                    value={attendeeEmails}
+                    onChange={setAttendeeEmails}
+                    recent={recentEmails}
+                  />
+                  {locationType === 'google_meet' && attendeeEmails.length === 0 ? (
+                    <p className="text-[11px] text-amber-500 mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      Add at least one attendee email to create a Google Meet invite.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                      Press Enter to add each email. Google Meet needs at least one to send invites.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
@@ -806,6 +1012,14 @@ export default function CRMMeetingsPage() {
                       className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                     />
                   )}
+                  {(locationType === 'google_meet' || locationType === 'zoom') && (
+                    <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                      We&apos;ll create this on your connected{' '}
+                      {locationType === 'google_meet' ? 'Google Calendar' : 'Zoom'} account and
+                      generate the real join link. Connect it first in Integrations if you
+                      haven&apos;t.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -819,7 +1033,14 @@ export default function CRMMeetingsPage() {
                 <Button
                   onClick={handleAddMeeting}
                   isLoading={isSaving}
-                  disabled={!title || !date || !time}
+                  disabled={
+                    !title ||
+                    !date ||
+                    !time ||
+                    isPastDate ||
+                    slotConflict ||
+                    (locationType === 'google_meet' && attendeeEmails.length === 0)
+                  }
                 >
                   Save Meeting
                 </Button>
@@ -855,13 +1076,11 @@ export default function CRMMeetingsPage() {
         <Button
           variant="outline"
           onClick={() => setMeetingToDelete(null)}
-          disabled={isDeleting}
         >
           Cancel
         </Button>
         <Button
           onClick={handleDeleteMeeting}
-          isLoading={isDeleting}
           className="bg-red-600 hover:bg-red-500"
         >
           Delete
@@ -870,5 +1089,104 @@ export default function CRMMeetingsPage() {
     </div>
   </div>
 )}
+        {/* Meeting details sheet - opened from a calendar pill. Mirrors the
+            inline list actions (mark done / cancel / delete) so the calendar
+            view is fully actionable. */}
+        {selectedMeeting && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setSelectedMeeting(null)}
+          >
+            <div
+              className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] truncate pr-3">
+                  {selectedMeeting.title}
+                </h3>
+                <button
+                  onClick={() => setSelectedMeeting(null)}
+                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="px-6 py-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <Clock className="h-4 w-4 text-[var(--text-tertiary)] shrink-0" />
+                  {new Date(selectedMeeting.date_time).toLocaleString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}{' '}
+                  · {selectedMeeting.duration_minutes}m
+                </div>
+                <div>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                      selectedMeeting.status === 'completed'
+                        ? 'bg-green-500/15 text-green-500'
+                        : selectedMeeting.status === 'cancelled'
+                        ? 'bg-red-500/15 text-red-500'
+                        : 'bg-[#2B79F7]/15 text-[#2B79F7]'
+                    }`}
+                  >
+                    {selectedMeeting.status === 'completed'
+                      ? 'Done'
+                      : selectedMeeting.status === 'cancelled'
+                      ? 'Cancelled'
+                      : 'Scheduled'}
+                  </span>
+                </div>
+                {selectedMeeting.description && (
+                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                    {selectedMeeting.description}
+                  </p>
+                )}
+                {selectedMeeting.location_url && (
+                  <a
+                    href={selectedMeeting.location_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-[#2B79F7] hover:underline"
+                  >
+                    <LinkIcon className="h-4 w-4" />
+                    Join link
+                  </a>
+                )}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 px-6 py-4 border-t border-[var(--border-primary)]">
+                {selectedMeeting.status !== 'completed' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleStatusChange(selectedMeeting.id, 'completed')}
+                  >
+                    Mark done
+                  </Button>
+                )}
+                {selectedMeeting.status !== 'cancelled' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleStatusChange(selectedMeeting.id, 'cancelled')}
+                  >
+                    Cancel meeting
+                  </Button>
+                )}
+                <Button
+                  onClick={() => {
+                    setMeetingToDelete(selectedMeeting)
+                    setSelectedMeeting(null)
+                  }}
+                  className="bg-red-600 hover:bg-red-500"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 }

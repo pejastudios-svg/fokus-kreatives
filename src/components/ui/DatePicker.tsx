@@ -1,53 +1,78 @@
 'use client'
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const POPOVER_WIDTH = 320
+const POPOVER_HEIGHT = 420
 
 interface DatePickerProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  /** Grey out + disable any day before today (e.g. meeting dates). */
+  disablePast?: boolean
 }
 
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-export function DatePicker({ value, onChange, placeholder = 'Select date', className = '' }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = 'Select date', className = '', disablePast = false }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [viewDate, setViewDate] = useState(() => {
     if (value) return new Date(value)
     return new Date()
   })
-  // Flip the calendar above the trigger when there isn't enough room
-  // below (common on capture pages where the meeting section is near
-  // the bottom of the viewport).
-  const [dropDirection, setDropDirection] = useState<'down' | 'up'>('down')
+  // The calendar is rendered in a portal with FIXED positioning so it's
+  // never clipped by a modal's overflow. We compute its coords from the
+  // trigger rect on open and keep them in sync on scroll/resize.
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
+      const t = e.target as Node
+      if (containerRef.current?.contains(t)) return
+      if (popoverRef.current?.contains(t)) return
+      setIsOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Decide drop direction on open. Calendar approx height = 420px
-  // (header + 6 rows + footer).
+  // Position the popover: below the trigger by default, flipped above when
+  // there isn't room, and shifted left so it never runs off the right edge.
   useLayoutEffect(() => {
-    if (!isOpen || !buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    const POPOVER_HEIGHT = 420
-    const spaceBelow = window.innerHeight - rect.bottom
-    const spaceAbove = rect.top
-    const next: 'up' | 'down' =
-      spaceBelow < POPOVER_HEIGHT && spaceAbove > spaceBelow ? 'up' : 'down'
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- viewport-conditional flip on open
-    setDropDirection(next)
+    if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close
+      setCoords(null)
+      return
+    }
+    const place = () => {
+      const btn = buttonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const openUp = spaceBelow < POPOVER_HEIGHT && spaceAbove > spaceBelow
+      let top = openUp ? rect.top - POPOVER_HEIGHT - 8 : rect.bottom + 8
+      top = Math.max(8, Math.min(top, window.innerHeight - POPOVER_HEIGHT - 8))
+      let left = rect.left
+      if (left + POPOVER_WIDTH > window.innerWidth - 8) left = window.innerWidth - POPOVER_WIDTH - 8
+      left = Math.max(8, left)
+      setCoords({ top, left })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
   }, [isOpen])
 
   const selectedDate = value ? new Date(value) : null
@@ -131,6 +156,14 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
     return selectedDate && date.toDateString() === selectedDate.toDateString()
   }
 
+  const isPast = (date: Date) => {
+    const d = new Date(date)
+    d.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return d.getTime() < today.getTime()
+  }
+
   const calendarDays = getDaysInMonth(viewDate)
 
   return (
@@ -151,11 +184,11 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
         </span>
       </button>
 
-      {isOpen && (
+      {isOpen && coords && typeof document !== 'undefined' && createPortal(
         <div
-          className={`absolute z-50 w-80 max-w-[calc(100vw-1rem)] bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-4 animate-in fade-in zoom-in duration-150 ${
-            dropDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
+          ref={popoverRef}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: POPOVER_WIDTH, zIndex: 1000 }}
+          className="bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-4 animate-in fade-in zoom-in duration-150"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -189,21 +222,32 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
 
           {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => handleSelectDate(day.date)}
-                className={`
-                  p-2 text-sm rounded-lg transition-all
-                  ${!day.isCurrentMonth ? 'text-theme-tertiary' : 'text-theme-primary'}
-                  ${isSelected(day.date) ? 'bg-[#2B79F7] text-white font-semibold' : 'hover:bg-theme-tertiary'}
-                  ${isToday(day.date) && !isSelected(day.date) ? 'ring-1 ring-[#2B79F7] font-semibold' : ''}
-                `}
-              >
-                {day.date.getDate()}
-              </button>
-            ))}
+            {calendarDays.map((day, index) => {
+              const selected = isSelected(day.date)
+              const past = disablePast && isPast(day.date)
+              // Single source of text colour so the selected day's white
+              // text isn't overridden by text-theme-primary.
+              const cls = past
+                ? 'text-theme-tertiary opacity-30 cursor-not-allowed'
+                : selected
+                ? 'bg-[#2B79F7] text-white font-semibold'
+                : !day.isCurrentMonth
+                ? 'text-theme-tertiary hover:bg-theme-tertiary'
+                : 'text-theme-primary hover:bg-theme-tertiary'
+              const ring =
+                !past && isToday(day.date) && !selected ? 'ring-1 ring-[#2B79F7] font-semibold' : ''
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  disabled={past}
+                  onClick={() => !past && handleSelectDate(day.date)}
+                  className={`p-2 text-sm rounded-lg transition-all ${cls} ${ring}`}
+                >
+                  {day.date.getDate()}
+                </button>
+              )
+            })}
           </div>
 
           {/* Footer */}
@@ -223,7 +267,8 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
               Clear
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

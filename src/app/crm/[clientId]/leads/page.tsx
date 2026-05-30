@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
+import { toast } from '@/components/ui/Toast'
 import { 
   Plus, 
   GripVertical, 
@@ -486,23 +487,40 @@ export default function CRMLeads() {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, data: updatedData, updated_at: updatedAt } : l))
     setPendingLeads(prev => new Set(prev).add(leadId))
 
-    try {
+    // A transient network / auth-token-refresh blip can make the first write
+    // fail with an empty error and then succeed on retry (which is what you
+    // saw). Retry a few times with a short backoff before giving up and
+    // rolling the optimistic change back.
+    let lastError: { message?: string; code?: string; details?: string } | null = null
+    let saved = false
+    for (let attempt = 0; attempt < 3; attempt++) {
       const { error } = await supabase
         .from('leads')
         .update({ data: updatedData, updated_at: updatedAt })
         .eq('id', leadId)
-
-      if (error) throw error
-    } catch (err) {
-      console.error('Failed to update lead:', err)
-      setLeads(prev => prev.map(l => l.id === leadId ? lead : l))
-    } finally {
-      setPendingLeads(prev => {
-        const next = new Set(prev)
-        next.delete(leadId)
-        return next
-      })
+      if (!error) {
+        saved = true
+        break
+      }
+      lastError = error
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
     }
+
+    if (!saved) {
+      console.error('Failed to update lead after retries:', {
+        message: lastError?.message,
+        code: lastError?.code,
+        details: lastError?.details,
+      })
+      setLeads(prev => prev.map(l => l.id === leadId ? lead : l))
+      toast.error('Could not save that change. Please try again.')
+    }
+
+    setPendingLeads(prev => {
+      const next = new Set(prev)
+      next.delete(leadId)
+      return next
+    })
 
     setEditingCell(null)
     setEditValue('')

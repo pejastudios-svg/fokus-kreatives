@@ -220,6 +220,10 @@ export interface CreateCalendarEventInput {
   /** Visitor's email + display name; goes into the invite list so
    *  Google emails them the calendar invite + the Meet link. */
   attendee: { email: string; displayName?: string }
+  /** Extra attendees beyond the primary one. Used when a meeting is
+   *  created manually from the CRM and several people are invited.
+   *  Each also gets the Google invite + Meet link. */
+  extraAttendees?: Array<{ email: string; displayName?: string }>
 }
 
 export interface CreatedCalendarEvent {
@@ -297,6 +301,10 @@ export async function createGoogleCalendarEvent(
     end: { dateTime: input.endIso, timeZone: input.timeZone || 'UTC' },
     attendees: [
       { email: input.attendee.email, displayName: input.attendee.displayName },
+      ...(input.extraAttendees || []).map((a) => ({
+        email: a.email,
+        displayName: a.displayName,
+      })),
     ],
     conferenceData: {
       createRequest: {
@@ -342,5 +350,38 @@ export async function createGoogleCalendarEvent(
     meetUrl,
     start: json.start.dateTime || input.startIso,
     end: json.end.dateTime || input.endIso,
+  }
+}
+
+/** Cancel (delete) a Google Calendar event on the host's primary
+ *  calendar. `sendUpdates=all` emails the attendee the cancellation.
+ *  A 404/410 means the event is already gone, which we treat as
+ *  success (the end state - no event - is what we wanted). */
+export async function cancelGoogleCalendarEvent(
+  accessToken: string,
+  eventId: string,
+): Promise<void> {
+  const url = new URL(
+    `${GOOGLE_CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+  )
+  url.searchParams.set('sendUpdates', 'all')
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  })
+  // 404/410 = event not on THIS account's calendar (already deleted, or it
+  // was created under a different connected Google account). We don't throw
+  // - the desired end state (no event for us) holds - but we log it because
+  // it's the usual reason a "cancel" appears to do nothing on Google.
+  if (res.status === 404 || res.status === 410) {
+    console.warn(
+      `[google] event ${eventId} not found on the connected account (status ${res.status}) - nothing deleted`,
+    )
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Google Calendar event delete failed (${res.status}): ${text || 'unknown'}`)
   }
 }

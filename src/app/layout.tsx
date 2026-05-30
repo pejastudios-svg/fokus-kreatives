@@ -3,6 +3,8 @@ import './globals.css'
 import { Montserrat, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { ServiceWorkerBoot } from '@/components/notifications/ServiceWorkerBoot'
+import { Toaster } from '@/components/ui/Toast'
+import { ModalScrollLock } from '@/components/ui/ModalScrollLock'
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -95,7 +97,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               messages from the SW so we can navigate the SPA without
               forcing a full reload. */}
           <ServiceWorkerBoot />
+          {/* Locks background scroll whenever any modal overlay is open. */}
+          <ModalScrollLock />
           {children}
+          {/* Single global toaster. It renders only the toasts whose area
+              (crm vs agency) matches the page on screen, keeping the two
+              sides' toasts isolated from each other. */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { CalendarClock, CheckCircle2, Loader2, X, AlertTriangle, ExternalLink } from 'lucide-react'
+import { humanizeIntegrationError } from '@/lib/integrations/errorMessages'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface Integration {
   provider: 'calendly' | 'google_meet' | 'zoom'
@@ -98,22 +100,30 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
   const providerPathSegment = (p: 'calendly' | 'google_meet' | 'zoom') =>
     p === 'google_meet' ? 'google' : p
 
-  const handleDisconnect = async (provider: 'calendly' | 'google_meet' | 'zoom') => {
-    if (!confirm(`Disconnect ${provider}?`)) return
+  // Which provider the in-app "disconnect?" modal is confirming (null = closed).
+  const [disconnectTarget, setDisconnectTarget] = useState<
+    'calendly' | 'google_meet' | 'zoom' | null
+  >(null)
+
+  // Runs after the user confirms in the modal. Throws on failure so the
+  // modal surfaces the error; the modal shows a spinner + disables its
+  // confirm button for the whole duration of this await.
+  const performDisconnect = async () => {
+    if (!disconnectTarget) return
     const res = await fetch(
-      `/api/integrations/${providerPathSegment(provider)}/disconnect`,
+      `/api/integrations/${providerPathSegment(disconnectTarget)}/disconnect`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
       },
     )
-    const data = await res.json()
-    if (data.success) {
-      await load()
-    } else {
-      alert(data.error || 'Disconnect failed')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Disconnect failed')
     }
+    setDisconnectTarget(null)
+    await load()
   }
 
   // Picking up the result of the Google OAuth round-trip. The
@@ -247,7 +257,9 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
                     </p>
                   )}
                   {conn?.last_error && conn?.webhook_registered !== false && (
-                    <p className="text-xs text-red-500 mt-1">{conn.last_error}</p>
+                    <p className="text-xs text-red-500 mt-1">
+                      {humanizeIntegrationError(conn.last_error, p.key)}
+                    </p>
                   )}
                 </div>
                 <div className="shrink-0">
@@ -260,7 +272,7 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
                       size="sm"
                       variant="outline"
                       disabled={!canManage}
-                      onClick={() => void handleDisconnect(p.key)}
+                      onClick={() => setDisconnectTarget(p.key)}
                     >
                       Disconnect
                     </Button>
@@ -302,6 +314,17 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
           }}
         />
       )}
+
+      <ConfirmModal
+        open={disconnectTarget !== null}
+        tone="danger"
+        title={`Disconnect ${PROVIDERS.find((p) => p.key === disconnectTarget)?.label ?? ''}?`}
+        message="This removes the connection for this client. Meetings already booked stay, but new ones can't be created through it until you reconnect."
+        confirmLabel="Disconnect"
+        cancelLabel="Cancel"
+        onConfirm={performDisconnect}
+        onClose={() => setDisconnectTarget(null)}
+      />
     </Card>
   )
 }

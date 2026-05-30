@@ -24,6 +24,21 @@ export interface CaptureField {
   options?: string[]
   embedUrl?: string
   embedHeight?: number
+  /** Which form section (multi-step page) this field belongs to. Empty
+   *  / unknown means it falls into the first step. Pages with no sections
+   *  ignore this and render every field on one page. */
+  sectionId?: string
+}
+
+/** A step in a multi-section capture form. Fields reference a section by id.
+ *  A page can have up to 10. The last section carries the submit button; all
+ *  earlier ones get a "Next" button. */
+export interface CaptureSection {
+  id: string
+  /** Shown as the step heading. Optional - empty renders no heading. */
+  title?: string
+  /** Optional sub-text under the heading. */
+  description?: string
 }
 
 export interface CaptureTheme {
@@ -89,6 +104,9 @@ export interface CapturePageInfo {
    *  default blue (#2B79F7). */
   accent_color?: string | null
   fields?: CaptureField[] | null
+  /** Ordered multi-step sections. Empty / null = single-page form (legacy
+   *  behaviour - every field on one page). */
+  sections?: CaptureSection[] | null
   theme?: CaptureTheme | null
   layout_template?: LayoutTemplate | null
 }
@@ -113,4 +131,8 @@ export interface CaptureFormBag {
    *  capture page to the session-tracking hook so the analytics tab
    *  can show drop-off (which field they bounced from). */
   onFieldFocus?: (fieldId: string) => void
+  /** Editor live-preview mode: lets the Next/Back buttons step through
+   *  sections without required-field validation so the builder can see
+   *  every section while editing. */
+  preview?: boolean
 }
