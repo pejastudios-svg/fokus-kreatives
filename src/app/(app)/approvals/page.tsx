@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
 import { ClientPicker } from '@/components/dashboard/ClientPicker'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
-import { cldThumb } from '@/lib/cloudinary'
+import { cldThumb, cldVideoPosterFromUrl } from '@/lib/cloudinary'
 import {
   Plus,
   Search,
@@ -964,20 +964,16 @@ function ApprovalsBoardSkeleton() {
   // perceives as the skeleton flickering on/off. The Skeleton blocks
   // already have their own animate-pulse shimmer for "loading" feel.
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[1, 2, 3, 4, 5, 6].map((i) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
         <Card key={i} className="overflow-hidden">
           <Skeleton className="aspect-video w-full rounded-none" />
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-7 w-7 rounded-full" />
-              <Skeleton className="h-3 w-24" />
-            </div>
+          <CardContent className="p-3 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
             <div className="flex gap-2 pt-1">
-              <Skeleton className="h-7 w-20 rounded-md" />
               <Skeleton className="h-7 w-16 rounded-md" />
+              <Skeleton className="h-7 w-12 rounded-md" />
             </div>
           </CardContent>
         </Card>
@@ -1132,7 +1128,7 @@ function ApprovalsBoardSkeleton() {
             </CardContent>
           </Card>
         ) : viewMode === 'board' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredApprovals.map((a) => (
               <ApprovalBoardCard
                 key={a.id}
@@ -1963,6 +1959,42 @@ function StatusPill({ approved }: { approved: boolean }) {
  * No network probing - pure URL inspection - so this is cheap to render for
  * a list of cards.
  */
+// Video thumbnail with graceful degradation:
+//   1. Cloudinary poster frame (so_auto .jpg) - the best case.
+//   2. If that 404s (strict transformations disabled, or just not a Cloudinary
+//      video), fall back to the raw <video> seeked to 0.1s for a first frame.
+//   3. If the source itself is gone (e.g. the asset was deleted from Cloudinary
+//      but the approval still references it), the <video> simply paints nothing
+//      over a neutral background - a clean placeholder, never a broken-image
+//      glyph + alt text.
+function VideoThumb({ url, title }: { url: string; title: string }) {
+  const poster = cldVideoPosterFromUrl(url, { w: 800, h: 450, crop: 'fill' })
+  const [posterFailed, setPosterFailed] = useState(false)
+  const showVideo = !poster || posterFailed
+
+  return (
+    <div className="absolute inset-0 bg-[var(--bg-tertiary)]">
+      {!showVideo && poster ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={poster}
+          alt={title}
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={() => setPosterFailed(true)}
+        />
+      ) : (
+        <video
+          src={`${url}#t=0.1`}
+          className="absolute inset-0 h-full w-full object-cover"
+          muted
+          playsInline
+          preload="metadata"
+        />
+      )}
+    </div>
+  )
+}
+
 function AssetPreview({ url, title }: { url: string; title: string }) {
   const lower = url.toLowerCase()
   const isImage = /\.(png|jpe?g|gif|webp|svg|avif|heic)(\?|$)/.test(lower)
@@ -1979,15 +2011,7 @@ function AssetPreview({ url, title }: { url: string; title: string }) {
     )
   }
   if (isVideo) {
-    return (
-      <video
-        src={url}
-        className="absolute inset-0 h-full w-full object-cover"
-        muted
-        playsInline
-        preload="metadata"
-      />
-    )
+    return <VideoThumb url={url} title={title} />
   }
   if (ytId) {
     return (

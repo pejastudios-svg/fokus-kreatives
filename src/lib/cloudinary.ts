@@ -286,3 +286,33 @@ export function cldThumb(
 
   return `https://res.cloudinary.com/${cloudName}/video/upload/${t.join(',')}/${asset.public_id}.jpg`
 }
+
+/**
+ * Poster-frame JPG for a Cloudinary VIDEO delivery URL given only its URL
+ * string (when we don't have the full CloudinaryAsset - e.g. an approval card
+ * that just stored the secure_url). Inserts a `so_auto` frame-extraction
+ * transform and swaps the extension to `.jpg`. Returns null when the URL isn't
+ * a Cloudinary video URL, so callers can fall back to a <video> tag.
+ */
+export function cldVideoPosterFromUrl(
+  url: string,
+  opts: { w?: number; h?: number; crop?: 'fill' | 'limit' | 'fit' } = {},
+): string | null {
+  if (!url || !url.includes('res.cloudinary.com')) return null
+  const marker = '/video/upload/'
+  const idx = url.indexOf(marker)
+  if (idx === -1) return null
+
+  const prefix = url.slice(0, idx + marker.length)
+  // Whatever follows the marker (existing transforms + public_id) - just force
+  // the extension to .jpg. Cloudinary chains our transform ahead of any
+  // existing one, so we don't need to parse it.
+  const rest = url.slice(idx + marker.length).replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg')
+
+  const t: string[] = ['so_auto', 'f_auto', 'q_auto']
+  if (opts.w) t.push(`w_${opts.w}`)
+  if (opts.h) t.push(`h_${opts.h}`)
+  if (opts.crop) t.push(`c_${opts.crop}`)
+
+  return `${prefix}${t.join(',')}/${rest}`
+}
