@@ -12,6 +12,7 @@
 // page scrollable or stuck locked.
 
 import { useEffect } from 'react'
+import { acquireScrollLock, releaseScrollLock } from '@/hooks/useBodyScrollLock'
 
 const OVERLAY_SELECTOR = '.fixed.inset-0[class*="bg-black"]'
 
@@ -31,17 +32,17 @@ export function ModalScrollLock() {
   useEffect(() => {
     let raf = 0
     let locked = false
-    let savedOverflow = ''
 
     const apply = () => {
       raf = 0
       const hasModal = Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).some(isVisible)
+      // Go through the shared ref counter (not body.style directly) so this
+      // observer and useBodyScrollLock never stomp each other's saved state.
       if (hasModal && !locked) {
-        savedOverflow = document.body.style.overflow
-        document.body.style.overflow = 'hidden'
+        acquireScrollLock()
         locked = true
       } else if (!hasModal && locked) {
-        document.body.style.overflow = savedOverflow
+        releaseScrollLock()
         locked = false
       }
     }
@@ -57,8 +58,11 @@ export function ModalScrollLock() {
     return () => {
       observer.disconnect()
       if (raf) cancelAnimationFrame(raf)
-      // Safety: never leave the page locked if this unmounts.
-      if (locked) document.body.style.overflow = savedOverflow
+      // Safety: release our lock if this unmounts while still held.
+      if (locked) {
+        releaseScrollLock()
+        locked = false
+      }
     }
   }, [])
 
