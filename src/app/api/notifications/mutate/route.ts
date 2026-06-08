@@ -18,7 +18,9 @@ const admin = createServiceClient(
  * Body shapes:
  *   { action: 'mark_read', id: string }
  *   { action: 'mark_all_read' }
+ *   { action: 'mark_read_many', ids: string[] }
  *   { action: 'delete_one', id: string }
+ *   { action: 'delete_many', ids: string[] }
  *   { action: 'clear_all' }
  */
 export async function POST(req: NextRequest) {
@@ -31,8 +33,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 })
     }
 
-    const body = (await req.json()) as { action?: string; id?: string }
+    const body = (await req.json()) as { action?: string; id?: string; ids?: string[] }
     const action = body.action
+    const cleanIds = Array.isArray(body.ids)
+      ? body.ids.filter((x): x is string => typeof x === 'string' && !!x)
+      : []
 
     if (action === 'mark_read') {
       if (!body.id) {
@@ -58,6 +63,40 @@ export async function POST(req: NextRequest) {
         .is('read_at', null)
       if (error) {
         console.error('mark_all_read error:', error)
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    // Bulk mark-read for a specific set of rows (e.g. one CRM's inbox). One
+    // atomic UPDATE instead of N round-trips, so realtime fires a single
+    // settled state rather than a flickering sequence.
+    if (action === 'mark_read_many') {
+      if (cleanIds.length === 0) return NextResponse.json({ success: true })
+      const { error } = await admin
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', cleanIds)
+        .eq('user_id', user.id)
+        .is('read_at', null)
+      if (error) {
+        console.error('mark_read_many error:', error)
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    // Bulk delete for a specific set of rows (e.g. "clear all" within one CRM
+    // inbox, which must NOT touch other clients' notifications). Single DELETE.
+    if (action === 'delete_many') {
+      if (cleanIds.length === 0) return NextResponse.json({ success: true })
+      const { error } = await admin
+        .from('notifications')
+        .delete()
+        .in('id', cleanIds)
+        .eq('user_id', user.id)
+      if (error) {
+        console.error('delete_many error:', error)
         return NextResponse.json({ success: false, error: error.message }, { status: 500 })
       }
       return NextResponse.json({ success: true })

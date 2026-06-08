@@ -442,7 +442,8 @@ export default function CRMCapturePages() {
       .from('capture_pages')
       .select('*')
       .eq('client_id', clientId)
-      .order('created_at', { ascending: true })
+      // Newest first so a freshly created page lands at the top of the list.
+      .order('created_at', { ascending: false })
 
     if (error) console.error('Failed to load capture pages:', error)
     setPages((data || []) as CapturePage[])

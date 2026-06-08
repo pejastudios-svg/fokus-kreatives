@@ -8,7 +8,7 @@
 // for that client). The header bell continues to show non-CRM
 // stuff (approvals, tasks, brand intake) across the workspace.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -45,6 +45,13 @@ export default function CRMInboxPage() {
   const [items, setItems] = useState<NotificationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
+
+  // While a bulk clear / mark-all is in flight, ignore realtime refetches.
+  // The deletes/updates each emit a postgres_changes event, and a refetch
+  // landing mid-mutation reads a half-applied DB state and repopulates the
+  // list - which is exactly the "cleared 4, 2 popped back, cleared again"
+  // flicker. The optimistic update is the source of truth during this window.
+  const mutatingRef = useRef(false)
 
   // Filter to "this client's CRM-scoped notifications only" both on
   // initial fetch + on each realtime update. We compare client_id
@@ -85,7 +92,7 @@ export default function CRMInboxPage() {
           console.error('[crm-inbox] load error:', error)
           return
         }
-        if (isMounted) {
+        if (isMounted && !mutatingRef.current) {
           const rows = ((data || []) as NotificationRow[]).filter(matchesThisCrm)
           setItems(rows)
         }
@@ -161,13 +168,12 @@ export default function CRMInboxPage() {
     if (unread.length === 0) return
     const now = new Date().toISOString()
     const prev = items
+    const ids = unread.map((n) => n.id)
+    mutatingRef.current = true
     setItems((cur) => cur.map((n) => (n.read_at ? n : { ...n, read_at: now })))
-    const results = await Promise.all(
-      unread.map((n) => callMutate({ action: 'mark_read', id: n.id })),
-    )
-    if (results.some((r) => !r)) {
-      setItems(prev)
-    }
+    const ok = await callMutate({ action: 'mark_read_many', ids })
+    if (!ok) setItems(prev)
+    mutatingRef.current = false
   }, [items, callMutate])
 
   const deleteOne = useCallback(
@@ -196,15 +202,18 @@ export default function CRMInboxPage() {
       return
     }
     const prev = items
-    // Optimistic: empty the list, close the modal, and celebrate right away.
+    const ids = prev.map((n) => n.id)
+    // Guard realtime refetches until the single bulk delete settles, then
+    // optimistically empty the list, close the modal, and celebrate.
+    mutatingRef.current = true
     setItems([])
     setConfirmClearOpen(false)
     setShowCleared(true)
     setTimeout(() => setShowCleared(false), 3500)
 
-    void Promise.all(prev.map((n) => callMutate({ action: 'delete_one', id: n.id })))
-      .then((results) => {
-        if (results.some((r) => !r)) {
+    void callMutate({ action: 'delete_many', ids })
+      .then((ok) => {
+        if (!ok) {
           setItems(prev)
           setShowCleared(false)
         }
@@ -213,6 +222,9 @@ export default function CRMInboxPage() {
         console.error('clear all failed:', err)
         setItems(prev)
         setShowCleared(false)
+      })
+      .finally(() => {
+        mutatingRef.current = false
       })
   }, [items, callMutate])
 
