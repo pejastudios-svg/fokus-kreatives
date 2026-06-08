@@ -15,6 +15,8 @@ const AGENCY_NOTIFY_EMAIL = 'fokuskreatives@gmail.com'
 interface Body {
   token?: string
   answers?: Record<string, string>
+  /** Voice-note URLs keyed by question id. */
+  audioUrls?: Record<string, string>
 }
 
 async function notifyAgency(
@@ -87,6 +89,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Body
     const token = body.token?.trim()
     const answers = body.answers || {}
+    const audioUrls = body.audioUrls || {}
 
     if (!token) {
       return NextResponse.json({ success: false, error: 'Missing token' }, { status: 400 })
@@ -115,14 +118,18 @@ export async function POST(req: NextRequest) {
       question_text: string
       entry_index: number
       answer: string
+      audio_url: string | null
     }[] = []
 
-    for (const [qid, rawAnswer] of Object.entries(answers)) {
-      if (typeof rawAnswer !== 'string') continue
-      const answer = rawAnswer.trim()
-      if (!answer) continue
+    // Build from the union of answered + voice-noted questions so a recording
+    // is kept even if its transcript came back empty.
+    const answeredIds = new Set([...Object.keys(answers), ...Object.keys(audioUrls)])
+    for (const qid of answeredIds) {
       const q = questionMap.get(qid)
       if (!q) continue
+      const answer = typeof answers[qid] === 'string' ? answers[qid].trim() : ''
+      const audio = typeof audioUrls[qid] === 'string' ? audioUrls[qid] : null
+      if (!answer && !audio) continue
       rows.push({
         series_form_id: form.id,
         client_id: form.client_id,
@@ -130,6 +137,7 @@ export async function POST(req: NextRequest) {
         question_text: q.text,
         entry_index: q.entry_index,
         answer,
+        audio_url: audio,
       })
     }
 

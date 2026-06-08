@@ -136,7 +136,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <span className="w-10" />
           </header>
 
-          <main className="flex-1 overflow-auto bg-[var(--bg-secondary)] dark:bg-black">
+          {/* No `overflow-auto` here: the app scrolls the window (window.scrollTo)
+              and locks the background via body overflow for modals. An
+              overflow-auto scrollport on main would be a nested scroll container
+              that never actually scrolls, which silently breaks `position: sticky`
+              for anything inside a page. Wide content self-manages its own
+              overflow (planner grid, tables). */}
+          <main className="flex-1 bg-[var(--bg-secondary)] dark:bg-black">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>

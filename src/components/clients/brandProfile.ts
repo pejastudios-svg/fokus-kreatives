@@ -119,6 +119,17 @@ export type BrandProfile = {
     anything_else: string
     collaboration_style: 'hands_on' | 'collaborative' | 'hands_off'
   }
+
+  // Freeform fields the agency adds per client: notes, links, pasted tables,
+  // the 100 seed-topic bank, anything. URLs auto-hyperlink on display and
+  // pipe/tab rows render as a table. Added via a repeatable "+ Add field" row.
+  custom_fields: CustomField[]
+}
+
+export interface CustomField {
+  id: string
+  label: string
+  content: string
 }
 
 export function defaultBrandProfile(): BrandProfile {
@@ -235,6 +246,7 @@ export function defaultBrandProfile(): BrandProfile {
       anything_else: '',
       collaboration_style: 'collaborative',
     },
+    custom_fields: [],
   }
 }
 
@@ -344,5 +356,15 @@ export function normalizeBrandProfile(input?: Partial<BrandProfile> | null): Bra
     positioning: { ...d.positioning, ...v.positioning },
 
     final: { ...d.final, ...v.final },
+
+    custom_fields: Array.isArray(v.custom_fields)
+      ? v.custom_fields
+          .filter((f): f is CustomField => !!f && typeof f === 'object')
+          .map((f, i) => ({
+            id: typeof f.id === 'string' && f.id ? f.id : `cf_${i}`,
+            label: typeof f.label === 'string' ? f.label : '',
+            content: typeof f.content === 'string' ? f.content : '',
+          }))
+      : d.custom_fields,
   }
 }

@@ -28,6 +28,8 @@ interface Body {
   // to the answer maps above. Trust the client check - server-side word
   // counting on every submit isn't worth the cost.
   thinFlags?: Record<string, boolean>
+  // Voice-note URLs keyed by question id, parallel to the answer maps.
+  audioUrls?: Record<string, string>
 }
 
 const INPUT_TYPE_TO_POSITION: Record<TopicInputType, number> = {
@@ -53,6 +55,7 @@ interface AnswerRow {
   thin_flag: boolean
   topic_group_id: string | null
   group_position: number | null
+  audio_url: string | null
 }
 
 async function notifyAgency(
@@ -120,6 +123,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Body
     const token = body.token?.trim()
     const thinFlags = body.thinFlags || {}
+    const audioUrls = body.audioUrls || {}
 
     if (!token) {
       return NextResponse.json({ success: false, error: 'Missing token' }, { status: 400 })
@@ -160,9 +164,10 @@ export async function POST(req: NextRequest) {
 
         for (const q of topic.questions) {
           const raw = topicAns[q.id]
-          if (typeof raw !== 'string') continue
-          const answer = raw.trim()
-          if (!answer) continue
+          const answer = typeof raw === 'string' ? raw.trim() : ''
+          const audio = audioUrls[q.id] ?? null
+          // Keep the row when there's a typed answer OR a recorded voice note.
+          if (!answer && !audio) continue
           topicHasAnswers = true
           const pillar: TopicPillar = topic.pillar_hint || 'unassigned'
           rows.push({
@@ -175,6 +180,7 @@ export async function POST(req: NextRequest) {
             thin_flag: !!thinFlags[q.id],
             topic_group_id: groupId,
             group_position: INPUT_TYPE_TO_POSITION[q.input_type] ?? null,
+            audio_url: audio,
           })
         }
 
@@ -215,12 +221,13 @@ export async function POST(req: NextRequest) {
         if (q && typeof q.id === 'string') questionMap.set(q.id, q)
       }
 
-      for (const [qid, rawAnswer] of Object.entries(answers)) {
-        if (typeof rawAnswer !== 'string') continue
-        const answer = rawAnswer.trim()
-        if (!answer) continue
+      const ids = new Set([...Object.keys(answers), ...Object.keys(audioUrls)])
+      for (const qid of ids) {
         const q = questionMap.get(qid)
         if (!q) continue
+        const answer = typeof answers[qid] === 'string' ? answers[qid].trim() : ''
+        const audio = audioUrls[qid] ?? null
+        if (!answer && !audio) continue
         rows.push({
           client_id: form.client_id,
           question: q.text,
@@ -231,6 +238,7 @@ export async function POST(req: NextRequest) {
           thin_flag: !!thinFlags[qid],
           topic_group_id: null,
           group_position: null,
+          audio_url: audio,
         })
       }
 

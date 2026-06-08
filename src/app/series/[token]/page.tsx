@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
+import { VoiceTextarea } from '@/components/ui/VoiceTextarea'
 import { Button } from '@/components/ui/Button'
 import { CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
 import type {
@@ -59,6 +60,11 @@ export default function SeriesFormPage() {
   const [client, setClient] = useState<PublicClient | null>(null)
   const [answers, setAnswers, clearAnswers] = useFormPersistence<Record<string, string>>(
     `series-form:${token}`,
+    {},
+  )
+  // Voice-note URLs keyed by question id, persisted alongside the text answers.
+  const [audioUrls, setAudioUrls, clearAudioUrls] = useFormPersistence<Record<string, string>>(
+    `series-form-audio:${token}`,
     {},
   )
   const [isLoading, setIsLoading] = useState(true)
@@ -117,6 +123,15 @@ export default function SeriesFormPage() {
     setAnswers((prev) => ({ ...prev, [id]: value }))
   }
 
+  const handleAudioChange = (id: string, url: string | null) => {
+    setAudioUrls((prev) => {
+      const next = { ...prev }
+      if (url) next[id] = url
+      else delete next[id]
+      return next
+    })
+  }
+
   const handleSubmit = async () => {
     if (!form) return
     setIsSubmitting(true)
@@ -125,13 +140,14 @@ export default function SeriesFormPage() {
       const res = await fetch('/api/series-form/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, answers }),
+        body: JSON.stringify({ token, answers, audioUrls }),
       })
       const data = await res.json()
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {
         clearAnswers()
+        clearAudioUrls()
         setSuccess(true)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
@@ -260,12 +276,15 @@ export default function SeriesFormPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <textarea
+              <VoiceTextarea
                 value={answers[q.id] ?? ''}
-                onChange={(e) => handleChange(q.id, e.target.value)}
+                onChange={(v) => handleChange(q.id, v)}
+                audioUrl={audioUrls[q.id] ?? null}
+                onAudioChange={(url) => handleAudioChange(q.id, url)}
+                uploadFolder="voice-notes/series"
                 placeholder={
                   q.placeholder ||
-                  'Tell the actual story - 3 to 8 sentences. Specific moments beat polished summaries.'
+                  'Tell the actual story - 3 to 8 sentences. Specific moments beat polished summaries. Or tap the mic to record.'
                 }
                 rows={5}
                 className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-y"

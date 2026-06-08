@@ -104,7 +104,7 @@ export default function ClientDetailPage() {
   const [confirmKind, setConfirmKind] = useState<null | 'archive' | 'delete'>(null)
   const [showBrandUrlInput, setShowBrandUrlInput] = useState(false)
 
-  const [formData, setFormData, clearFormData, draftRestored] = useFormPersistence<ClientFormData>(
+  const [formData, setFormData, , draftRestored] = useFormPersistence<ClientFormData>(
     `clients:${clientId}`,
     {
       name: '',
@@ -315,11 +315,21 @@ export default function ClientDetailPage() {
       setNotification({ type: 'error', message: 'Failed to save changes' })
     } else {
       setNotification({ type: 'success', message: 'Client updated successfully!' })
-      clearFormData()
+      // Drop the persisted draft WITHOUT blanking the live form. formData
+      // already holds exactly what we just saved, so there's no need to clear
+      // it to the empty default and refetch - doing that flashed an empty
+      // brand profile during the fetch round-trip. Just refresh the `client`
+      // snapshot in the background for any derived UI.
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem(`clients:${clientId}`)
+        } catch {
+          // storage disabled - ignore
+        }
+      }
       const row = await fetchClient()
       if (row) {
         setClient(row)
-        setFormData(mapClientToForm(row))
         setIntakeToken(row.brand_intake_token ?? null)
       }
     }
@@ -429,8 +439,8 @@ export default function ClientDetailPage() {
       <Header title={client.name ?? ''} subtitle={client.business_name ?? ''} />
 
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <Link href={`/clients/${clientId}`} className="inline-flex items-center text-[#2B79F7] hover:underline">
+        <div className="sticky top-14 md:top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between gap-3 bg-[var(--bg-secondary)] dark:bg-black border-b border-[var(--border-primary)]">
+          <Link href={`/clients/${clientId}`} className="inline-flex items-center text-[#2B79F7] hover:underline shrink-0">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to profile
           </Link>

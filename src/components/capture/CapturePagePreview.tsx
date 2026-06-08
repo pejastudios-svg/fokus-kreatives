@@ -9,7 +9,7 @@
 // inside the modal's right pane (Tally pattern).
 
 import { CaptureLayout } from './layouts'
-import { isColorDark, buildCaptureThemeVars } from './colorUtils'
+import { isColorDark, relativeLuminance, buildCaptureThemeVars } from './colorUtils'
 import type {
   CaptureField,
   CaptureSection,
@@ -97,7 +97,19 @@ export function CapturePagePreview({ form }: Props) {
     // Default to a white card so the preview always renders as a
     // light-mode form by default, decoupled from the admin theme.
     const cardColor = form.theme?.cardColor || '#ffffff'
-    style = { ...style, ...(buildCaptureThemeVars(cardColor) as React.CSSProperties) }
+    const vars = buildCaptureThemeVars(cardColor)
+    let pageBgDark = false
+    if (bg) {
+      if (bg.type === 'gradient') {
+        const lum =
+          (relativeLuminance(bg.from || '#2B79F7') + relativeLuminance(bg.to || '#143A80')) / 2
+        pageBgDark = lum < 0.5
+      } else {
+        pageBgDark = isColorDark(bg.color || '#f9fafb')
+      }
+    }
+    vars['--capture-footer'] = pageBgDark ? '#ffffff' : '#0f172a'
+    style = { ...style, ...(vars as React.CSSProperties) }
     return style
   })()
 

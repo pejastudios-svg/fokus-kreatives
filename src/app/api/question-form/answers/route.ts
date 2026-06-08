@@ -52,14 +52,20 @@ export async function GET(req: NextRequest) {
     const groupIds = formTopics.map((t) => topicGroupIdFor(form.id, t.id))
     const { data: rows } = await supabase
       .from('topics')
-      .select('answer, input_type, thin_flag, topic_group_id, group_position')
+      .select('answer, input_type, thin_flag, topic_group_id, group_position, audio_url')
       .eq('client_id', form.client_id)
       .eq('source', 'form')
       .in('topic_group_id', groupIds)
 
     const byGroup = new Map<
       string,
-      Array<{ input_type: string; answer: string; thin_flag: boolean; group_position: number | null }>
+      Array<{
+        input_type: string
+        answer: string
+        thin_flag: boolean
+        group_position: number | null
+        audio_url: string | null
+      }>
     >()
     for (const r of rows || []) {
       if (!r.topic_group_id) continue
@@ -69,6 +75,7 @@ export async function GET(req: NextRequest) {
         answer: r.answer || '',
         thin_flag: !!r.thin_flag,
         group_position: r.group_position ?? null,
+        audio_url: r.audio_url ?? null,
       })
       byGroup.set(r.topic_group_id, list)
     }
@@ -76,8 +83,9 @@ export async function GET(req: NextRequest) {
     const topicsOut = formTopics.map((t) => {
       const gid = topicGroupIdFor(form.id, t.id)
       const stored = byGroup.get(gid) || []
-      const byType = new Map<string, { answer: string; thin_flag: boolean }>()
-      for (const s of stored) byType.set(s.input_type, { answer: s.answer, thin_flag: s.thin_flag })
+      const byType = new Map<string, { answer: string; thin_flag: boolean; audio_url: string | null }>()
+      for (const s of stored)
+        byType.set(s.input_type, { answer: s.answer, thin_flag: s.thin_flag, audio_url: s.audio_url })
 
       const questions = t.questions.map((q) => {
         const hit = byType.get(q.input_type)
@@ -87,6 +95,7 @@ export async function GET(req: NextRequest) {
           text: q.text,
           answer: hit?.answer ?? null,
           thin_flag: hit?.thin_flag ?? false,
+          audio_url: hit?.audio_url ?? null,
         }
       })
 
@@ -119,16 +128,23 @@ export async function GET(req: NextRequest) {
 
   const { data: topicRows } = await supabase
     .from('topics')
-    .select('question, answer, pillar, thin_flag')
+    .select('question, answer, pillar, thin_flag, audio_url')
     .eq('client_id', form.client_id)
     .eq('source', 'form')
     .gte('created_at', windowStart)
     .lte('created_at', windowEnd)
 
-  const answerByQuestion = new Map<string, { answer: string; thin_flag: boolean }>()
+  const answerByQuestion = new Map<
+    string,
+    { answer: string; thin_flag: boolean; audio_url: string | null }
+  >()
   for (const row of topicRows || []) {
     if (typeof row.question === 'string' && typeof row.answer === 'string') {
-      answerByQuestion.set(row.question, { answer: row.answer, thin_flag: !!row.thin_flag })
+      answerByQuestion.set(row.question, {
+        answer: row.answer,
+        thin_flag: !!row.thin_flag,
+        audio_url: row.audio_url ?? null,
+      })
     }
   }
 
@@ -140,6 +156,7 @@ export async function GET(req: NextRequest) {
       pillar: q.pillar || null,
       answer: hit?.answer ?? null,
       thin_flag: hit?.thin_flag ?? false,
+      audio_url: hit?.audio_url ?? null,
     }
   })
 

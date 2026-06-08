@@ -21,6 +21,7 @@ import {
   Moon,
   CalendarRange,
   ShieldCheck,
+  Lightbulb,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -35,6 +36,7 @@ const baseNavigation = [
   { name: 'Competitors', href: '/competitors', icon: Search },
   { name: 'Approvals', href: '/approvals', icon: ClipboardList },
   { name: 'Campaigns', href: '/campaigns', icon: Sparkles },
+  { name: 'Prompts', href: '/prompts', icon: Lightbulb },
 ]
 
 interface SidebarProps {

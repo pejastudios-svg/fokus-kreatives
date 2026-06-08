@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { CaptureLayout } from '@/components/capture/layouts'
-import { isColorDark, buildCaptureThemeVars } from '@/components/capture/colorUtils'
+import { isColorDark, relativeLuminance, buildCaptureThemeVars } from '@/components/capture/colorUtils'
 import { useSessionTracking } from '@/components/capture/useSessionTracking'
 import type {
   CaptureField,
@@ -159,7 +159,22 @@ export default function PublicCapturePage() {
     // card so the page ALWAYS looks like a light-mode form by
     // default, regardless of the admin's theme.
     const cardColor = pageInfo?.theme?.cardColor || '#ffffff'
-    style = { ...style, ...(buildCaptureThemeVars(cardColor) as React.CSSProperties) }
+    const vars = buildCaptureThemeVars(cardColor)
+    // Footer ("Powered by …") sits on the PAGE background, not the card, so
+    // its colour must contrast with the page bg: white on dark, near-black on
+    // light. For gradients we average the two stops' luminance.
+    let pageBgDark = false
+    if (bg) {
+      if (bg.type === 'gradient') {
+        const lum =
+          (relativeLuminance(bg.from || '#2B79F7') + relativeLuminance(bg.to || '#143A80')) / 2
+        pageBgDark = lum < 0.5
+      } else {
+        pageBgDark = isColorDark(bg.color || '#f9fafb')
+      }
+    }
+    vars['--capture-footer'] = pageBgDark ? '#ffffff' : '#0f172a'
+    style = { ...style, ...(vars as React.CSSProperties) }
     return style
   }, [pageInfo])
 

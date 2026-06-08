@@ -638,6 +638,76 @@ export function BrandProfileForm({
           </div>
         </CardContent>
       </Card>
+
+      {/* Custom fields & notes - freeform per-client area. Paste anything:
+          notes, links (auto-hyperlinked on the client page), pasted tables,
+          the 100 seed-topic bank. Mirrors the repeatable "+ Add" row pattern. */}
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">Custom fields &amp; notes</h3>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">
+            Add your own labelled fields and paste in whatever you need: notes, links, tables, the seed-topic bank.
+            Links turn into clickable links on the client page.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {bp.custom_fields.length === 0 ? (
+            <p className="text-sm text-[var(--text-tertiary)]">
+              No custom fields yet. Add one to store links, tables, or the 100 seed topics.
+            </p>
+          ) : (
+            bp.custom_fields.map((field, idx) => (
+              <div
+                key={field.id}
+                className="space-y-2 rounded-lg border border-[var(--border-primary)] p-3 bg-[var(--bg-secondary)]"
+              >
+                <div className="flex gap-2">
+                  <Input
+                    value={field.label}
+                    onChange={(e) => {
+                      const copy = [...bp.custom_fields]
+                      copy[idx] = { ...copy[idx], label: e.target.value }
+                      set('custom_fields', copy)
+                    }}
+                    placeholder="Field name (e.g., 100 Seed Topics, Brand links, Asset folder)"
+                    className="flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set('custom_fields', bp.custom_fields.filter((_, i) => i !== idx))}
+                    className="px-3 text-sm text-[var(--text-tertiary)] hover:text-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  value={field.content}
+                  onChange={(e) => {
+                    const copy = [...bp.custom_fields]
+                    copy[idx] = { ...copy[idx], content: e.target.value }
+                    set('custom_fields', copy)
+                  }}
+                  rows={5}
+                  className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm font-mono"
+                  placeholder="Paste anything. Links auto-hyperlink. For a table, paste rows with | or tabs between columns."
+                />
+              </div>
+            ))
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              set('custom_fields', [
+                ...bp.custom_fields,
+                { id: crypto.randomUUID(), label: '', content: '' },
+              ])
+            }
+            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            + Add field
+          </button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -769,6 +769,7 @@ interface AnswerSummary {
       text: string
       answer: string | null
       thin_flag: boolean
+      audio_url?: string | null
     }>
   }>
   answers: Array<{
@@ -777,6 +778,7 @@ interface AnswerSummary {
     pillar: string | null
     answer: string | null
     thin_flag?: boolean
+    audio_url?: string | null
   }>
 }
 
@@ -814,6 +816,9 @@ function AnswerInlineView({ summary }: { summary: AnswerSummary }) {
                       <span className="text-theme-tertiary italic">No answer</span>
                     )}
                   </p>
+                  {q.audio_url && (
+                    <audio controls src={q.audio_url} className="mt-1.5 ml-1 h-8 w-full max-w-xs" />
+                  )}
                 </div>
               ))}
             </div>
@@ -836,6 +841,9 @@ function AnswerInlineView({ summary }: { summary: AnswerSummary }) {
           <p className="mt-1 ml-5 text-theme-secondary whitespace-pre-wrap">
             {a.answer || <span className="text-theme-tertiary italic">No answer</span>}
           </p>
+          {a.audio_url && (
+            <audio controls src={a.audio_url} className="mt-1.5 ml-5 h-8 w-full max-w-xs" />
+          )}
         </li>
       ))}
     </ol>

@@ -27,6 +27,7 @@ import {
   Check,
   Mail,
   X as XIcon,
+  StickyNote,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { useAgencyUser } from '@/components/auth/AgencyUserContext'
@@ -73,13 +74,14 @@ const PACKAGE_TIER_LABEL: Record<PackageTier, string> = {
   lower: 'Lower (Foundation)',
 }
 
-type TabKey = 'overview' | 'audience' | 'guidelines' | 'competitors' | 'team'
+type TabKey = 'overview' | 'audience' | 'guidelines' | 'competitors' | 'team' | 'notes'
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'overview', label: 'Overview', icon: Briefcase },
   { key: 'audience', label: 'Audience', icon: Target },
   { key: 'guidelines', label: 'Brand guidelines', icon: FileText },
   { key: 'competitors', label: 'Competitors', icon: Megaphone },
+  { key: 'notes', label: 'Notes', icon: StickyNote },
   { key: 'team', label: 'Team', icon: UsersIcon },
 ]
 
@@ -309,8 +311,8 @@ export default function ClientProfilePage() {
     <>
       <Header title="Client profile" subtitle={client.business_name || client.name || ''} />
       <div className="p-4 md:p-8 max-w-5xl mx-auto">
-        {/* Back + notification */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Back + notification - sticky so Back stays reachable while scrolling */}
+        <div className="sticky top-14 md:top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between gap-3 bg-[var(--bg-secondary)] dark:bg-black border-b border-[var(--border-primary)]">
           <Link
             href="/clients"
             className="inline-flex items-center text-[#2B79F7] hover:underline text-sm"
@@ -590,6 +592,7 @@ export default function ClientProfilePage() {
         {tab === 'audience' && <AudienceTab client={client} profile={profile} />}
         {tab === 'guidelines' && <GuidelinesTab client={client} profile={profile} flash={flash} />}
         {tab === 'competitors' && <CompetitorsTab client={client} profile={profile} />}
+        {tab === 'notes' && <NotesTab profile={profile} />}
         {tab === 'team' && <ClientAssignees clientId={clientId} />}
       </div>
 
@@ -817,6 +820,138 @@ function ChipList({ items }: { items: string[] }) {
 // ============================================================================
 // Tabs
 // ============================================================================
+
+// Split a line of text into clickable links + plain text. Matches http(s)
+// URLs and bare www. links. Used by the Notes tab so pasted links work.
+// Split (global) keeps the delimiters; a separate non-global test classifies
+// each part, so there's no shared lastIndex state to reset.
+const URL_SPLIT_RE = /(https?:\/\/[^\s]+|www\.[^\s]+)/g
+const URL_TEST_RE = /^(https?:\/\/|www\.)/
+
+function linkify(text: string, keyPrefix: string): React.ReactNode[] {
+  return text.split(URL_SPLIT_RE).map((part, i) => {
+    if (!part) return null
+    if (URL_TEST_RE.test(part)) {
+      const href = part.startsWith('http') ? part : `https://${part}`
+      return (
+        <a
+          key={`${keyPrefix}-${i}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#2B79F7] underline break-all hover:opacity-80"
+        >
+          {part}
+        </a>
+      )
+    }
+    return <span key={`${keyPrefix}-${i}`}>{part}</span>
+  })
+}
+
+// A content block is rendered as a table when 2+ consecutive lines each
+// contain a column separator (| or tab). Otherwise it's linkified text with
+// line breaks preserved. Keeps "paste a table OR paste notes" both working.
+function splitRow(line: string): string[] | null {
+  if (line.includes('\t')) return line.split('\t').map((c) => c.trim())
+  if (line.includes('|')) {
+    // Markdown-style: drop leading/trailing pipes, then split.
+    return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim())
+  }
+  return null
+}
+
+// A markdown separator row like | --- | --- | - skip it in rendering.
+function isSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c.replace(/\s/g, '')))
+}
+
+function CustomFieldContent({ content, fieldId }: { content: string; fieldId: string }) {
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  const rows = lines.map(splitRow)
+  const tableLineCount = rows.filter(Boolean).length
+  const looksLikeTable = tableLineCount >= 2
+
+  if (looksLikeTable) {
+    const tableRows = rows
+      .map((cells, i) => ({ cells, i }))
+      .filter((r): r is { cells: string[]; i: number } => !!r.cells && !isSeparatorRow(r.cells))
+    if (tableRows.length) {
+      const [head, ...body] = tableRows
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                {head.cells.map((c, ci) => (
+                  <th
+                    key={ci}
+                    className="border border-[var(--border-primary)] px-3 py-2 text-left font-semibold text-[var(--text-primary)] bg-[var(--bg-secondary)]"
+                  >
+                    {linkify(c, `${fieldId}-h-${ci}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((r) => (
+                <tr key={r.i}>
+                  {r.cells.map((c, ci) => (
+                    <td
+                      key={ci}
+                      className="border border-[var(--border-primary)] px-3 py-2 align-top text-[var(--text-secondary)]"
+                    >
+                      {linkify(c, `${fieldId}-r${r.i}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+  }
+
+  return (
+    <div className="whitespace-pre-wrap break-words text-sm text-[var(--text-secondary)] leading-relaxed">
+      {lines.map((line, i) => (
+        <div key={i}>{line ? linkify(line, `${fieldId}-l${i}`) : ' '}</div>
+      ))}
+    </div>
+  )
+}
+
+function NotesTab({ profile }: { profile: BrandProfile }) {
+  const fields = profile.custom_fields.filter((f) => (f.label.trim() || f.content.trim()))
+  if (fields.length === 0) {
+    return (
+      <Section title="Notes & custom fields" description="Freeform fields for this client.">
+        <p className="text-sm text-[var(--text-tertiary)]">
+          No custom fields yet. Add them in Edit client to store links, tables, or the 100 seed topics.
+        </p>
+      </Section>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      {fields.map((field) => (
+        <Card key={field.id}>
+          <CardContent className="p-5 md:p-6 space-y-3">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">
+              {field.label.trim() || 'Untitled field'}
+            </h3>
+            {field.content.trim() ? (
+              <CustomFieldContent content={field.content} fieldId={field.id} />
+            ) : (
+              <p className="text-sm text-[var(--text-tertiary)]">Empty.</p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
 
 function OverviewTab({ client, profile }: { client: ClientRow; profile: BrandProfile }) {
   return (

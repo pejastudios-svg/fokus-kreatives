@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { VoiceTextarea } from '@/components/ui/VoiceTextarea'
 import { CheckCircle, AlertCircle, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import type {
   FormQuestion,
@@ -87,6 +88,11 @@ export default function QuestionFormPage() {
   const [topicAnswers, setTopicAnswers, clearTopicAnswers] = useFormPersistence<
     Record<string, Record<string, string>>
   >(`question-form-topics:${token}`, {})
+  // Voice-note URLs keyed by question id (unique across legacy + topic forms).
+  const [audioUrls, setAudioUrls, clearAudioUrls] = useFormPersistence<Record<string, string>>(
+    `question-form-audio:${token}`,
+    {},
+  )
 
   const [prefilled, setPrefilled] = useState(false)
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set())
@@ -176,6 +182,15 @@ export default function QuestionFormPage() {
     }))
   }
 
+  const handleAudioChange = (qid: string, url: string | null) => {
+    setAudioUrls((prev) => {
+      const next = { ...prev }
+      if (url) next[qid] = url
+      else delete next[qid]
+      return next
+    })
+  }
+
   const toggleTopic = (id: string) => {
     setExpandedTopics((prev) => {
       const next = new Set(prev)
@@ -213,6 +228,7 @@ export default function QuestionFormPage() {
         body: JSON.stringify({
           token,
           ...(isTopicForm ? { topicAnswers } : { answers }),
+          audioUrls,
           thinFlags,
         }),
       })
@@ -222,6 +238,7 @@ export default function QuestionFormPage() {
       } else {
         clearAnswers()
         clearTopicAnswers()
+        clearAudioUrls()
         setSuccess(true)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
@@ -370,6 +387,8 @@ export default function QuestionFormPage() {
                         question={q}
                         value={topicAns[q.id] || ''}
                         onChange={(v) => handleTopicChange(topic.id, q.id, v)}
+                        audioUrl={audioUrls[q.id] ?? null}
+                        onAudioChange={(url) => handleAudioChange(q.id, url)}
                       />
                     ))}
                   </CardContent>
@@ -398,6 +417,8 @@ export default function QuestionFormPage() {
                   value={answers[q.id] ?? ''}
                   placeholder={q.placeholder}
                   onChange={(v) => handleLegacyChange(q.id, v)}
+                  audioUrl={audioUrls[q.id] ?? null}
+                  onAudioChange={(url) => handleAudioChange(q.id, url)}
                 />
               </CardContent>
             </Card>
@@ -444,20 +465,27 @@ function LegacyAnswerField({
   value,
   placeholder,
   onChange,
+  audioUrl,
+  onAudioChange,
 }: {
   value: string
   placeholder?: string
   onChange: (v: string) => void
+  audioUrl?: string | null
+  onAudioChange?: (url: string | null) => void
 }) {
   const [touched, setTouched] = useState(false)
   const showThin = touched && !!value.trim() && isThinAnswer(value)
   return (
     <div>
-      <textarea
+      <VoiceTextarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         onBlur={() => setTouched(true)}
-        placeholder={placeholder || 'Type your answer - 2 to 6 sentences is perfect.'}
+        audioUrl={audioUrl}
+        onAudioChange={onAudioChange}
+        uploadFolder="voice-notes/questions"
+        placeholder={placeholder || 'Type your answer - 2 to 6 sentences, or tap the mic to record.'}
         rows={4}
         className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
       />
@@ -470,10 +498,14 @@ function TopicQuestionField({
   question,
   value,
   onChange,
+  audioUrl,
+  onAudioChange,
 }: {
   question: FormTopicQuestion
   value: string
   onChange: (v: string) => void
+  audioUrl?: string | null
+  onAudioChange?: (url: string | null) => void
 }) {
   const [touched, setTouched] = useState(false)
   const showThin = touched && !!value.trim() && isThinAnswer(value)
@@ -483,11 +515,14 @@ function TopicQuestionField({
         {INPUT_TYPE_LABEL[question.input_type] || question.input_type}
       </div>
       <p className="text-sm text-[var(--text-primary)] font-medium mb-2">{question.text}</p>
-      <textarea
+      <VoiceTextarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         onBlur={() => setTouched(true)}
-        placeholder={question.placeholder || 'Type your answer - 2 to 6 sentences is perfect.'}
+        audioUrl={audioUrl}
+        onAudioChange={onAudioChange}
+        uploadFolder="voice-notes/questions"
+        placeholder={question.placeholder || 'Type your answer - 2 to 6 sentences, or tap the mic to record.'}
         rows={4}
         className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none"
       />

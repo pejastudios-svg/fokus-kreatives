@@ -15,6 +15,18 @@ import { useEffect } from 'react'
 
 const OVERLAY_SELECTOR = '.fixed.inset-0[class*="bg-black"]'
 
+// An overlay only counts as an OPEN modal if it's actually visible. Hidden
+// backdrops that live permanently in the DOM - the mobile-nav scrim
+// (`md:hidden …` = display:none on desktop) or a closed drawer
+// (`opacity-0 pointer-events-none`) - must NOT lock scroll.
+function isVisible(el: Element): boolean {
+  const cs = getComputedStyle(el)
+  if (cs.display === 'none' || cs.visibility === 'hidden') return false
+  if (parseFloat(cs.opacity || '1') < 0.05) return false
+  const r = el.getBoundingClientRect()
+  return r.width > 0 && r.height > 0
+}
+
 export function ModalScrollLock() {
   useEffect(() => {
     let raf = 0
@@ -23,7 +35,7 @@ export function ModalScrollLock() {
 
     const apply = () => {
       raf = 0
-      const hasModal = document.querySelector(OVERLAY_SELECTOR) !== null
+      const hasModal = Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).some(isVisible)
       if (hasModal && !locked) {
         savedOverflow = document.body.style.overflow
         document.body.style.overflow = 'hidden'

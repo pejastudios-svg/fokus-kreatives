@@ -119,7 +119,7 @@ function CompactLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Captur
 
             <CaptureFormBody pageInfo={pageInfo} {...form} />
 
-            <p className="mt-6 text-xs text-[var(--text-tertiary)] text-center">
+            <p className="mt-6 text-xs text-[var(--capture-footer)] opacity-70 text-center">
               Powered by Fokus Kreativez
             </p>
           </CardContent>
@@ -159,7 +159,7 @@ function SplitLayout({
         <div className="mt-6">
           <CaptureFormBody pageInfo={pageInfo} {...form} />
         </div>
-        <p className="mt-6 text-xs text-[var(--text-tertiary)]">Powered by Fokus Kreativez</p>
+        <p className="mt-6 text-xs text-[var(--capture-footer)] opacity-70">Powered by Fokus Kreativez</p>
       </div>
     </div>
   )
@@ -223,7 +223,7 @@ function HeroOverlayLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Ca
           <div className="mt-6">
             <CaptureFormBody pageInfo={pageInfo} {...form} />
           </div>
-          <p className="mt-6 text-xs text-[var(--text-tertiary)] text-center">
+          <p className="mt-6 text-xs text-[var(--capture-footer)] opacity-70 text-center">
             Powered by Fokus Kreativez
           </p>
         </div>
@@ -283,7 +283,7 @@ function BannerTopLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Capt
           </div>
           <CaptureFormBody pageInfo={pageInfo} {...form} />
         </div>
-        <p className="mt-6 text-xs text-[var(--text-tertiary)] text-center">
+        <p className="mt-6 text-xs text-[var(--capture-footer)] opacity-70 text-center">
           Powered by Fokus Kreativez
         </p>
       </div>
@@ -332,7 +332,7 @@ function MinimalLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Captur
           )}
         </div>
         <CaptureFormBody pageInfo={pageInfo} {...form} />
-        <p className="mt-10 text-xs text-[var(--text-tertiary)] text-center">
+        <p className="mt-10 text-xs text-[var(--capture-footer)] opacity-70 text-center">
           Powered by Fokus Kreativez
         </p>
       </div>
