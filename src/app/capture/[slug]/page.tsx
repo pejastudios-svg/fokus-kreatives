@@ -36,6 +36,8 @@ interface RawFieldData {
   options?: unknown
   embedUrl?: unknown
   embedHeight?: unknown
+  repeatable?: unknown
+  packages?: unknown
   sectionId?: unknown
 }
 
@@ -51,6 +53,17 @@ function normalizeFields(f: unknown): CaptureField[] {
     options: Array.isArray(x.options) ? x.options.map(String) : undefined,
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
+    // Preserve repeatable + packages or they vanish on the public page.
+    repeatable: x.repeatable ? true : undefined,
+    packages: Array.isArray(x.packages)
+      ? (x.packages as Array<Record<string, unknown>>).map((p, i) => ({
+          id: String(p.id || `pkg-${i}`),
+          name: String(p.name || ''),
+          subtitle: p.subtitle ? String(p.subtitle) : undefined,
+          price: p.price ? String(p.price) : undefined,
+          features: Array.isArray(p.features) ? (p.features as unknown[]).map(String) : undefined,
+        }))
+      : undefined,
     sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
 }

@@ -76,6 +76,8 @@ export function formatNotificationText(n: NotificationRow): string {
       return `Payment recorded${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}`
     case 'payment_due':
       return `Payment due${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}`
+    case 'payment_marked_paid':
+      return `${get(data, 'billToName') || 'A client'} marked their invoice paid${get(data, 'invoiceNumber') ? ` (#${get(data, 'invoiceNumber')})` : ''} - confirm it`
     default:
       return 'Notification'
   }
@@ -149,7 +151,11 @@ export function notificationHref(
       : `/crm/${clientId}/meetings`
   }
 
-  if (n.type === 'payment_created' || n.type === 'payment_due') {
+  if (
+    n.type === 'payment_created' ||
+    n.type === 'payment_due' ||
+    n.type === 'payment_marked_paid'
+  ) {
     const clientId = get(data, 'clientId')
     if (!clientId) return null
     const paymentId = get(data, 'paymentId')

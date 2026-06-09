@@ -7,12 +7,25 @@ export type FieldType =
   | 'text'
   | 'email'
   | 'phone'
+  | 'url'
   | 'textarea'
   | 'select'
   | 'radio'
   | 'date'
   | 'time'
   | 'embed'
+  | 'package'
+
+/** One selectable plan in a `package` field. The visitor picks one; the
+ *  chosen package's name is saved as the field's value. */
+export interface PackageOption {
+  id: string
+  name: string
+  subtitle?: string
+  price?: string
+  /** "What's included" - one line per feature. */
+  features?: string[]
+}
 
 export interface CaptureField {
   id: string
@@ -24,6 +37,12 @@ export interface CaptureField {
   options?: string[]
   embedUrl?: string
   embedHeight?: number
+  /** Text/email/phone/url fields only: let the visitor add several entries
+   *  (e.g. multiple social handles), each on its own line. Stored newline-
+   *  joined under the field id. */
+  repeatable?: boolean
+  /** `package` fields only: the selectable plan cards. */
+  packages?: PackageOption[]
   /** Which form section (multi-step page) this field belongs to. Empty
    *  / unknown means it falls into the first step. Pages with no sections
    *  ignore this and render every field on one page. */

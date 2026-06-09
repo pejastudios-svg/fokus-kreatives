@@ -17,6 +17,8 @@ import {
   Calendar,
   Clock,
   Link as LinkIcon,
+  Globe,
+  Package,
   Mail,
   Phone,
   AlignLeft,
@@ -24,21 +26,25 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
+  Plus,
   Asterisk,
   GripVertical,
 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
+import type { PackageOption } from './types'
 
 type FieldType =
   | 'text'
   | 'email'
   | 'phone'
+  | 'url'
   | 'textarea'
   | 'select'
   | 'radio'
   | 'date'
   | 'time'
   | 'embed'
+  | 'package'
 
 interface CaptureField {
   id: string
@@ -50,7 +56,11 @@ interface CaptureField {
   options?: string[]
   embedUrl?: string
   embedHeight?: number
+  repeatable?: boolean
+  packages?: PackageOption[]
 }
+
+const REPEATABLE_TYPES = new Set<FieldType>(['text', 'email', 'phone', 'url'])
 
 interface Props {
   field: CaptureField
@@ -79,12 +89,14 @@ const TYPE_META: Record<
   text: { label: 'Text', icon: Type },
   email: { label: 'Email', icon: Mail },
   phone: { label: 'Phone', icon: Phone },
+  url: { label: 'Link', icon: Globe },
   textarea: { label: 'Long text', icon: AlignLeft },
   select: { label: 'Dropdown', icon: ChevronDown },
   radio: { label: 'Options', icon: CircleDot },
   date: { label: 'Date', icon: Calendar },
   time: { label: 'Time', icon: Clock },
   embed: { label: 'Embed', icon: LinkIcon },
+  package: { label: 'Package', icon: Package },
 }
 
 export function CaptureFieldRow({
@@ -105,6 +117,20 @@ export function CaptureFieldRow({
   const rowRef = useRef<HTMLDivElement>(null)
   const meta = TYPE_META[field.type]
   const Icon = meta.icon
+
+  const patchPkg = (i: number, patch: Partial<PackageOption>) =>
+    onUpdate(field.id, {
+      packages: (field.packages || []).map((p, j) => (j === i ? { ...p, ...patch } : p)),
+    })
+  const addPackage = () =>
+    onUpdate(field.id, {
+      packages: [
+        ...(field.packages || []),
+        { id: crypto.randomUUID(), name: '', price: '', subtitle: '', features: [] },
+      ],
+    })
+  const removePackage = (i: number) =>
+    onUpdate(field.id, { packages: (field.packages || []).filter((_, j) => j !== i) })
 
   return (
     <div
@@ -242,7 +268,7 @@ export function CaptureFieldRow({
             </div>
           </div>
 
-          {field.type !== 'embed' && (
+          {field.type !== 'embed' && field.type !== 'package' && (
             <Input
               label="Placeholder (optional)"
               value={field.placeholder || ''}
@@ -252,7 +278,7 @@ export function CaptureFieldRow({
           )}
 
           <Input
-            label="Helper text (optional)"
+            label={field.type === 'embed' ? 'Helper text shown under the embed (optional)' : 'Helper text (optional)'}
             value={field.description || ''}
             onChange={(e) => onUpdate(field.id, { description: e.target.value })}
             placeholder="Small note shown under the field"
@@ -268,6 +294,18 @@ export function CaptureFieldRow({
             Required
           </label>
 
+          {REPEATABLE_TYPES.has(field.type) && (
+            <label className="flex items-center gap-2 text-sm text-[var(--text-primary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!field.repeatable}
+                onChange={(e) => onUpdate(field.id, { repeatable: e.target.checked })}
+                className="h-4 w-4 rounded border-[var(--border-primary)] bg-[var(--bg-input)] text-[#2B79F7]"
+              />
+              Allow multiple entries (visitor can add up to 5, one per line)
+            </label>
+          )}
+
           {(field.type === 'select' || field.type === 'radio') && (
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
@@ -276,12 +314,10 @@ export function CaptureFieldRow({
               <textarea
                 value={(field.options || []).join('\n')}
                 onChange={(e) =>
-                  onUpdate(field.id, {
-                    options: e.target.value
-                      .split('\n')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  })
+                  // Split only - no trim/filter here, or pressing Space at the
+                  // end of a word or Enter for a new line gets stripped as you
+                  // type. Empty lines are cleaned on save / when rendered.
+                  onUpdate(field.id, { options: e.target.value.split('\n') })
                 }
                 rows={4}
                 className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
@@ -306,6 +342,77 @@ export function CaptureFieldRow({
                 }
                 placeholder="520"
               />
+            </div>
+          )}
+
+          {field.type === 'package' && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-[var(--text-primary)]">
+                Packages (the visitor picks one)
+              </label>
+              {(field.packages || []).map((p, i) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-[var(--border-primary)] p-3 space-y-2 bg-[var(--bg-card)]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[var(--text-tertiary)]">
+                      Package {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removePackage(i)}
+                      className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-500"
+                      title="Remove package"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-2">
+                    <Input
+                      label="Name"
+                      value={p.name}
+                      onChange={(e) => patchPkg(i, { name: e.target.value })}
+                      placeholder="Premium"
+                    />
+                    <Input
+                      label="Price"
+                      value={p.price || ''}
+                      onChange={(e) => patchPkg(i, { price: e.target.value })}
+                      placeholder="$49/mo"
+                    />
+                  </div>
+                  <Input
+                    label="Subtitle (optional)"
+                    value={p.subtitle || ''}
+                    onChange={(e) => patchPkg(i, { subtitle: e.target.value })}
+                    placeholder="Business"
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                      What&apos;s included (one per line)
+                    </label>
+                    <textarea
+                      value={(p.features || []).join('\n')}
+                      onChange={(e) =>
+                        // Split only (see options note) so Space/Enter aren't
+                        // eaten while typing. Empties cleaned on save / render.
+                        patchPkg(i, { features: e.target.value.split('\n') })
+                      }
+                      rows={4}
+                      className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                      placeholder={'Everything in Starter\nPriority support\nCustom reports'}
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addPackage}
+                className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                <Plus className="h-4 w-4" /> Add package
+              </button>
             </div>
           )}
 

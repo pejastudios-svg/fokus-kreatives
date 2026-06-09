@@ -24,6 +24,7 @@ import {
   Type,
   CircleDot,
   Calendar,
+  Package,
   ListChecks,
   FileDown,
   Info,
@@ -42,9 +43,11 @@ import { BrandImageUpload } from '@/components/capture/BrandImageUpload'
 import { ThemePicker } from '@/components/capture/ThemePicker'
 import { CaptureFieldRow } from '@/components/capture/CaptureFieldRow'
 import { CaptureAdvancedAnalytics } from '@/components/capture/CaptureAdvancedAnalytics'
-import type { LayoutTemplate } from '@/components/capture/types'
+import type { LayoutTemplate, PackageOption } from '@/components/capture/types'
 
-type FieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'date' | 'time' | 'embed'
+type FieldType =
+  | 'text' | 'email' | 'phone' | 'url' | 'textarea'
+  | 'select' | 'radio' | 'date' | 'time' | 'embed' | 'package'
 
 type CaptureField = {
   id: string
@@ -56,6 +59,8 @@ type CaptureField = {
   options?: string[]
   embedUrl?: string
   embedHeight?: number
+  repeatable?: boolean
+  packages?: PackageOption[]
   sectionId?: string
 }
 
@@ -227,6 +232,8 @@ interface RawField {
   options?: unknown;
   embedUrl?: unknown;
   embedHeight?: unknown;
+  repeatable?: unknown;
+  packages?: unknown;
   sectionId?: unknown;
 }
 
@@ -245,8 +252,42 @@ function normalizeFields(f: unknown): CaptureField[] {
     options: Array.isArray(x.options) ? (x.options as unknown[]).map(String) : undefined,
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
+    repeatable: x.repeatable ? true : undefined,
+    packages: Array.isArray(x.packages)
+      ? (x.packages as Array<Record<string, unknown>>).map((p, i) => ({
+          id: String(p.id || `pkg-${i}`),
+          name: String(p.name || ''),
+          subtitle: p.subtitle ? String(p.subtitle) : undefined,
+          price: p.price ? String(p.price) : undefined,
+          features: Array.isArray(p.features)
+            ? (p.features as unknown[]).map(String)
+            : undefined,
+        }))
+      : undefined,
     sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
+}
+
+// Trim + drop blank lines from the "one per line" lists right before saving.
+// The editor keeps them raw while typing (so Space/Enter aren't eaten); this
+// is where they get tidied so the stored data and public page stay clean.
+function cleanFieldsForSave(fields: CaptureField[]): CaptureField[] {
+  return fields.map((f) => {
+    const out: CaptureField = { ...f }
+    if (out.options) {
+      out.options = out.options.map((o) => o.trim()).filter(Boolean)
+    }
+    if (out.packages) {
+      out.packages = out.packages.map((p) => ({
+        ...p,
+        name: (p.name || '').trim(),
+        subtitle: p.subtitle?.trim() || undefined,
+        price: p.price?.trim() || undefined,
+        features: (p.features || []).map((x) => x.trim()).filter(Boolean),
+      }))
+    }
+    return out
+  })
 }
 
 export default function CRMCapturePages() {
@@ -557,17 +598,38 @@ export default function CRMCapturePages() {
         type === 'text' ? 'Text' :
         type === 'email' ? 'Email' :
         type === 'phone' ? 'Phone' :
+        type === 'url' ? 'Link' :
         type === 'textarea' ? 'Long text' :
         type === 'select' ? 'Dropdown' :
         type === 'radio' ? 'Options' :
         type === 'date' ? 'Date' :
         type === 'time' ? 'Time' :
+        type === 'package' ? 'Choose a package' :
         'Embed',
       required: false,
-      placeholder: type === 'textarea' ? 'Type here…' : 'Type here…',
+      placeholder: type === 'url' ? 'https://…' : 'Type here…',
       options: (type === 'select' || type === 'radio') ? ['Option 1', 'Option 2'] : undefined,
       embedUrl: type === 'embed' ? 'https://www.loom.com/share/your-video-id' : undefined,
       embedHeight: type === 'embed' ? 520 : undefined,
+      packages:
+        type === 'package'
+          ? [
+              {
+                id: crypto.randomUUID(),
+                name: 'Starter',
+                subtitle: 'Individual',
+                price: '$29/mo',
+                features: ['Feature one', 'Feature two', 'Feature three'],
+              },
+              {
+                id: crypto.randomUUID(),
+                name: 'Premium',
+                subtitle: 'Business',
+                price: '$49/mo',
+                features: ['Everything in Starter', 'Priority support', 'Custom reports'],
+              },
+            ]
+          : undefined,
       sectionId,
     }
 
@@ -702,7 +764,7 @@ export default function CRMCapturePages() {
             accent_color: form.accent_color || null,
             block_duplicate_emails: form.block_duplicate_emails,
             meeting_duration_minutes: form.meeting_duration_minutes || 30,
-            fields: form.fields,
+            fields: cleanFieldsForSave(form.fields),
             sections: form.sections,
             theme: form.theme,
             layout_template: form.layout_template,
@@ -764,7 +826,7 @@ export default function CRMCapturePages() {
           accent_color: form.accent_color || null,
           block_duplicate_emails: form.block_duplicate_emails,
           meeting_duration_minutes: form.meeting_duration_minutes || 30,
-          fields: form.fields,
+          fields: cleanFieldsForSave(form.fields),
           sections: form.sections,
           theme: form.theme,
           layout_template: form.layout_template,
@@ -1590,14 +1652,14 @@ function CaptureSkeleton() {
                   placeholder="You're in! Let's Keep Going."
                 />
 
-                {/* Button accent color drives both the Submit button
-                    and the success-state lead-magnet button. Uses a
-                    native color input so we get the browser's
-                    swatches without bringing in another picker lib.
-                    Empty value falls back to the default blue. */}
+                {/* Accent color drives every accented element on the public
+                    page: Next/Submit + success buttons, and the package picker
+                    (selected outline, check tick, and the Select button).
+                    Native color input for the browser's swatches; empty falls
+                    back to the default blue. */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-                    Button color
+                    Accent color
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -1628,7 +1690,7 @@ function CaptureSkeleton() {
                     )}
                   </div>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
-                    Applies to the Submit button{form.lead_magnet_url ? ' and the success-state button' : ''}.
+                    Applies to the Next/Submit buttons, the package picker (tick, outline &amp; Select){form.lead_magnet_url ? ', and the success-state button' : ''}.
                   </p>
                 </div>
 
@@ -1807,10 +1869,12 @@ function CaptureSkeleton() {
                         <div className="flex flex-wrap gap-2">
                           {([
                             { type: 'text' as FieldType, label: 'Text', icon: Type },
+                            { type: 'url' as FieldType, label: 'Link', icon: Globe },
                             { type: 'select' as FieldType, label: 'Dropdown', icon: ChevronDown },
                             { type: 'radio' as FieldType, label: 'Options', icon: CircleDot },
                             { type: 'date' as FieldType, label: 'Date', icon: Calendar },
                             { type: 'embed' as FieldType, label: 'Embed', icon: LinkIcon },
+                            { type: 'package' as FieldType, label: 'Package', icon: Package },
                           ]).map((opt) => (
                             <button
                               key={opt.type}
@@ -2134,7 +2198,7 @@ function CaptureSkeleton() {
     return (
       <div key={k} className="flex gap-3 text-sm">
         <div className="w-48 text-[var(--text-tertiary)] break-all">{label}</div>
-        <div className="flex-1 text-[var(--text-primary)] break-all">
+        <div className="flex-1 text-[var(--text-primary)] break-words whitespace-pre-line">
           {v === null || v === undefined || String(v) === '' ? '-' : String(v)}
         </div>
       </div>

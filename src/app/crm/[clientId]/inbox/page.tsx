@@ -34,6 +34,7 @@ const CRM_TYPES = new Set([
   'meeting_created',
   'payment_created',
   'payment_due',
+  'payment_marked_paid',
 ])
 
 export default function CRMInboxPage() {

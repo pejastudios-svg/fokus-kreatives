@@ -40,6 +40,7 @@ interface ClientInfo {
   business_name: string
   archived_at?: string | null
   package_tier?: 'top' | 'middle' | 'lower' | null
+  profile_picture_url?: string | null
 }
 
 type PackageTier = 'top' | 'middle' | 'lower'
@@ -324,6 +325,7 @@ useEffect(() => {
       'meeting_created',
       'payment_created',
       'payment_due',
+      'payment_marked_paid',
     ]
 
     const refresh = async () => {
@@ -504,11 +506,15 @@ useEffect(() => {
             </button>
             <Link href={`/crm/${clientId}/dashboard`} className="flex items-center gap-2">
               <Image
-                src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-                alt="Fokus Kreatives"
+                src={
+                  clientInfo?.profile_picture_url ||
+                  'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
+                }
+                alt={clientInfo?.business_name || clientInfo?.name || 'Logo'}
                 width={32}
                 height={32}
-                className="object-contain h-7 w-auto"
+                unoptimized
+                className="h-8 w-8 rounded-full object-cover bg-white ring-1 ring-[var(--border-primary)]"
                 priority
               />
             </Link>
@@ -665,11 +671,15 @@ useEffect(() => {
           >
             <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--border-primary)]">
               <Image
-                src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-                alt="Fokus Kreatives"
+                src={
+                  clientInfo?.profile_picture_url ||
+                  'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
+                }
+                alt={clientInfo?.business_name || clientInfo?.name || 'Logo'}
                 width={32}
                 height={32}
-                className="object-contain h-7 w-auto"
+                unoptimized
+                className="h-8 w-8 rounded-full object-cover bg-white ring-1 ring-[var(--border-primary)]"
               />
               <button
                 type="button"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
 import {
@@ -16,8 +16,15 @@ import {
   BellOff,
   Search,
   FileDown,
+  FileText,
+  Send,
+  Loader2,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Toggle } from '@/components/ui/Toggle'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { DatePicker } from '@/components/ui/DatePicker'
@@ -67,6 +74,40 @@ interface Payment {
   recurrence_type?: 'days' | 'weeks' | 'months' | null
   recurrence_interval?: number | null
   recurring_count?: number
+  // --- Invoice fields (only when is_invoice) ---
+  is_invoice?: boolean
+  line_items?: InvoiceLineItem[]
+  send_status?: 'draft' | 'scheduled' | 'sent' | null
+  send_on?: string | null
+  sent_at?: string | null
+  bill_to_name?: string | null
+  bill_to_email?: string | null
+  issue_date?: string | null
+  tax_rate?: number | null
+  discount?: number | null
+  doc_url?: string | null
+  payment_link?: string | null
+  public_token?: string | null
+  client_marked_paid_at?: string | null
+}
+
+interface InvoiceLineItem {
+  description: string
+  quantity: number
+  unit_price: number
+}
+
+// Mirror of the server-side invoiceTotals so the modal can preview totals
+// without a round-trip.
+function computeTotals(items: InvoiceLineItem[], taxRate: number, discount: number) {
+  const subtotal = items.reduce(
+    (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
+    0,
+  )
+  const discountAmt = Math.min(Number(discount) || 0, subtotal)
+  const taxable = subtotal - discountAmt
+  const taxAmt = taxable * ((Number(taxRate) || 0) / 100)
+  return { subtotal, discountAmt, taxAmt, total: taxable + taxAmt }
 }
 
 type SortKey =
@@ -121,7 +162,8 @@ export default function CRMRevenue() {
     loadUser()
   }, [supabase])
 
-  const [newPayment, setNewPayment] = useState({
+  type LineItemDraft = { description: string; quantity: string; unit_price: string }
+  const emptyForm = {
     amount: '',
     currency: 'USD',
     status: 'pending' as Payment['status'],
@@ -132,7 +174,54 @@ export default function CRMRevenue() {
     is_recurring: false,
     recurrence_type: 'months' as 'days' | 'weeks' | 'months',
     recurrence_interval: 1,
-  })
+    // Invoice mode (the toggle) + its fields.
+    is_invoice: false,
+    bill_to_name: '',
+    bill_to_email: '',
+    issue_date: '',
+    tax_rate: '',
+    discount: '',
+    payment_link: '',
+    line_items: [{ description: '', quantity: '1', unit_price: '' }] as LineItemDraft[],
+    schedule_send: true,
+  }
+  const [newPayment, setNewPayment] = useState({ ...emptyForm })
+  // When set, the modal is editing an existing invoice rather than creating.
+  const [editId, setEditId] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<string | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // Deep-link from the CRM inbox: `?focus=<paymentId>` scrolls to + briefly
+  // highlights that invoice so a "payment marked paid" notification lands
+  // right on the row with the Confirm button.
+  const searchParams = useSearchParams()
+  const focusParam = searchParams?.get('focus') || null
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!focusParam || isLoading) return
+    const el = document.getElementById(`pay-${focusParam}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightId(focusParam)
+    const t = setTimeout(() => setHighlightId(null), 2800)
+    return () => clearTimeout(t)
+  }, [focusParam, isLoading, payments.length])
+
+  // When invoice mode is on and a lead is linked, prefill the bill-to from the
+  // lead - but only into empty fields, so a manual edit is never clobbered.
+  useEffect(() => {
+    if (!newPayment.is_invoice || !selectedLeadId) return
+    const lead = leads.find((l) => l.id === selectedLeadId)
+    if (!lead) return
+    const d = (lead.data || {}) as Record<string, string>
+    setNewPayment((p) => ({
+      ...p,
+      bill_to_name: p.bill_to_name || d.name || '',
+      bill_to_email: p.bill_to_email || d.email || '',
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLeadId, newPayment.is_invoice])
 
   // Define loaders using useCallback to fix dependency warnings
   const loadPayments = useCallback(async () => {
@@ -191,60 +280,119 @@ export default function CRMRevenue() {
     })
   }, [leads, leadSearch])
 
+  // Live invoice totals for the builder preview + Save amount.
+  const invoicePreview = useMemo(() => {
+    const items = newPayment.line_items.map((li) => ({
+      description: li.description,
+      quantity: parseFloat(li.quantity) || 0,
+      unit_price: parseFloat(li.unit_price) || 0,
+    }))
+    return computeTotals(items, parseFloat(newPayment.tax_rate) || 0, parseFloat(newPayment.discount) || 0)
+  }, [newPayment.line_items, newPayment.tax_rate, newPayment.discount])
+
+  // --- Invoice form helpers ---
+  const setLineItem = (i: number, patch: Partial<LineItemDraft>) =>
+    setNewPayment((p) => ({
+      ...p,
+      line_items: p.line_items.map((li, j) => (j === i ? { ...li, ...patch } : li)),
+    }))
+  const addLineItem = () =>
+    setNewPayment((p) => ({
+      ...p,
+      line_items: [...p.line_items, { description: '', quantity: '1', unit_price: '' }],
+    }))
+  const removeLineItem = (i: number) =>
+    setNewPayment((p) => ({ ...p, line_items: p.line_items.filter((_, j) => j !== i) }))
+
+  const resetForm = () => {
+    setNewPayment({ ...emptyForm })
+    setEditId(null)
+    setSelectedLeadId(null)
+    setLeadSearch('')
+  }
+
   const handleAddPayment = async () => {
-    if (!newPayment.amount) return
+    const inv = newPayment.is_invoice
+
+    const items: InvoiceLineItem[] = newPayment.line_items
+      .map((li) => ({
+        description: li.description.trim(),
+        quantity: parseFloat(li.quantity) || 0,
+        unit_price: parseFloat(li.unit_price) || 0,
+      }))
+      .filter((li) => li.description || li.quantity > 0 || li.unit_price > 0)
+    const taxRate = parseFloat(newPayment.tax_rate) || 0
+    const discount = parseFloat(newPayment.discount) || 0
+    const totals = computeTotals(items, taxRate, discount)
+    const amount = inv ? totals.total : parseFloat(newPayment.amount)
+
+    // Invoice needs at least one line item; a plain payment needs an amount.
+    if (inv ? items.length === 0 : !newPayment.amount) return
     setIsSavingPayment(true)
 
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .insert({
-          client_id: clientId,
-          lead_id: selectedLeadId || null,
-          amount: parseFloat(newPayment.amount),
-          currency: newPayment.currency,
-          status: newPayment.status,
-          due_date: newPayment.due_date || null,
-          notes: newPayment.notes || null,
-          invoice_number: newPayment.invoice_number || null,
-          reminder_enabled: newPayment.reminder_enabled,
-          is_recurring: newPayment.is_recurring,
-          recurrence_type: newPayment.is_recurring ? newPayment.recurrence_type : null,
-          recurrence_interval: newPayment.is_recurring ? newPayment.recurrence_interval : null,
-          recurring_count: 0,
-        })
-        // Re-select with the lead join so the row we drop into local state
-        // already has the linked lead's data attached. Without this, the
-        // new row appears in the list but its Lead column is empty until
-        // a manual refresh re-fetches the join.
-        .select(`*, lead:leads(data)`)
-        .single()
-
-      if (error) {
-        console.error('Failed to add payment:', error)
-        return
+      const base = {
+        client_id: clientId,
+        lead_id: selectedLeadId || null,
+        amount,
+        currency: newPayment.currency,
+        status: newPayment.status,
+        due_date: newPayment.due_date || null,
+        notes: newPayment.notes || null,
+        invoice_number: newPayment.invoice_number || null,
+        reminder_enabled: newPayment.reminder_enabled,
+        is_recurring: newPayment.is_recurring,
+        recurrence_type: newPayment.is_recurring ? newPayment.recurrence_type : null,
+        recurrence_interval: newPayment.is_recurring ? newPayment.recurrence_interval : null,
+        is_invoice: inv,
+        line_items: inv ? items : [],
+        bill_to_name: inv ? newPayment.bill_to_name || null : null,
+        bill_to_email: inv ? newPayment.bill_to_email || null : null,
+        issue_date: inv ? newPayment.issue_date || null : null,
+        tax_rate: inv ? taxRate : 0,
+        discount: inv ? discount : 0,
+        payment_link: inv ? newPayment.payment_link || null : null,
+        // Send on the due date; held as draft/scheduled until then.
+        send_on: inv ? newPayment.due_date || null : null,
+        send_status: inv ? (newPayment.schedule_send ? 'scheduled' : 'draft') : null,
       }
 
-      if (data) {
-        // Update local state
-        setPayments(prev => [data as Payment, ...prev])
-        setShowAddModal(false)
-        setNewPayment({
-          amount: '',
-          currency: 'USD',
-          status: 'pending',
-          due_date: '',
-          notes: '',
-          invoice_number: '',
-          reminder_enabled: true,
-          is_recurring: false,
-          recurrence_type: 'months',
-          recurrence_interval: 1,
-        })
-        setSelectedLeadId(null)
-        setLeadSearch('')
+      let data: Payment | null = null
+      if (editId) {
+        const res = await supabase
+          .from('payments')
+          .update(base)
+          .eq('id', editId)
+          .select(`*, lead:leads(data)`)
+          .single()
+        if (res.error) {
+          console.error('Failed to update payment:', res.error)
+          return
+        }
+        data = res.data as Payment
+        const updated = data
+        setPayments((prev) => prev.map((p) => (p.id === editId ? updated : p)))
+      } else {
+        const res = await supabase
+          .from('payments')
+          .insert({ ...base, recurring_count: 0 })
+          .select(`*, lead:leads(data)`)
+          .single()
+        if (res.error) {
+          console.error('Failed to add payment:', res.error)
+          return
+        }
+        data = res.data as Payment
+        const inserted = data
+        setPayments((prev) => [inserted, ...prev])
+      }
 
-        // Email notification
+      // The invoice is now a hosted page (/invoice/<public_token>), generated
+      // from the row - no document to build here. The token comes back on the
+      // inserted/updated row via the select above.
+
+      // Notify on new records only (not edits).
+      if (!editId && data) {
         try {
           if (userEmail) {
             await fetch('/api/notify-email', {
@@ -266,24 +414,123 @@ export default function CRMRevenue() {
           console.error('Failed to send payment_created email', err)
         }
 
-        // In-app notification to every CRM team member. Gated by each
-        // user's notify_payment_reminder pref server-side.
         void fetch('/api/notifications/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientId,
             type: 'payment_created',
-            data: {
-              amount: data.amount,
-              currency: data.currency,
-              dueDate: data.due_date,
-            },
+            data: { amount: data.amount, currency: data.currency, dueDate: data.due_date },
           }),
         }).catch((e) => console.error('in-app payment notification failed:', e))
       }
+
+      setShowAddModal(false)
+      resetForm()
     } finally {
       setIsSavingPayment(false)
+    }
+  }
+
+  // Open the modal to edit an existing invoice (draft/scheduled only).
+  const openEditInvoice = (p: Payment) => {
+    setEditId(p.id)
+    setSelectedLeadId(p.lead_id || null)
+    setNewPayment({
+      ...emptyForm,
+      currency: p.currency || 'USD',
+      status: p.status === 'paid' ? 'paid' : 'pending',
+      due_date: p.due_date || '',
+      notes: p.notes || '',
+      invoice_number: p.invoice_number || '',
+      reminder_enabled: p.reminder_enabled,
+      is_invoice: true,
+      bill_to_name: p.bill_to_name || '',
+      bill_to_email: p.bill_to_email || '',
+      issue_date: p.issue_date || '',
+      tax_rate: p.tax_rate ? String(p.tax_rate) : '',
+      discount: p.discount ? String(p.discount) : '',
+      payment_link: p.payment_link || '',
+      schedule_send: p.send_status !== 'draft',
+      line_items:
+        Array.isArray(p.line_items) && p.line_items.length
+          ? p.line_items.map((li) => ({
+              description: li.description || '',
+              quantity: String(li.quantity ?? ''),
+              unit_price: String(li.unit_price ?? ''),
+            }))
+          : [{ description: '', quantity: '1', unit_price: '' }],
+    })
+    setShowAddModal(true)
+  }
+
+  // The hosted invoice page URL for a row. Guarded for SSR (no window).
+  const invoiceUrl = (p: Payment) =>
+    p.public_token && typeof window !== 'undefined'
+      ? `${window.location.origin}/invoice/${p.public_token}`
+      : ''
+
+  // Send a draft/scheduled invoice right now (skips waiting for the date).
+  // Only flips to 'sent' if the email actually goes out.
+  const handleSendNow = async (p: Payment) => {
+    if (!p.bill_to_email) {
+      alert('Add a bill-to email on this invoice before sending.')
+      return
+    }
+    setSendingId(p.id)
+    try {
+      const res = await fetch('/api/notify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'invoice_sent',
+          payload: {
+            to: p.bill_to_email,
+            billToName: p.bill_to_name ?? '',
+            invoiceNumber: p.invoice_number ?? '',
+            amount: p.amount,
+            currency: p.currency,
+            dueDate: p.due_date,
+            link: invoiceUrl(p),
+          },
+        }),
+      })
+      const ok = res.ok && (await res.json().catch(() => ({ success: false }))).success
+      if (!ok) {
+        alert('Could not send the invoice email. Check the Apps Script invoice_sent template is deployed.')
+        return
+      }
+      const { error } = await supabase
+        .from('payments')
+        .update({ send_status: 'sent', sent_at: new Date().toISOString() })
+        .eq('id', p.id)
+      if (!error) {
+        setPayments((prev) =>
+          prev.map((x) =>
+            x.id === p.id ? { ...x, send_status: 'sent', sent_at: new Date().toISOString() } : x,
+          ),
+        )
+      }
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  // CRM confirms the client's "I've paid" - flips the invoice to Paid.
+  const handleConfirmPaid = async (p: Payment) => {
+    setConfirmingId(p.id)
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ status: 'paid', paid_date: new Date().toISOString() })
+        .eq('id', p.id)
+      if (!error) {
+        setPayments((prev) =>
+          prev.map((x) => (x.id === p.id ? { ...x, status: 'paid' } : x)),
+        )
+      }
+    } finally {
+      setConfirmingId(null)
     }
   }
 
@@ -369,6 +616,18 @@ export default function CRMRevenue() {
             recurrence_type: payment.recurrence_type,
             recurrence_interval: payment.recurrence_interval,
             recurring_count: (payment.recurring_count || 0) + 1,
+            // Carry invoice fields so a recurring invoice regenerates as a
+            // fresh invoice (new token, unpaid, re-scheduled to the next date).
+            is_invoice: payment.is_invoice ?? false,
+            line_items: payment.is_invoice ? payment.line_items ?? [] : [],
+            bill_to_name: payment.bill_to_name ?? null,
+            bill_to_email: payment.bill_to_email ?? null,
+            issue_date: payment.is_invoice ? nextDue : null,
+            tax_rate: payment.tax_rate ?? 0,
+            discount: payment.discount ?? 0,
+            payment_link: payment.payment_link ?? null,
+            send_on: payment.is_invoice ? nextDue : null,
+            send_status: payment.is_invoice ? 'scheduled' : null,
           })
           .select()
           .single()
@@ -1143,8 +1402,13 @@ function RevenueSkeleton() {
             return (
               <div
                 key={payment.id}
-                className={`px-3 sm:px-4 py-3 flex items-center gap-3 ${
+                id={`pay-${payment.id}`}
+                className={`px-3 sm:px-4 py-3 flex items-center gap-3 transition-all ${
                   isTemp ? 'opacity-60 pointer-events-none' : ''
+                } ${
+                  highlightId === payment.id
+                    ? 'ring-2 ring-[#2B79F7] rounded-xl bg-[#2B79F7]/5'
+                    : ''
                 }`}
               >
                 {/* Lead avatar */}
@@ -1235,6 +1499,100 @@ function RevenueSkeleton() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  {payment.is_invoice && (
+                    <>
+                      <span
+                        className={`hidden sm:inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                          payment.send_status === 'sent'
+                            ? 'bg-green-500/20 text-green-500'
+                            : payment.send_status === 'scheduled'
+                              ? 'bg-blue-500/20 text-[#2B79F7]'
+                              : 'bg-gray-500/20 text-[var(--text-tertiary)]'
+                        }`}
+                        title={
+                          payment.send_status === 'scheduled' && payment.send_on
+                            ? `Auto-sends ${new Date(payment.send_on).toLocaleDateString()}`
+                            : undefined
+                        }
+                      >
+                        {payment.send_status === 'sent'
+                          ? 'Sent'
+                          : payment.send_status === 'scheduled'
+                            ? 'Scheduled'
+                            : 'Draft'}
+                      </span>
+                      {payment.client_marked_paid_at && payment.status !== 'paid' && (
+                        <button
+                          onClick={() => handleConfirmPaid(payment)}
+                          disabled={confirmingId === payment.id}
+                          title="Client marked this paid - confirm it"
+                          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-colors disabled:opacity-50 shrink-0"
+                        >
+                          {confirmingId === payment.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          Confirm paid
+                        </button>
+                      )}
+                      {payment.public_token && (
+                        <a
+                          href={invoiceUrl(payment)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open invoice page"
+                          className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-colors"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      {payment.public_token && (
+                        <button
+                          onClick={() => {
+                            void navigator.clipboard.writeText(invoiceUrl(payment))
+                            const id = payment.id
+                            setCopiedId(id)
+                            setTimeout(
+                              () => setCopiedId((c) => (c === id ? null : c)),
+                              1500,
+                            )
+                          }}
+                          title={copiedId === payment.id ? 'Copied!' : 'Copy invoice link'}
+                          className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-colors"
+                        >
+                          {copiedId === payment.id ? (
+                            <Check className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
+                      {payment.send_status !== 'sent' && (
+                        <>
+                          <button
+                            onClick={() => openEditInvoice(payment)}
+                            title="Edit invoice"
+                            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSendNow(payment)}
+                            disabled={sendingId === payment.id}
+                            title="Send now"
+                            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-colors disabled:opacity-50"
+                          >
+                            {sendingId === payment.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
                   <button
                     onClick={() => handleToggleReminder(payment.id)}
                     title={payment.reminder_enabled ? 'Reminder on' : 'Reminder off'}
@@ -1266,23 +1624,31 @@ function RevenueSkeleton() {
 
       {/* Add Payment Modal */}
       {showAddModal && (
-        <Modal onClose={() => setShowAddModal(false)} title="Add Payment">
+        <Modal
+          onClose={() => {
+            setShowAddModal(false)
+            resetForm()
+          }}
+          title={editId ? 'Edit invoice' : newPayment.is_invoice ? 'New invoice' : 'Add Payment'}
+        >
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Invoice toggle - off = simple payment record, on = full invoice. */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-4 py-3">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                  Amount
-                </label>
-                <input
-                  type="number"
-                  value={newPayment.amount}
-                  onChange={(e) =>
-                    setNewPayment({ ...newPayment, amount: e.target.value })
-                  }
-                  placeholder="0.00"
-                  className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                />
+                <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                  <FileText className="h-4 w-4 text-[#2B79F7]" /> Create as invoice
+                </p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                  Line items, totals, and a downloadable .docx. Held as a draft until the send date.
+                </p>
               </div>
+              <Toggle
+                checked={newPayment.is_invoice}
+                onChange={(v) => setNewPayment({ ...newPayment, is_invoice: v })}
+              />
+            </div>
+
+            {newPayment.is_invoice ? (
               <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                   Currency
@@ -1297,7 +1663,36 @@ function RevenueSkeleton() {
                   placeholder="Choose currency"
                 />
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={newPayment.amount}
+                    onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Currency
+                  </label>
+                  <CurrencyPicker
+                    value={newPayment.currency}
+                    onChange={(next) => {
+                      if (next) setNewPayment({ ...newPayment, currency: next })
+                    }}
+                    options={Object.keys(fx.rates)}
+                    variant="input"
+                    placeholder="Choose currency"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1365,6 +1760,182 @@ function RevenueSkeleton() {
               </select>
             </div>
 
+            {newPayment.is_invoice && (
+              <div className="space-y-4 rounded-xl border border-[var(--border-primary)] p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                      Bill to (name)
+                    </label>
+                    <input
+                      type="text"
+                      value={newPayment.bill_to_name}
+                      onChange={(e) => setNewPayment({ ...newPayment, bill_to_name: e.target.value })}
+                      placeholder="Client name"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                      Bill to (email)
+                    </label>
+                    <input
+                      type="email"
+                      value={newPayment.bill_to_email}
+                      onChange={(e) => setNewPayment({ ...newPayment, bill_to_email: e.target.value })}
+                      placeholder="client@email.com"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Issue date
+                  </label>
+                  <DatePicker
+                    value={newPayment.issue_date}
+                    onChange={(d) => setNewPayment({ ...newPayment, issue_date: d })}
+                    placeholder="Pick an issue date"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Payment link (optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={newPayment.payment_link}
+                    onChange={(e) => setNewPayment({ ...newPayment, payment_link: e.target.value })}
+                    placeholder="https://… (Stripe, PayPal, bank link)"
+                    className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    The invoice page&apos;s &ldquo;Pay now&rdquo; button sends the client here.
+                  </p>
+                </div>
+
+                {/* Line items */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                    Line items (what it&apos;s for)
+                  </label>
+                  <div className="space-y-2">
+                    {newPayment.line_items.map((li, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={li.description}
+                          onChange={(e) => setLineItem(i, { description: e.target.value })}
+                          placeholder="Description"
+                          className="flex-1 min-w-0 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        />
+                        <input
+                          type="number"
+                          value={li.quantity}
+                          onChange={(e) => setLineItem(i, { quantity: e.target.value })}
+                          placeholder="Qty"
+                          className="w-16 px-2 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        />
+                        <input
+                          type="number"
+                          value={li.unit_price}
+                          onChange={(e) => setLineItem(i, { unit_price: e.target.value })}
+                          placeholder="Price"
+                          className="w-24 px-2 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                        />
+                        {newPayment.line_items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLineItem(i)}
+                            className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-red-500 shrink-0"
+                            aria-label="Remove item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addLineItem}
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#2B79F7] hover:opacity-80"
+                  >
+                    <Plus className="h-4 w-4" /> Add item
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                      Tax (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={newPayment.tax_rate}
+                      onChange={(e) => setNewPayment({ ...newPayment, tax_rate: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                      Discount ({newPayment.currency})
+                    </label>
+                    <input
+                      type="number"
+                      value={newPayment.discount}
+                      onChange={(e) => setNewPayment({ ...newPayment, discount: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    />
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] px-4 py-3 text-sm space-y-1">
+                  <div className="flex justify-between text-[var(--text-secondary)]">
+                    <span>Subtotal</span>
+                    <span>{newPayment.currency} {invoicePreview.subtotal.toFixed(2)}</span>
+                  </div>
+                  {invoicePreview.discountAmt > 0 && (
+                    <div className="flex justify-between text-[var(--text-secondary)]">
+                      <span>Discount</span>
+                      <span>- {newPayment.currency} {invoicePreview.discountAmt.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {invoicePreview.taxAmt > 0 && (
+                    <div className="flex justify-between text-[var(--text-secondary)]">
+                      <span>Tax ({parseFloat(newPayment.tax_rate) || 0}%)</span>
+                      <span>{newPayment.currency} {invoicePreview.taxAmt.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1.5 mt-1 border-t border-[var(--border-primary)] font-semibold text-[var(--text-primary)]">
+                    <span>Total</span>
+                    <span>{newPayment.currency} {invoicePreview.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Auto-send toggle */}
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      Auto-send on the due date
+                    </p>
+                    <p className="text-xs text-[var(--text-tertiary)]">
+                      Off keeps it a draft you send yourself.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={newPayment.schedule_send}
+                    onChange={(v) => setNewPayment({ ...newPayment, schedule_send: v })}
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Invoice Number
@@ -1413,7 +1984,8 @@ function RevenueSkeleton() {
               <span className="text-[var(--text-secondary)]">Enable payment reminders</span>
             </label>
 
-            {/* Recurring Payment */}
+            {/* Recurring Payment - hidden for invoices (not supported there). */}
+            {!newPayment.is_invoice && (
             <div className="border-t border-[var(--border-primary)] pt-4 mt-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1473,14 +2045,16 @@ function RevenueSkeleton() {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
             <Button
               onClick={handleAddPayment}
               isLoading={isSavingPayment}
+              disabled={newPayment.is_invoice ? !invoicePreview.total : !newPayment.amount}
             >
-              Add Payment
+              {editId ? 'Save changes' : newPayment.is_invoice ? 'Create invoice' : 'Add Payment'}
             </Button>
           </div>
         </Modal>

@@ -12,12 +12,19 @@
 // no sections render every field on a single page (legacy behaviour).
 
 import { useState } from 'react'
+import { Plus, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Confetti } from '@/components/ui/Confetti'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { TimePicker } from '@/components/ui/TimePicker'
 import { AvailabilitySlotPicker } from './AvailabilitySlotPicker'
 import { CalendlyInlineWidget } from './CalendlyInlineWidget'
 import type { CaptureField, CaptureSection, CapturePageInfo, CaptureFormBag } from './types'
+
+// Field types that can carry multiple visitor entries when `repeatable`.
+const REPEATABLE_TYPES = new Set(['text', 'email', 'phone', 'url'])
+// Hard cap on entries a visitor can add to one repeatable field.
+const MAX_REPEAT_ENTRIES = 5
 
 // Turn any pasted URL into the best in-page render: a direct image, a
 // native video, a provider embed (YouTube / Vimeo / Loom / Drive / etc.),
@@ -129,6 +136,12 @@ export function CaptureFormBody({
   // live check (missingLabel below), so it never shows on load and clears the
   // instant the field is filled.
   const [triedSubmit, setTriedSubmit] = useState(false)
+  // Per-field entry lists for repeatable fields. Derived from the stored
+  // (newline-joined) value on first touch, then owned locally so empty rows
+  // can exist while typing without being stripped from the saved value.
+  const [repeatLists, setRepeatLists] = useState<Record<string, string[]>>({})
+  // Brief celebratory burst when a package card is selected.
+  const [showConfetti, setShowConfetti] = useState(false)
   const current = steps[Math.min(step, steps.length - 1)]
   const isLast = step >= steps.length - 1
   const isMultiStep = steps.length > 1
@@ -170,13 +183,35 @@ export function CaptureFormBody({
     if (triedSubmit) setTriedSubmit(false)
   }
 
+  // Repeatable-field helpers. The visible list keeps empty rows; the saved
+  // value is the trimmed, non-empty entries joined by newlines.
+  const getList = (id: string): string[] => {
+    if (repeatLists[id]) return repeatLists[id]
+    const v = values[id]
+    const arr = v ? v.split('\n') : ['']
+    return arr.length ? arr : ['']
+  }
+  const commitList = (id: string, list: string[]) => {
+    setRepeatLists((m) => ({ ...m, [id]: list }))
+    setValue(id, list.map((s) => s.trim()).filter(Boolean).join('\n'))
+    if (triedSubmit) setTriedSubmit(false)
+  }
+
+  const selectPackage = (id: string, name: string) => {
+    handleSetValue(id, name)
+    setShowConfetti(false)
+    // Next tick so re-selecting another card re-triggers the mount animation.
+    window.requestAnimationFrame(() => setShowConfetti(true))
+    window.setTimeout(() => setShowConfetti(false), 2200)
+  }
+
   if (success) {
     const buttonText =
       (pageInfo.success_button_text && pageInfo.success_button_text.trim()) ||
       'Access Your Free Resource'
     return (
       <div className="space-y-4">
-        <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm">
+        <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm text-center">
           {successMessage}
         </p>
         {leadMagnetUrl && (
@@ -184,7 +219,7 @@ export function CaptureFormBody({
             href={leadMagnetUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ backgroundColor: accent }}
+            style={{ backgroundColor: accent, backgroundImage: 'none' }}
             className="inline-flex items-center justify-center px-4 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 w-full transition-opacity"
           >
             {buttonText}
@@ -198,25 +233,23 @@ export function CaptureFormBody({
   const renderField = (f: CaptureField) => {
     if (f.type === 'embed') {
       const embed = detectEmbed(f.embedUrl)
+      let media: React.ReactNode
       if (embed.kind === 'image') {
-        return (
-          <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+        media = (
+          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
             <img src={embed.src} alt={f.label} className="w-full h-auto object-contain" />
           </div>
         )
-      }
-      if (embed.kind === 'video') {
-        return (
-          <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden bg-black">
+      } else if (embed.kind === 'video') {
+        media = (
+          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden bg-black">
             <video src={embed.src} controls className="w-full h-auto" />
           </div>
         )
-      }
-      if (embed.kind === 'link') {
-        return (
-          <div key={f.id} className="rounded-lg border border-[var(--border-primary)] p-4 bg-[var(--bg-tertiary)]">
-            <p className="text-sm text-[var(--text-secondary)] font-medium">{f.label || 'Embed'}</p>
-            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+      } else if (embed.kind === 'link') {
+        media = (
+          <div className="rounded-lg border border-[var(--border-primary)] p-4 bg-[var(--bg-tertiary)]">
+            <p className="text-xs text-[var(--text-tertiary)]">
               This provider may block embedding on external sites. Open it here:
             </p>
             <a
@@ -229,18 +262,169 @@ export function CaptureFormBody({
             </a>
           </div>
         )
+      } else {
+        media = (
+          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+            <iframe
+              src={embed.src}
+              className="w-full border-0"
+              style={{ height: f.embedHeight || 520 }}
+              loading="lazy"
+              title={f.label || 'Embed'}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )
       }
+      // Title (label) above, helper text (description) below - both were
+      // settable in the builder but never rendered for embeds before.
       return (
-        <div key={f.id} className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
-          <iframe
-            src={embed.src}
-            className="w-full border-0"
-            style={{ height: f.embedHeight || 520 }}
-            loading="lazy"
-            title={f.label || 'Embed'}
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
-          />
+        <div key={f.id} className="space-y-1.5 min-w-0">
+          {f.label && (
+            <p className="text-sm font-medium text-[var(--text-secondary)]">{f.label}</p>
+          )}
+          {media}
+          {f.description && (
+            <p className="text-xs text-[var(--text-tertiary)]">{f.description}</p>
+          )}
+        </div>
+      )
+    }
+
+    // Repeatable text-like field: multiple entries, one per line.
+    if (REPEATABLE_TYPES.has(f.type) && f.repeatable) {
+      const list = getList(f.id)
+      const inputType = f.type === 'phone' ? 'tel' : f.type
+      return (
+        <div key={f.id} className="min-w-0">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+            {f.label}
+            {f.required ? ' *' : ''}
+          </label>
+          <div className="space-y-2">
+            {list.map((val, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type={inputType}
+                  value={val}
+                  onChange={(e) => {
+                    const next = [...list]
+                    next[i] = e.target.value
+                    commitList(f.id, next)
+                  }}
+                  onFocus={focusHandler(f.id)}
+                  placeholder={f.placeholder || ''}
+                  className="flex-1 min-w-0 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                />
+                {list.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => commitList(f.id, list.filter((_, j) => j !== i))}
+                    className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-red-500 shrink-0"
+                    aria-label="Remove entry"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {list.length < MAX_REPEAT_ENTRIES && (
+            <button
+              type="button"
+              onClick={() => commitList(f.id, [...list, ''])}
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium hover:opacity-80"
+              style={{ color: accent }}
+            >
+              <Plus className="h-4 w-4" /> Add another
+            </button>
+          )}
+          {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
+        </div>
+      )
+    }
+
+    // Package picker: selectable plan cards. Single-select; selecting shows a
+    // check + a confetti pop and stays put (no auto-advance).
+    if (f.type === 'package') {
+      const selected = values[f.id] || ''
+      const pkgs = f.packages || []
+      return (
+        <div key={f.id} className="min-w-0">
+          {(f.label || f.description) && (
+            <div className="mb-2">
+              {f.label && (
+                <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                  {f.label}
+                  {f.required ? ' *' : ''}
+                </label>
+              )}
+              {f.description && (
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{f.description}</p>
+              )}
+            </div>
+          )}
+          <div className="flex flex-col gap-3">
+            {pkgs.map((p) => {
+              const isSel = selected === p.name
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => selectPackage(f.id, p.name)}
+                  className="relative w-full text-left rounded-xl border-2 p-4 transition-all hover:shadow-md flex flex-col"
+                  style={{
+                    borderColor: isSel ? accent : 'var(--border-primary)',
+                    backgroundColor: isSel ? `${accent}14` : 'var(--bg-input)',
+                  }}
+                >
+                  {isSel && (
+                    <span
+                      className="absolute top-3 right-3 h-6 w-6 rounded-full flex items-center justify-center text-white"
+                      style={{ backgroundColor: accent, backgroundImage: 'none' }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                  <p className="text-base font-bold text-[var(--text-primary)] pr-7">{p.name}</p>
+                  {p.subtitle && (
+                    <p className="text-xs text-[var(--text-tertiary)]">{p.subtitle}</p>
+                  )}
+                  {p.price && (
+                    <p className="mt-2 text-2xl font-extrabold text-[var(--text-primary)]">{p.price}</p>
+                  )}
+                  {(() => {
+                    const feats = (p.features || []).filter((ft) => ft.trim() !== '')
+                    if (feats.length === 0) return null
+                    return (
+                      <ul className="mt-3 space-y-1.5 flex-1">
+                        {feats.map((ft, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 text-sm text-[var(--text-secondary)]"
+                          >
+                            <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: accent }} />
+                            <span>{ft}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  })()}
+                  <span
+                    className="mt-4 inline-flex items-center justify-center w-full rounded-full px-4 py-2 text-sm font-semibold"
+                    style={
+                      isSel
+                        ? { backgroundColor: accent, color: '#fff' }
+                        : { border: `1px solid ${accent}`, color: accent }
+                    }
+                  >
+                    {isSel ? 'Selected' : 'Select'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )
     }
@@ -279,11 +463,13 @@ export function CaptureFormBody({
             className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           >
             <option value="">Select…</option>
-            {(f.options || []).map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
+            {(f.options || [])
+              .filter((o) => o.trim() !== '')
+              .map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
           </select>
           {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
         </div>
@@ -298,7 +484,7 @@ export function CaptureFormBody({
             {f.required ? ' *' : ''}
           </label>
           <div className="space-y-2">
-            {(f.options || []).map((opt) => (
+            {(f.options || []).filter((o) => o.trim() !== '').map((opt) => (
               <label key={opt} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <input
                   type="radio"
@@ -469,6 +655,8 @@ export function CaptureFormBody({
       }}
       className="space-y-4"
     >
+      {showConfetti && <Confetti />}
+
       {current.section && (current.section.title || current.section.description) && (
         <div>
           {current.section.title && (
@@ -495,28 +683,37 @@ export function CaptureFormBody({
             size="lg"
             onClick={goBack}
             className="shrink-0"
+            style={{ borderColor: accent, color: accent }}
             data-preview-nav
           >
             Back
           </Button>
         )}
         {isLast ? (
+          // Distinct keys on Next vs Submit are load-bearing: without them
+          // React reuses the same <button> DOM node and just flips type
+          // "button" -> "submit". Because React flushes synchronously inside the
+          // click event, the button you clicked for "Next" becomes a submit
+          // button mid-click and the browser submits the form on that same tap.
+          // Separate keys mount a fresh Submit node the click never touched.
           <Button
+            key="nav-submit"
             type="submit"
             className="w-full"
             size="lg"
             isLoading={isSubmitting}
-            style={{ backgroundColor: accent }}
+            style={{ backgroundColor: accent, backgroundImage: 'none' }}
           >
             Submit
           </Button>
         ) : (
           <Button
+            key="nav-next"
             type="button"
             className="w-full"
             size="lg"
             onClick={goNext}
-            style={{ backgroundColor: accent }}
+            style={{ backgroundColor: accent, backgroundImage: 'none' }}
             data-preview-nav
           >
             Next
