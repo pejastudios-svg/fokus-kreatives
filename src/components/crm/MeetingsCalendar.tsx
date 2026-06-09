@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 
 // Minimal shape the calendar needs. The page's Meeting type is a
 // superset, so it satisfies this without an adapter.
@@ -72,6 +72,10 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
     const target = monthOf(meetings.find((m) => m.id === focusMeetingId))
     if (target) setCursor(target)
   }
+
+  // "All meetings on this day" popup, opened by clicking a day's empty space
+  // or its "+N more". Selecting one inside it opens the usual detail modal.
+  const [dayModal, setDayModal] = useState<{ date: Date; items: T[] } | null>(null)
 
   const now = new Date()
   const todayKey = dayKey(now)
@@ -173,16 +177,25 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
           const dayMeetings = byDay.get(key) || []
           const isToday = key === todayKey
           const isPast = cell.date.getTime() < todayMidnight
+          const openDay = () => {
+            if (dayMeetings.length) setDayModal({ date: cell.date, items: dayMeetings })
+          }
           return (
             <div
               key={key}
-              className="group relative min-h-[88px] border-b border-r border-[var(--border-primary)] p-1.5 align-top"
+              onClick={openDay}
+              className={`group relative min-h-[88px] border-b border-r border-[var(--border-primary)] p-1.5 align-top ${
+                dayMeetings.length ? 'cursor-pointer' : ''
+              }`}
             >
               <div className="flex items-center justify-between">
                 {onAddOnDate && !isPast ? (
                   <button
                     type="button"
-                    onClick={() => onAddOnDate(cell.date)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAddOnDate(cell.date)
+                    }}
                     title="Add meeting on this day"
                     className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-opacity"
                   >
@@ -209,7 +222,10 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
                   return (
                     <button
                       key={m.id}
-                      onClick={() => onSelectMeeting(m)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectMeeting(m)
+                      }}
                       title={`${m.title} · ${t}`}
                       className={`w-full text-left truncate rounded px-1 py-0.5 text-[10px] leading-tight transition-opacity hover:opacity-80 ${pillClasses(
                         m.status,
@@ -220,15 +236,86 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
                   )
                 })}
                 {dayMeetings.length > 3 && (
-                  <div className="px-1 text-[10px] text-[var(--text-tertiary)]">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openDay()
+                    }}
+                    className="w-full text-left px-1 text-[10px] text-[var(--text-tertiary)] hover:text-[#2B79F7]"
+                  >
                     +{dayMeetings.length - 3} more
-                  </div>
+                  </button>
                 )}
               </div>
             </div>
           )
         })}
       </div>
+
+      {/* "All meetings on this day" popup. Clicking a row opens the normal
+          detail modal (via onSelectMeeting) and closes this one. */}
+      {dayModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setDayModal(null)}
+        >
+          <div
+            className="w-full max-w-sm max-h-[80vh] flex flex-col rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-primary)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                {dayModal.date.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+                <span className="ml-2 text-[var(--text-tertiary)] font-normal">
+                  {dayModal.items.length} meeting{dayModal.items.length === 1 ? '' : 's'}
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDayModal(null)}
+                className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {dayModal.items.map((m) => {
+                const t = new Date(m.date_time).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      onSelectMeeting(m)
+                      setDayModal(null)
+                    }}
+                    className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors"
+                  >
+                    <span
+                      className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${pillClasses(
+                        m.status,
+                      )}`}
+                    >
+                      {t}
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-primary)]">
+                      {m.title}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

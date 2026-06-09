@@ -151,18 +151,21 @@ export default function CRMMeetingsPage() {
     }
   }, [clientId, loadMeetings, loadUserAndClient])
 
-  const filteredMeetings = meetings.filter((m) => {
-    const now = new Date()
-    const dt = new Date(m.date_time)
+  const filteredMeetings = meetings
+    .filter((m) => {
+      const now = new Date()
+      const dt = new Date(m.date_time)
 
-    if (statusFilter === 'upcoming') {
-      return m.status === 'scheduled' && dt >= now
-    }
-    if (statusFilter === 'past') {
-      return dt < now || m.status !== 'scheduled'
-    }
-    return true
-  })
+      if (statusFilter === 'upcoming') {
+        return m.status === 'scheduled' && dt >= now
+      }
+      if (statusFilter === 'past') {
+        return dt < now || m.status !== 'scheduled'
+      }
+      return true
+    })
+    // Recently added first across every tab (upcoming / all / past).
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   // ---- PDF export -------------------------------------------------------
 
