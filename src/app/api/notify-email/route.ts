@@ -39,16 +39,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // White-label: outward-facing emails with a clientId get the client's
+    // sender name + reply-to attached (see withEmailBranding).
+    const { withEmailBranding } = await import('@/lib/emailOutbox')
+    const branded = await withEmailBranding(type, { ...payload, secret: undefined })
+
     const res = await fetch(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret,
         type,
-        payload: {
-          ...payload,
-          secret: undefined, // don't forward the secret inside payload
-        },
+        payload: branded,
       }),
     })
 

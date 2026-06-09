@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const { data: due, error } = await db
       .from('payments')
-      .select('id, invoice_number, amount, currency, due_date, bill_to_name, bill_to_email, public_token')
+      .select('id, client_id, invoice_number, amount, currency, due_date, bill_to_name, bill_to_email, public_token')
       .eq('is_invoice', true)
       .eq('send_status', 'scheduled')
       .lte('send_on', today)
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
         const ok = await enqueueEmail({
           type: 'invoice_sent',
           payload: {
+            clientId: inv.client_id,
             to: inv.bill_to_email,
             billToName: inv.bill_to_name ?? '',
             invoiceNumber: inv.invoice_number ?? '',

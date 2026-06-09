@@ -185,6 +185,54 @@ export async function markFailed(id: string, attempts: number, err: unknown): Pr
 }
 
 /**
+ * Email types that go to the CLIENT'S audience (their leads / customers)
+ * rather than to the agency team. Only these get white-label branding -
+ * internal notifications keep the Fokus Kreativez sender.
+ */
+const OUTWARD_EMAIL_TYPES = new Set([
+  'invoice_sent',
+  'meeting_invitee_confirmation',
+  'meeting_rescheduled',
+])
+
+/**
+ * White-label option 1: when an outward-facing email carries a `clientId`,
+ * attach the client's sender display name + reply-to so Apps Script can send
+ * as `"Client Biz" <agency@gmail>` with replies routed to the client.
+ * Missing clientId / non-outward type / lookup failure = unchanged payload.
+ */
+export async function withEmailBranding(
+  type: string,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (!OUTWARD_EMAIL_TYPES.has(type)) return payload
+  const clientId = typeof payload.clientId === 'string' ? payload.clientId : ''
+  if (!clientId) return payload
+  try {
+    const { data } = await admin()
+      .from('clients')
+      .select('business_name, name, email_from_name, email_reply_to')
+      .eq('id', clientId)
+      .maybeSingle()
+    if (!data) return payload
+    const fromName =
+      (data.email_from_name as string | null)?.trim() ||
+      (data.business_name as string | null)?.trim() ||
+      (data.name as string | null)?.trim() ||
+      ''
+    const replyTo = (data.email_reply_to as string | null)?.trim() || ''
+    return {
+      ...payload,
+      ...(fromName ? { fromName } : {}),
+      ...(replyTo ? { replyTo } : {}),
+    }
+  } catch (e) {
+    console.error('[withEmailBranding] lookup failed:', e)
+    return payload
+  }
+}
+
+/**
  * Send a single outbox row by calling Apps Script directly. Used by the
  * cron worker. Throws on failure so the caller can run markFailed.
  */
@@ -195,13 +243,15 @@ export async function deliverEmail(row: OutboxRow): Promise<void> {
     throw new Error('Apps Script not configured')
   }
 
+  const payload = await withEmailBranding(row.type, row.payload)
+
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       secret,
       type: row.type,
-      payload: row.payload,
+      payload,
     }),
   })
   const text = await res.text()

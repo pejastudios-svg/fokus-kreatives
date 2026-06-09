@@ -72,6 +72,8 @@ export function formatNotificationText(n: NotificationRow): string {
       return `New submission on ${get(data, 'pageName') || 'capture page'}`
     case 'meeting_created':
       return `Meeting booked: ${get(data, 'meetingTitle') || get(data, 'title') || 'New meeting'}`
+    case 'meeting_rescheduled':
+      return `Meeting rescheduled: ${get(data, 'meetingTitle') || 'meeting'}${get(data, 'when') ? ` to ${get(data, 'when')}` : ''}`
     case 'payment_created':
       return `Payment recorded${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}`
     case 'payment_due':
@@ -142,7 +144,7 @@ export function notificationHref(
       : `/crm/${clientId}/capture?tab=submissions`
   }
 
-  if (n.type === 'meeting_created') {
+  if (n.type === 'meeting_created' || n.type === 'meeting_rescheduled') {
     const clientId = get(data, 'clientId')
     if (!clientId) return null
     const meetingId = get(data, 'meetingId')

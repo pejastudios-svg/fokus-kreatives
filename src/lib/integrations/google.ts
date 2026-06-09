@@ -385,3 +385,37 @@ export async function cancelGoogleCalendarEvent(
     throw new Error(`Google Calendar event delete failed (${res.status}): ${text || 'unknown'}`)
   }
 }
+
+/** Reschedule a Google Calendar event: PATCH its start/end times. We only
+ *  touch start/end so the Meet link + attendees stay intact. `sendUpdates=all`
+ *  makes Google email attendees the updated time automatically. 404/410 means
+ *  the event isn't on this account (treated as a soft no-op). */
+export async function updateGoogleCalendarEventTime(
+  accessToken: string,
+  eventId: string,
+  startIso: string,
+  endIso: string,
+  timeZone = 'UTC',
+): Promise<void> {
+  const url = new URL(
+    `${GOOGLE_CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+  )
+  url.searchParams.set('sendUpdates', 'all')
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      start: { dateTime: startIso, timeZone },
+      end: { dateTime: endIso, timeZone },
+    }),
+    cache: 'no-store',
+  })
+  if (res.status === 404 || res.status === 410) {
+    console.warn(`[google] event ${eventId} not found on the connected account (status ${res.status}) - not rescheduled`)
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Google Calendar event update failed (${res.status}): ${text || 'unknown'}`)
+  }
+}

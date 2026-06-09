@@ -32,6 +32,7 @@ const CRM_TYPES = new Set([
   'lead_created',
   'capture_submission',
   'meeting_created',
+  'meeting_rescheduled',
   'payment_created',
   'payment_due',
   'payment_marked_paid',

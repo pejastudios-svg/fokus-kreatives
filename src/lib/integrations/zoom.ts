@@ -269,3 +269,31 @@ export async function cancelZoomMeeting(
     throw new Error(`Zoom meeting delete failed (${res.status}): ${text || 'unknown'}`)
   }
 }
+
+/** Reschedule a scheduled Zoom meeting: PATCH its start_time + duration.
+ *  The join link/id stay the same. Zoom notifies registrants per the
+ *  meeting's own settings; our app also emails the attendee separately.
+ *  204 = success; 404 = meeting already gone (soft no-op). */
+export async function updateZoomMeeting(
+  accessToken: string,
+  meetingId: string,
+  startIso: string,
+  durationMinutes: number,
+  timeZone = 'UTC',
+): Promise<void> {
+  const url = new URL(`${ZOOM_API_BASE}/meetings/${encodeURIComponent(meetingId)}`)
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_time: startIso, duration: durationMinutes, timezone: timeZone }),
+    cache: 'no-store',
+  })
+  if (res.status === 404) {
+    console.warn(`[zoom] meeting ${meetingId} not found - not rescheduled`)
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Zoom meeting update failed (${res.status}): ${text || 'unknown'}`)
+  }
+}

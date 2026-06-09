@@ -485,6 +485,7 @@ export default function CRMRevenue() {
         body: JSON.stringify({
           type: 'invoice_sent',
           payload: {
+            clientId,
             to: p.bill_to_email,
             billToName: p.bill_to_name ?? '',
             invoiceNumber: p.invoice_number ?? '',

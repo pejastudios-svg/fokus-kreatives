@@ -3,8 +3,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { getConnectedGoogleIntegration } from '@/lib/integrations/googleTokenStore'
 import { getConnectedZoomIntegration } from '@/lib/integrations/zoomTokenStore'
-import { cancelGoogleCalendarEvent } from '@/lib/integrations/google'
-import { cancelZoomMeeting } from '@/lib/integrations/zoom'
+import { cancelGoogleCalendarEvent, updateGoogleCalendarEventTime } from '@/lib/integrations/google'
+import { cancelZoomMeeting, updateZoomMeeting } from '@/lib/integrations/zoom'
 import { cancelCalendlyEvent } from '@/lib/integrations/calendly'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +27,7 @@ interface MeetingRow {
   status: string
   integration_provider: Provider
   external_id: string | null
+  duration_minutes: number
 }
 
 type AuthResult =
@@ -48,7 +49,7 @@ async function loadAuthorizedMeeting(id: string): Promise<AuthResult> {
 
   const { data, error } = await supabase
     .from('meetings')
-    .select('id, client_id, status, integration_provider, external_id')
+    .select('id, client_id, status, integration_provider, external_id, duration_minutes')
     .eq('id', id)
     .maybeSingle()
 
@@ -105,6 +106,41 @@ async function cancelOnPlatform(
   }
 }
 
+// Moves the meeting to a new time on whichever platform created it, so the
+// provider sends its own update to attendees. Google patches the event time
+// (sendUpdates=all emails attendees); Zoom patches start_time + duration.
+// Calendly bookings are owned by the invitee and can't be moved via API, so
+// they're a soft no-op. Failures are surfaced softly - our DB time + our own
+// email already went out.
+async function rescheduleOnPlatform(
+  meeting: MeetingRow,
+  startIso: string,
+  durationMinutes: number,
+): Promise<{ updated: boolean; error?: string }> {
+  const { integration_provider: provider, external_id: externalId, client_id: clientId } = meeting
+  if (!provider || !externalId) return { updated: false }
+
+  try {
+    if (provider === 'google_meet') {
+      const integ = await getConnectedGoogleIntegration(clientId)
+      if (!integ) return { updated: false, error: 'Google Calendar not connected' }
+      const endIso = new Date(new Date(startIso).getTime() + durationMinutes * 60000).toISOString()
+      await updateGoogleCalendarEventTime(integ.accessToken, externalId, startIso, endIso)
+    } else if (provider === 'zoom') {
+      const integ = await getConnectedZoomIntegration(clientId)
+      if (!integ) return { updated: false, error: 'Zoom not connected' }
+      await updateZoomMeeting(integ.accessToken, externalId, startIso, durationMinutes)
+    } else {
+      // Calendly (or anything else): nothing we can move from our side.
+      return { updated: false }
+    }
+    return { updated: true }
+  } catch (err) {
+    console.error('[crm/meetings] platform reschedule failed:', err)
+    return { updated: false, error: err instanceof Error ? err.message : 'Platform reschedule failed' }
+  }
+}
+
 // PATCH = status change. When the new status is 'cancelled' we also
 // cancel the meeting on the external platform. 'completed' / 'scheduled'
 // only touch our DB.
@@ -120,7 +156,44 @@ export async function PATCH(
     }
     const { supabase, meeting } = auth
 
-    const body = (await req.json().catch(() => ({}))) as { status?: string }
+    const body = (await req.json().catch(() => ({}))) as {
+      status?: string
+      dateTimeIso?: string
+      durationMinutes?: number
+    }
+
+    // Reschedule path: update the meeting's date/time (+ optional duration).
+    // The page sends the attendee + in-app notifications after this succeeds
+    // (client-side, so the time formats in the user's timezone).
+    if (body.dateTimeIso) {
+      const when = new Date(body.dateTimeIso)
+      if (Number.isNaN(when.getTime())) {
+        return NextResponse.json({ success: false, error: 'Invalid date/time' }, { status: 400 })
+      }
+      const newDuration =
+        typeof body.durationMinutes === 'number' && body.durationMinutes > 0
+          ? body.durationMinutes
+          : meeting.duration_minutes || 30
+      const patch: Record<string, unknown> = {
+        date_time: when.toISOString(),
+        duration_minutes: newDuration,
+      }
+      const { error } = await supabase.from('meetings').update(patch).eq('id', id)
+      if (error) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      }
+
+      // Move the event on the connected platform so it sends its own update.
+      const platform = await rescheduleOnPlatform(meeting, when.toISOString(), newDuration)
+
+      return NextResponse.json({
+        success: true,
+        rescheduled: true,
+        platformUpdated: platform.updated,
+        platformError: platform.error ?? null,
+      })
+    }
+
     const status = body.status
     if (status !== 'scheduled' && status !== 'completed' && status !== 'cancelled') {
       return NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 })

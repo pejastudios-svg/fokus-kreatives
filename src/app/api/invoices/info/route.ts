@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const { data: client } = await db
     .from('clients')
-    .select('business_name, name, profile_picture_url')
+    .select('business_name, name, profile_picture_url, email_from_name')
     .eq('id', pay.client_id)
     .single()
 
@@ -51,7 +51,14 @@ export async function GET(req: NextRequest) {
       status: pay.status,
       sendStatus: pay.send_status,
       clientMarkedPaidAt: pay.client_marked_paid_at,
-      from: client?.business_name || client?.name || 'Fokus Kreatives',
+      // Same resolution as the email sender name: the Email branding card's
+      // Sender name wins, then business name, then the client's name - so the
+      // invoice "From" always matches what the email says it's from.
+      from:
+        client?.email_from_name ||
+        client?.business_name ||
+        client?.name ||
+        'Fokus Kreatives',
       logo: client?.profile_picture_url || null,
     },
   })

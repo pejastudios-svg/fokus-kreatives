@@ -561,6 +561,19 @@ export function CaptureFormBody({
               email: values['email'] || undefined,
             }}
           />
+        ) : isCalendlyIntegration && pageInfo.calendly_url ? (
+          // No slug = the builder preview. Show a plain embed so Calendly is
+          // visible while editing, without the booking-callback wiring (which
+          // only matters on the live, slugged page).
+          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+            <iframe
+              src={pageInfo.calendly_url}
+              className="w-full border-0"
+              style={{ height: 600 }}
+              loading="lazy"
+              title="Schedule a meeting"
+            />
+          </div>
         ) : isLegacyCalendlyUrl ? (
           <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
             <iframe

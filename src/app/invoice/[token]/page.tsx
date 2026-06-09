@@ -250,7 +250,7 @@ export default function InvoicePage() {
             {inv.notes && (
               <div className="mt-7">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Notes</p>
-                <p className="text-slate-600 text-sm mt-1 whitespace-pre-line">{inv.notes}</p>
+                <p className="text-slate-600 text-sm mt-1 whitespace-pre-line break-words">{inv.notes}</p>
               </div>
             )}
 

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Loading'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { IntegrationsCard } from '@/components/integrations/IntegrationsCard'
+import { EmailBrandingCard } from '@/components/integrations/EmailBrandingCard'
 import { AvailabilityCard } from '@/components/integrations/AvailabilityCard'
 import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
 import { useCrmRole } from '@/components/crm/CrmRoleContext'
@@ -325,6 +326,10 @@ function SettingsSkeleton() {
               wired later. Bookings made via any connected provider
               auto-log into the meetings table. */}
           <IntegrationsCard clientId={clientId} canManage={canEditWorkspace} />
+
+          {/* White-label email: sender display name + reply-to for emails
+              that go to this client's leads/customers. */}
+          <EmailBrandingCard clientId={clientId} canManage={canEditWorkspace} />
 
           <AvailabilityCard clientId={clientId} canManage={canEditWorkspace} />
 

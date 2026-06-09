@@ -48,6 +48,7 @@ interface Meeting {
    *  Used so meetings booked via Calendly are labelled "Calendly"
    *  rather than falling through to the legacy "Jitsi" default. */
   integration_provider?: 'calendly' | 'google_meet' | 'zoom' | null
+  attendee_email?: string | null
   created_at: string
   creator?: {
     id: string
@@ -76,6 +77,10 @@ export default function CRMMeetingsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   // Meeting opened from a calendar pill - shows a details/actions sheet.
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [rDate, setRDate] = useState('')
+  const [rTime, setRTime] = useState('')
+  const [isRescheduling, setIsRescheduling] = useState(false)
   // Meeting to ring when jumping from the list into the calendar.
   const [calendarFocusId, setCalendarFocusId] = useState<string | null>(null)
 
@@ -400,6 +405,7 @@ export default function CRMMeetingsPage() {
             body: JSON.stringify({
               type: 'meeting_invitee_confirmation',
               payload: {
+                clientId,
                 to,
                 title: data.title,
                 when,
@@ -460,6 +466,83 @@ export default function CRMMeetingsPage() {
     setAttendeeEmails([])
     setLocationType('custom')
     setLocationUrl('')
+  }
+
+  // Reschedule (edit the date/time) of a meeting + notify the attendee.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const openReschedule = (m: Meeting) => {
+    const d = new Date(m.date_time)
+    setRDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)
+    setRTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`)
+    setRescheduleOpen(true)
+  }
+  const handleReschedule = async (m: Meeting) => {
+    if (!rDate || !rTime) return
+    const newDate = new Date(`${rDate}T${rTime}:00`)
+    if (Number.isNaN(newDate.getTime())) return
+    setIsRescheduling(true)
+    try {
+      const res = await fetch(`/api/crm/meetings/${m.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateTimeIso: newDate.toISOString() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        toast.error(json.error || 'Could not reschedule the meeting.')
+        return
+      }
+      const iso = newDate.toISOString()
+      setMeetings((cur) => cur.map((x) => (x.id === m.id ? { ...x, date_time: iso } : x)))
+      setSelectedMeeting((sm) => (sm && sm.id === m.id ? { ...sm, date_time: iso } : sm))
+      setRescheduleOpen(false)
+      if (json.platformError) {
+        // Local time moved, but the provider event didn't - tell them why.
+        toast.error(humanizeIntegrationError(json.platformError, m.integration_provider ?? undefined))
+      } else {
+        toast.success('Meeting rescheduled.')
+      }
+
+      const whenStr = newDate.toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+      // Email the attendee ourselves only for manual meetings. For Google /
+      // Zoom the platform already sent its own update (sendUpdates=all), so a
+      // second email from us would double-notify.
+      if (m.attendee_email && !m.integration_provider) {
+        void fetch('/api/notify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'meeting_rescheduled',
+            payload: {
+              clientId,
+              to: m.attendee_email,
+              title: m.title,
+              when: whenStr,
+              link: m.location_url || '',
+              clientName: workspaceName,
+            },
+          }),
+        }).catch(() => {})
+      }
+      // In-app notification to the CRM team.
+      void fetch('/api/notifications/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          type: 'meeting_rescheduled',
+          data: { clientId, meetingId: m.id, meetingTitle: m.title, when: whenStr },
+        }),
+      }).catch(() => {})
+    } finally {
+      setIsRescheduling(false)
+    }
   }
 
   const handleStatusChange = async (id: string, status: Status) => {
@@ -1098,7 +1181,7 @@ export default function CRMMeetingsPage() {
         {selectedMeeting && (
           <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setSelectedMeeting(null)}
+            onClick={() => { setSelectedMeeting(null); setRescheduleOpen(false) }}
           >
             <div
               className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
@@ -1109,7 +1192,7 @@ export default function CRMMeetingsPage() {
                   {selectedMeeting.title}
                 </h3>
                 <button
-                  onClick={() => setSelectedMeeting(null)}
+                  onClick={() => { setSelectedMeeting(null); setRescheduleOpen(false) }}
                   className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
                 >
                   <X className="h-5 w-5" />
@@ -1126,7 +1209,56 @@ export default function CRMMeetingsPage() {
                     minute: '2-digit',
                   })}{' '}
                   · {selectedMeeting.duration_minutes}m
+                  {selectedMeeting.status === 'scheduled' && !rescheduleOpen && (
+                    <button
+                      type="button"
+                      onClick={() => openReschedule(selectedMeeting)}
+                      className="ml-1 text-xs font-medium text-[#2B79F7] hover:underline"
+                    >
+                      Reschedule
+                    </button>
+                  )}
                 </div>
+
+                {rescheduleOpen && (
+                  <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3 space-y-3">
+                    <p className="text-xs font-medium text-[var(--text-secondary)]">
+                      Pick a new date &amp; time
+                    </p>
+                    <DateTimePicker
+                      date={rDate}
+                      time={rTime}
+                      onChange={({ date: d, time: t }) => {
+                        setRDate(d)
+                        setRTime(t)
+                      }}
+                    />
+                    {selectedMeeting.attendee_email && (
+                      <p className="text-[11px] text-[var(--text-tertiary)]">
+                        {selectedMeeting.attendee_email} will be emailed the new time.
+                      </p>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRescheduleOpen(false)}
+                        disabled={isRescheduling}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleReschedule(selectedMeeting)}
+                        isLoading={isRescheduling}
+                        disabled={!rDate || !rTime}
+                      >
+                        Save &amp; notify
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <span
                     className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${

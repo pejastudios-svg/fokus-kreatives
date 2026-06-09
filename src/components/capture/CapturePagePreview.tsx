@@ -30,6 +30,7 @@ interface FormShape {
   is_active: boolean
   include_meeting: boolean
   calendly_url: string
+  meeting_integration?: CapturePageInfo['meeting_integration']
   success_button_text?: string
   success_message?: string
   accent_color?: string
@@ -52,6 +53,13 @@ export function CapturePagePreview({ form }: Props) {
     banner_url: form.banner_url || null,
     include_meeting: form.include_meeting,
     calendly_url: form.calendly_url || null,
+    // Pass the chosen integration so the preview matches the public page.
+    // Without it, a modern Calendly page falls into the LEGACY "confirm the
+    // date/time you scheduled" path (which only exists for old pages that
+    // have a raw calendly_url and no integration). Calendly inline auto-logs,
+    // so its manual confirm block is hidden - exactly like the public page.
+    meeting_integration: form.meeting_integration ?? null,
+    meeting_auto_logged: form.meeting_integration === 'calendly',
     lead_magnet_url: form.lead_magnet_url || null,
     success_button_text: form.success_button_text || null,
     success_message: form.success_message || null,
