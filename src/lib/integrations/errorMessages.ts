@@ -3,12 +3,13 @@
 // friendly messages we can safely show users. Falls back to a generic
 // "reconnect" message rather than leaking raw JSON.
 
-type Provider = 'calendly' | 'google_meet' | 'zoom'
+type Provider = 'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp'
 
 const LABELS: Record<Provider, string> = {
   calendly: 'Calendly',
   google_meet: 'Google Calendar',
   zoom: 'Zoom',
+  gmail_smtp: 'Email (Gmail)',
 }
 
 export function providerLabel(provider?: Provider | null): string {

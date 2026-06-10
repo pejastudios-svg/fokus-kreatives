@@ -225,6 +225,10 @@ export async function withEmailBranding(
       ...payload,
       ...(fromName ? { fromName } : {}),
       ...(replyTo ? { replyTo } : {}),
+      // Outward copy says "Your meeting with <clientName>" etc. - make that
+      // the SAME name the email claims to be from (the Email branding Sender
+      // name), not whatever internal label the caller had on hand.
+      ...(fromName ? { clientName: fromName } : {}),
     }
   } catch (e) {
     console.error('[withEmailBranding] lookup failed:', e)
@@ -244,6 +248,13 @@ export async function deliverEmail(row: OutboxRow): Promise<void> {
   }
 
   const payload = await withEmailBranding(row.type, row.payload)
+
+  // White-label option 2: outward emails for clients with a connected Gmail
+  // send via SMTP as the client. trySmtpSend self-gates (outward type +
+  // clientId + connector present) and never throws - false = fall back to
+  // the Apps Script branded send below so the email always delivers.
+  const { trySmtpSend } = await import('./email/smtpSender')
+  if (await trySmtpSend(row.type, payload)) return
 
   const res = await fetch(scriptUrl, {
     method: 'POST',

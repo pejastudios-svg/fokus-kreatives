@@ -60,21 +60,26 @@ async function gateByPreferences(
 
 /**
  * Resolve recipients when the caller passes a `clientId` instead of an
- * explicit `userIds` array. Used by CRM-team-wide events (new lead,
- * new meeting, payment) where the firing site doesn't know the team
- * roster - just the client. We pull every active member of that CRM
- * via `client_memberships` and let the prefs gate filter from there.
+ * explicit `userIds` array. Used by CRM-scoped events (new lead, new
+ * meeting, payment) where the firing site doesn't know the roster.
+ *
+ * The CRM inbox is the CLIENT'S surface, so these go only to the client's
+ * own accounts - users whose users.client_id points at this CRM (the owner
+ * + their invited team). Agency-side accounts (client_id null: Fokus admins
+ * and agency staff) are deliberately excluded even when they hold a
+ * client_memberships row; memberships grant ACCESS to manage the CRM, not a
+ * subscription to its notifications.
  */
 async function resolveClientRecipients(clientId: string): Promise<string[]> {
   const { data, error } = await supabaseAdmin
-    .from('client_memberships')
-    .select('user_id')
+    .from('users')
+    .select('id')
     .eq('client_id', clientId)
   if (error) {
-    console.error('client_memberships lookup error:', error)
+    console.error('client users lookup error:', error)
     return []
   }
-  return Array.from(new Set((data ?? []).map((r) => (r as { user_id: string }).user_id)))
+  return Array.from(new Set((data ?? []).map((r) => (r as { id: string }).id)))
 }
 
 export async function POST(req: NextRequest) {

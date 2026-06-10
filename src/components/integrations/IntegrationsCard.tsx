@@ -19,7 +19,7 @@ import { humanizeIntegrationError } from '@/lib/integrations/errorMessages'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 interface Integration {
-  provider: 'calendly' | 'google_meet' | 'zoom'
+  provider: 'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp'
   status: 'connected' | 'error' | 'disconnected'
   last_error: string | null
   /** True when the provider's webhook was successfully registered.
@@ -39,7 +39,7 @@ interface Props {
 }
 
 const PROVIDERS: Array<{
-  key: 'calendly' | 'google_meet' | 'zoom'
+  key: 'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp'
   label: string
   blurb: string
   available: boolean
@@ -65,12 +65,22 @@ const PROVIDERS: Array<{
       'Same as Google Meet but the auto-generated link is a Zoom meeting.',
     available: true,
   },
+  {
+    key: 'gmail_smtp',
+    label: 'Email (Gmail)',
+    blurb:
+      'Send invoices and meeting emails from your own Gmail address - your name, your profile picture, replies to you. Uses a Google app password; stored encrypted.',
+    available: true,
+  },
 ]
 
 export function IntegrationsCard({ clientId, canManage }: Props) {
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [calendlyModalOpen, setCalendlyModalOpen] = useState(false)
+  const [gmailModalOpen, setGmailModalOpen] = useState(false)
+  // Test-send state for the connected gmail_smtp row.
+  const [testState, setTestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
   const load = async () => {
     setLoading(true)
@@ -97,12 +107,12 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
 
   // Provider-specific disconnect endpoints. URL segment for
   // 'google_meet' is 'google' (we kept the existing folder name).
-  const providerPathSegment = (p: 'calendly' | 'google_meet' | 'zoom') =>
-    p === 'google_meet' ? 'google' : p
+  const providerPathSegment = (p: 'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp') =>
+    p === 'google_meet' ? 'google' : p === 'gmail_smtp' ? 'gmail-smtp' : p
 
   // Which provider the in-app "disconnect?" modal is confirming (null = closed).
   const [disconnectTarget, setDisconnectTarget] = useState<
-    'calendly' | 'google_meet' | 'zoom' | null
+    'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp' | null
   >(null)
 
   // Runs after the user confirms in the modal. Throws on failure so the
@@ -171,7 +181,7 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
       <CardHeader className="flex flex-row items-center gap-2">
         <CalendarClock className="h-4 w-4 text-[#2B79F7]" />
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-          Meeting integrations
+          Integrations
         </h3>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -243,6 +253,36 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
                       )}
                     </p>
                   )}
+                  {isConnected && p.key === 'gmail_smtp' && (
+                    <button
+                      type="button"
+                      disabled={testState === 'sending'}
+                      onClick={async () => {
+                        setTestState('sending')
+                        try {
+                          const res = await fetch('/api/integrations/gmail-smtp/test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clientId }),
+                          })
+                          const data = await res.json().catch(() => ({}))
+                          setTestState(data.success ? 'sent' : 'error')
+                        } catch {
+                          setTestState('error')
+                        }
+                        setTimeout(() => setTestState('idle'), 4000)
+                      }}
+                      className="mt-1 text-xs text-[#2B79F7] hover:underline disabled:opacity-50"
+                    >
+                      {testState === 'sending'
+                        ? 'Sending test…'
+                        : testState === 'sent'
+                          ? 'Test sent - check the inbox ✓'
+                          : testState === 'error'
+                            ? 'Test failed - try reconnecting'
+                            : 'Send test email'}
+                    </button>
+                  )}
                   {/* Free-tier Calendly: server-pushed webhooks aren't
                       allowed, but the inline-embed widget posts a
                       booking event on the visitor's browser that we
@@ -291,6 +331,9 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
                         } else if (p.key === 'zoom') {
                           // Zoom uses OAuth - same pattern.
                           window.location.href = `/api/integrations/zoom/connect?clientId=${encodeURIComponent(clientId)}`
+                        } else if (p.key === 'gmail_smtp') {
+                          // App-password flow - guided modal, no OAuth.
+                          setGmailModalOpen(true)
                         }
                       }}
                     >
@@ -315,6 +358,17 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
         />
       )}
 
+      {gmailModalOpen && (
+        <GmailSmtpConnectModal
+          clientId={clientId}
+          onClose={() => setGmailModalOpen(false)}
+          onConnected={() => {
+            setGmailModalOpen(false)
+            void load()
+          }}
+        />
+      )}
+
       <ConfirmModal
         open={disconnectTarget !== null}
         tone="danger"
@@ -326,6 +380,151 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
         onClose={() => setDisconnectTarget(null)}
       />
     </Card>
+  )
+}
+
+function GmailSmtpConnectModal({
+  clientId,
+  onClose,
+  onConnected,
+}: {
+  clientId: string
+  onClose: () => void
+  onConnected: () => void
+}) {
+  const [address, setAddress] = useState('')
+  const [appPassword, setAppPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!address.trim() || !appPassword.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/integrations/gmail-smtp/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, address: address.trim(), appPassword }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.success) {
+        setError(data.error || 'Connection failed')
+        return
+      }
+      onConnected()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connection failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const step = (n: number, children: React.ReactNode) => (
+    <li className="flex gap-2.5">
+      <span className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#2B79F7]/15 text-[#2B79F7] text-[11px] font-bold">
+        {n}
+      </span>
+      <span className="flex-1 leading-relaxed">{children}</span>
+    </li>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-2xl"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-primary)]">
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">
+            Connect your email
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Invoices and meeting emails will send from your own Gmail - your name, your
+            profile picture, replies straight to you. Takes about 2 minutes:
+          </p>
+
+          <ol className="space-y-2.5 text-xs text-[var(--text-secondary)]">
+            {step(
+              1,
+              <>
+                Turn on 2-Step Verification for your Google account (skip if already on):{' '}
+                <a
+                  href="https://myaccount.google.com/signinoptions/two-step-verification"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[#2B79F7] hover:underline"
+                >
+                  open settings <ExternalLink className="h-3 w-3" />
+                </a>
+              </>,
+            )}
+            {step(
+              2,
+              <>
+                Create an app password (name it anything, e.g. &ldquo;CRM&rdquo;):{' '}
+                <a
+                  href="https://myaccount.google.com/apppasswords"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[#2B79F7] hover:underline"
+                >
+                  myaccount.google.com/apppasswords <ExternalLink className="h-3 w-3" />
+                </a>
+              </>,
+            )}
+            {step(3, <>Paste your Gmail address and the 16-character password below.</>)}
+          </ol>
+
+          <Input
+            label="Gmail address"
+            type="email"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="you@gmail.com"
+            disabled={busy}
+            autoFocus
+          />
+          <Input
+            label="App password"
+            value={appPassword}
+            onChange={(e) => setAppPassword(e.target.value)}
+            placeholder="xxxx xxxx xxxx xxxx"
+            disabled={busy}
+          />
+
+          <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+            We verify the password with a live Gmail login before saving, store it
+            encrypted (AES-256), and only use it to send your CRM emails. Disconnecting
+            deletes our copy; you can also revoke the app password in your Google account
+            at any time.
+          </p>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-primary)]">
+          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={busy || !address.trim() || !appPassword.trim()} isLoading={busy}>
+            Verify &amp; connect
+          </Button>
+        </div>
+      </form>
+    </div>
   )
 }
 

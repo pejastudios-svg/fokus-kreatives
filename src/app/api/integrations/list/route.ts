@@ -19,7 +19,7 @@ const admin = createServiceClient(
 )
 
 interface IntegrationRow {
-  provider: 'calendly' | 'google_meet' | 'zoom'
+  provider: 'calendly' | 'google_meet' | 'zoom' | 'gmail_smtp'
   status: string
   last_error: string | null
   metadata: Record<string, unknown> | null
@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       google_user_name?: string
       zoom_user_email?: string
       zoom_user_name?: string
+      gmail_address?: string
     }
     // Pick the display strings out of the provider-specific metadata
     // shape. Each provider stores its own fields (Calendly puts
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
     // we collapse them to a single `display` so the UI doesn't need
     // to branch.
     const email =
-      m.calendly_user_email || m.google_user_email || m.zoom_user_email || null
+      m.calendly_user_email || m.google_user_email || m.zoom_user_email || m.gmail_address || null
     const name =
       m.calendly_user_name || m.google_user_name || m.zoom_user_name || null
     return {

@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
     const { withEmailBranding } = await import('@/lib/emailOutbox')
     const branded = await withEmailBranding(type, { ...payload, secret: undefined })
 
+    // Option 2: clients with a connected Gmail send outward emails from their
+    // own address via SMTP. Self-gating; false = fall back to Apps Script.
+    const { trySmtpSend } = await import('@/lib/email/smtpSender')
+    if (await trySmtpSend(type, branded)) {
+      return NextResponse.json({ success: true, via: 'smtp' })
+    }
+
     const res = await fetch(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

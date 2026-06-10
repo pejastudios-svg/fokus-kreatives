@@ -106,15 +106,15 @@ export function EmailBrandingCard({ clientId, canManage }: Props) {
               disabled={!canManage}
             />
             {error && <p className="text-xs text-red-500">{error}</p>}
-            <div className="flex items-center gap-3">
-              <Button size="sm" onClick={handleSave} disabled={!canManage} isLoading={saving}>
-                Save
-              </Button>
+            <div className="flex items-center justify-end gap-3">
               {saved && (
                 <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Saved
                 </span>
               )}
+              <Button size="sm" onClick={handleSave} disabled={!canManage} isLoading={saving}>
+                Save
+              </Button>
             </div>
           </>
         )}

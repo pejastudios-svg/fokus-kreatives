@@ -124,11 +124,11 @@ export function BrowserNotificationsToggle() {
           onClick={handleToggle}
           disabled={busy}
           className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            active ? 'bg-[#2B79F7]' : 'bg-[var(--bg-card-hover)]'
+            active ? 'bg-[#2B79F7]' : 'bg-[var(--border-secondary)]'
           } ${busy ? 'opacity-60 cursor-wait' : ''}`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
               active ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
