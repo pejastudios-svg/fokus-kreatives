@@ -62,13 +62,23 @@ export async function POST(req: NextRequest) {
     })
 
     const text = await res.text()
-    if (!res.ok) {
+    // Apps Script returns handler errors (incl. daily-quota exhaustion) as a
+    // 200 with an "Error: ..." body - treat those as failures too so callers
+    // (e.g. invoice Send now) surface them instead of reporting success.
+    if (!res.ok || text.startsWith('Error:') || text.startsWith('Unauthorized')) {
       console.error('Apps Script notify-email error:', text)
       return NextResponse.json(
-        { success: false, error: 'Apps Script error', details: text },
+        { success: false, error: 'Apps Script error', details: text.slice(0, 300) },
         { status: 500 }
       )
     }
+
+    const { logEmailSend } = await import('@/lib/email/sendLog')
+    void logEmailSend({
+      clientId: typeof branded.clientId === 'string' ? branded.clientId : null,
+      channel: 'apps_script',
+      type,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

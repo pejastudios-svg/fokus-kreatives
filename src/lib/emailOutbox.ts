@@ -269,4 +269,19 @@ export async function deliverEmail(row: OutboxRow): Promise<void> {
   if (!res.ok) {
     throw new Error(`Apps Script ${res.status}: ${text.slice(0, 500)}`)
   }
+  // Apps Script's doPost catches handler errors (incl. "Service invoked too
+  // many times for one day" = quota exhausted) and returns them as a 200
+  // with an "Error: ..." body. Treat that as a failure so the outbox retries
+  // with backoff and the email delivers after the quota refills, instead of
+  // being marked sent and silently lost.
+  if (text.startsWith('Error:') || text.startsWith('Unauthorized') || text.startsWith('Server misconfigured')) {
+    throw new Error(`Apps Script rejected: ${text.slice(0, 500)}`)
+  }
+
+  const { logEmailSend } = await import('./email/sendLog')
+  void logEmailSend({
+    clientId: typeof payload.clientId === 'string' ? payload.clientId : null,
+    channel: 'apps_script',
+    type: row.type,
+  })
 }

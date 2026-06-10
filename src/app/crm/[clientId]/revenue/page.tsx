@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
@@ -95,6 +95,27 @@ interface InvoiceLineItem {
   description: string
   quantity: number
   unit_price: number
+}
+
+// Next invoice number for a lead: find their highest existing numeric
+// invoice number and increment it, keeping the prefix + zero-padding
+// (INV-002 -> INV-003). First invoice for a lead starts at INV-001.
+function nextInvoiceNumberForLead(payments: Payment[], leadId: string): string {
+  let bestNum = 0
+  let bestPrefix = 'INV-'
+  let bestWidth = 3
+  for (const p of payments) {
+    if (p.lead_id !== leadId || !p.invoice_number) continue
+    const m = p.invoice_number.trim().match(/^(.*?)(\d+)$/)
+    if (!m) continue
+    const num = parseInt(m[2], 10)
+    if (num > bestNum) {
+      bestNum = num
+      bestPrefix = m[1] || 'INV-'
+      bestWidth = m[2].length
+    }
+  }
+  return bestPrefix + String(bestNum + 1).padStart(bestWidth, '0')
 }
 
 // Mirror of the server-side invoiceTotals so the modal can preview totals
@@ -309,6 +330,21 @@ export default function CRMRevenue() {
     setEditId(null)
     setSelectedLeadId(null)
     setLeadSearch('')
+    lastAutoInvoiceNo.current = ''
+  }
+
+  // Auto-fill the invoice number from the lead's history (their highest
+  // number + 1). Only on NEW invoices, and never over a number the user
+  // typed themselves - we only replace empty or our own prior suggestion.
+  const lastAutoInvoiceNo = useRef('')
+  const suggestInvoiceNumber = (leadId: string | null, isInvoice: boolean) => {
+    if (editId || !isInvoice || !leadId) return
+    setNewPayment((prev) => {
+      if (prev.invoice_number && prev.invoice_number !== lastAutoInvoiceNo.current) return prev
+      const suggestion = nextInvoiceNumberForLead(payments, leadId)
+      lastAutoInvoiceNo.current = suggestion
+      return { ...prev, invoice_number: suggestion }
+    })
   }
 
   const handleAddPayment = async () => {
@@ -1645,7 +1681,10 @@ function RevenueSkeleton() {
               </div>
               <Toggle
                 checked={newPayment.is_invoice}
-                onChange={(v) => setNewPayment({ ...newPayment, is_invoice: v })}
+                onChange={(v) => {
+                  setNewPayment({ ...newPayment, is_invoice: v })
+                  if (v) suggestInvoiceNumber(selectedLeadId, true)
+                }}
               />
             </div>
 
@@ -1743,9 +1782,11 @@ function RevenueSkeleton() {
               </div>
               <select
                 value={selectedLeadId || ''}
-                onChange={(e) =>
-                  setSelectedLeadId(e.target.value || null)
-                }
+                onChange={(e) => {
+                  const leadId = e.target.value || null
+                  setSelectedLeadId(leadId)
+                  suggestInvoiceNumber(leadId, newPayment.is_invoice)
+                }}
                 className="w-full px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
               >
                 <option value="">No lead linked</option>

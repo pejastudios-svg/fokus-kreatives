@@ -51,6 +51,9 @@ export async function POST(req: NextRequest) {
       transport.close()
     }
 
+    const { logEmailSend } = await import('@/lib/email/sendLog')
+    void logEmailSend({ clientId, channel: 'smtp', type: 'test' })
+
     return NextResponse.json({ success: true })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Test send failed'

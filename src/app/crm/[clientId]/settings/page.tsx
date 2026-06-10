@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { IntegrationsCard } from '@/components/integrations/IntegrationsCard'
 import { EmailBrandingCard } from '@/components/integrations/EmailBrandingCard'
+import { EmailQuotaCard } from '@/components/integrations/EmailQuotaCard'
 import { AvailabilityCard } from '@/components/integrations/AvailabilityCard'
 import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
 import { LegalFooter } from '@/components/legal/LegalFooter'
@@ -331,6 +332,10 @@ function SettingsSkeleton() {
           {/* White-label email: sender display name + reply-to for emails
               that go to this client's leads/customers. */}
           <EmailBrandingCard clientId={clientId} canManage={canEditWorkspace} />
+
+          {/* Sending limits for both email channels (connected Gmail +
+              shared sender), with friendly reset times when exhausted. */}
+          <EmailQuotaCard clientId={clientId} />
 
           <AvailabilityCard clientId={clientId} canManage={canEditWorkspace} />
 

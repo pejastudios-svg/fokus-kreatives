@@ -134,6 +134,9 @@ export async function trySmtpSend(
     } finally {
       transport.close()
     }
+    // Quota tracking (Gmail has no remaining-quota API for SMTP).
+    const { logEmailSend } = await import('./sendLog')
+    void logEmailSend({ clientId, channel: 'smtp', type })
     return true
   } catch (err) {
     console.error('[smtpSender] send failed, falling back to Apps Script:', err)
