@@ -44,3 +44,33 @@ export function decryptSecret(blob: string): string {
     decipher.final(),
   ]).toString('utf8')
 }
+
+/** True when a stored value is one of our encrypted blobs. */
+export function isSealed(value: string): boolean {
+  return value.startsWith('v1:')
+}
+
+/**
+ * Tolerant read for integration tokens: decrypts sealed blobs, passes
+ * legacy plaintext rows through unchanged. Lets encrypted and
+ * not-yet-backfilled rows coexist during the migration window.
+ */
+export function openSecret(value: string): string {
+  return isSealed(value) ? decryptSecret(value) : value
+}
+
+/**
+ * Best-effort seal for hot paths (OAuth token refresh persists). If the
+ * key is missing/misconfigured we store plaintext (status quo) and log,
+ * rather than failing the user-facing operation that triggered the
+ * refresh. New-connection routes use encryptSecret directly and DO fail
+ * loud, so credentials never silently regress there.
+ */
+export function sealSecretOrPlain(value: string): string {
+  try {
+    return encryptSecret(value)
+  } catch (e) {
+    console.error('[secretBox] seal failed, storing plaintext:', e)
+    return value
+  }
+}

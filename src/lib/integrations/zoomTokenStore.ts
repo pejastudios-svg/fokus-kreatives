@@ -6,6 +6,7 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { refreshZoomAccessToken } from './zoom'
+import { openSecret, sealSecretOrPlain } from '@/lib/crypto/secretBox'
 
 const admin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +47,8 @@ export async function getConnectedZoomIntegration(
 
   if (!expiresSoon) {
     return {
-      accessToken: integration.access_token,
+      // openSecret: decrypts sealed rows, passes legacy plaintext through.
+      accessToken: openSecret(integration.access_token),
       userId: integration.user_id,
       hostEmail: integration.metadata?.zoom_user_email ?? null,
     }
@@ -64,18 +66,19 @@ export async function getConnectedZoomIntegration(
   }
 
   try {
-    const refreshed = await refreshZoomAccessToken(integration.refresh_token)
+    const refreshed = await refreshZoomAccessToken(openSecret(integration.refresh_token))
     const newExpiresAt = new Date(
       Date.now() + (refreshed.expires_in - 60) * 1000,
     ).toISOString()
     // CRUCIAL: persist the new refresh_token. Zoom invalidates the
     // previous one after rotation - if we don't store the fresh one,
-    // the next refresh call will fail.
+    // the next refresh call will fail. Best-effort seal so a missing
+    // key never breaks the rotation persist.
     await admin
       .from('user_integrations')
       .update({
-        access_token: refreshed.access_token,
-        refresh_token: refreshed.refresh_token,
+        access_token: sealSecretOrPlain(refreshed.access_token),
+        refresh_token: sealSecretOrPlain(refreshed.refresh_token),
         expires_at: newExpiresAt,
         status: 'connected',
         last_error: null,

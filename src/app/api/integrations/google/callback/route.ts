@@ -19,6 +19,7 @@ import {
   fetchGoogleUserInfo,
   verifyState,
 } from '@/lib/integrations/google'
+import { encryptSecret } from '@/lib/crypto/secretBox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -133,8 +134,9 @@ export async function GET(req: NextRequest) {
       client_id: parsed.clientId,
       user_id: user.id,
       provider: 'google_meet',
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token ?? null,
+      // Stored AES-256-GCM encrypted; readers go through openSecret().
+      access_token: encryptSecret(tokens.access_token),
+      refresh_token: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : null,
       scope: tokens.scope,
       expires_at: expiresAt,
       status: 'connected',

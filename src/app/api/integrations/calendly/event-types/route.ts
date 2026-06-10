@@ -61,8 +61,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const { openSecret } = await import('@/lib/crypto/secretBox')
     const eventTypes = await listCalendlyEventTypes(
-      integration.access_token,
+      openSecret(integration.access_token),
       integration.metadata.calendly_user_uri,
     )
     // Strip down to the fields the editor actually needs.

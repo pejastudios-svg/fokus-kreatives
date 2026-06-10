@@ -103,13 +103,15 @@ export async function POST(req: NextRequest) {
       .eq('status', 'connected')
       .maybeSingle()
 
-    const token = integration?.access_token
-    if (!token) {
+    const stored = integration?.access_token
+    if (!stored) {
       return NextResponse.json(
         { success: false, error: 'Calendly not connected' },
         { status: 404 },
       )
     }
+    const { openSecret } = await import('@/lib/crypto/secretBox')
+    const token = openSecret(stored)
 
     // Fetch event + invitee in parallel. The host's PAT proves we
     // own the booking; the fetch failing means either the URI is

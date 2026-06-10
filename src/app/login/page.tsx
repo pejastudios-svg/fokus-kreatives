@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
+import { LegalFooter } from '@/components/legal/LegalFooter'
 
 type Mode = 'login' | 'forgot-email' | 'forgot-verify' | 'forgot-success'
 
@@ -202,7 +203,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-gradient flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-gradient flex flex-col items-center justify-center p-4 gap-4">
       <Card className="w-full max-w-md">
         <CardContent className="p-8">
           <div className="flex justify-center mb-8">
@@ -412,6 +413,7 @@ function LoginForm() {
           )}
         </CardContent>
       </Card>
+      <LegalFooter className="text-white/70" />
     </div>
   )
 }

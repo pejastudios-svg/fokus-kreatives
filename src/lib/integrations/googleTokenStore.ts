@@ -9,6 +9,7 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { refreshGoogleAccessToken } from './google'
+import { openSecret, sealSecretOrPlain } from '@/lib/crypto/secretBox'
 
 const admin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +54,8 @@ export async function getConnectedGoogleIntegration(
 
   if (!expiresSoon) {
     return {
-      accessToken: integration.access_token,
+      // openSecret: decrypts sealed rows, passes legacy plaintext through.
+      accessToken: openSecret(integration.access_token),
       userId: integration.user_id,
       hostEmail: integration.metadata?.google_user_email ?? null,
     }
@@ -74,14 +76,15 @@ export async function getConnectedGoogleIntegration(
   }
 
   try {
-    const refreshed = await refreshGoogleAccessToken(integration.refresh_token)
+    const refreshed = await refreshGoogleAccessToken(openSecret(integration.refresh_token))
     const newExpiresAt = new Date(
       Date.now() + (refreshed.expires_in - 60) * 1000,
     ).toISOString()
     await admin
       .from('user_integrations')
       .update({
-        access_token: refreshed.access_token,
+        // Best-effort seal: a missing key must not break meeting creation.
+        access_token: sealSecretOrPlain(refreshed.access_token),
         expires_at: newExpiresAt,
         status: 'connected',
         last_error: null,

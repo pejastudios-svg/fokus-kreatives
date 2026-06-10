@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
     const integration = row as IntegrationRow | null
     const tokenToRevoke = integration?.refresh_token || integration?.access_token
     if (tokenToRevoke) {
-      await revokeGoogleToken(tokenToRevoke)
+      const { openSecret } = await import('@/lib/crypto/secretBox')
+      await revokeGoogleToken(openSecret(tokenToRevoke))
     }
 
     const { error } = await admin

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { encryptSecret } from '@/lib/crypto/secretBox'
 import {
   verifyCalendlyToken,
   createCalendlyWebhook,
@@ -102,7 +103,8 @@ export async function POST(req: NextRequest) {
         client_id: clientId,
         user_id: user.id,
         provider: 'calendly',
-        access_token: token,
+        // Stored AES-256-GCM encrypted; readers go through openSecret().
+        access_token: encryptSecret(token),
         scope: 'user',
         status: 'connected',
         last_error: webhookError,

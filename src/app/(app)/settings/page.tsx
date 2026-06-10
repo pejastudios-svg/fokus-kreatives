@@ -10,6 +10,7 @@ import { User, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Bell } from 'lucide-
 import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/Loading'
 import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
+import { LegalFooter } from '@/components/legal/LegalFooter'
 
 export default function SettingsPage() {
   const [name, setName] = useState('')
@@ -316,6 +317,8 @@ function SettingsSkeleton() {
                 <BrowserNotificationsToggle />
               </CardContent>
             </Card>
+
+            <LegalFooter className="text-[var(--text-tertiary)] pb-2" />
           </>
         )}
       </div>

@@ -93,9 +93,10 @@ async function cancelOnPlatform(
         .eq('provider', 'calendly')
         .eq('status', 'connected')
         .maybeSingle()
-      const token = (row as { access_token: string | null } | null)?.access_token
-      if (!token) return { cancelled: false, error: 'Calendly not connected' }
-      await cancelCalendlyEvent(token, externalId)
+      const stored = (row as { access_token: string | null } | null)?.access_token
+      if (!stored) return { cancelled: false, error: 'Calendly not connected' }
+      const { openSecret } = await import('@/lib/crypto/secretBox')
+      await cancelCalendlyEvent(openSecret(stored), externalId)
     } else {
       return { cancelled: false }
     }

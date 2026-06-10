@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { encryptSecret } from '@/lib/crypto/secretBox'
 import {
   exchangeZoomCode,
   fetchZoomUser,
@@ -120,8 +121,9 @@ export async function GET(req: NextRequest) {
       client_id: parsed.clientId,
       user_id: user.id,
       provider: 'zoom',
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      // Stored AES-256-GCM encrypted; readers go through openSecret().
+      access_token: encryptSecret(tokens.access_token),
+      refresh_token: encryptSecret(tokens.refresh_token),
       scope: tokens.scope,
       expires_at: expiresAt,
       status: 'connected',

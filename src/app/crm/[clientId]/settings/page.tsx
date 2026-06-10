@@ -13,6 +13,7 @@ import { IntegrationsCard } from '@/components/integrations/IntegrationsCard'
 import { EmailBrandingCard } from '@/components/integrations/EmailBrandingCard'
 import { AvailabilityCard } from '@/components/integrations/AvailabilityCard'
 import { BrowserNotificationsToggle } from '@/components/notifications/BrowserNotificationsToggle'
+import { LegalFooter } from '@/components/legal/LegalFooter'
 import { useCrmRole } from '@/components/crm/CrmRoleContext'
 import {
   User,
@@ -494,5 +495,6 @@ function SettingsSkeleton() {
           </div>
         </div>
         )}
+        <LegalFooter className="text-[var(--text-tertiary)] mt-8 pb-2" />
       </div>
 }

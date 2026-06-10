@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
 
     const integration = row as IntegrationRow | null
     if (integration?.access_token && integration?.metadata?.webhook_uri) {
+      const { openSecret } = await import('@/lib/crypto/secretBox')
       await deleteCalendlyWebhook(
-        integration.access_token,
+        openSecret(integration.access_token),
         integration.metadata.webhook_uri,
       )
     }
