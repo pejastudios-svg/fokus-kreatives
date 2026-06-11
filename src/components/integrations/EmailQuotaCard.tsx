@@ -19,7 +19,7 @@ interface QuotaData {
     remaining?: number
     resetsAt?: string | null
   }
-  appsScript: { remaining: number; resetsAt: string | null } | null
+  appsScript: { used: number; remaining: number | null; resetsAt: string | null }
 }
 
 function fmtReset(iso: string | null | undefined): string {
@@ -55,7 +55,8 @@ export function EmailQuotaCard({ clientId }: { clientId: string }) {
 
   const smtp = data?.smtp
   const smtpExhausted = !!smtp?.connected && (smtp.remaining ?? 1) <= 0
-  const scriptExhausted = data?.appsScript != null && data.appsScript.remaining <= 0
+  const scriptExhausted =
+    data?.appsScript?.remaining != null && data.appsScript.remaining <= 0
   const pct =
     smtp?.connected && smtp.limit
       ? Math.min(100, Math.round(((smtp.used ?? 0) / smtp.limit) * 100))
@@ -119,19 +120,15 @@ export function EmailQuotaCard({ clientId }: { clientId: string }) {
             <div className="pt-4 border-t border-[var(--border-primary)]">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-[var(--text-primary)]">Shared sender</span>
-                {data.appsScript ? (
-                  <span className="text-xs text-[var(--text-secondary)] tabular-nums">
-                    {data.appsScript.remaining} left today
-                  </span>
-                ) : (
-                  <span className="text-xs text-[var(--text-tertiary)]">Quota unavailable</span>
-                )}
+                <span className="text-xs text-[var(--text-secondary)] tabular-nums">
+                  {data.appsScript.used} sent in the last 24h
+                </span>
               </div>
               {scriptExhausted && (
                 <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   The shared sender hit its daily limit. Sending resumes around{' '}
-                  {fmtReset(data.appsScript?.resetsAt)}.
+                  {fmtReset(data.appsScript.resetsAt)}.
                 </p>
               )}
               <p className="mt-1.5 text-[11px] text-[var(--text-tertiary)] leading-snug">

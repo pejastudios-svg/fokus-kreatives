@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       clientId: typeof branded.clientId === 'string' ? branded.clientId : null,
       channel: 'apps_script',
       type,
+      count: Array.isArray(branded.to) ? branded.to.filter(Boolean).length : 1,
     })
 
     return NextResponse.json({ success: true })

@@ -511,6 +511,28 @@ const submissionData = {
       } else if (emails.length > 0) {
         const ns = notificationSettings as NotificationSettings
 
+        // Send via Apps Script and record it in email_send_log so the
+        // Settings quota card counts this route's emails too. One log row
+        // per recipient - that's how Google meters the daily quota.
+        const sendScriptEmail = async (
+          type: string,
+          payload: Record<string, unknown>,
+          recipients: number,
+        ) => {
+          const res = await fetch(scriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret, type, payload }),
+          })
+          const text = await res.text()
+          if (!res.ok || text.startsWith('Error:') || text.startsWith('Unauthorized')) {
+            console.error(`Capture ${type} email error:`, text.slice(0, 300))
+            return
+          }
+          const { logEmailSend } = await import('@/lib/email/sendLog')
+          void logEmailSend({ clientId, channel: 'apps_script', type, count: recipients })
+        }
+
         // 5a) Meeting created (from capture). Two emails go out:
         //   - HOST email: existing meeting_created handler, now with
         //     `platform` so the email can say "via Zoom / Google Meet
@@ -569,25 +591,21 @@ const submissionData = {
               : undefined,
           })
 
-          await fetch(scriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              secret,
-              type: 'meeting_created',
-              payload: {
-                to: emails,
-                title: createdMeeting.title,
-                when,
-                link: createdMeeting.location_url,
-                clientName: clientDisplayName,
-                platform,
-                attendeeName: createdMeeting.attendee_name ?? null,
-                attendeeEmail: createdMeeting.attendee_email ?? null,
-                calendar,
-              },
-            }),
-          })
+          await sendScriptEmail(
+            'meeting_created',
+            {
+              to: emails,
+              title: createdMeeting.title,
+              when,
+              link: createdMeeting.location_url,
+              clientName: clientDisplayName,
+              platform,
+              attendeeName: createdMeeting.attendee_name ?? null,
+              attendeeEmail: createdMeeting.attendee_email ?? null,
+              calendar,
+            },
+            emails.length,
+          )
 
           // Visitor confirmation. Zoom is the must-have case; manual
           // flow (no integration, no calendly_url) also benefits if
@@ -595,46 +613,38 @@ const submissionData = {
           const attendeeEmail = createdMeeting.attendee_email
           const platformAutoEmails = isCalendly || isGoogleMeet
           if (attendeeEmail && !platformAutoEmails) {
-            await fetch(scriptUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                secret,
-                type: 'meeting_invitee_confirmation',
-                payload: {
-                  to: [attendeeEmail],
-                  title: createdMeeting.title,
-                  when,
-                  link: createdMeeting.location_url,
-                  clientName: clientDisplayName,
-                  platform,
-                  attendeeName: createdMeeting.attendee_name ?? null,
-                  calendar,
-                },
-              }),
-            })
+            await sendScriptEmail(
+              'meeting_invitee_confirmation',
+              {
+                to: [attendeeEmail],
+                title: createdMeeting.title,
+                when,
+                link: createdMeeting.location_url,
+                clientName: clientDisplayName,
+                platform,
+                attendeeName: createdMeeting.attendee_name ?? null,
+                calendar,
+              },
+              1,
+            )
           }
         }
 
         // 5b) Capture submission email
         const captureEnabled = ns.capture_submissions !== false
         if (captureEnabled) {
-          await fetch(scriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              secret,
-              type: 'capture_submission',
-              payload: {
-                to: emails,
-                pageName: page.name || slug,
-                slug,
-                formData: submissionData,
-                fieldLabels,
-                clientName: clientDisplayName,
-              },
-            }),
-          })
+          await sendScriptEmail(
+            'capture_submission',
+            {
+              to: emails,
+              pageName: page.name || slug,
+              slug,
+              formData: submissionData,
+              fieldLabels,
+              clientName: clientDisplayName,
+            },
+            emails.length,
+          )
         }
 
         // 5c) Lead created email. Skipped when we deduped into an
@@ -646,20 +656,16 @@ const submissionData = {
         if (leadsEnabled && !existingLeadId) {
           const leadName = leadData.name || 'New Lead'
 
-          await fetch(scriptUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              secret,
-              type: 'lead_created',
-              payload: {
-                to: emails,
-                leadName,
-                source: `capture:${slug}`,
-                clientName: clientDisplayName,
-              },
-            }),
-          })
+          await sendScriptEmail(
+            'lead_created',
+            {
+              to: emails,
+              leadName,
+              source: `capture:${slug}`,
+              clientName: clientDisplayName,
+            },
+            emails.length,
+          )
         }
       }
     } catch (notifyErr) {

@@ -283,5 +283,6 @@ export async function deliverEmail(row: OutboxRow): Promise<void> {
     clientId: typeof payload.clientId === 'string' ? payload.clientId : null,
     channel: 'apps_script',
     type: row.type,
+    count: Array.isArray(payload.to) ? payload.to.filter(Boolean).length : 1,
   })
 }

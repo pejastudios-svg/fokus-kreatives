@@ -80,7 +80,38 @@ export async function GET(req: NextRequest) {
   }
 
   // --- Apps Script (shared sender) ------------------------------------------
-  let appsScript: { remaining: number; resetsAt: string | null } | null = null
+  // `used` is OUR ledger (email_send_log, one row per recipient) and is the
+  // number to trust for "what did this email cost": it moves by exactly the
+  // recipient count of each send. Google's `remaining` is shown too, but it
+  // updates lazily (often minutes behind) and is drained by everything the
+  // agency account sends - script crons, other CRMs - so it can move in
+  // jumps that have nothing to do with the email you just sent.
+  const { count: scriptUsed } = await admin
+    .from('email_send_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('channel', 'apps_script')
+    .gte('created_at', since)
+
+  const { data: oldestRow } = await admin
+    .from('email_send_log')
+    .select('created_at')
+    .eq('channel', 'apps_script')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const appsScript: { used: number; remaining: number | null; resetsAt: string | null } = {
+    used: scriptUsed ?? 0,
+    remaining: null,
+    // The window rolls: capacity frees up as the oldest send ages out.
+    resetsAt: oldestRow?.created_at
+      ? new Date(
+          new Date(oldestRow.created_at as string).getTime() + 24 * 60 * 60 * 1000,
+        ).toISOString()
+      : null,
+  }
+
   try {
     const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
     const secret = process.env.APPS_SCRIPT_SECRET
@@ -94,30 +125,12 @@ export async function GET(req: NextRequest) {
       const text = await res.text()
       const parsed = JSON.parse(text) as { remaining?: number }
       if (typeof parsed.remaining === 'number') {
-        // Estimate the reset from our own oldest logged send in the window -
-        // Google doesn't expose the exact refill time.
-        const { data: oldestRow } = await admin
-          .from('email_send_log')
-          .select('created_at')
-          .eq('channel', 'apps_script')
-          .gte('created_at', since)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        appsScript = {
-          remaining: parsed.remaining,
-          resetsAt: oldestRow?.created_at
-            ? new Date(
-                new Date(oldestRow.created_at as string).getTime() + 24 * 60 * 60 * 1000,
-              ).toISOString()
-            : null,
-        }
+        appsScript.remaining = parsed.remaining
       }
     }
   } catch {
     // Old script deployment (no 'quota' case) or network blip - the UI shows
-    // "unavailable" rather than erroring the whole card.
-    appsScript = null
+    // our own counter and skips the live-remaining line.
   }
 
   return NextResponse.json({ success: true, smtp, appsScript })
