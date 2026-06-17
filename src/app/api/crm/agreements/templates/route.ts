@@ -21,14 +21,27 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await adminClient
     .from('agreement_templates')
-    .select('id, name, body_html, created_at, updated_at')
+    .select('id, name, body_html, created_at, updated_at, access_password_hash')
     .eq('client_id', clientId)
     .order('updated_at', { ascending: false })
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ success: true, templates: data || [] })
+  // Never leak the hash; withhold body_html for locked templates (the editor
+  // unlocks via POST action 'unlock').
+  const templates = (data || []).map((t) => {
+    const locked = Boolean(t.access_password_hash)
+    return {
+      id: t.id,
+      name: t.name,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+      passwordProtected: locked,
+      body_html: locked ? undefined : t.body_html,
+    }
+  })
+  return NextResponse.json({ success: true, templates })
 }
 
 // POST /api/crm/agreements/templates - create a template

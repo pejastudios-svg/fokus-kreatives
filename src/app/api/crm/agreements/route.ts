@@ -7,14 +7,19 @@ import {
   cleanInvoiceConfig,
   emailSigners,
   emailCcRecipients,
+  presentAgreement,
   type SignerRow,
 } from '@/lib/agreements/shared'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/crm/agreements?clientId=... - list agreements with their signers
+// GET /api/crm/agreements?clientId=...[&view=deleted] - list agreements with
+// their signers. Default excludes soft-deleted; view=deleted returns the
+// Recently Deleted set (restorable, auto-purged after 30 days).
 export async function GET(req: NextRequest) {
-  const clientId = new URL(req.url).searchParams.get('clientId')
+  const url = new URL(req.url)
+  const clientId = url.searchParams.get('clientId')
+  const deletedView = url.searchParams.get('view') === 'deleted'
   if (!clientId) {
     return NextResponse.json({ success: false, error: 'Missing clientId' }, { status: 400 })
   }
@@ -27,16 +32,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: tier.error }, { status: tier.status })
   }
 
-  const { data, error } = await adminClient
+  let query = adminClient
     .from('agreements')
     .select(AGREEMENT_COLUMNS)
     .eq('client_id', clientId)
-    .order('updated_at', { ascending: false })
+  query = deletedView
+    ? query.not('deleted_at', 'is', null).order('deleted_at', { ascending: false })
+    : query.is('deleted_at', null).order('updated_at', { ascending: false })
 
+  const { data, error } = await query
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ success: true, agreements: data || [] })
+  // Strip the password hash + withhold body_html for locked agreements.
+  const agreements = (data || []).map((r) => presentAgreement(r as unknown as Record<string, unknown>))
+  return NextResponse.json({ success: true, agreements })
 }
 
 // POST /api/crm/agreements - create an agreement (draft or send right away).
@@ -151,5 +161,10 @@ export async function POST(req: NextRequest) {
     .eq('id', row.id)
     .single()
 
-  return NextResponse.json({ success: true, agreement: full, emailedNow })
+  // Creator just authored it -> return with body included (unlocked).
+  return NextResponse.json({
+    success: true,
+    agreement: full ? presentAgreement(full as unknown as Record<string, unknown>, { unlocked: true }) : full,
+    emailedNow,
+  })
 }

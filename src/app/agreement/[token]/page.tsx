@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Check, Loader2, Clock } from 'lucide-react'
+import { Check, Loader2, Clock, Lock } from 'lucide-react'
 import { AGREEMENT_DOC_CSS, DOC_FONTS_URL } from '@/components/agreements/docStyles'
 
 interface SignerInfo {
@@ -34,6 +34,40 @@ interface AgreementInfo {
 const SIGNATURE_FONT =
   '"Snell Roundhand", "Savoye LET", "Brush Script MT", "Segoe Script", cursive'
 
+/**
+ * Rasterize the typed name in the signature font to a PNG data URL, so the
+ * signed-copy PDF can embed the exact handwriting-style mark the signer saw
+ * (the server-side PDF renderer lacks these fonts). Returns null if canvas
+ * is unavailable.
+ */
+function renderSignaturePng(name: string): string | null {
+  try {
+    const fontPx = 44
+    const pad = 10
+    const font = `italic ${fontPx}px ${SIGNATURE_FONT}`
+    const measure = document.createElement('canvas').getContext('2d')
+    if (!measure) return null
+    measure.font = font
+    const textW = Math.min(560, Math.ceil(measure.measureText(name).width))
+    const w = textW + pad * 2
+    const h = fontPx + pad * 2
+    const scale = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = w * scale
+    canvas.height = h * scale
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.scale(scale, scale)
+    ctx.fillStyle = '#111827'
+    ctx.font = font
+    ctx.textBaseline = 'middle'
+    ctx.fillText(name, pad, h / 2)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return null
+  }
+}
+
 function fmtSigned(iso: string | null): string {
   if (!iso) return ''
   return new Date(iso).toLocaleString(undefined, {
@@ -56,16 +90,51 @@ export default function AgreementSignPage() {
   const [consent, setConsent] = useState(false)
   const [signing, setSigning] = useState(false)
   const [justSigned, setJustSigned] = useState(false)
+  // Soft-deleted ("no longer available") + password-lock states.
+  const [gone, setGone] = useState(false)
+  const [locked, setLocked] = useState<{ title: string; from: string } | null>(null)
+  const [password, setPassword] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
+
+  // Load the agreement, optionally with a password. Locked agreements come
+  // back with only title + from until the correct password is supplied; the
+  // working password is kept in state so signing can re-send it.
+  const load = useCallback(
+    async (pw?: string) => {
+      const url =
+        `/api/agreements/info?token=${encodeURIComponent(token)}` +
+        (pw ? `&password=${encodeURIComponent(pw)}` : '')
+      const res = await fetch(url)
+      if (res.status === 410) {
+        setGone(true)
+        return
+      }
+      const json = await res.json()
+      if (!json.success) {
+        setError(json.error || 'Agreement not found')
+        return
+      }
+      const ag = json.agreement as AgreementInfo & {
+        locked?: boolean
+        passwordError?: boolean
+      }
+      if (ag.locked) {
+        setLocked({ title: ag.title, from: ag.from })
+        if (ag.passwordError) setPwError('Incorrect password. Try again.')
+        return
+      }
+      setLocked(null)
+      setInfo(ag as AgreementInfo)
+    },
+    [token],
+  )
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const res = await fetch(`/api/agreements/info?token=${encodeURIComponent(token)}`)
-        const json = await res.json()
-        if (cancelled) return
-        if (!json.success) setError(json.error || 'Agreement not found')
-        else setInfo(json.agreement as AgreementInfo)
+        if (!cancelled) await load()
       } catch {
         if (!cancelled) setError('Could not load this agreement.')
       } finally {
@@ -75,7 +144,18 @@ export default function AgreementSignPage() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, load])
+
+  const submitPassword = useCallback(async () => {
+    if (!password.trim()) return
+    setUnlocking(true)
+    setPwError('')
+    try {
+      await load(password)
+    } finally {
+      setUnlocking(false)
+    }
+  }, [password, load])
 
   const handleSign = useCallback(async () => {
     if (name.trim().length < 2 || !consent) return
@@ -84,7 +164,12 @@ export default function AgreementSignPage() {
       const res = await fetch('/api/agreements/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, name: name.trim() }),
+        body: JSON.stringify({
+          token,
+          name: name.trim(),
+          password: password || undefined,
+          signatureImage: renderSignaturePng(name.trim()) || undefined,
+        }),
       })
       const json = await res.json()
       if (!json.success) {
@@ -109,12 +194,67 @@ export default function AgreementSignPage() {
     } finally {
       setSigning(false)
     }
-  }, [token, name, consent])
+  }, [token, name, consent, password])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4]">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+
+  // Soft-deleted: link is dead (the signature, if any, still legally stands).
+  if (gone) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+        <div className="bg-white rounded-xl border border-[#e5e3df] px-8 py-10 text-center max-w-sm shadow-sm">
+          <p className="text-slate-800 font-semibold">No longer available</p>
+          <p className="text-slate-500 text-sm mt-1">
+            This agreement is no longer available. If you signed it, your copy was emailed to you.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Password-locked: prompt before showing anything.
+  if (locked && !info) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+        <div className="bg-white rounded-xl border border-[#e5e3df] px-8 py-9 max-w-sm w-full shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2B79F7]/10 mx-auto">
+            <Lock className="h-5 w-5 text-[#2B79F7]" />
+          </div>
+          <p className="mt-4 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            {locked.from}
+          </p>
+          <p className="mt-1 text-center text-base font-semibold text-slate-900">{locked.title}</p>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            This agreement is password protected. Enter the password you were given to open it.
+          </p>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !unlocking) void submitPassword()
+            }}
+            placeholder="Password"
+            autoFocus
+            className="mt-4 w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-[#2B79F7] bg-white"
+          />
+          {pwError && <p className="mt-2 text-xs text-red-600">{pwError}</p>}
+          <button
+            type="button"
+            onClick={() => void submitPassword()}
+            disabled={unlocking || !password.trim()}
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm text-white font-semibold transition-opacity disabled:opacity-50"
+            style={{ backgroundColor: '#2B79F7' }}
+          >
+            {unlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlock'}
+          </button>
+        </div>
       </div>
     )
   }

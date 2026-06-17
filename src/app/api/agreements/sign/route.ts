@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendAgreementEmail, agreementUrl } from '@/lib/agreements/send'
-import { cleanInvoiceConfig, invoiceTotal } from '@/lib/agreements/shared'
+import { cleanInvoiceConfig, invoiceTotal, buildSignedPdfHtml } from '@/lib/agreements/shared'
+import { verifyAccessPassword } from '@/lib/agreements/password'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,9 +22,22 @@ const admin = createServiceClient(
 // When the LAST signer signs, the agreement flips to 'signed' and the
 // signed-copy email goes out to every signer plus the CRM team.
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { token?: string; name?: string }
+  const body = (await req.json().catch(() => ({}))) as {
+    token?: string
+    name?: string
+    password?: string
+    signatureImage?: string
+  }
   const token = body.token || ''
   const name = (body.name || '').trim()
+  // The browser-rendered signature PNG (data URL). Validated + size-capped;
+  // anything else is dropped (the PDF falls back to script text).
+  const signatureImage =
+    typeof body.signatureImage === 'string' &&
+    body.signatureImage.startsWith('data:image/png;base64,') &&
+    body.signatureImage.length < 300_000
+      ? body.signatureImage
+      : null
 
   if (!token || name.length < 2) {
     return NextResponse.json(
@@ -35,7 +49,7 @@ export async function POST(req: NextRequest) {
   const { data: signer } = await admin
     .from('agreement_signers')
     .select(
-      'id, agreement_id, email, signed_at, agreement:agreements(id, client_id, title, status, public_token, cc_emails, invoice_config, lead_id)',
+      'id, agreement_id, email, signed_at, agreement:agreements(id, client_id, title, body_html, status, public_token, cc_emails, invoice_config, lead_id, access_password_hash, deleted_at)',
     )
     .eq('token', token)
     .maybeSingle()
@@ -44,17 +58,37 @@ export async function POST(req: NextRequest) {
     id: string
     client_id: string
     title: string
+    body_html: string
     status: string
     public_token: string
     cc_emails: string[] | null
     invoice_config: unknown
     lead_id: string | null
+    access_password_hash: string | null
+    deleted_at: string | null
   } | null
 
   if (!signer || !agreement || agreement.status === 'draft') {
     return NextResponse.json(
       { success: false, error: 'This signing link is not valid.' },
       { status: 404 },
+    )
+  }
+  if (agreement.deleted_at) {
+    return NextResponse.json(
+      { success: false, error: 'This agreement is no longer available.' },
+      { status: 410 },
+    )
+  }
+  // Password-locked agreements require the password to sign too, so the link
+  // alone (without the out-of-band password) can't complete a signature.
+  if (
+    agreement.access_password_hash &&
+    !verifyAccessPassword(String(body.password || ''), agreement.access_password_hash)
+  ) {
+    return NextResponse.json(
+      { success: false, error: 'This agreement is password protected.' },
+      { status: 401 },
     )
   }
   if (signer.signed_at || agreement.status === 'signed') {
@@ -70,21 +104,34 @@ export async function POST(req: NextRequest) {
     req.headers.get('x-real-ip') ||
     null
 
-  const { data: updated, error } = await admin
-    .from('agreement_signers')
-    .update({
-      signed_at: signedAt,
-      signer_name: name,
-      sign_ip: ip,
-      sign_user_agent: (req.headers.get('user-agent') || '').slice(0, 300) || null,
-    })
-    .eq('id', signer.id)
-    .is('signed_at', null) // idempotency guard against concurrent signs
-    .select('id')
-    .maybeSingle()
+  const baseUpdate = {
+    signed_at: signedAt,
+    signer_name: name,
+    sign_ip: ip,
+    sign_user_agent: (req.headers.get('user-agent') || '').slice(0, 300) || null,
+  }
+  const recordSignature = (withImage: boolean) =>
+    admin
+      .from('agreement_signers')
+      .update(withImage ? { ...baseUpdate, signature_image: signatureImage } : baseUpdate)
+      .eq('id', signer.id)
+      .is('signed_at', null) // idempotency guard against concurrent signs
+      .select('id')
+      .maybeSingle()
+
+  let { data: updated, error } = await recordSignature(true)
+  // The signature_image column may not be migrated yet - don't let that block
+  // signing. Retry without it so the signature still records.
+  if (error && /signature_image/i.test(error.message || '')) {
+    ;({ data: updated, error } = await recordSignature(false))
+  }
 
   if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[agreements/sign] could not record signature:', error)
+    return NextResponse.json(
+      { success: false, error: 'Could not record your signature. Please try again.' },
+      { status: 500 },
+    )
   }
   if (!updated) {
     return NextResponse.json(
@@ -94,11 +141,28 @@ export async function POST(req: NextRequest) {
   }
 
   // Fully signed? Flip the agreement and email the signed copy to everyone.
-  const { data: allSigners } = await admin
-    .from('agreement_signers')
-    .select('email, name, signed_at, signer_name')
-    .eq('agreement_id', agreement.id)
-    .order('created_at', { ascending: true })
+  // signature_image may not be migrated yet - fall back to the columns that
+  // always exist so completion + emails still go out.
+  type SignerSummary = {
+    email: string
+    name: string | null
+    signed_at: string | null
+    signer_name: string | null
+    signature_image?: string | null
+  }
+  const fetchAllSigners = (cols: string) =>
+    admin
+      .from('agreement_signers')
+      .select(cols)
+      .eq('agreement_id', agreement.id)
+      .order('created_at', { ascending: true })
+
+  const withImage = await fetchAllSigners('email, name, signed_at, signer_name, signature_image')
+  const allSignersRes =
+    withImage.error && /signature_image/i.test(withImage.error.message || '')
+      ? await fetchAllSigners('email, name, signed_at, signer_name')
+      : withImage
+  const allSigners = (allSignersRes.data as unknown as SignerSummary[] | null) || []
   const pending = (allSigners || []).filter((s) => !s.signed_at)
   const allSigned = pending.length === 0
   let invoiceUrl: string | null = null
@@ -202,6 +266,29 @@ export async function POST(req: NextRequest) {
       minute: '2-digit',
     })
 
+    // Signed-copy PDF attachment. Skipped for password-protected agreements
+    // (an open PDF would defeat the password) - those stay link-only, gated
+    // by the password. Apps Script builds the PDF from this HTML on send.
+    const isProtected = Boolean(agreement.access_password_hash)
+    const pdfFields: Record<string, unknown> = isProtected
+      ? {}
+      : {
+          attachPdf: true,
+          pdfName: `${agreement.title}.pdf`,
+          pdfHtml: buildSignedPdfHtml({
+            title: agreement.title,
+            bodyHtml: agreement.body_html,
+            signerNames: signerNames || name,
+            signedAtText,
+            signers: (allSigners || []).map((s) => ({
+              email: s.email as string,
+              signerName: (s.signer_name as string | null) || null,
+              signedAt: (s.signed_at as string | null) || null,
+              signatureImage: (s.signature_image as string | null) || null,
+            })),
+          }),
+        }
+
     for (const s of allSigners || []) {
       await sendAgreementEmail(
         'agreement_signed',
@@ -214,6 +301,7 @@ export async function POST(req: NextRequest) {
           signedAt: signedAtText,
           link,
           invoiceUrl,
+          ...pdfFields,
         },
         `agreement:${agreement.id}:signed:${s.email}`,
       )
@@ -233,6 +321,7 @@ export async function POST(req: NextRequest) {
           signedAt: signedAtText,
           link,
           invoiceUrl,
+          ...pdfFields,
         },
         `agreement:${agreement.id}:signed:cc:${ccEmail}`,
       )
@@ -265,6 +354,7 @@ export async function POST(req: NextRequest) {
           signedAt: signedAtText,
           link,
           invoiceUrl,
+          ...pdfFields,
         },
         `agreement:${agreement.id}:signed:team`,
       )

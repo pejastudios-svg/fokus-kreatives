@@ -7,9 +7,103 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  *  linked invoice's state embedded. The payments embed is disambiguated by
  *  constraint name - agreements and payments reference each other. */
 export const AGREEMENT_COLUMNS =
-  'id, title, status, public_token, lead_id, template_id, recipient_name, recipient_email, cc_emails, signed_at, sent_at, viewed_at, created_at, body_html, invoice_config, payment_id, ' +
+  'id, title, status, public_token, lead_id, template_id, recipient_name, recipient_email, cc_emails, signed_at, sent_at, viewed_at, created_at, body_html, invoice_config, payment_id, access_password_hash, deleted_at, ' +
   'signers:agreement_signers(id, email, name, signed_at, signer_name), ' +
   'payment:payments!agreements_payment_id_fkey(id, status, public_token)'
+
+/**
+ * Shape an agreement row for the client: never leak the password hash, expose
+ * a `passwordProtected` boolean instead, and withhold `body_html` for locked
+ * agreements until the caller unlocks them. `unlocked: true` is passed when
+ * the caller just authored/edited the row (they already have the content) or
+ * after a successful unlock.
+ */
+export function presentAgreement(
+  row: Record<string, unknown>,
+  opts: { unlocked?: boolean } = {},
+): Record<string, unknown> {
+  const { access_password_hash, ...rest } = row
+  const passwordProtected = Boolean(access_password_hash)
+  const out: Record<string, unknown> = { ...rest, passwordProtected }
+  if (passwordProtected && !opts.unlocked) delete out.body_html
+  return out
+}
+
+/**
+ * Wrap a signed agreement's body into a standalone, print-ready HTML document
+ * that Apps Script converts to PDF (HTML blob → application/pdf) and attaches
+ * to the signed-copy email. Kept inline-styled so it renders identically
+ * wherever it's opened.
+ */
+export function buildSignedPdfHtml(args: {
+  title: string
+  bodyHtml: string
+  signerNames: string
+  signedAtText: string
+  signers: {
+    email: string
+    signerName: string | null
+    signedAt: string | null
+    signatureImage?: string | null
+  }[]
+}): string {
+  const esc = (s: string) =>
+    String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // Render each signature the way the signing page does: the typed name in a
+  // script/cursive face on a signature line, with name, email and timestamp
+  // beneath. Italic + a script stack keeps it reading as a signature even if
+  // the cursive font isn't available in the PDF renderer.
+  const sigBlocks = args.signers
+    .map((s) => {
+      const who = esc(s.signerName || s.email)
+      const when = s.signedAt ? esc(new Date(s.signedAt).toLocaleString('en-GB')) : ''
+      if (!s.signedAt) {
+        return (
+          '<div class="sigrow">' +
+          '<div class="line pending"></div>' +
+          `<div class="cap">Awaiting signature &middot; ${esc(s.email)}</div>` +
+          '</div>'
+        )
+      }
+      // Prefer the captured signature image (the exact mark the signer saw);
+      // fall back to script-styled text when none was captured.
+      const ink =
+        typeof s.signatureImage === 'string' && s.signatureImage.startsWith('data:image/png;base64,')
+          ? `<img class="inkimg" src="${s.signatureImage}" alt="${who}" />`
+          : `<div class="ink">${who}</div>`
+      return (
+        '<div class="sigrow">' +
+        ink +
+        '<div class="line"></div>' +
+        `<div class="cap">${who} &middot; ${esc(s.email)}</div>` +
+        `<div class="cap muted">Signed ${when}</div>` +
+        '</div>'
+      )
+    })
+    .join('')
+  return (
+    '<!doctype html><html><head><meta charset="utf-8"/>' +
+    '<style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;' +
+    'line-height:1.6;font-size:13px;padding:40px;max-width:760px;margin:0 auto;}' +
+    'h1{font-size:20px;margin:0 0 4px;} .meta{color:#6B7280;font-size:11px;margin-bottom:24px;}' +
+    '.doc{border-top:1px solid #E5E7EB;padding-top:20px;}' +
+    '.sig{margin-top:32px;border-top:1px solid #E5E7EB;padding-top:16px;}' +
+    '.sig h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;margin:0 0 14px;}' +
+    '.sigrow{margin-bottom:22px;}' +
+    ".ink{font-family:'Snell Roundhand','Savoye LET','Brush Script MT','Segoe Script',cursive;" +
+    'font-style:italic;font-size:30px;line-height:1;color:#111827;}' +
+    '.inkimg{display:block;height:48px;max-width:340px;}' +
+    '.line{border-bottom:1px solid #94A3B8;max-width:320px;margin-top:4px;}' +
+    '.line.pending{border-bottom-style:dashed;height:26px;}' +
+    '.cap{font-size:11px;color:#6B7280;margin-top:4px;} .cap.muted{color:#9CA3AF;margin-top:1px;}</style>' +
+    '</head><body>' +
+    `<h1>${esc(args.title)}</h1>` +
+    `<div class="meta">Signed by ${esc(args.signerNames)} on ${esc(args.signedAtText)}</div>` +
+    `<div class="doc">${args.bodyHtml}</div>` +
+    `<div class="sig"><h2>Signatures</h2>${sigBlocks}</div>` +
+    '</body></html>'
+  )
+}
 
 export interface InvoiceConfig {
   lineItems: { description: string; quantity: number; unit_price: number }[]

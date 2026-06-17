@@ -36,6 +36,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
+  Lock,
+  LockOpen,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react'
 import type { KebabMenuItem } from '@/components/ui/KebabMenu'
 
@@ -45,6 +49,7 @@ interface Template {
   body_html: string
   created_at: string
   updated_at: string
+  passwordProtected?: boolean
 }
 
 interface Signer {
@@ -79,6 +84,8 @@ interface Agreement {
   payment_id: string | null
   payment: { id: string; status: string; public_token: string } | null
   signers: Signer[]
+  passwordProtected?: boolean
+  deleted_at?: string | null
 }
 
 interface Lead {
@@ -209,6 +216,15 @@ function SlidingViews({
   )
 }
 
+/** Small "locked" pill shown on password-protected cards. */
+function StatusLockTag() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+      <Lock className="h-2.5 w-2.5" /> Locked
+    </span>
+  )
+}
+
 /** Drive-style document card: a miniature render of the actual content,
  *  status tag floating on the preview, details + menu in the footer. */
 function DocCard({
@@ -219,6 +235,7 @@ function DocCard({
   menu,
   onOpen,
   footerExtra,
+  locked,
 }: {
   bodyHtml: string
   title: string
@@ -227,6 +244,8 @@ function DocCard({
   menu: KebabMenuItem[]
   onOpen: () => void
   footerExtra?: ReactNode
+  /** Password-protected: the body isn't loaded, show a lock placeholder. */
+  locked?: boolean
 }) {
   return (
     // No overflow-hidden on the card itself: it would clip the dropdown
@@ -237,10 +256,19 @@ function DocCard({
         onClick={onOpen}
         className="relative h-52 overflow-hidden rounded-t-2xl bg-white text-left cursor-pointer"
       >
-        <div
-          className="agreement-doc origin-top-left scale-[0.4] w-[250%] px-10 py-8 pointer-events-none select-none"
-          dangerouslySetInnerHTML={{ __html: bodyHtml }}
-        />
+        {locked ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400">
+            <Lock className="h-7 w-7" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide">
+              Password protected
+            </span>
+          </div>
+        ) : (
+          <div
+            className="agreement-doc origin-top-left scale-[0.4] w-[250%] px-10 py-8 pointer-events-none select-none"
+            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+          />
+        )}
         {tag && <div className="absolute top-2 right-2">{tag}</div>}
       </button>
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-slate-300 dark:border-[var(--border-primary)]">
@@ -411,10 +439,17 @@ export default function AgreementsPage() {
   const params = useParams()
   const clientId = (params?.clientId as string) || ''
   const supabase = createClient()
-  const { workspaceName, canEditRecords } = useCrmRole()
+  const { workspaceName, canEditRecords, isClientUser } = useCrmRole()
+  // Only the client who owns this workspace sees the password-recovery
+  // (force-remove) action; the server independently enforces that the caller
+  // is the workspace-owner account, so hiding it is not the only gate.
+  const canRecoverPassword = isClientUser
 
   const [agreements, setAgreements] = useState<Agreement[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  // Recently Deleted (soft-deleted) agreements + whether that view is open.
+  const [deletedAgreements, setDeletedAgreements] = useState<Agreement[]>([])
+  const [showDeleted, setShowDeleted] = useState(false)
   const [leads, setLeads] = useState<Lead[]>([])
   const [fields, setFields] = useState<CustomFieldRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -916,24 +951,36 @@ export default function AgreementsPage() {
   }
 
   const deleteTemplate = (t: Template) => {
+    const doDelete = async (pw?: string) => {
+      const qs =
+        `clientId=${encodeURIComponent(clientId)}` +
+        (pw ? `&password=${encodeURIComponent(pw)}` : '')
+      const res = await fetch(`/api/crm/agreements/templates/${t.id}?${qs}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Could not delete the template.')
+      setTemplates((prev) => prev.filter((x) => x.id !== t.id))
+      setConfirm(null)
+    }
+    // Locked template needs its password to delete (so the lock can't be
+    // bypassed by deleting). Owner who forgot it removes the lock first.
+    if (t.passwordProtected) {
+      setConfirm({
+        title: 'Delete template',
+        message: `"${t.name}" is locked. Enter its password to delete it.`,
+        confirmLabel: 'Delete',
+        tone: 'danger',
+        requirePassword: true,
+        passwordLabel: 'Password',
+        onConfirm: (pw) => doDelete(pw || ''),
+      })
+      return
+    }
     setConfirm({
       title: 'Delete template',
       message: `Delete the template "${t.name}"? This cannot be undone.`,
       confirmLabel: 'Delete',
       tone: 'danger',
-      onConfirm: async () => {
-        const res = await fetch(
-          `/api/crm/agreements/templates/${t.id}?clientId=${encodeURIComponent(clientId)}`,
-          { method: 'DELETE' },
-        )
-        const json = await res.json()
-        if (!json.success) {
-          toast.error(json.error || 'Could not delete the template.')
-          return
-        }
-        setTemplates((prev) => prev.filter((x) => x.id !== t.id))
-        setConfirm(null)
-      },
+      onConfirm: () => doDelete(),
     })
   }
 
@@ -1095,23 +1142,275 @@ export default function AgreementsPage() {
   }
 
   const deleteAgreement = (a: Agreement) => {
+    const signed = a.status === 'signed' || a.signers.some((s) => s.signed_at)
+    const baseMsg = signed
+      ? `Move "${a.title}" to Recently Deleted? The signing link stops working and it leaves your page, but the signature and any copies already emailed stay intact. Restorable for 30 days.`
+      : `Move "${a.title}" to Recently Deleted? You can restore it within 30 days.`
+    const doDelete = async (pw?: string) => {
+      const qs =
+        `clientId=${encodeURIComponent(clientId)}` +
+        (pw ? `&password=${encodeURIComponent(pw)}` : '')
+      const res = await fetch(`/api/crm/agreements/${a.id}?${qs}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Could not delete the agreement.')
+      setAgreements((prev) => prev.filter((x) => x.id !== a.id))
+      setConfirm(null)
+      toast.success('Moved to Recently Deleted.')
+    }
+    // A locked agreement needs its password to delete (so the lock can't be
+    // bypassed by deleting). Owner who forgot it removes the lock first.
+    if (a.passwordProtected) {
+      setConfirm({
+        title: 'Delete agreement',
+        message: `"${a.title}" is locked. Enter its password to delete it.`,
+        confirmLabel: 'Delete',
+        tone: 'danger',
+        requirePassword: true,
+        passwordLabel: 'Password',
+        onConfirm: (pw) => doDelete(pw || ''),
+      })
+      return
+    }
     setConfirm({
       title: 'Delete agreement',
-      message: `Delete "${a.title}"? This cannot be undone.`,
+      message: baseMsg,
       confirmLabel: 'Delete',
       tone: 'danger',
-      onConfirm: async () => {
-        const res = await fetch(
-          `/api/crm/agreements/${a.id}?clientId=${encodeURIComponent(clientId)}`,
-          { method: 'DELETE' },
-        )
-        const json = await res.json()
-        if (!json.success) {
-          toast.error(json.error || 'Could not delete the agreement.')
-          return
-        }
-        setAgreements((prev) => prev.filter((x) => x.id !== a.id))
+      onConfirm: () => doDelete(),
+    })
+  }
+
+  // --- Password lock + Recently Deleted ---
+
+  const agreementAction = async (id: string, payload: Record<string, unknown>) => {
+    const res = await fetch(`/api/crm/agreements/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, ...payload }),
+    })
+    return res.json()
+  }
+
+  /** Ensure we have an agreement's body_html, prompting + unlocking when it
+   *  is password protected, then run `proceed` with the body. */
+  const withAgreementBody = (a: Agreement, proceed: (bodyHtml: string) => void) => {
+    if (!a.passwordProtected || a.body_html) {
+      proceed(a.body_html)
+      return
+    }
+    setConfirm({
+      title: 'Password protected',
+      message: `Enter the password to open "${a.title}".`,
+      confirmLabel: 'Unlock',
+      requirePassword: true,
+      passwordLabel: 'Password',
+      onConfirm: async (pw) => {
+        const json = await agreementAction(a.id, { action: 'unlock', password: pw || '' })
+        if (!json.success) throw new Error(json.error || 'Incorrect password.')
         setConfirm(null)
+        proceed(json.bodyHtml as string)
+      },
+    })
+  }
+
+  const setAgreementPassword = (a: Agreement) => {
+    if (a.passwordProtected) {
+      // Removing requires the CURRENT password (so the lock can't be lifted
+      // by someone who doesn't know it). Owner recovery is a separate action.
+      setConfirm({
+        title: 'Remove password',
+        message: `Enter the current password to remove the lock from "${a.title}".`,
+        confirmLabel: 'Remove',
+        tone: 'danger',
+        requirePassword: true,
+        passwordLabel: 'Current password',
+        onConfirm: async (pw) => {
+          const json = await agreementAction(a.id, {
+            action: 'set_password',
+            password: null,
+            currentPassword: pw || '',
+          })
+          if (!json.success) throw new Error(json.error || 'Could not update.')
+          setConfirm(null)
+          setAgreements((prev) =>
+            prev.map((x) => (x.id === a.id ? { ...x, passwordProtected: false } : x)),
+          )
+          toast.success('Password removed.')
+        },
+      })
+      return
+    }
+    setConfirm({
+      title: 'Set a password',
+      message:
+        `Only people with this password can open "${a.title}" (here and on the signing link), and the document is encrypted with it. ` +
+        'Save the password carefully: if it is lost or forgotten it can only be recovered by the workspace owner (the client who owns this CRM).',
+      confirmLabel: 'Set password',
+      requirePassword: true,
+      passwordLabel: 'New password (min 4 characters)',
+      onConfirm: async (pw) => {
+        const json = await agreementAction(a.id, { action: 'set_password', password: pw || '' })
+        if (!json.success) throw new Error(json.error || 'Could not set password.')
+        setConfirm(null)
+        setAgreements((prev) =>
+          prev.map((x) => (x.id === a.id ? { ...x, passwordProtected: true } : x)),
+        )
+        toast.success('Password set. Document encrypted.')
+      },
+    })
+  }
+
+  // Agency-owner recovery: lift the lock without the password. Server rejects
+  // anyone who isn't the workspace owner.
+  const forceRemoveAgreementPassword = (a: Agreement) => {
+    setConfirm({
+      title: 'Force remove password',
+      message: `Remove the lock from "${a.title}" without the password? Only the workspace owner can do this. It is logged.`,
+      confirmLabel: 'Force remove',
+      tone: 'danger',
+      onConfirm: async () => {
+        const json = await agreementAction(a.id, {
+          action: 'set_password',
+          password: null,
+          force: true,
+        })
+        if (!json.success) throw new Error(json.error || 'Only the workspace owner can do this.')
+        setConfirm(null)
+        setAgreements((prev) =>
+          prev.map((x) => (x.id === a.id ? { ...x, passwordProtected: false } : x)),
+        )
+        toast.success('Password removed.')
+      },
+    })
+  }
+
+  const templateAction = (id: string, payload: Record<string, unknown>) =>
+    fetch(`/api/crm/agreements/templates/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, ...payload }),
+    }).then((r) => r.json())
+
+  const setTemplatePassword = (t: Template) => {
+    if (t.passwordProtected) {
+      setConfirm({
+        title: 'Remove password',
+        message: `Enter the current password to remove the lock from "${t.name}".`,
+        confirmLabel: 'Remove',
+        tone: 'danger',
+        requirePassword: true,
+        passwordLabel: 'Current password',
+        onConfirm: async (pw) => {
+          const json = await templateAction(t.id, {
+            action: 'set_password',
+            password: null,
+            currentPassword: pw || '',
+          })
+          if (!json.success) throw new Error(json.error || 'Could not update.')
+          setConfirm(null)
+          setTemplates((prev) =>
+            prev.map((x) => (x.id === t.id ? { ...x, passwordProtected: false } : x)),
+          )
+          toast.success('Password removed.')
+        },
+      })
+      return
+    }
+    setConfirm({
+      title: 'Set a password',
+      message:
+        `Lock "${t.name}" and encrypt it. Only people with the password can open it. ` +
+        'Save the password carefully: if lost or forgotten it can only be recovered by the workspace owner (the client who owns this CRM).',
+      confirmLabel: 'Set password',
+      requirePassword: true,
+      passwordLabel: 'New password (min 4 characters)',
+      onConfirm: async (pw) => {
+        const json = await templateAction(t.id, { action: 'set_password', password: pw || '' })
+        if (!json.success) throw new Error(json.error || 'Could not set password.')
+        setConfirm(null)
+        setTemplates((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, passwordProtected: true } : x)),
+        )
+        toast.success('Password set. Template encrypted.')
+      },
+    })
+  }
+
+  const forceRemoveTemplatePassword = (t: Template) => {
+    setConfirm({
+      title: 'Force remove password',
+      message: `Remove the lock from "${t.name}" without the password? Only the workspace owner can do this.`,
+      confirmLabel: 'Force remove',
+      tone: 'danger',
+      onConfirm: async () => {
+        const json = await templateAction(t.id, { action: 'set_password', password: null, force: true })
+        if (!json.success) throw new Error(json.error || 'Only the workspace owner can do this.')
+        setConfirm(null)
+        setTemplates((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, passwordProtected: false } : x)),
+        )
+        toast.success('Password removed.')
+      },
+    })
+  }
+
+  const withTemplateBody = (t: Template, proceed: (bodyHtml: string) => void) => {
+    if (!t.passwordProtected || t.body_html) {
+      proceed(t.body_html)
+      return
+    }
+    setConfirm({
+      title: 'Password protected',
+      message: `Enter the password to open "${t.name}".`,
+      confirmLabel: 'Unlock',
+      requirePassword: true,
+      passwordLabel: 'Password',
+      onConfirm: async (pw) => {
+        const res = await fetch(`/api/crm/agreements/templates/${t.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, action: 'unlock', password: pw || '' }),
+        })
+        const json = await res.json()
+        if (!json.success) throw new Error(json.error || 'Incorrect password.')
+        setConfirm(null)
+        proceed(json.bodyHtml as string)
+      },
+    })
+  }
+
+  const openRecentlyDeleted = async () => {
+    setShowDeleted(true)
+    const res = await fetch(
+      `/api/crm/agreements?clientId=${encodeURIComponent(clientId)}&view=deleted`,
+    )
+    const json = await res.json()
+    if (json.success) setDeletedAgreements(json.agreements as Agreement[])
+  }
+
+  const restoreAgreement = async (a: Agreement) => {
+    const json = await agreementAction(a.id, { action: 'restore' })
+    if (!json.success) {
+      toast.error(json.error || 'Could not restore.')
+      return
+    }
+    setDeletedAgreements((prev) => prev.filter((x) => x.id !== a.id))
+    toast.success('Restored.')
+    void loadAll()
+  }
+
+  const permanentlyDeleteAgreement = (a: Agreement) => {
+    setConfirm({
+      title: 'Delete permanently',
+      message: `Permanently delete "${a.title}"? This cannot be undone. The signature record and any emailed copies are not affected.`,
+      confirmLabel: 'Delete forever',
+      tone: 'danger',
+      onConfirm: async () => {
+        const json = await agreementAction(a.id, { action: 'delete_permanent' })
+        if (!json.success) throw new Error(json.error || 'Could not delete.')
+        setConfirm(null)
+        setDeletedAgreements((prev) => prev.filter((x) => x.id !== a.id))
+        toast.success('Permanently deleted.')
       },
     })
   }
@@ -1338,7 +1637,10 @@ export default function AgreementsPage() {
       title={confirm?.title || ''}
       message={confirm?.message || ''}
       confirmLabel={confirm?.confirmLabel}
+      cancelLabel={confirm?.cancelLabel}
       tone={confirm?.tone}
+      requirePassword={confirm?.requirePassword}
+      passwordLabel={confirm?.passwordLabel}
       onConfirm={confirm?.onConfirm || (() => {})}
       onClose={() => setConfirm(null)}
     />
@@ -1739,26 +2041,23 @@ export default function AgreementsPage() {
 
   const openAgreement = (a: Agreement) => {
     if (a.status === 'draft' && canEditRecords) {
-      openCompose({ draft: a })
+      withAgreementBody(a, (html) => openCompose({ draft: { ...a, body_html: html } }))
     } else {
       touchAgreement(a.id, a.status)
       window.open(`/agreement/${a.public_token}`, '_blank', 'noopener')
     }
   }
 
-  // Anything carrying a real signature (signed, or partially signed by one
-  // of several signers) is a record: no Delete offered, and the server
-  // rejects it anyway.
   const hasSignature = (a: Agreement) =>
     a.status === 'signed' || a.signers.some((s) => s.signed_at)
 
   const agreementMenu = (a: Agreement): KebabMenuItem[] => [
     ...(canEditRecords && a.status === 'draft'
-      ? [{ label: 'Edit & send', onClick: () => openCompose({ draft: a }) }]
+      ? [{ label: 'Edit & send', onClick: () => withAgreementBody(a, (html) => openCompose({ draft: { ...a, body_html: html } })) }]
       : []),
     // Sent but unsigned: take it back and fix it without retyping.
     ...(canEditRecords && a.status !== 'draft' && !hasSignature(a)
-      ? [{ label: 'Edit & resend', onClick: () => recallAndEdit(a) }]
+      ? [{ label: 'Edit & resend', onClick: () => withAgreementBody(a, (html) => recallAndEdit({ ...a, body_html: html })) }]
       : []),
     ...(a.status !== 'draft'
       ? [
@@ -1766,12 +2065,23 @@ export default function AgreementsPage() {
           { label: 'Copy view link', onClick: () => copyLink(a) },
         ]
       : []),
-    // Any doc can seed a new draft; the original stays untouched. This is
-    // the only edit path off a signed document.
+    // Any doc can seed a new draft; the original stays untouched.
     ...(canEditRecords
-      ? [{ label: 'Duplicate', onClick: () => void duplicateAgreement(a) }]
+      ? [{ label: 'Duplicate', onClick: () => withAgreementBody(a, (html) => void duplicateAgreement({ ...a, body_html: html })) }]
       : []),
-    ...(canEditRecords && !hasSignature(a)
+    // Password lock - any role can set/remove it (removing needs the password).
+    {
+      label: a.passwordProtected ? 'Remove password' : 'Set password',
+      icon: a.passwordProtected ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />,
+      onClick: () => setAgreementPassword(a),
+    },
+    // Agency-owner recovery when the password is lost.
+    ...(a.passwordProtected && canRecoverPassword
+      ? [{ label: 'Force remove (owner)', onClick: () => forceRemoveAgreementPassword(a) }]
+      : []),
+    // Soft delete is always available now (signed docs go to Recently
+    // Deleted; the signature + emailed copies are untouched).
+    ...(canEditRecords
       ? [{ label: 'Delete', onClick: () => deleteAgreement(a), tone: 'destructive' as const }]
       : []),
   ]
@@ -1814,16 +2124,30 @@ export default function AgreementsPage() {
   const templateMenu = (t: Template): KebabMenuItem[] => [
     ...(canEditRecords
       ? [
-          { label: 'Edit', onClick: () => openTemplate(t) },
+          { label: 'Edit', onClick: () => withTemplateBody(t, (html) => openTemplate({ ...t, body_html: html })) },
           {
             label: 'Status trigger',
-            onClick: () => {
-              setAutoStatus('')
-              setAutoTpl(t)
-            },
+            // Locked templates require the password here too - the trigger
+            // stages this template's body to leads, so it shouldn't be set up
+            // without unlocking. withTemplateBody prompts when locked.
+            onClick: () =>
+              withTemplateBody(t, () => {
+                setAutoStatus('')
+                setAutoTpl(t)
+              }),
           },
-          { label: 'Delete', onClick: () => deleteTemplate(t), tone: 'destructive' as const },
         ]
+      : []),
+    {
+      label: t.passwordProtected ? 'Remove password' : 'Set password',
+      icon: t.passwordProtected ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />,
+      onClick: () => setTemplatePassword(t),
+    },
+    ...(t.passwordProtected && canRecoverPassword
+      ? [{ label: 'Force remove (owner)', onClick: () => forceRemoveTemplatePassword(t) }]
+      : []),
+    ...(canEditRecords
+      ? [{ label: 'Delete', onClick: () => deleteTemplate(t), tone: 'destructive' as const }]
       : []),
   ]
 
@@ -1887,6 +2211,15 @@ export default function AgreementsPage() {
             className="w-full rounded-full border border-[var(--border-primary)] bg-[var(--bg-secondary)] pl-9 pr-4 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[#2B79F7]"
           />
         </div>
+        <button
+          type="button"
+          title="Recently deleted"
+          onClick={openRecentlyDeleted}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Recently deleted</span>
+        </button>
         <div className="inline-flex shrink-0 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-1">
           <button
             type="button"
@@ -1926,13 +2259,25 @@ export default function AgreementsPage() {
               <DocCard
                 key={t.id}
                 bodyHtml={t.body_html}
+                locked={t.passwordProtected}
                 title={t.name}
                 subtitle={`Updated ${fmtDate(t.updated_at)}`}
+                tag={t.passwordProtected ? <StatusLockTag /> : undefined}
                 menu={templateMenu(t)}
-                onOpen={() => (canEditRecords ? openTemplate(t) : undefined)}
+                onOpen={() =>
+                  canEditRecords
+                    ? withTemplateBody(t, (html) => openTemplate({ ...t, body_html: html }))
+                    : undefined
+                }
                 footerExtra={
                   canEditRecords ? (
-                    <Button size="sm" className="rounded-full" onClick={() => openCompose({ template: t })}>
+                    <Button
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() =>
+                        withTemplateBody(t, (html) => openCompose({ template: { ...t, body_html: html } }))
+                      }
+                    >
                       Use
                     </Button>
                   ) : undefined
@@ -1947,11 +2292,21 @@ export default function AgreementsPage() {
             {visibleTemplates.map((t) => (
               <Card key={t.id}>
                 <CardContent className="p-4 flex items-center justify-between gap-2">
-                  <button type="button" onClick={() => canEditRecords && openTemplate(t)} className="min-w-0 text-left">
-                    <p className="font-medium text-sm text-[var(--text-primary)] truncate">{t.name}</p>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                      Updated {fmtDate(t.updated_at)}
-                    </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      canEditRecords &&
+                      withTemplateBody(t, (html) => openTemplate({ ...t, body_html: html }))
+                    }
+                    className="min-w-0 text-left flex items-center gap-2"
+                  >
+                    {t.passwordProtected && <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />}
+                    <span className="min-w-0">
+                      <p className="font-medium text-sm text-[var(--text-primary)] truncate">{t.name}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                        Updated {fmtDate(t.updated_at)}
+                      </p>
+                    </span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <KebabMenu items={templateMenu(t)} />
@@ -1974,9 +2329,15 @@ export default function AgreementsPage() {
               <DocCard
                 key={a.id}
                 bodyHtml={a.body_html}
+                locked={a.passwordProtected}
                 title={a.title}
                 subtitle={agreementSubtitle(a)}
-                tag={statusPill(a)}
+                tag={
+                  <div className="flex items-center gap-1">
+                    {a.passwordProtected && <StatusLockTag />}
+                    {statusPill(a)}
+                  </div>
+                }
                 menu={agreementMenu(a)}
                 onOpen={() => openAgreement(a)}
               />
@@ -1997,11 +2358,14 @@ export default function AgreementsPage() {
             {visibleAgreements.map((a) => (
               <Card key={a.id}>
                 <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
-                  <button type="button" onClick={() => openAgreement(a)} className="min-w-0 text-left">
-                    <p className="font-medium text-sm text-[var(--text-primary)] truncate">
-                      {a.title}
-                    </p>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-1">{agreementSubtitle(a)}</p>
+                  <button type="button" onClick={() => openAgreement(a)} className="min-w-0 text-left flex items-center gap-2">
+                    {a.passwordProtected && <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />}
+                    <span className="min-w-0">
+                      <p className="font-medium text-sm text-[var(--text-primary)] truncate">
+                        {a.title}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">{agreementSubtitle(a)}</p>
+                    </span>
                   </button>
                   <div className="flex items-center gap-2 shrink-0">
                     {statusPill(a)}
@@ -2039,6 +2403,77 @@ export default function AgreementsPage() {
       {/* Status trigger rules for a template: when a lead enters the chosen
           status, a draft is staged from this template (filled from the lead,
           signer prefilled) and the team is notified to review & send. */}
+      {showDeleted && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => setShowDeleted(false)}
+        >
+          <div
+            className="w-full max-w-lg mt-16 mb-8 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 px-5 py-4 border-b border-[var(--border-primary)]">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Recently deleted</h3>
+                <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
+                  Restorable for 30 days, then permanently removed.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleted(false)}
+                className="shrink-0 rounded-full p-1.5 text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3 max-h-[60vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {deletedAgreements.length === 0 ? (
+                <p className="py-10 text-center text-sm text-[var(--text-tertiary)]">
+                  Nothing here. Deleted agreements show up for 30 days.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {deletedAgreements.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                          {a.title}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-tertiary)]">
+                          {a.status}
+                          {a.deleted_at ? ` · deleted ${fmtDate(a.deleted_at)}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void restoreAgreement(a)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                        </Button>
+                        <button
+                          type="button"
+                          title="Delete permanently"
+                          onClick={() => permanentlyDeleteAgreement(a)}
+                          className="p-1.5 rounded-md text-red-500 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {autoTpl && (
         <div
           className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"

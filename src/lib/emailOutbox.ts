@@ -254,12 +254,19 @@ export async function deliverEmail(row: OutboxRow): Promise<void> {
 
   const payload = await withEmailBranding(row.type, row.payload)
 
+  // Signed-agreement copies that carry a PDF must go through Apps Script,
+  // which builds the PDF from HTML (the SMTP/nodemailer path has no PDF
+  // renderer). Skip SMTP for those so they reach the Apps Script handler.
+  const wantsAppsScriptPdf = row.type === 'agreement_signed' && payload.attachPdf === true
+
   // White-label option 2: outward emails for clients with a connected Gmail
   // send via SMTP as the client. trySmtpSend self-gates (outward type +
   // clientId + connector present) and never throws - false = fall back to
   // the Apps Script branded send below so the email always delivers.
-  const { trySmtpSend } = await import('./email/smtpSender')
-  if (await trySmtpSend(row.type, payload)) return
+  if (!wantsAppsScriptPdf) {
+    const { trySmtpSend } = await import('./email/smtpSender')
+    if (await trySmtpSend(row.type, payload)) return
+  }
 
   const res = await fetch(scriptUrl, {
     method: 'POST',

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { verifyAccessPassword } from '@/lib/agreements/password'
+import { asEncryptedBody, decryptBodyWithPassword } from '@/lib/agreements/bodyCrypto'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,7 +19,8 @@ interface SignerOut {
   signerName: string | null
 }
 
-const AGREEMENT_SELECT = 'id, client_id, title, body_html, status, viewed_at, signed_at, payment_id'
+const AGREEMENT_SELECT =
+  'id, client_id, title, body_html, status, viewed_at, signed_at, payment_id, access_password_hash, deleted_at, body_encryption'
 
 interface AgreementRow {
   id: string
@@ -28,6 +31,9 @@ interface AgreementRow {
   viewed_at: string | null
   signed_at: string | null
   payment_id: string | null
+  access_password_hash: string | null
+  deleted_at: string | null
+  body_encryption: unknown
 }
 
 // GET /api/agreements/info?token=... - public readout for the signing page.
@@ -36,7 +42,9 @@ interface AgreementRow {
 // get the signature input) or the agreement's public token (view-only,
 // used by the CRM "copy link" action). Mirrors /api/invoices/info.
 export async function GET(req: NextRequest) {
-  const token = new URL(req.url).searchParams.get('token')
+  const url = new URL(req.url)
+  const token = url.searchParams.get('token')
+  const password = url.searchParams.get('password') || ''
   if (!token) {
     return NextResponse.json({ success: false, error: 'Missing token' }, { status: 400 })
   }
@@ -64,6 +72,57 @@ export async function GET(req: NextRequest) {
 
   if (!agreement || agreement.status === 'draft') {
     return NextResponse.json({ success: false, error: 'Agreement not found' }, { status: 404 })
+  }
+
+  // Soft-deleted: the link is dead but the signature still legally happened.
+  if (agreement.deleted_at) {
+    return NextResponse.json(
+      { success: false, gone: true, error: 'This agreement is no longer available.' },
+      { status: 410 },
+    )
+  }
+
+  // Password-locked: until the correct password is supplied, return only the
+  // title/sender + a locked flag, never the body or signer list.
+  if (agreement.access_password_hash) {
+    if (!password || !verifyAccessPassword(password, agreement.access_password_hash)) {
+      const { data: lockClient } = await admin
+        .from('clients')
+        .select('business_name, name, email_from_name')
+        .eq('id', agreement.client_id)
+        .maybeSingle()
+      const lockFrom =
+        (lockClient?.email_from_name as string | null)?.trim() ||
+        (lockClient?.business_name as string | null)?.trim() ||
+        (lockClient?.name as string | null)?.trim() ||
+        'Fokus Kreatives'
+      return NextResponse.json({
+        success: true,
+        agreement: {
+          title: agreement.title,
+          locked: true,
+          from: lockFrom,
+          passwordError: Boolean(password),
+        },
+      })
+    }
+  }
+
+  // Past the lock gate: decrypt the body for locked agreements (password was
+  // just verified above). Unlocked agreements use the stored plaintext.
+  let bodyHtml = agreement.body_html
+  if (agreement.access_password_hash) {
+    const enc = asEncryptedBody(agreement.body_encryption)
+    if (enc) {
+      const plain = decryptBodyWithPassword(enc, password)
+      if (plain == null) {
+        return NextResponse.json(
+          { success: false, error: 'Could not open this agreement.' },
+          { status: 500 },
+        )
+      }
+      bodyHtml = plain
+    }
   }
 
   // First open stamps viewed_at (kept once set).
@@ -120,7 +179,7 @@ export async function GET(req: NextRequest) {
     success: true,
     agreement: {
       title: agreement.title,
-      bodyHtml: agreement.body_html,
+      bodyHtml,
       status: agreement.status,
       signedAt: agreement.signed_at,
       from: fromName,

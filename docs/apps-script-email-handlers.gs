@@ -453,11 +453,34 @@ function handleAgreementSigned(payload) {
     (invoiceUrl
       ? paraHtml('An invoice for this agreement is ready.') + buttonHtml(invoiceUrl, 'View invoice')
       : '') +
-    mutedHtml('Keep this email for your records. The link above always shows the signed document.'),
+    mutedHtml(payload.pdfHtml
+      ? 'A PDF copy of the signed agreement is attached for your records.'
+      : 'Keep this email for your records. The link above always shows the signed document.'),
     payload.fromName
   )
 
-  sendHtmlEmail(payload, subject, html)
+  // Attach a PDF of the signed agreement when the app provided its HTML.
+  // Apps Script renders HTML -> PDF natively (no library needed). Password
+  // protected agreements omit pdfHtml on purpose and stay link-only.
+  var attachments = []
+  if (payload.pdfHtml) {
+    try {
+      var name = (payload.pdfName || (title + '.pdf')).replace(/[^\w.\- ]+/g, '').slice(0, 120)
+      if (name.slice(-4).toLowerCase() !== '.pdf') name += '.pdf'
+      var pdf = Utilities.newBlob(payload.pdfHtml, 'text/html', 'agreement.html')
+        .getAs('application/pdf')
+        .setName(name)
+      attachments.push(pdf)
+    } catch (e) {
+      Logger.log('handleAgreementSigned: PDF build failed, sending without attachment: ' + e)
+    }
+  }
+
+  var msg = { to: normalizeRecipients(payload.to), subject: subject, htmlBody: html }
+  if (payload.fromName) msg.name = payload.fromName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  if (attachments.length) msg.attachments = attachments
+  MailApp.sendEmail(msg)
 }
 
 // ========== PAYMENTS ==========
@@ -1207,6 +1230,25 @@ function runEmailCampaignsCron() {
     Logger.log('runEmailCampaignsCron: ' + res.getResponseCode() + ' ' + res.getContentText())
   } catch (e) {
     Logger.log('runEmailCampaignsCron failed: ' + e)
+  }
+}
+
+// Recently Deleted purge (Agreements): hard-deletes agreements soft-deleted
+// 30+ days ago. Add a daily time trigger.
+function runAgreementsPurge() {
+  const props = PropertiesService.getScriptProperties()
+  const appUrl = props.getProperty('APP_URL')
+  const cronSecret = props.getProperty('CRON_SECRET')
+  if (!appUrl || !cronSecret) {
+    Logger.log('Missing APP_URL or CRON_SECRET in Script Properties')
+    return
+  }
+  const url = appUrl + '/api/cron/purge-agreements?secret=' + encodeURIComponent(cronSecret)
+  try {
+    const res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true })
+    Logger.log('runAgreementsPurge: ' + res.getResponseCode() + ' ' + res.getContentText())
+  } catch (e) {
+    Logger.log('runAgreementsPurge failed: ' + e)
   }
 }
 
