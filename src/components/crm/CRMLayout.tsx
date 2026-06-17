@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useParams } from 'next/navigation'
@@ -19,8 +20,10 @@ import {
   Menu,
   ChevronDown,
   Inbox,
+  FileSignature,
+  Mail,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, ensureRealtimeAuth } from '@/lib/supabase/client'
 import { Loading } from '@/components/ui/Loading'
 import { PageTransition } from '@/components/ui/PageTransition'
 import { CrmRoleProvider } from '@/components/crm/CrmRoleContext'
@@ -94,8 +97,8 @@ useEffect(() => {
   // channel below.
   const [inboxUnreadCount, setInboxUnreadCount] = useState(0)
 
-  // Popup inside CRM (for leads/meetings only; approval popups handled globally)
-  const [popup, setPopup] = useState<{ type: 'lead' | 'meeting'; title: string; subtitle?: string } | null>(null)
+  // Popup inside CRM (leads/meetings/payments; approval popups handled globally)
+  const [popup, setPopup] = useState<{ type: 'lead' | 'meeting' | 'payment'; title: string; subtitle?: string } | null>(null)
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -143,8 +146,27 @@ useEffect(() => {
 
   useEffect(() => {
     if (!popup) return
-    if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
-    popupTimerRef.current = setTimeout(() => setPopup(null), 9000)
+    // A popup that fires while the tab is hidden would dismiss before the
+    // user ever switches back - they hear the sound, see nothing. Hold it
+    // until the tab is visible, THEN start the countdown.
+    const start = () => {
+      if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
+      popupTimerRef.current = setTimeout(() => setPopup(null), 9000)
+    }
+    if (document.hidden) {
+      const onVis = () => {
+        if (!document.hidden) {
+          start()
+          document.removeEventListener('visibilitychange', onVis)
+        }
+      }
+      document.addEventListener('visibilitychange', onVis)
+      return () => {
+        document.removeEventListener('visibilitychange', onVis)
+        if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
+      }
+    }
+    start()
     return () => {
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
     }
@@ -329,29 +351,85 @@ useEffect(() => {
       'payment_marked_paid',
     ]
 
+    // Popup watermark: only payment rows created AFTER this moment pop.
+    // The popup rides on refresh() rather than the realtime payload, so a
+    // 15s poll keeps popups working even when realtime delivery fails.
+    let lastSeen = new Date().toISOString()
+
     const refresh = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, data, type')
+        .select('id, data, type, created_at')
         .eq('user_id', user.id)
         .is('read_at', null)
         .in('type', CRM_TYPES)
       if (error || cancelled) return
-      const count = (data || []).filter((n) => {
+      const mine = (data || []).filter((n) => {
         const d = n.data as { clientId?: unknown } | null
         return typeof d?.clientId === 'string' && d.clientId === clientId
-      }).length
-      if (!cancelled) setInboxUnreadCount(count)
+      })
+      if (!cancelled) setInboxUnreadCount(mine.length)
+
+      const freshPayments = mine
+        .filter((n) => n.type.startsWith('payment') && (n.created_at as string) > lastSeen)
+        .sort((a, b) => ((a.created_at as string) < (b.created_at as string) ? 1 : -1))
+      if (freshPayments.length > 0 && !cancelled) {
+        const n = freshPayments[0]
+        lastSeen = n.created_at as string
+        const d = n.data as Record<string, unknown>
+        const amount = d?.amount
+        const currency = d?.currency
+        const fromAgreement = typeof d?.fromAgreement === 'string' ? (d.fromAgreement as string) : ''
+        setPopup({
+          type: 'payment',
+          title:
+            n.type === 'payment_marked_paid'
+              ? 'Invoice marked paid'
+              : n.type === 'payment_due'
+                ? 'Payment due'
+                : 'Payment recorded',
+          subtitle:
+            [
+              amount != null && currency ? `${currency} ${amount}` : '',
+              fromAgreement ? `From agreement: ${fromAgreement}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ') || undefined,
+        })
+        playNotificationSound()
+      }
     }
 
     void refresh()
+    const pollTimer = setInterval(() => void refresh(), 15000)
+
+    // Same-tab fast path: the inbox page announces every mutation (mark
+    // read, delete, clear) with the exact new unread count, so the badge
+    // updates the instant the user acts. We apply that count immediately
+    // (no bounce) and reconcile against the DB on a short delay - once the
+    // write has settled - so realtime delivery isn't required.
+    let localReconcile: ReturnType<typeof setTimeout> | null = null
+    const onLocalChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { clientId?: string; unread?: number }
+        | undefined
+      if (detail && detail.clientId === clientId && typeof detail.unread === 'number') {
+        setInboxUnreadCount(detail.unread)
+      }
+      if (localReconcile) clearTimeout(localReconcile)
+      localReconcile = setTimeout(() => void refresh(), 1500)
+    }
+    window.addEventListener('fk:notifications-changed', onLocalChange)
 
     let channel: ReturnType<typeof supabase.channel> | null = null
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || cancelled) return
+      // RLS-gated realtime needs the user JWT on the socket - a restored
+      // session doesn't propagate it reliably, which silently drops events.
+      await ensureRealtimeAuth()
       channel = supabase
         .channel(`crm-inbox-badge-${clientId}-${user.id}`)
         .on(
@@ -362,13 +440,22 @@ useEffect(() => {
             table: 'notifications',
             filter: `user_id=eq.${user.id}`,
           },
+          // Just a fast trigger - refresh() owns badge AND payment popups,
+          // so the 15s poll below covers any realtime delivery failure.
           () => void refresh(),
         )
-        .subscribe()
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED' && status !== 'CLOSED') {
+            console.warn('[crm-badge] realtime channel status:', status)
+          }
+        })
     })()
 
     return () => {
       cancelled = true
+      clearInterval(pollTimer)
+      if (localReconcile) clearTimeout(localReconcile)
+      window.removeEventListener('fk:notifications-changed', onLocalChange)
       if (channel) supabase.removeChannel(channel)
     }
   }, [supabase, clientId, isAuthorized])
@@ -388,7 +475,9 @@ useEffect(() => {
     Leads: ['top', 'middle'],
     Revenue: ['top'],
     Meetings: ['top', 'middle'],
-    Team: ['top'],
+    Agreements: ['top'],
+    Emails: ['top'],
+    Team: ['top', 'middle'],
     'Capture Pages': ['top', 'middle'],
   }
   const clientTier = (clientInfo?.package_tier ?? null) as PackageTier | null
@@ -407,6 +496,8 @@ useEffect(() => {
       Leads: 'leads',
       Revenue: 'revenue',
       Meetings: 'meetings',
+      Agreements: 'agreements',
+      Emails: 'emails',
       Team: 'team',
       'Capture Pages': 'capture',
     }
@@ -426,6 +517,8 @@ useEffect(() => {
     { name: 'Leads', icon: Users, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Revenue', icon: DollarSign, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Meetings', icon: Calendar, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Agreements', icon: FileSignature, roles: ['admin','manager','employee'] as Role[] },
+    { name: 'Emails', icon: Mail, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Team', icon: UserCircleIcon, roles: ['admin','manager','employee'] as Role[] },
     { name: 'Capture Pages', icon: FileInput, roles: ['admin','manager','employee'] as Role[] },
   ]
@@ -461,6 +554,8 @@ useEffect(() => {
       leads: 'Leads',
       revenue: 'Revenue',
       meetings: 'Meetings',
+      agreements: 'Agreements',
+      emails: 'Emails',
       team: 'Team',
       capture: 'Capture Pages',
     }
@@ -791,8 +886,8 @@ useEffect(() => {
         </PageTransition>
 
         {/* Local CRM popup (leads/meetings) */}
-        {popup && (
-          <div className="fixed bottom-4 right-4 z-50 max-w-sm">
+        {popup && createPortal(
+          <div className="fixed bottom-4 right-4 z-[90] max-w-sm">
             <div className="bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-xl px-4 py-3 shadow-theme-lg flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{popup.title}</p>
@@ -802,7 +897,8 @@ useEffect(() => {
                 ×
               </button>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
 
         {/* Global notifications popup (approvals + mentions etc) */}

@@ -294,7 +294,7 @@ export function SlotDetailDrawer({
                 }
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {/* No spinner. Approve is optimistic — the slot status
+                {/* No spinner. Approve is optimistic - the slot status
                     flips to 'approved' immediately on click, so isApproved
                     is true the moment the API call kicks off. The button
                     text + icon update instantly; the background request

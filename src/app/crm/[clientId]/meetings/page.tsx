@@ -1297,7 +1297,13 @@ export default function CRMMeetingsPage() {
                 {selectedMeeting.status !== 'completed' && (
                   <Button
                     variant="outline"
-                    onClick={() => handleStatusChange(selectedMeeting.id, 'completed')}
+                    onClick={() => {
+                      // Close the sheet so the list behind it visibly moves
+                      // the meeting out of "upcoming" right away. The status
+                      // change runs (and rolls back on failure) regardless.
+                      void handleStatusChange(selectedMeeting.id, 'completed')
+                      setSelectedMeeting(null)
+                    }}
                   >
                     Mark done
                   </Button>
@@ -1305,7 +1311,10 @@ export default function CRMMeetingsPage() {
                 {selectedMeeting.status !== 'cancelled' && (
                   <Button
                     variant="outline"
-                    onClick={() => handleStatusChange(selectedMeeting.id, 'cancelled')}
+                    onClick={() => {
+                      void handleStatusChange(selectedMeeting.id, 'cancelled')
+                      setSelectedMeeting(null)
+                    }}
                   >
                     Cancel meeting
                   </Button>

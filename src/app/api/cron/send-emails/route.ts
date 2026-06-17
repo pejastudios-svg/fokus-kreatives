@@ -173,9 +173,24 @@ export async function GET(req: NextRequest) {
         await deliverEmail(row)
         await markSent(row.id)
         sent++
+        if (row.type === 'marketing_email') {
+          const { syncMarketingSendResult } = await import('@/lib/emailMarketing/dispatch')
+          await syncMarketingSendResult(row.payload, { ok: true })
+        }
       } catch (err) {
         await markFailed(row.id, row.attempts, err)
         failed++
+        // Mirror TERMINAL failures onto the campaign send row so stats and
+        // the failure auto-pause see them. Non-terminal attempts keep
+        // retrying via the outbox backoff and stay 'queued' on the campaign
+        // side. 5 = the outbox MAX_ATTEMPTS.
+        if (row.type === 'marketing_email' && row.attempts + 1 >= 5) {
+          const { syncMarketingSendResult } = await import('@/lib/emailMarketing/dispatch')
+          await syncMarketingSendResult(row.payload, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
       }
     }
 

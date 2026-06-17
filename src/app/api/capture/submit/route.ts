@@ -61,7 +61,7 @@ async function getNotificationTargets(clientId: string) {
     client.business_name || client.name || 'Client'
   const notificationSettings = client.notification_settings || {}
 
-  // 1) Workspace owners (main workspace) – client_id IS NULL, role admin/manager
+  // 1) Workspace owners (main workspace) - client_id IS NULL, role admin/manager
   const { data: ownerUsers, error: ownerError } = await supabase
     .from('users')
     .select('email, role, client_id')
@@ -71,7 +71,7 @@ async function getNotificationTargets(clientId: string) {
     console.error('getNotificationTargets: owner users error', ownerError)
   }
 
-  // 2) CRM team – users attached to this client, role client/admin/manager
+  // 2) CRM team - users attached to this client, role client/admin/manager
   const { data: clientUsers, error: clientUsersError } = await supabase
     .from('users')
     .select('email, role, client_id')
@@ -278,6 +278,55 @@ const submissionData = {
       date_added: today,
     }
 
+    // Capture-to-lead field mapping: page fields flagged mapToLead write
+    // their answer onto the lead under a readable key (slug of the label)
+    // and get a matching custom_fields column ON FIRST USE, so the answer
+    // shows up on the Leads table and is filterable in email groups.
+    const pageFields = Array.isArray(page.fields)
+      ? (page.fields as Array<Record<string, unknown>>)
+      : []
+    const mappedFields = pageFields.filter(
+      (f) => f && f.mapToLead === true && f.type !== 'embed' && f.label,
+    )
+    if (mappedFields.length > 0) {
+      const RESERVED_KEYS = new Set(['name', 'email', 'phone', 'status', 'source', 'date_added'])
+      const slugify = (label: string) =>
+        label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 60)
+
+      const { data: existingFields } = await supabase
+        .from('custom_fields')
+        .select('field_key')
+        .eq('client_id', clientId)
+      const existingKeys = new Set((existingFields || []).map((f) => f.field_key as string))
+      let nextPosition = existingKeys.size
+
+      for (const f of mappedFields) {
+        const key = slugify(String(f.label))
+        if (!key || RESERVED_KEYS.has(key)) continue
+
+        const raw = (v as Record<string, unknown>)[String(f.id)]
+        const value = raw === null || raw === undefined ? '' : String(raw).trim()
+        if (value) (leadData as Record<string, unknown>)[key] = value
+
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key)
+          const { error: cfError } = await supabase.from('custom_fields').insert({
+            client_id: clientId,
+            field_name: String(f.label),
+            field_key: key,
+            field_type: 'text',
+            options: [],
+            position: nextPosition++,
+            is_default: false,
+            is_required: false,
+          })
+          if (cfError) {
+            console.error('capture mapToLead column create error:', cfError)
+          }
+        }
+      }
+    }
+
     // Look up an existing lead by email (case-insensitive). We need
     // to scan in JS because data->>email is a JSONB extraction and
     // Postgres can't case-insensitively index that without an extra
@@ -302,19 +351,21 @@ const submissionData = {
     }
 
     if (existingLeadId) {
-      // Merge: preserve the existing lead's status + position, overlay
-      // new fields from this submission. The new lead row's keys
-      // shadow stale values on the existing row.
+      // Merge policy: EXISTING answers win. A returning lead (same email)
+      // fills in fields they never answered before, but a re-submission
+      // never overwrites values already on the lead - curated data and
+      // earlier answers stay intact. Status is covered by the same rule.
       const { data: existing } = await supabase
         .from('leads')
         .select('data')
         .eq('id', existingLeadId)
         .single()
       const prevData = (existing?.data as Record<string, unknown> | null) || {}
-      const merged = {
-        ...prevData,
-        ...leadData,
-        status: (prevData.status as string) || leadData.status,
+      const merged: Record<string, unknown> = { ...leadData }
+      for (const [k, prevVal] of Object.entries(prevData)) {
+        const hasPrev =
+          prevVal !== null && prevVal !== undefined && String(prevVal).trim() !== ''
+        if (hasPrev) merged[k] = prevVal
       }
       const { error: leadUpdateErr } = await supabase
         .from('leads')

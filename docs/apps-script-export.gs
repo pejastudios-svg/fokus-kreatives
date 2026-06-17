@@ -6,7 +6,7 @@
  * that, we create ONE Google Doc per campaign. Each doc is:
  *   - Named "Campaign 1 (DATE)" / "Campaign 2 (DATE)" / etc. The file
  *     name shows in Drive directly.
- *   - Has a single Tab 1 (always — Apps Script default).
+ *   - Has a single Tab 1 (always - Apps Script default).
  *   - Body starts with the campaign name as H1, then metadata, then the
  *     long-form, then H2 sections for each non-long-form asset, with
  *     H3 sub-headings for bracket section tags ([TITLE], [HOOK], etc.).

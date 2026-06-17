@@ -2,7 +2,7 @@
 //
 // Used to auto-derive a sensible card surface color from the
 // user-picked page background. The rule: card should READ AGAINST the
-// page bg — so we shift its lightness opposite to the bg's.
+// page bg - so we shift its lightness opposite to the bg's.
 
 export function hexToHsl(hex: string): [number, number, number] | null {
   const m = hex.trim().match(/^#?([0-9a-f]{6})$/i)

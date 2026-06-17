@@ -193,6 +193,11 @@ const OUTWARD_EMAIL_TYPES = new Set([
   'invoice_sent',
   'meeting_invitee_confirmation',
   'meeting_rescheduled',
+  'agreement_sent',
+  'agreement_signed',
+  // Campaign value emails (Emails tab). Pre-rendered per recipient - the
+  // payload carries final subject + html; branding still resolves fromName.
+  'marketing_email',
 ])
 
 /**

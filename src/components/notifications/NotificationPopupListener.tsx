@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createPortal } from 'react-dom'
+import { createClient, ensureRealtimeAuth } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import { notificationHref } from '@/lib/notifications'
@@ -44,6 +45,7 @@ const TITLES: Record<string, string> = {
   payment_created: 'Payment recorded',
   payment_due: 'Payment due',
   payment_marked_paid: 'Invoice marked paid',
+  agreement_staged: 'Agreement ready to send',
 }
 
 export function NotificationPopupListener() {
@@ -89,6 +91,10 @@ export function NotificationPopupListener() {
 
       setUserRole(userRow?.role || null)
 
+      // RLS-gated realtime needs the user JWT on the socket - a restored
+      // session doesn't propagate it reliably, which silently drops events.
+      await ensureRealtimeAuth()
+
       const channel = supabase
         .channel(`notif-popup-${user.id}`)
         .on(
@@ -114,12 +120,13 @@ export function NotificationPopupListener() {
             }
             setPopup(row)
             playSound()
-
-            if (timerRef.current) clearTimeout(timerRef.current)
-            timerRef.current = setTimeout(() => setPopup(null), 9000)
           }
         )
-        .subscribe()
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED' && status !== 'CLOSED') {
+            console.warn('[notif-popup] realtime channel status:', status)
+          }
+        })
 
       return () => supabase.removeChannel(channel)
     }
@@ -130,6 +137,33 @@ export function NotificationPopupListener() {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [supabase])
+
+  // Dismiss countdown starts only while the tab is VISIBLE - otherwise the
+  // popup would be gone before the user switches back (sound, no toast).
+  useEffect(() => {
+    if (!popup) return
+    const start = () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setPopup(null), 9000)
+    }
+    if (document.hidden) {
+      const onVis = () => {
+        if (!document.hidden) {
+          start()
+          document.removeEventListener('visibilitychange', onVis)
+        }
+      }
+      document.addEventListener('visibilitychange', onVis)
+      return () => {
+        document.removeEventListener('visibilitychange', onVis)
+        if (timerRef.current) clearTimeout(timerRef.current)
+      }
+    }
+    start()
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [popup])
 
   if (!popup) return null
 
@@ -144,6 +178,7 @@ export function NotificationPopupListener() {
   // (meeting title, lead name, page, invoice #), then the client name.
   const subtitle =
     popup.data?.contentSnippet ||
+    popup.data?.agreementTitle ||
     popup.data?.title ||
     popup.data?.approvalTitle ||
     popup.data?.meetingTitle ||
@@ -156,7 +191,7 @@ export function NotificationPopupListener() {
   // CRM-scoped events deep-link to the right CRM page (inbox/leads/meetings/
   // revenue) via the shared href resolver; approvals keep their role-aware
   // routes; anything else falls back to the agency client profile / raw url.
-  const crmTarget = CRM_TYPES.has(popup.type)
+  const crmTarget = CRM_TYPES.has(popup.type) || popup.type === 'agreement_staged'
     ? notificationHref(
         { id: popup.id, type: popup.type, data: popup.data, read_at: null, created_at: popup.created_at },
         { isClientRole: userRole === 'client' },
@@ -178,8 +213,10 @@ export function NotificationPopupListener() {
     router.push(target)
   }
 
-  return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm">
+  // Portal to <body>: a transformed/filtered ancestor anywhere in a layout
+  // would re-anchor position:fixed and strand the toast off-screen.
+  return createPortal(
+    <div className="fixed bottom-4 right-4 z-[90] max-w-sm">
       <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <button
@@ -207,5 +244,5 @@ export function NotificationPopupListener() {
         </div>
       </div>
     </div>
-  )
+    , document.body)
 }

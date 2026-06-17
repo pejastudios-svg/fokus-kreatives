@@ -299,7 +299,7 @@ export default function CompetitorsPage() {
             <CardContent className="py-12 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-[#2B79F7] mx-auto mb-4" />
               <p className="text-[var(--text-secondary)]">Breaking down the script…</p>
-              <p className="text-sm text-[var(--text-tertiary)] mt-2">This usually takes 10–30 seconds.</p>
+              <p className="text-sm text-[var(--text-tertiary)] mt-2">This usually takes 10-30 seconds.</p>
             </CardContent>
           </Card>
         )}

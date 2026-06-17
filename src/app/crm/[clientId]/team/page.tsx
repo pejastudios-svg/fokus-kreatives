@@ -705,7 +705,7 @@ export default function CRMTeamPage() {
       <div className="flex items-center justify-between mb-4 gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-[var(--text-tertiary)] truncate">
-            Members who can access this client CRM
+            Members who can access this CRM
           </p>
           <p className="text-[var(--text-tertiary)] text-[11px] mt-0.5 truncate">
             CRM:{' '}

@@ -30,3 +30,21 @@ export function createClient() {
   if (!cached) cached = build()
   return cached
 }
+
+/**
+ * Apply the signed-in user's JWT to the realtime socket BEFORE subscribing
+ * to postgres_changes on RLS-protected tables (notifications, ...).
+ *
+ * When a page loads with a RESTORED session (INITIAL_SESSION), supabase-js
+ * does not reliably propagate the access token to realtime - the socket
+ * keeps the anon key, the server's RLS check fails for user-scoped rows,
+ * and events are silently dropped. Explicit sign-ins don't hit this, which
+ * makes it look intermittent. Call this before channel().subscribe().
+ */
+export async function ensureRealtimeAuth() {
+  const client = createClient()
+  const {
+    data: { session },
+  } = await client.auth.getSession()
+  client.realtime.setAuth(session?.access_token ?? null)
+}

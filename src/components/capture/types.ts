@@ -41,6 +41,11 @@ export interface CaptureField {
    *  (e.g. multiple social handles), each on its own line. Stored newline-
    *  joined under the field id. */
   repeatable?: boolean
+  /** Save this answer onto the lead: creates a matching column on the
+   *  Leads page (keyed by a slug of the label) and writes each new
+   *  submission's answer there. Existing lead values are never
+   *  overwritten by later submissions from the same email. */
+  mapToLead?: boolean
   /** `package` fields only: the selectable plan cards. */
   packages?: PackageOption[]
   /** Which form section (multi-step page) this field belongs to. Empty

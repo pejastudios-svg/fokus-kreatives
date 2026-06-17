@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { createClient } from '@/lib/supabase/client'
+import {
+  saveDraftSnapshot,
+  loadDraftSnapshot,
+  clearDraftSnapshot,
+} from '@/lib/draftSnapshot'
 import { Skeleton } from '@/components/ui/Loading'
 import { Toggle } from '@/components/ui/Toggle'
 import { useCrmRole } from '@/components/crm/CrmRoleContext'
@@ -60,6 +65,7 @@ type CaptureField = {
   embedUrl?: string
   embedHeight?: number
   repeatable?: boolean
+  mapToLead?: boolean
   packages?: PackageOption[]
   sectionId?: string
 }
@@ -233,6 +239,7 @@ interface RawField {
   embedUrl?: unknown;
   embedHeight?: unknown;
   repeatable?: unknown;
+  mapToLead?: unknown;
   packages?: unknown;
   sectionId?: unknown;
 }
@@ -253,6 +260,7 @@ function normalizeFields(f: unknown): CaptureField[] {
     embedUrl: x.embedUrl ? String(x.embedUrl) : undefined,
     embedHeight: x.embedHeight ? Number(x.embedHeight) : undefined,
     repeatable: x.repeatable ? true : undefined,
+    mapToLead: x.mapToLead ? true : undefined,
     packages: Array.isArray(x.packages)
       ? (x.packages as Array<Record<string, unknown>>).map((p, i) => ({
           id: String(p.id || `pkg-${i}`),
@@ -266,6 +274,26 @@ function normalizeFields(f: unknown): CaptureField[] {
       : undefined,
     sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
+}
+
+// The account's "main scheduling page" URL, derived from any event type's
+// scheduling URL (Calendly events live at calendly.com/<user>/<event>, so
+// dropping the event slug yields the host page that lists every event).
+// Used so the "Main scheduling page" option embeds a real URL instead of
+// nothing.
+function deriveMainSchedulingUrl(
+  eventTypes: { scheduling_url: string }[] | null,
+): string {
+  const first = eventTypes?.[0]?.scheduling_url
+  if (!first) return ''
+  try {
+    const u = new URL(first)
+    const parts = u.pathname.split('/').filter(Boolean)
+    if (parts.length >= 2) parts.pop()
+    return `${u.origin}/${parts.join('/')}`.replace(/\/$/, '')
+  } catch {
+    return ''
+  }
 }
 
 // Trim + drop blank lines from the "one per line" lists right before saving.
@@ -427,6 +455,7 @@ export default function CRMCapturePages() {
   }
   const [calendlyEventTypes, setCalendlyEventTypes] = useState<CalendlyEventTypeBrief[] | null>(null)
   const [loadingEventTypes, setLoadingEventTypes] = useState(false)
+  const mainSchedulingUrl = deriveMainSchedulingUrl(calendlyEventTypes)
 
   useEffect(() => {
     if (!clientId) return
@@ -471,6 +500,21 @@ export default function CRMCapturePages() {
       .finally(() => setLoadingEventTypes(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.meeting_integration, connectedIntegrations])
+
+  // Default to the main scheduling page once event types load: with Calendly
+  // selected and no specific event chosen, fill calendly_url with the host
+  // page so the preview (and the saved/public page) actually embed it instead
+  // of rendering nothing.
+  useEffect(() => {
+    if (form.meeting_integration !== 'calendly') return
+    if (!mainSchedulingUrl) return
+    if (form.calendly_url) return
+    setForm((prev) =>
+      prev.meeting_integration === 'calendly' && !prev.calendly_url
+        ? { ...prev, calendly_url: mainSchedulingUrl }
+        : prev,
+    )
+  }, [form.meeting_integration, form.calendly_url, mainSchedulingUrl])
 
   useEffect(() => {
     if (clientId) loadPages()
@@ -738,6 +782,52 @@ export default function CRMCapturePages() {
     setDragOverFieldId(null)
   }
 
+  // ---- Refresh/offline insurance for the editor modal. The working form
+  // snapshots to localStorage on every change: a refresh or crash reopens
+  // the modal with everything intact, and a failed save retries by itself
+  // when the connection comes back. Explicit close (X) discards. ----
+  const captureSnapshotKey = `fk:capture:editor:${clientId}`
+  const captureRestoredRef = useRef(false)
+  const pendingRetryRef = useRef(false)
+  const handleSaveRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    if (!showModal) return
+    const t = setTimeout(() => {
+      saveDraftSnapshot(captureSnapshotKey, {
+        editingPageId: editingPage?.id || null,
+        form,
+      })
+    }, 350)
+    return () => clearTimeout(t)
+  }, [showModal, editingPage, form, captureSnapshotKey])
+
+  useEffect(() => {
+    if (isLoading || captureRestoredRef.current) return
+    captureRestoredRef.current = true
+    const snap = loadDraftSnapshot<{ editingPageId: string | null; form: typeof form }>(
+      captureSnapshotKey,
+    )
+    if (!snap?.form) return
+    setEditingPage(
+      snap.editingPageId ? pages.find((p) => p.id === snap.editingPageId) || null : null,
+    )
+    setForm(snap.form)
+    setShowModal(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, pages])
+
+  useEffect(() => {
+    const onOnline = () => {
+      if (pendingRetryRef.current && showModal) {
+        pendingRetryRef.current = false
+        handleSaveRef.current()
+      }
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [showModal])
+
   const handleSave = async () => {
     if (!form.name || !form.slug) return
     if (slugError) return
@@ -785,9 +875,13 @@ export default function CRMCapturePages() {
             raw: JSON.stringify(error, Object.getOwnPropertyNames(error)),
           }
           console.error('Update capture page error:', errBag)
+          // Likely offline: the working copy stays snapshotted on this
+          // device and the save retries when the connection returns.
+          pendingRetryRef.current = true
           setNotification(`Error: ${error.message || error.details || 'Update failed - check console'}`)
           setTimeout(() => setNotification(null), 4000)
         } else {
+          clearDraftSnapshot(captureSnapshotKey)
           setNotification('Capture page updated')
           setTimeout(() => setNotification(null), 3000)
           setShowModal(false)
@@ -839,9 +933,11 @@ export default function CRMCapturePages() {
             details: error.details,
             hint: error.hint,
           })
+          pendingRetryRef.current = true
           setNotification(`Error: ${error.message || 'Create failed'}`)
           setTimeout(() => setNotification(null), 3000)
         } else {
+          clearDraftSnapshot(captureSnapshotKey)
           setNotification('Capture page created')
           setTimeout(() => setNotification(null), 3000)
           setShowModal(false)
@@ -852,6 +948,11 @@ export default function CRMCapturePages() {
       setIsSaving(false)
     }
   }
+
+  // Keep the online-retry hook pointed at the latest save closure.
+  useEffect(() => {
+    handleSaveRef.current = () => void handleSave()
+  })
 
   const handleDelete = async () => {
     if (!pageToDelete) return
@@ -1536,7 +1637,11 @@ function CaptureSkeleton() {
                     onChange={(v) => setForm((prev) => ({ ...prev, is_active: v }))}
                   />
                   <button
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      // Explicit close = intentional discard of the working copy.
+                      clearDraftSnapshot(captureSnapshotKey)
+                      setShowModal(false)
+                    }}
                     className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
                   >
                     <X className="h-5 w-5" />
@@ -2013,7 +2118,7 @@ function CaptureSkeleton() {
                                 }
                                 className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                               >
-                                <option value="">
+                                <option value={mainSchedulingUrl}>
                                   Main scheduling page (visitor picks an event)
                                 </option>
                                 {calendlyEventTypes.map((et) => (

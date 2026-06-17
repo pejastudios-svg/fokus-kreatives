@@ -70,6 +70,9 @@ interface Payment {
   lead?: {
     data: Record<string, unknown>
   }
+  // Provenance: set when this invoice was created by a signed agreement.
+  agreement_id?: string | null
+  agreement?: { id: string; title: string } | null
   is_recurring?: boolean
   recurrence_type?: 'days' | 'weeks' | 'months' | null
   recurrence_interval?: number | null
@@ -249,7 +252,7 @@ export default function CRMRevenue() {
     setIsLoading(true)
     const { data } = await supabase
       .from('payments')
-      .select(`*, lead:leads(data)`)
+      .select(`*, lead:leads(data), agreement:agreements!payments_agreement_id_fkey(id, title)`)
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
 
@@ -399,7 +402,7 @@ export default function CRMRevenue() {
           .from('payments')
           .update(base)
           .eq('id', editId)
-          .select(`*, lead:leads(data)`)
+          .select(`*, lead:leads(data), agreement:agreements!payments_agreement_id_fkey(id, title)`)
           .single()
         if (res.error) {
           console.error('Failed to update payment:', res.error)
@@ -412,7 +415,7 @@ export default function CRMRevenue() {
         const res = await supabase
           .from('payments')
           .insert({ ...base, recurring_count: 0 })
-          .select(`*, lead:leads(data)`)
+          .select(`*, lead:leads(data), agreement:agreements!payments_agreement_id_fkey(id, title)`)
           .single()
         if (res.error) {
           console.error('Failed to add payment:', res.error)
@@ -1499,6 +1502,11 @@ function RevenueSkeleton() {
                   <p className="text-xs text-[var(--text-secondary)] truncate">
                     {leadName || leadEmail || 'No lead linked'}
                   </p>
+                  {payment.agreement && (
+                    <p className="text-[10px] font-semibold text-[#2B79F7] truncate">
+                      From agreement: {payment.agreement.title}
+                    </p>
+                  )}
                   <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
                     {payment.due_date
                       ? `Due ${new Date(payment.due_date).toLocaleDateString(undefined, {
@@ -2119,7 +2127,7 @@ function RevenueSkeleton() {
   )
 }
 
-// Modal Component – bigger, centered, clean overlay
+// Modal Component - bigger, centered, clean overlay
 function Modal(props: { children: React.ReactNode; onClose: () => void; title: string }) {
   const { children, onClose, title } = props
 

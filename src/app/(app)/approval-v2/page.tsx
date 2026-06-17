@@ -13,7 +13,7 @@ interface Approval {
   clients?: { name: string; business_name?: string | null } | null
 }
 
-// Approval v2 — list page.
+// Approval v2 - list page.
 //
 // Reads from the same `approvals` table as v1 and links to the v2
 // detail page. Intentionally minimal so the focus stays on whether

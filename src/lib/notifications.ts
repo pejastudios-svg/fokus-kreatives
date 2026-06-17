@@ -75,11 +75,25 @@ export function formatNotificationText(n: NotificationRow): string {
     case 'meeting_rescheduled':
       return `Meeting rescheduled: ${get(data, 'meetingTitle') || 'meeting'}${get(data, 'when') ? ` to ${get(data, 'when')}` : ''}`
     case 'payment_created':
-      return `Payment recorded${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}`
+      return `Payment recorded${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}${get(data, 'fromAgreement') ? ` - from agreement "${get(data, 'fromAgreement')}"` : ''}`
     case 'payment_due':
       return `Payment due${get(data, 'amount') ? `: ${get(data, 'amount')}` : ''}`
+    case 'agreement_staged':
+      return `Agreement ready for ${get(data, 'leadName') || 'a lead'}: "${get(data, 'agreementTitle') || 'Agreement'}" - review & send`
     case 'payment_marked_paid':
       return `${get(data, 'billToName') || 'A client'} marked their invoice paid${get(data, 'invoiceNumber') ? ` (#${get(data, 'invoiceNumber')})` : ''} - confirm it`
+    case 'email_campaign_review':
+      return `Email ready for review: "${get(data, 'subject') || 'Untitled'}"${get(data, 'scheduledFor') ? ` - sends ${get(data, 'scheduledFor')}` : ''}`
+    case 'email_campaign_paused':
+      return get(data, 'reason') || `Campaign "${get(data, 'campaignName') || ''}" was paused`
+    case 'email_campaign_failed':
+      return `Email campaign issue${get(data, 'campaignName') ? ` on "${get(data, 'campaignName')}"` : ''}: ${get(data, 'reason') || 'check the Emails tab'}`
+    case 'email_material_low': {
+      const remaining = typeof data.remaining === 'number' ? data.remaining : 0
+      return `${get(data, 'clientName') || 'A client'} has only ${remaining} unused form answer${remaining === 1 ? '' : 's'} left for email campaigns - send a new questions form`
+    }
+    case 'email_plan_upgrade':
+      return `${get(data, 'clientName') || 'A client'} has outgrown free email sending - move them to Google Workspace to lift the daily limit`
     default:
       return 'Notification'
   }
@@ -95,10 +109,26 @@ export function notificationHref(
   const taskId = get(data, 'taskId')
   if (taskId) return `/tasks?taskId=${taskId}`
 
+  if (n.type === 'agreement_staged') {
+    const clientId = get(data, 'clientId')
+    return clientId ? `/crm/${clientId}/agreements` : null
+  }
+
+  if (
+    n.type === 'email_campaign_review' ||
+    n.type === 'email_campaign_paused' ||
+    n.type === 'email_campaign_failed' ||
+    n.type === 'email_plan_upgrade'
+  ) {
+    const clientId = get(data, 'clientId')
+    return clientId ? `/crm/${clientId}/emails` : null
+  }
+
   if (
     n.type === 'brand_intake_submitted' ||
     n.type === 'question_form_submitted' ||
-    n.type === 'series_form_submitted'
+    n.type === 'series_form_submitted' ||
+    n.type === 'email_material_low'
   ) {
     const clientId = get(data, 'clientId')
     return clientId ? `/clients/${clientId}` : null

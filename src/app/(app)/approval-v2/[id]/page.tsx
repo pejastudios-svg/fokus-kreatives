@@ -27,7 +27,7 @@ interface ApprovalItem {
   position: number
 }
 
-// Approval v2 — detail page.
+// Approval v2 - detail page.
 //
 // Reads `approvals` + `approval_items` from the same Supabase tables as
 // v1 and renders each item with the v2 AssetRenderer (which in turn

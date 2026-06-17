@@ -44,7 +44,7 @@ function pickCategory(industry: string): string {
   if (i.includes('marketing')) return 'Marketing'
   if (i.includes('coach')) return 'Coaching'
 
-  // fallback: first 2–4 words of industry
+  // fallback: first 2-4 words of industry
   const cleaned = titleCase(industry || 'Content Marketing')
   const words = cleaned.split(' ')
   return words.slice(0, Math.min(4, Math.max(2, words.length))).join(' ')

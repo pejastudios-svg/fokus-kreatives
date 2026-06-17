@@ -29,6 +29,7 @@ import {
   CheckSquare,
   ChevronDown,
   CheckCircle2,
+  ListChecks,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
@@ -126,8 +127,27 @@ const fieldTypeConfig: Record<string, { icon: React.ElementType; label: string }
   url: { icon: LinkIcon, label: 'URL' },
   date: { icon: Calendar, label: 'Date' },
   select: { icon: List, label: 'Select' },
+  multiselect: { icon: ListChecks, label: 'Multi-select' },
   status: { icon: Tag, label: 'Status' },
   checkbox: { icon: CheckSquare, label: 'Checkbox' },
+}
+
+// Multi-select values: canonical storage is a string array in lead.data.
+// Tolerates JSON-encoded strings (modal drafts) and comma lists (imports).
+const toMultiValues = (raw: unknown): string[] => {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (typeof raw === 'string' && raw.trim()) {
+    if (raw.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
+      } catch {
+        /* fall through to comma split */
+      }
+    }
+    return raw.split(',').map((x) => x.trim()).filter(Boolean)
+  }
+  return []
 }
 
 // Helper function to safely get options from a field and remove duplicates.
@@ -229,6 +249,10 @@ export default function CRMLeads() {
   const [fields, setFields] = useState<CustomField[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  // Email-marketing suppression list: lowercase email -> unsubscribed date.
+  // Drives the blinking badge on leads that opted out of campaign emails.
+  const [unsubByEmail, setUnsubByEmail] = useState<Map<string, string>>(new Map())
+  const [unsubPopup, setUnsubPopup] = useState<{ name: string; date: string } | null>(null)
   
   // View state
   const [view, setView] = useState<'table' | 'board' | 'chart'>('table')
@@ -373,11 +397,32 @@ export default function CRMLeads() {
     setLeads(data || [])
   }, [clientId, supabase])
 
+  const loadSuppressions = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/crm/email-marketing/suppressions?clientId=${encodeURIComponent(clientId)}`,
+      ).then((r) => r.json())
+      if (res.success) {
+        setUnsubByEmail(
+          new Map(
+            (res.suppressions as { email: string; created_at: string }[]).map((s) => [
+              s.email.toLowerCase(),
+              s.created_at,
+            ]),
+          ),
+        )
+      }
+    } catch {
+      // Badge is informational - never block the leads table on it.
+    }
+  }, [clientId])
+
   const loadData = useCallback(async () => {
     setIsLoading(true)
     await Promise.all([loadFields(), loadLeads()])
     setIsLoading(false)
-  }, [loadFields, loadLeads])
+    void loadSuppressions()
+  }, [loadFields, loadLeads, loadSuppressions])
 
   // Load data
   useEffect(() => {
@@ -398,10 +443,17 @@ export default function CRMLeads() {
   // the persisted one (or rolls back on failure).
   const createLead = async (rawData: Record<string, string>) => {
     const tempId = `temp-${Date.now()}`
-    const leadData = {
+    const leadData: Record<string, unknown> = {
       ...rawData,
       date_added: rawData.date_added || new Date().toISOString().split('T')[0],
       status: rawData.status || 'new',
+    }
+    // Multi-select drafts arrive JSON-encoded (the modal state is string
+    // typed); canonical storage is a real array.
+    for (const f of fields) {
+      if (f.field_type !== 'multiselect') continue
+      const v = leadData[f.field_key]
+      if (typeof v === 'string') leadData[f.field_key] = toMultiValues(v)
     }
 
     const tempLead: Lead = {
@@ -477,7 +529,7 @@ export default function CRMLeads() {
   }
 
   // Optimistic update lead
-    const handleUpdateLead = useCallback(async (leadId: string, fieldKey: string, value: string) => {
+    const handleUpdateLead = useCallback(async (leadId: string, fieldKey: string, value: string | string[], opts?: { keepDropdown?: boolean }) => {
     const lead = leads.find(l => l.id === leadId)
     if (!lead) return
 
@@ -524,8 +576,24 @@ export default function CRMLeads() {
 
     setEditingCell(null)
     setEditValue('')
-    setStatusDropdown(null)
-  }, [leads, supabase])
+    // Multi-select toggles keep the picker open so several options can be
+    // chosen in one visit; single-select still closes on pick.
+    if (!opts?.keepDropdown) setStatusDropdown(null)
+
+    // Status changed: fire agreement automations (stage drafts for any
+    // template bound to this status). Fire-and-forget - the staged draft
+    // arrives via notification.
+    if (saved && typeof value === 'string' && value && value !== lead.data?.[fieldKey]) {
+      const statusField = fields.find((f) => f.field_type === 'status')
+      if (statusField && fieldKey === statusField.field_key) {
+        void fetch('/api/crm/agreements/automations/fire', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, leadId, status: value }),
+        }).catch(() => {})
+      }
+    }
+  }, [leads, supabase, fields, clientId])
 
   // Optimistic delete lead
   const handleDeleteLead = async (leadId: string) => {
@@ -553,7 +621,7 @@ export default function CRMLeads() {
     const tempId = `temp-${Date.now()}`
 
     const defaultOptions =
-      newField.type === 'status' || newField.type === 'select'
+      newField.type === 'status' || newField.type === 'select' || newField.type === 'multiselect'
         ? [{ value: 'option1', label: 'Option 1', color: '#3B82F6' }]
         : newField.type === 'url'
           ? buildUrlMetaOptions(
@@ -711,10 +779,13 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
   
   const currentOptions = getFieldOptions(field)
   
-  // Check if option with same value already exists
+  // Duplicate value: suffix with a small counter (readable, unlike the old
+  // timestamp suffix that leaked into chips as option_1781224257472).
   if (currentOptions.some(o => o.value === option.value)) {
-    // Generate unique value
-    option.value = `${option.value}_${Date.now()}`
+    const base = option.value
+    let i = 2
+    while (currentOptions.some(o => o.value === `${base}_${i}`)) i++
+    option.value = `${base}_${i}`
   }
   
   const newOptions = [...currentOptions, option]
@@ -749,7 +820,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
   // Cell handlers
     const handleCellClick = (e: React.MouseEvent, leadId: string, fieldKey: string, value: string, fieldType: string) => {
     e.stopPropagation()
-    if (fieldType === 'status' || fieldType === 'select') {
+    if (fieldType === 'status' || fieldType === 'select' || fieldType === 'multiselect') {
       setStatusDropdown({ leadId, fieldKey })
     } else if (fieldType === 'checkbox') {
       // Checkbox is its own input - the click on the cell shouldn't
@@ -1569,6 +1640,11 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 className="w-full px-3 py-1.5 bg-[var(--bg-input)] border-2 border-[#2B79F7] rounded-lg text-[var(--text-primary)] focus:outline-none text-sm"
                                 onClick={(e) => e.stopPropagation()}
                               />
+                            ) : field.field_type === 'multiselect' ? (
+                              <MultiBadges
+                                values={toMultiValues(lead.data?.[field.field_key])}
+                                options={getFieldOptions(field)}
+                              />
                             ) : field.field_type === 'status' || field.field_type === 'select' ? (
                               <StatusBadge value={value} options={getFieldOptions(field)} />
                             ) : field.field_type === 'url' &&
@@ -1597,8 +1673,27 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                               />
                             </div>
                           ) : (
-                            <span className="text-[var(--text-primary)] block min-h-6 px-2 py-1 rounded hover:bg-[var(--bg-card-hover)] transition-colors">
+                            <span className="text-[var(--text-primary)] flex items-center gap-1.5 min-h-6 px-2 py-1 rounded hover:bg-[var(--bg-card-hover)] transition-colors">
                               {(value as string) || <span className="text-[var(--text-tertiary)]">-</span>}
+                              {field.field_key === 'name' &&
+                                (() => {
+                                  const leadEmail = String(lead.data?.email || '').toLowerCase()
+                                  const unsubDate = leadEmail ? unsubByEmail.get(leadEmail) : undefined
+                                  if (!unsubDate) return null
+                                  return (
+                                    <button
+                                      title="Unsubscribed from emails"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setUnsubPopup({
+                                          name: (lead.data?.name as string) || leadEmail,
+                                          date: unsubDate,
+                                        })
+                                      }}
+                                      className="shrink-0 h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse ring-2 ring-amber-200"
+                                    />
+                                  )
+                                })()}
                             </span>
                             )}
                           </td>
@@ -1669,6 +1764,10 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                   </option>
                                 ))}
                               </select>
+                            ) : field.field_type === 'multiselect' ? (
+                              <span className="text-xs text-[var(--text-tertiary)]">
+                                Set after creating
+                              </span>
                             ) : field.field_type === 'checkbox' ? (
                               <div className="text-center w-full">
                                 <input
@@ -2131,6 +2230,42 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
           )
         })()}
 
+        {/* Unsubscribed-lead info popup (yellow badge click) */}
+        {unsubPopup && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setUnsubPopup(null)}
+          >
+            <div
+              className="w-full max-w-sm rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200" />
+                <span className="font-semibold text-[var(--text-primary)]">Unsubscribed from emails</span>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                {unsubPopup.name} unsubscribed on{' '}
+                {new Date(unsubPopup.date).toLocaleDateString(undefined, {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+                . They stay in your leads but no longer receive campaign emails. Manage this in the
+                Emails tab under Unsubscribed.
+              </p>
+              <div className="mt-4 text-right">
+                <button
+                  onClick={() => setUnsubPopup(null)}
+                  className="px-4 py-2 rounded-lg bg-[#2B79F7] text-white text-sm font-medium"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Add Lead Modal */}
         {showAddLead && (
           <Modal onClose={() => { setShowAddLead(false); setNewLead({}) }} title="Add New Lead">
@@ -2144,7 +2279,35 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       {field.field_name}
                       {field.is_required && <span className="text-red-400 ml-1">*</span>}
                     </label>
-                    {(field.field_type === 'status' || field.field_type === 'select') ? (
+                    {field.field_type === 'multiselect' ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {options.map((opt) => {
+                          const selected = toMultiValues(newLead[field.field_key]).includes(opt.value)
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                const cur = toMultiValues(newLead[field.field_key])
+                                const next = selected
+                                  ? cur.filter((v) => v !== opt.value)
+                                  : [...cur, opt.value]
+                                setNewLead({ ...newLead, [field.field_key]: JSON.stringify(next) })
+                              }}
+                              title={opt.label}
+                              className="max-w-full truncate px-3 py-1 rounded-full text-xs font-semibold border transition-colors"
+                              style={
+                                selected
+                                  ? { backgroundColor: `${opt.color}20`, color: opt.color, borderColor: `${opt.color}60` }
+                                  : { borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)' }
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (field.field_type === 'status' || field.field_type === 'select') ? (
                       <select
                         value={newLead[field.field_key] || ''}
                         onChange={(e) => setNewLead({ ...newLead, [field.field_key]: e.target.value })}
@@ -2345,15 +2508,147 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         )}
 
         {/* Status Dropdown */}
-        {statusDropdown && (
-          <StatusDropdown
-            options={getFieldOptions(fields.find(f => f.field_key === statusDropdown.fieldKey) || fields[0])}
-            currentValue={(leads.find(l => l.id === statusDropdown.leadId)?.data?.[statusDropdown.fieldKey] as string) || ''}
-            onSelect={(value) => handleUpdateLead(statusDropdown.leadId, statusDropdown.fieldKey, value)}
-            onClose={() => setStatusDropdown(null)}
-          />
-        )}
+        {statusDropdown && (() => {
+          const ddField = fields.find(f => f.field_key === statusDropdown.fieldKey) || fields[0]
+          const ddLead = leads.find(l => l.id === statusDropdown.leadId)
+          if (ddField?.field_type === 'multiselect') {
+            const current = toMultiValues(ddLead?.data?.[statusDropdown.fieldKey])
+            return (
+              <MultiSelectDropdown
+                options={getFieldOptions(ddField)}
+                values={current}
+                onToggle={(value) => {
+                  const next = current.includes(value)
+                    ? current.filter((v) => v !== value)
+                    : [...current, value]
+                  void handleUpdateLead(statusDropdown.leadId, statusDropdown.fieldKey, next, {
+                    keepDropdown: true,
+                  })
+                }}
+                onClose={() => setStatusDropdown(null)}
+              />
+            )
+          }
+          return (
+            <StatusDropdown
+              options={getFieldOptions(ddField)}
+              currentValue={(ddLead?.data?.[statusDropdown.fieldKey] as string) || ''}
+              onSelect={(value) => handleUpdateLead(statusDropdown.leadId, statusDropdown.fieldKey, value)}
+              onClose={() => setStatusDropdown(null)}
+            />
+          )
+        })()}
       </div>
+}
+
+// Multi-select chips - one colored badge per selected value.
+function MultiBadges({ values, options }: { values: string[]; options: StatusOption[] }) {
+  if (values.length === 0) return <span className="text-[var(--text-tertiary)]">-</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {values.map((v) => {
+        const opt = options.find((o) => o.value === v)
+        const color = opt?.color || '#6B7280'
+        return (
+          <span
+            key={v}
+            title={opt?.label || v}
+            className="inline-flex max-w-[180px] items-center px-2 py-0.5 rounded-full text-[11px] font-semibold"
+            style={{ backgroundColor: `${color}20`, color, border: `1px solid ${color}40` }}
+          >
+            <span className="truncate">{opt?.label || v}</span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// Multi-select dropdown - checkbox rows, stays open for multiple toggles.
+function MultiSelectDropdown({
+  options,
+  values,
+  onToggle,
+  onClose,
+}: {
+  options: StatusOption[]
+  values: string[]
+  onToggle: (value: string) => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">
+          <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
+            Select options
+          </p>
+        </div>
+        {options.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-[var(--text-tertiary)]">No options yet.</p>
+        ) : (
+          options.map((opt) => {
+            const on = values.includes(opt.value)
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onToggle(opt.value)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  on ? 'bg-[#2B79F7]/10' : 'hover:bg-[var(--bg-card-hover)]'
+                }`}
+              >
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold text-white"
+                  style={
+                    on
+                      ? { backgroundColor: opt.color, borderColor: opt.color }
+                      : { borderColor: 'var(--border-primary)' }
+                  }
+                >
+                  {on ? '✓' : ''}
+                </span>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                <span className="min-w-0 flex-1 text-left text-sm text-[var(--text-primary)] break-all">
+                  {opt.label}
+                </span>
+              </button>
+            )
+          })
+        )}
+        {/* Values still on the lead whose option was deleted/renamed: list
+            them so they can be unchecked instead of being stuck forever. */}
+        {values.filter((v) => !options.some((o) => o.value === v)).map((v) => (
+          <button
+            key={v}
+            onClick={() => onToggle(v)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--bg-card-hover)]/50 transition-colors"
+          >
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-transparent bg-[var(--text-tertiary)] text-[10px] font-bold text-white">
+              ✓
+            </span>
+            <span className="min-w-0 flex-1 text-left text-sm text-[var(--text-tertiary)] break-all">
+              {v}
+              <span className="ml-1.5 text-[10px]">(removed option)</span>
+            </span>
+          </button>
+        ))}
+        <div className="border-t border-[var(--border-primary)] mt-2 pt-2 px-2 pb-1">
+          <button
+            onClick={onClose}
+            className="w-full rounded-lg bg-[#2B79F7] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Status Badge Component
@@ -2363,7 +2658,8 @@ function StatusBadge({ value, options }: { value: string; options: StatusOption[
 
   return (
     <span 
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all hover:scale-105"
+      title={option.label}
+      className="inline-flex max-w-[200px] items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all hover:scale-105"
       style={{ 
         backgroundColor: `${option.color}20`, 
         color: option.color,
@@ -2371,10 +2667,10 @@ function StatusBadge({ value, options }: { value: string; options: StatusOption[
       }}
     >
       <span 
-        className="w-1.5 h-1.5 rounded-full"
+        className="w-1.5 h-1.5 rounded-full shrink-0"
         style={{ backgroundColor: option.color }}
       />
-      {option.label}
+      <span className="truncate">{option.label}</span>
     </span>
   )
 }
@@ -2743,8 +3039,8 @@ function FieldSettingsModal({
           <UrlMetaEditor field={field} onUpdate={onUpdate} />
         )}
 
-        {/* Status/Select Options */}
-        {(field.field_type === 'status' || field.field_type === 'select') && (
+        {/* Status/Select/Multi-select Options */}
+        {(field.field_type === 'status' || field.field_type === 'select' || field.field_type === 'multiselect') && (
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
               Options (drag to reorder)
@@ -2786,10 +3082,12 @@ function FieldSettingsModal({
                     />
                   ) : (
                     <span 
-                      className="text-[var(--text-primary)] flex-1 cursor-pointer hover:text-[var(--text-secondary)]"
+                      className={`min-w-0 flex-1 cursor-pointer break-all hover:text-[var(--text-secondary)] ${
+                        opt.label ? 'text-[var(--text-primary)]' : 'italic text-[var(--text-tertiary)]'
+                      }`}
                       onClick={() => setEditingOption(opt.value)}
                     >
-                      {opt.label}
+                      {opt.label || 'Unnamed option (click to rename)'}
                     </span>
                   )}
                   <button
@@ -2898,7 +3196,7 @@ function LeadDetailModal({
   fields: CustomField[]
   isPending: boolean
   onClose: () => void
-  onUpdate: (leadId: string, fieldKey: string, value: string) => void
+  onUpdate: (leadId: string, fieldKey: string, value: string | string[]) => void
   onDelete: (leadId: string) => void
   getFieldOptions: (field: CustomField) => StatusOption[]
 }) {
@@ -3125,7 +3423,7 @@ function LeadPropertyRow({
   field: CustomField
   lead: Lead
   options: StatusOption[]
-  onUpdate: (leadId: string, fieldKey: string, value: string) => void
+  onUpdate: (leadId: string, fieldKey: string, value: string | string[]) => void
 }) {
   const value = (lead.data?.[field.field_key] as string) || ''
   const Icon = fieldTypeConfig[field.field_type]?.icon
@@ -3163,6 +3461,52 @@ function LeadPropertyRow({
     setDraftUrlText('')
   }
 
+  // Multi-select: every option as a toggle chip, saves on each click.
+  if (field.field_type === 'multiselect') {
+    const values = toMultiValues(lead.data?.[field.field_key])
+    return (
+      <div className="flex items-start gap-3 py-1">
+        <div className="flex items-center gap-1.5 w-24 shrink-0 mt-1">
+          {Icon && <Icon className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />}
+          <span className="text-xs text-[var(--text-tertiary)] truncate">
+            {field.field_name}
+          </span>
+        </div>
+        <div className="flex-1 flex flex-wrap gap-1">
+          {options.length === 0 ? (
+            <span className="text-sm text-[var(--text-tertiary)]">-</span>
+          ) : (
+            options.map((opt) => {
+              const on = values.includes(opt.value)
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    onUpdate(
+                      lead.id,
+                      field.field_key,
+                      on ? values.filter((v) => v !== opt.value) : [...values, opt.value],
+                    )
+                  }
+                  title={opt.label}
+                  className="max-w-full truncate px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors"
+                  style={
+                    on
+                      ? { backgroundColor: `${opt.color}20`, color: opt.color, borderColor: `${opt.color}60` }
+                      : { borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)' }
+                  }
+                >
+                  {opt.label}
+                </button>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // Status / select renders as a select-style row that opens inline.
   if (field.field_type === 'status' || field.field_type === 'select') {
     const opt = options.find((o) => o.value === value)
@@ -3177,7 +3521,7 @@ function LeadPropertyRow({
         <select
           value={value}
           onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-          className="flex-1 px-2 py-1 bg-transparent border-0 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2B79F7] cursor-pointer"
+          className="flex-1 min-w-0 max-w-full truncate px-2 py-1 bg-transparent border-0 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2B79F7] cursor-pointer"
         >
           <option value="">Empty</option>
           {options.map((o) => (
@@ -3347,7 +3691,7 @@ function StatusDropdown({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
+        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">
@@ -3367,7 +3711,7 @@ function StatusDropdown({
               className="w-4 h-4 rounded-full shrink-0"
               style={{ backgroundColor: opt.color }}
             />
-            <span className="text-[var(--text-primary)] flex-1 text-left">{opt.label}</span>
+            <span className="text-[var(--text-primary)] min-w-0 flex-1 text-left break-all">{opt.label}</span>
             {currentValue === opt.value && (
               <Check className="h-4 w-4 text-[#2B79F7] shrink-0" />
             )}

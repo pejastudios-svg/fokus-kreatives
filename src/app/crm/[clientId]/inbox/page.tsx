@@ -144,21 +144,38 @@ export default function CRMInboxPage() {
     }
   }, [])
 
+  // Tell the layout this client's unread count RIGHT NOW, with the exact
+  // number, so the badge updates the instant the user acts instead of after
+  // an HTTP round-trip. The layout reconciles against the DB shortly after.
+  const announceUnread = useCallback(
+    (unread: number) => {
+      window.dispatchEvent(
+        new CustomEvent('fk:notifications-changed', { detail: { clientId, unread } }),
+      )
+    },
+    [clientId],
+  )
+
   const markRead = useCallback(
     async (id: string) => {
       const target = items.find((n) => n.id === id)
       if (!target || target.read_at) return
-      setItems((prev) =>
-        prev.map((n) =>
-          n.id === id ? { ...n, read_at: new Date().toISOString() } : n,
-        ),
+      const next = items.map((n) =>
+        n.id === id ? { ...n, read_at: new Date().toISOString() } : n,
       )
+      // Guard realtime refetches during the write so a mid-flight fetch
+      // can't read a half-applied state and flicker the row.
+      mutatingRef.current = true
+      setItems(next)
+      announceUnread(next.filter((n) => !n.read_at).length)
       const ok = await callMutate({ action: 'mark_read', id })
       if (!ok) {
-        setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: null } : n)))
+        setItems(items)
+        announceUnread(items.filter((n) => !n.read_at).length)
       }
+      mutatingRef.current = false
     },
-    [items, callMutate],
+    [items, callMutate, announceUnread],
   )
 
   // Marking "all" read here = only the rows visible in THIS CRM
@@ -173,20 +190,33 @@ export default function CRMInboxPage() {
     const ids = unread.map((n) => n.id)
     mutatingRef.current = true
     setItems((cur) => cur.map((n) => (n.read_at ? n : { ...n, read_at: now })))
+    announceUnread(0)
     const ok = await callMutate({ action: 'mark_read_many', ids })
-    if (!ok) setItems(prev)
+    if (!ok) {
+      setItems(prev)
+      announceUnread(prev.filter((n) => !n.read_at).length)
+    }
     mutatingRef.current = false
-  }, [items, callMutate])
+  }, [items, callMutate, announceUnread])
 
   const deleteOne = useCallback(
     async (id: string) => {
       const target = items.find((n) => n.id === id)
       if (!target) return
-      setItems((cur) => cur.filter((n) => n.id !== id))
+      const next = items.filter((n) => n.id !== id)
+      // Guard realtime refetches during the delete so the row can't pop
+      // back in from a fetch that lands before the delete is visible.
+      mutatingRef.current = true
+      setItems(next)
+      announceUnread(next.filter((n) => !n.read_at).length)
       const ok = await callMutate({ action: 'delete_one', id })
-      if (!ok) setItems((cur) => [target, ...cur])
+      if (!ok) {
+        setItems(items)
+        announceUnread(items.filter((n) => !n.read_at).length)
+      }
+      mutatingRef.current = false
     },
-    [items, callMutate],
+    [items, callMutate, announceUnread],
   )
 
   // Celebratory popup shown after a successful "Clear all", plus the
@@ -209,6 +239,7 @@ export default function CRMInboxPage() {
     // optimistically empty the list, close the modal, and celebrate.
     mutatingRef.current = true
     setItems([])
+    announceUnread(0)
     setConfirmClearOpen(false)
     setShowCleared(true)
     setTimeout(() => setShowCleared(false), 3500)
@@ -217,18 +248,20 @@ export default function CRMInboxPage() {
       .then((ok) => {
         if (!ok) {
           setItems(prev)
+          announceUnread(prev.filter((n) => !n.read_at).length)
           setShowCleared(false)
         }
       })
       .catch((err) => {
         console.error('clear all failed:', err)
         setItems(prev)
+        announceUnread(prev.filter((n) => !n.read_at).length)
         setShowCleared(false)
       })
       .finally(() => {
         mutatingRef.current = false
       })
-  }, [items, callMutate])
+  }, [items, callMutate, announceUnread])
 
   const filtered = useMemo(() => {
     if (filter === 'unread') return items.filter((n) => !n.read_at)

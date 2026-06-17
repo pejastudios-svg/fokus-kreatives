@@ -4,16 +4,16 @@
  * Cloudinary's chunked upload protocol: each chunk is a normal multipart POST
  * to the same /upload endpoint, with two headers tying the chunks together:
  *
- *   X-Unique-Upload-Id: <uuid>     — shared across every chunk of one file
- *   Content-Range: bytes A-B/T     — A,B inclusive byte offsets, T = total
+ *   X-Unique-Upload-Id: <uuid>     - shared across every chunk of one file
+ *   Content-Range: bytes A-B/T     - A,B inclusive byte offsets, T = total
  *
  * Cloudinary stitches the chunks together and only returns the final asset
  * metadata (public_id, secure_url, etc) on the LAST chunk. Intermediate
  * chunks return 200 with a minimal "done: false" body.
  *
  * Why this matters: a single-shot POST of a 50MB video over a 5 Mbps uplink
- * is ~80 seconds of one continuous TCP connection. Any blip — ISP idle
- * timeout, Cloudinary edge proxy timeout, brief WiFi handoff — kills the
+ * is ~80 seconds of one continuous TCP connection. Any blip - ISP idle
+ * timeout, Cloudinary edge proxy timeout, brief WiFi handoff - kills the
  * whole upload. With chunks, only the failing chunk needs to be retried.
  *
  * Retries are per-chunk with exponential backoff + jitter. 5xx responses
@@ -68,7 +68,7 @@ function isFinalResponse(data: unknown): data is FinalUploadResponse {
 
 function isPermanentError(status: number): boolean {
   // 4xx errors won't get better by retrying. 408 (request timeout) and
-  // 429 (too many requests) are exceptions — those CAN succeed on retry.
+  // 429 (too many requests) are exceptions - those CAN succeed on retry.
   return status >= 400 && status < 500 && status !== 408 && status !== 429
 }
 

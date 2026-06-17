@@ -57,6 +57,7 @@ interface CaptureField {
   embedUrl?: string
   embedHeight?: number
   repeatable?: boolean
+  mapToLead?: boolean
   packages?: PackageOption[]
 }
 
@@ -293,6 +294,24 @@ export function CaptureFieldRow({
             />
             Required
           </label>
+
+          {field.type !== 'embed' && (
+            <label className="flex items-start gap-2 text-sm text-[var(--text-primary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!field.mapToLead}
+                onChange={(e) => onUpdate(field.id, { mapToLead: e.target.checked })}
+                className="mt-0.5 h-4 w-4 rounded border-[var(--border-primary)] bg-[var(--bg-input)] text-[#2B79F7]"
+              />
+              <span>
+                Save answer to the lead profile
+                <span className="block text-xs text-[var(--text-tertiary)]">
+                  Adds a column on the Leads page and fills it from each new
+                  submission. Answers already on a lead are never overwritten.
+                </span>
+              </span>
+            </label>
+          )}
 
           {REPEATABLE_TYPES.has(field.type) && (
             <label className="flex items-center gap-2 text-sm text-[var(--text-primary)] cursor-pointer">

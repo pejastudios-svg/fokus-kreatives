@@ -49,7 +49,20 @@ export function KebabMenu({
   className = '',
 }: KebabMenuProps) {
   const [open, setOpen] = useState(false)
+  // Flip the panel above the trigger when the space below can't fit it
+  // (cards on the last visible row would otherwise push it off-screen).
+  const [dropUp, setDropUp] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  const toggle = () => {
+    if (!open && ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom
+      const estimated = Math.min(items.length * 38 + 12, window.innerHeight * 0.7)
+      setDropUp(spaceBelow < estimated && r.top > spaceBelow)
+    }
+    setOpen((v) => !v)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -73,7 +86,7 @@ export function KebabMenu({
     <div ref={ref} className={`relative inline-block ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         title={label}
         aria-label={label}
         className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
@@ -83,7 +96,7 @@ export function KebabMenu({
 
       {open && (
         <div
-          className={`absolute z-30 mt-1 ${align === 'right' ? 'right-0' : 'left-0'} w-60 max-w-[calc(100vw-1rem)] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl overflow-hidden max-h-[70vh] overflow-y-auto`}
+          className={`absolute z-30 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} ${align === 'right' ? 'right-0' : 'left-0'} w-60 max-w-[calc(100vw-1rem)] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl overflow-hidden max-h-[70vh] overflow-y-auto`}
         >
           <ul className="py-1">
             {items.map((item, i) => {

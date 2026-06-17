@@ -14,12 +14,19 @@ export type ToastType = 'success' | 'error' | 'info'
 // admin simply stops showing.
 export type ToastScope = 'crm' | 'agency'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface ToastItem {
   id: number
   message: string
   type: ToastType
   duration: number
   scope: ToastScope
+  /** Optional inline action ("Open", "Undo", ...) rendered next to the text. */
+  action?: ToastAction
 }
 
 /** CRM routes live under /crm/...; everything else is the agency/admin side. */
@@ -53,6 +60,8 @@ interface ToastOpts {
   duration?: number
   /** Override the auto-detected area. Rarely needed. */
   scope?: ToastScope
+  /** Inline action button ("Open", "Undo", ...). */
+  action?: ToastAction
 }
 
 export function toast(message: string, opts: ToastOpts = {}): number {
@@ -62,6 +71,7 @@ export function toast(message: string, opts: ToastOpts = {}): number {
     type: opts.type ?? 'info',
     duration: opts.duration ?? 5000,
     scope: opts.scope ?? currentScope(),
+    action: opts.action,
   }
   items = [...items, item]
   emit()
@@ -71,9 +81,17 @@ export function toast(message: string, opts: ToastOpts = {}): number {
   return item.id
 }
 
-toast.success = (message: string, duration?: number) => toast(message, { type: 'success', duration })
-toast.error = (message: string, duration?: number) => toast(message, { type: 'error', duration })
-toast.info = (message: string, duration?: number) => toast(message, { type: 'info', duration })
+type HelperOpts = Omit<ToastOpts, 'type'>
+// Helpers accept the legacy bare-duration second arg or a full options bag.
+const normalizeOpts = (o?: number | HelperOpts): HelperOpts =>
+  typeof o === 'number' ? { duration: o } : (o ?? {})
+
+toast.success = (message: string, opts?: number | HelperOpts) =>
+  toast(message, { ...normalizeOpts(opts), type: 'success' })
+toast.error = (message: string, opts?: number | HelperOpts) =>
+  toast(message, { ...normalizeOpts(opts), type: 'error' })
+toast.info = (message: string, opts?: number | HelperOpts) =>
+  toast(message, { ...normalizeOpts(opts), type: 'info' })
 
 const STYLES: Record<ToastType, { ring: string; icon: typeof Info; iconColor: string }> = {
   success: { ring: 'border-emerald-500/30', icon: CheckCircle, iconColor: 'text-emerald-500' },
@@ -192,6 +210,17 @@ export function Toaster() {
             >
               <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${s.iconColor}`} />
               <p className="flex-1 text-sm text-[var(--text-primary)] leading-snug">{t.message}</p>
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action?.onClick()
+                    dismiss(t.id)
+                  }}
+                  className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold text-[#2B79F7] hover:bg-[#2B79F7]/10 transition-colors"
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button
                 onClick={() => dismiss(t.id)}
                 title="Dismiss"

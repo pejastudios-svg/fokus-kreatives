@@ -1,5 +1,10 @@
 'use client'
 
+// Public invoice page (/invoice/<token>). Same design language as the
+// agreement signing page: a slim header bar with the sender and status,
+// then the invoice as a clean paper on a neutral canvas. No color bands,
+// no oversized buttons - it should read like a professional document.
+
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Check, ExternalLink, Loader2 } from 'lucide-react'
@@ -45,11 +50,9 @@ function money(n: number, currency: string) {
 }
 
 function fmtDate(d: string | null) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
-
-const LOGO = 'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
 
 export default function InvoicePage() {
   const params = useParams()
@@ -102,7 +105,7 @@ export default function InvoicePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4]">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     )
@@ -110,8 +113,8 @@ export default function InvoicePage() {
 
   if (error || !inv) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-8 py-10 text-center max-w-sm">
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-[#e5e3df] px-8 py-10 text-center max-w-sm">
           <p className="text-slate-800 font-semibold">Invoice unavailable</p>
           <p className="text-slate-500 text-sm mt-1">{error || 'This invoice could not be found.'}</p>
         </div>
@@ -126,171 +129,235 @@ export default function InvoicePage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Header */}
-          <div
-            className="px-6 sm:px-10 py-7 flex items-center justify-between"
-            style={{ background: 'linear-gradient(135deg,#2B79F7 0%,#1E54B7 55%,#143A80 100%)' }}
+    <div className="min-h-screen bg-[#f6f5f4]">
+      {/* Slim document header bar */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#e5e3df]">
+        <div className="max-w-[880px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {inv.logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={inv.logo}
+                alt=""
+                className="h-8 w-8 rounded-full object-cover shrink-0"
+              />
+            )}
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate">
+                {inv.from}
+              </p>
+              <p className="text-sm font-semibold text-slate-900 truncate">
+                Invoice{inv.invoiceNumber ? ` #${inv.invoiceNumber}` : ''}
+              </p>
+            </div>
+          </div>
+          <span
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${
+              isPaid
+                ? 'bg-green-100 text-green-700'
+                : marked
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-slate-100 text-slate-600'
+            }`}
           >
-            <div>
-              <p className="text-white text-2xl font-extrabold tracking-tight">INVOICE</p>
-              {inv.invoiceNumber && (
-                <p className="text-white/80 text-sm mt-0.5">#{inv.invoiceNumber}</p>
-              )}
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={inv.logo || LOGO}
-              alt={inv.from}
-              className="h-14 w-14 rounded-full object-cover bg-white ring-2 ring-white/40"
-            />
-          </div>
-
-          <div className="px-6 sm:px-10 py-7">
-            {/* Status banner */}
             {isPaid ? (
-              <div className="mb-6 flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-                <Check className="h-4 w-4" /> This invoice has been paid. Thank you.
-              </div>
+              <>
+                <Check className="h-3 w-3" /> Paid
+              </>
             ) : marked ? (
-              <div className="mb-6 flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
-                <Check className="h-4 w-4" /> Thanks - we&apos;ve let the team know. They&apos;ll confirm your payment shortly.
-              </div>
-            ) : null}
-
-            {/* From / Bill to */}
-            <div className="grid grid-cols-2 gap-6 mb-7">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">From</p>
-                <p className="text-slate-900 font-semibold mt-1">{inv.from}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bill to</p>
-                <p className="text-slate-900 font-semibold mt-1">{inv.billToName || '—'}</p>
-                {inv.billToEmail && <p className="text-slate-500 text-sm">{inv.billToEmail}</p>}
-              </div>
-            </div>
-
-            {/* Dates */}
-            <div className="flex gap-8 mb-7 text-sm">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Issued</p>
-                <p className="text-slate-800 mt-0.5">{fmtDate(inv.issueDate)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Due</p>
-                <p className="text-slate-800 mt-0.5">{fmtDate(inv.dueDate)}</p>
-              </div>
-            </div>
-
-            {/* Line items */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500">
-                    <th className="text-left font-semibold px-4 py-2.5">Description</th>
-                    <th className="text-center font-semibold px-3 py-2.5 w-14">Qty</th>
-                    <th className="text-right font-semibold px-3 py-2.5 w-28">Unit</th>
-                    <th className="text-right font-semibold px-4 py-2.5 w-32">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-4 text-slate-400 text-center">
-                        No line items
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((it, i) => (
-                      <tr key={i} className="border-t border-slate-100">
-                        <td className="px-4 py-2.5 text-slate-800">{it.description || '—'}</td>
-                        <td className="px-3 py-2.5 text-center text-slate-600">
-                          {Number(it.quantity) || 0}
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-slate-600">
-                          {money(Number(it.unit_price) || 0, inv.currency)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-800">
-                          {money((Number(it.quantity) || 0) * (Number(it.unit_price) || 0), inv.currency)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Totals */}
-            <div className="mt-5 ml-auto max-w-xs space-y-1.5 text-sm">
-              <div className="flex justify-between text-slate-500">
-                <span>Subtotal</span>
-                <span>{money(t.subtotal, inv.currency)}</span>
-              </div>
-              {t.discountAmt > 0 && (
-                <div className="flex justify-between text-slate-500">
-                  <span>Discount</span>
-                  <span>- {money(t.discountAmt, inv.currency)}</span>
-                </div>
-              )}
-              {t.taxAmt > 0 && (
-                <div className="flex justify-between text-slate-500">
-                  <span>Tax ({inv.taxRate}%)</span>
-                  <span>{money(t.taxAmt, inv.currency)}</span>
-                </div>
-              )}
-              <div className="flex justify-between pt-2 mt-1 border-t border-slate-200 text-slate-900 font-bold text-base">
-                <span>Total</span>
-                <span>{money(t.total, inv.currency)}</span>
-              </div>
-            </div>
-
-            {inv.notes && (
-              <div className="mt-7">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Notes</p>
-                <p className="text-slate-600 text-sm mt-1 whitespace-pre-line break-words">{inv.notes}</p>
-              </div>
+              'Payment reported'
+            ) : inv.dueDate ? (
+              `Due ${fmtDate(inv.dueDate)}`
+            ) : (
+              'Awaiting payment'
             )}
+          </span>
+        </div>
+      </div>
 
-            {/* Actions */}
-            {!isPaid && (
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                {inv.paymentLink && (
-                  <a
-                    href={inv.paymentLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-white font-semibold hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: '#2B79F7' }}
-                  >
-                    Pay now <ExternalLink className="h-4 w-4" />
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={handlePaid}
-                  disabled={marking || marked}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold border-2 transition-colors disabled:opacity-60"
-                  style={{ borderColor: '#2B79F7', color: '#2B79F7' }}
-                >
-                  {marking ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : marked ? (
-                    <>
-                      <Check className="h-4 w-4" /> Marked as paid
-                    </>
-                  ) : (
-                    "I've paid"
-                  )}
-                </button>
-              </div>
-            )}
+      <div className="max-w-[880px] mx-auto px-3 sm:px-6 pt-8 pb-4">
+        {(isPaid || marked) && (
+          <div
+            className={`mx-auto max-w-[720px] mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm border ${
+              isPaid
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-blue-50 border-blue-200 text-blue-700'
+            }`}
+          >
+            <Check className="h-4 w-4 shrink-0" />
+            {isPaid
+              ? 'This invoice has been paid. Thank you.'
+              : 'Thanks for letting us know. Your payment will be confirmed shortly.'}
           </div>
+        )}
+
+        {/* The paper */}
+        <div className="mx-auto max-w-[720px] bg-white rounded-lg border border-[#e5e3df] shadow-[0_1px_3px_rgba(0,0,0,0.06)] px-6 sm:px-12 py-10">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Invoice
+              </p>
+              {inv.invoiceNumber && (
+                <p className="text-xl font-semibold text-slate-900 mt-0.5">
+                  #{inv.invoiceNumber}
+                </p>
+              )}
+            </div>
+            <div className="text-right text-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Issued
+              </p>
+              <p className="text-slate-800 mt-0.5">{fmtDate(inv.issueDate)}</p>
+              {inv.dueDate && (
+                <>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-3">
+                    Due
+                  </p>
+                  <p className="text-slate-800 mt-0.5">{fmtDate(inv.dueDate)}</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 mt-8">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                From
+              </p>
+              <p className="text-slate-900 font-medium text-sm mt-1">{inv.from}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Bill to
+              </p>
+              <p className="text-slate-900 font-medium text-sm mt-1">{inv.billToName || '-'}</p>
+              {inv.billToEmail && <p className="text-slate-500 text-sm">{inv.billToEmail}</p>}
+            </div>
+          </div>
+
+          {/* Line items: hairlines only, no fills */}
+          <table className="w-full text-sm mt-9">
+            <thead>
+              <tr className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <th className="text-left font-semibold pb-2.5 border-b border-slate-200">
+                  Description
+                </th>
+                <th className="text-center font-semibold pb-2.5 border-b border-slate-200 w-14">
+                  Qty
+                </th>
+                <th className="text-right font-semibold pb-2.5 border-b border-slate-200 w-28">
+                  Unit
+                </th>
+                <th className="text-right font-semibold pb-2.5 border-b border-slate-200 w-32">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-4 text-slate-400 text-center">
+                    No line items
+                  </td>
+                </tr>
+              ) : (
+                items.map((it, i) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    <td className="py-3 pr-3 text-slate-800">{it.description || '-'}</td>
+                    <td className="py-3 px-3 text-center text-slate-600">
+                      {Number(it.quantity) || 0}
+                    </td>
+                    <td className="py-3 px-3 text-right text-slate-600">
+                      {money(Number(it.unit_price) || 0, inv.currency)}
+                    </td>
+                    <td className="py-3 pl-3 text-right text-slate-800">
+                      {money((Number(it.quantity) || 0) * (Number(it.unit_price) || 0), inv.currency)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="mt-5 ml-auto max-w-xs space-y-1.5 text-sm">
+            <div className="flex justify-between text-slate-500">
+              <span>Subtotal</span>
+              <span>{money(t.subtotal, inv.currency)}</span>
+            </div>
+            {t.discountAmt > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Discount</span>
+                <span>- {money(t.discountAmt, inv.currency)}</span>
+              </div>
+            )}
+            {t.taxAmt > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Tax ({inv.taxRate}%)</span>
+                <span>{money(t.taxAmt, inv.currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-2.5 mt-1 border-t border-slate-200 text-slate-900 font-semibold text-base">
+              <span>Total</span>
+              <span>{money(t.total, inv.currency)}</span>
+            </div>
+          </div>
+
+          {inv.notes && (
+            <div className="mt-9">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Notes
+              </p>
+              <p className="text-slate-600 text-sm mt-1.5 whitespace-pre-line break-words">
+                {inv.notes}
+              </p>
+            </div>
+          )}
+
+          {/* Actions, part of the document */}
+          {!isPaid && (
+            <div className="mt-10 pt-7 border-t border-slate-200 flex flex-wrap items-center gap-3">
+              {inv.paymentLink && (
+                <a
+                  href={inv.paymentLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm text-white font-semibold transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: '#2B79F7' }}
+                >
+                  Pay now <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handlePaid}
+                disabled={marking || marked}
+                className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold border border-slate-300 text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              >
+                {marking ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : marked ? (
+                  <>
+                    <Check className="h-4 w-4" /> Marked as paid
+                  </>
+                ) : (
+                  "I've paid"
+                )}
+              </button>
+              {inv.paymentLink && (
+                <p className="w-full text-xs text-slate-400 mt-1">
+                  Already paid another way? Use &quot;I&apos;ve paid&quot; and the team will
+                  confirm it.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        <p className="text-center text-slate-400 text-xs mt-4">Powered by Fokus Kreativez</p>
+        <p className="text-center text-slate-400 text-xs mt-6 pb-6">
+          Powered by Fokus Kreativez
+        </p>
       </div>
     </div>
   )

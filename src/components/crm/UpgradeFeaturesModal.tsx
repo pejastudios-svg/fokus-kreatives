@@ -7,14 +7,18 @@ import {
   Sparkles,
   ChevronDown,
   Check,
+  Play,
   type LucideIcon,
 } from 'lucide-react'
+import { FeatureDemo, hasFeatureDemo } from './FeatureDemos'
 
 type FeatureName =
   | 'Dashboard'
   | 'Leads'
   | 'Revenue'
   | 'Meetings'
+  | 'Agreements'
+  | 'Emails'
   | 'Team'
   | 'Capture Pages'
 
@@ -23,7 +27,7 @@ type LockedTab = { name: string; icon: LucideIcon }
 interface FeatureDetail {
   pitch: string
   bullets: string[]
-  preview: 'kpi' | 'pipeline' | 'revenue' | 'calendar' | 'team' | 'capture'
+  preview: 'kpi' | 'pipeline' | 'revenue' | 'calendar' | 'team' | 'capture' | 'agreements' | 'emails'
 }
 
 // Marketing copy is a separate concern from the modal layout, so it lives
@@ -55,12 +59,12 @@ const FEATURE_DETAIL: Record<FeatureName, FeatureDetail> = {
   },
   Revenue: {
     pitch:
-      'Invoice, track, and forecast every dollar tied to a client engagement.',
+      'Create and send branded invoices, take payment online, and track every dollar.',
     bullets: [
-      'Track total, this-month, pending, and overdue at the top of the page.',
-      'Auto-flag overdue invoices and send reminders on a schedule.',
-      'Mark payments paid in one click; the dashboard reflects it instantly.',
-      'See the next invoice that needs to go out without digging.',
+      'Build invoices with line items, tax, and discounts, then send them in a click.',
+      'Clients pay online through a secure link; mark manual payments paid in one tap.',
+      'Set recurring payments and automatic reminders for anything overdue.',
+      'See total, this month, pending, and overdue at the top of the page.',
     ],
     preview: 'revenue',
   },
@@ -74,6 +78,28 @@ const FEATURE_DETAIL: Record<FeatureName, FeatureDetail> = {
       'Keep upcoming and past meetings cleanly separated.',
     ],
     preview: 'calendar',
+  },
+  Agreements: {
+    pitch:
+      'Write contracts, send them for e-signature, and get paid - all in one place.',
+    bullets: [
+      'Draft on a clean doc editor with reusable templates and fill-from-lead fields.',
+      'Send to one or more signers, each with their own secure signing link.',
+      'Attach an invoice so the moment it is signed, payment is requested.',
+      'Auto-stage an agreement when a lead hits a chosen status, ready to send.',
+    ],
+    preview: 'agreements',
+  },
+  Emails: {
+    pitch:
+      'Send value emails to your leads on autopilot, written from your own answers.',
+    bullets: [
+      'Group leads by status or any field, or hand-pick who receives a campaign.',
+      'Emails are drafted for you, on the days and times you choose.',
+      'Every send goes out under your brand, with one-click unsubscribe handled.',
+      'Track delivery and click-through, including which call-to-action won.',
+    ],
+    preview: 'emails',
   },
   Team: {
     pitch:
@@ -181,24 +207,53 @@ function FeatureCard({
   detail: FeatureDetail
 }) {
   const [open, setOpen] = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
+  const demoable = hasFeatureDemo(name)
 
   return (
     <div className="rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-card)] overflow-hidden">
-      {/* Blurred preview strip */}
-      <div className="relative h-28 bg-[var(--bg-tertiary)] overflow-hidden">
-        <div className="absolute inset-0 blur-[3px] opacity-70 pointer-events-none">
-          <Preview kind={detail.preview} />
+      {showDemo && demoable ? (
+        // Live, self-playing walkthrough (click the preview to reach here).
+        <div className="relative bg-[var(--bg-tertiary)]/40 px-3 pt-3 pb-2.5 border-b border-[var(--border-primary)]">
+          <FeatureDemo feature={name} />
+          <button
+            type="button"
+            onClick={() => setShowDemo(false)}
+            className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-[var(--bg-card)]/90 border border-[var(--border-primary)] text-[10px] font-semibold text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+          >
+            Hide
+          </button>
         </div>
-        {/* Lock chip dead-center over the blurred preview */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)]/95 backdrop-blur-sm border border-[var(--border-primary)] text-[var(--text-secondary)] shadow-lg">
-            <Lock className="h-3.5 w-3.5 text-[#2B79F7]" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
-              Locked
-            </span>
+      ) : (
+        // Blurred teaser. Clicking it plays the demo when one exists.
+        <button
+          type="button"
+          onClick={() => demoable && setShowDemo(true)}
+          disabled={!demoable}
+          className={`relative block w-full h-28 bg-[var(--bg-tertiary)] overflow-hidden ${
+            demoable ? 'cursor-pointer group' : 'cursor-default'
+          }`}
+        >
+          <div className="absolute inset-0 blur-[3px] opacity-70 pointer-events-none">
+            <Preview kind={detail.preview} />
           </div>
-        </div>
-      </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            {demoable ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)]/95 backdrop-blur-sm border border-[var(--border-primary)] text-[var(--text-secondary)] shadow-lg transition-transform group-hover:scale-105">
+                <Play className="h-3.5 w-3.5 text-[#2B79F7] fill-[#2B79F7]" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider">
+                  See how it works
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)]/95 backdrop-blur-sm border border-[var(--border-primary)] text-[var(--text-secondary)] shadow-lg">
+                <Lock className="h-3.5 w-3.5 text-[#2B79F7]" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider">Locked</span>
+              </div>
+            )}
+          </div>
+        </button>
+      )}
 
       {/* Body */}
       <div className="px-4 py-3.5 space-y-3">
@@ -261,7 +316,49 @@ function Preview({ kind }: { kind: FeatureDetail['preview'] }) {
       return <TeamPreview />
     case 'capture':
       return <CapturePreview />
+    case 'agreements':
+      return <AgreementsPreview />
+    case 'emails':
+      return <EmailsPreview />
   }
+}
+
+function AgreementsPreview() {
+  // A document page with text lines and a signature scribble.
+  return (
+    <div className="absolute inset-0 p-3 flex justify-center">
+      <div className="w-2/3 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] p-2.5 space-y-1.5">
+        <div className="h-1.5 w-1/2 rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-1 w-full rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-1 w-full rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-1 w-4/5 rounded-full bg-[var(--bg-tertiary)]" />
+        <svg viewBox="0 0 60 16" className="h-4 w-16 mt-1" preserveAspectRatio="none">
+          <path
+            d="M2,12 C8,2 12,14 18,8 C22,4 26,12 32,6 C38,2 44,12 58,4"
+            fill="none"
+            stroke="#2B79F7"
+            strokeWidth="1.5"
+          />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function EmailsPreview() {
+  // A branded email card: brand line, subject, body lines, a pill button.
+  return (
+    <div className="absolute inset-0 p-3 flex justify-center">
+      <div className="w-2/3 rounded-md bg-[var(--bg-card)] border border-[var(--border-primary)] p-2.5 space-y-1.5">
+        <div className="h-1 w-10 rounded-full bg-[#2B79F7]/60" />
+        <div className="h-1.5 w-3/4 rounded-full bg-[var(--text-tertiary)]/50" />
+        <div className="h-1 w-full rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-1 w-full rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-1 w-2/3 rounded-full bg-[var(--bg-tertiary)]" />
+        <div className="h-3 w-1/3 rounded-full bg-[#2B79F7]/40 mt-1" />
+      </div>
+    </div>
+  )
 }
 
 function KpiPreview() {

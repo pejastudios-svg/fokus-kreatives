@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     )
 
     const fmtDate = (d: string | null) =>
-      d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
+      d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-'
 
     // --- Build the document --------------------------------------------------
     const itemRows = [
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
             (it) =>
               new TableRow({
                 children: [
-                  bodyCell(it.description || '—', AlignmentType.LEFT),
+                  bodyCell(it.description || '-', AlignmentType.LEFT),
                   bodyCell(String(Number(it.quantity) || 0), AlignmentType.CENTER),
                   bodyCell(money(Number(it.unit_price) || 0, currency), AlignmentType.RIGHT),
                   bodyCell(
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
                       width: { size: 50, type: WidthType.PERCENTAGE },
                       children: [
                         new Paragraph({ children: [new TextRun({ text: 'Bill to', bold: true, size: 18, color: '94A3B8' })] }),
-                        new Paragraph({ children: [new TextRun({ text: pay.bill_to_name || '—', size: 22, bold: true })] }),
+                        new Paragraph({ children: [new TextRun({ text: pay.bill_to_name || '-', size: 22, bold: true })] }),
                         new Paragraph({ children: [new TextRun({ text: pay.bill_to_email || '', size: 20, color: '64748B' })] }),
                       ],
                     }),

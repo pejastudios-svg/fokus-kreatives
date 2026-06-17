@@ -842,7 +842,7 @@ function ClientFilterCombobox({
   const selected = clients.find((c) => c.id === value) || null
   const label = selected
     ? selected.business_name
-      ? `${selected.name} – ${selected.business_name}`
+      ? `${selected.name} - ${selected.business_name}`
       : selected.name
     : 'All clients'
 

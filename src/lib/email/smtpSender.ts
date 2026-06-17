@@ -117,6 +117,13 @@ export async function trySmtpSend(
     const fromName = typeof payload.fromName === 'string' ? payload.fromName : ''
     const replyTo = typeof payload.replyTo === 'string' ? payload.replyTo : ''
 
+    // Marketing emails carry their unsubscribe URL - surface it as the
+    // RFC 8058 one-click header so Gmail/Yahoo render a native Unsubscribe
+    // button. The Apps Script fallback can't set headers; the footer link
+    // carries compliance there.
+    const listUnsubscribeUrl =
+      typeof payload.listUnsubscribeUrl === 'string' ? payload.listUnsubscribeUrl : ''
+
     const transport = buildTransport(creds)
     try {
       await transport.sendMail({
@@ -125,6 +132,14 @@ export async function trySmtpSend(
         ...(replyTo && replyTo !== creds.address ? { replyTo } : {}),
         subject: rendered.subject,
         html: rendered.html,
+        ...(listUnsubscribeUrl
+          ? {
+              headers: {
+                'List-Unsubscribe': `<${listUnsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              },
+            }
+          : {}),
         attachments: rendered.attachments.map((a) => ({
           filename: a.filename,
           content: a.content,
