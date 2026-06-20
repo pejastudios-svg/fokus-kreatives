@@ -150,6 +150,9 @@ export interface CaptureFormBag {
   error: string
   isSubmitting: boolean
   leadMagnetUrl: string | null
+  /** 'file' (uploaded PDF/doc) opens and downloads on click; 'url' (or
+   *  unset) just opens the external link in a new tab. */
+  leadMagnetType?: string | null
   onSubmit: (e: React.FormEvent) => void
   /** Optional - called when a field gains focus. Wired by the public
    *  capture page to the session-tracking hook so the analytics tab

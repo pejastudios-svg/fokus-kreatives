@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
     // 1) Find the capture page
     const { data: page, error: pageError } = await supabase
       .from('capture_pages')
-      .select('id, client_id, name, slug, headline, description, lead_magnet_url, include_meeting, calendly_url, meeting_integration, block_duplicate_emails, meeting_duration_minutes, fields')
+      .select('id, client_id, name, slug, headline, description, lead_magnet_url, lead_magnet_type, success_message, success_button_text, include_meeting, calendly_url, meeting_integration, block_duplicate_emails, meeting_duration_minutes, fields')
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
@@ -811,9 +811,59 @@ const submissionData = {
       console.error('Capture in-app notifications error:', inAppErr)
     }
 
+    // 7) Deliver the lead magnet to the submitter. Independent of the team
+    //    notification recipients above - this goes to the LEAD, gated only on
+    //    them giving an email and the page having a lead magnet set. For
+    //    uploaded files we pass the URL so Apps Script can attach the file;
+    //    links are delivered as a button only.
+    try {
+      const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
+      const secret = process.env.APPS_SCRIPT_SECRET
+      const magnetUrl = (page.lead_magnet_url as string | null) || null
+      const recipient = submissionData.email ? String(submissionData.email).trim() : ''
+      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)
+
+      if (scriptUrl && secret && magnetUrl && validEmail) {
+        const magnetType = page.lead_magnet_type === 'file' ? 'file' : 'url'
+        const fileName =
+          magnetType === 'file'
+            ? decodeURIComponent(magnetUrl.split('/').pop() || 'resource').replace(/^\d+-/, '')
+            : null
+        const res = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret,
+            type: 'lead_magnet',
+            payload: {
+              to: recipient,
+              leadName: submissionData.name || '',
+              magnetUrl,
+              magnetType,
+              fileName,
+              attachUrl: magnetType === 'file' ? magnetUrl : null,
+              clientName: clientDisplayName,
+              message: page.success_message || null,
+              buttonText: page.success_button_text || null,
+            },
+          }),
+        })
+        const text = await res.text()
+        if (res.ok && !text.startsWith('Error:') && !text.startsWith('Unauthorized')) {
+          const { logEmailSend } = await import('@/lib/email/sendLog')
+          void logEmailSend({ clientId, channel: 'apps_script', type: 'lead_magnet', count: 1 })
+        } else {
+          console.error('Capture lead_magnet email error:', text.slice(0, 300))
+        }
+      }
+    } catch (magnetErr) {
+      console.error('Capture lead magnet email error:', magnetErr)
+    }
+
     return NextResponse.json({
       success: true,
       lead_magnet_url: page.lead_magnet_url || null,
+      lead_magnet_type: page.lead_magnet_type === 'file' ? 'file' : 'url',
         })
   } catch (err: unknown) {
     console.error('Capture submit error:', err)

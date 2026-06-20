@@ -78,6 +78,7 @@ export default function PublicCapturePage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [leadMagnetUrl, setLeadMagnetUrl] = useState<string | null>(null)
+  const [leadMagnetType, setLeadMagnetType] = useState<string | null>(null)
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [meeting_date, setMeetingDate] = useState('')
@@ -297,6 +298,7 @@ export default function PublicCapturePage() {
       } else {
         setSuccess(true)
         setLeadMagnetUrl(data.lead_magnet_url || null)
+        setLeadMagnetType(data.lead_magnet_type || null)
       }
     } catch (err) {
       console.error('Public capture submit error:', err)
@@ -355,6 +357,7 @@ export default function PublicCapturePage() {
         error,
         isSubmitting,
         leadMagnetUrl,
+        leadMagnetType,
         onSubmit: handleSubmit,
         onFieldFocus: trackFieldFocus,
       }}

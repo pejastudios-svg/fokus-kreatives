@@ -96,6 +96,7 @@ export function CaptureFormBody({
   error,
   isSubmitting,
   leadMagnetUrl,
+  leadMagnetType,
   onSubmit,
   onFieldFocus,
   preview,
@@ -131,6 +132,13 @@ export function CaptureFormBody({
         })()
 
   const [step, setStep] = useState(0)
+  // The live Calendly inline widget reports a real booking via postMessage.
+  // When a form embeds it, a lead must book before they can submit - we hold
+  // that "they booked" state here and gate the Submit button on it.
+  const [calendlyBooked, setCalendlyBooked] = useState(false)
+  // Set when the visitor tries to submit without having booked, so the prompt
+  // reads as an error rather than a passive hint.
+  const [bookingPrompt, setBookingPrompt] = useState(false)
   // True only after the visitor tries to advance/submit with a required
   // field still empty. The "Please fill" message is DERIVED from this plus a
   // live check (missingLabel below), so it never shows on load and clears the
@@ -145,6 +153,17 @@ export function CaptureFormBody({
   const current = steps[Math.min(step, steps.length - 1)]
   const isLast = step >= steps.length - 1
   const isMultiStep = steps.length > 1
+
+  // The Calendly gate only applies on the live page (slug present, not the
+  // builder preview) where the inline widget can actually report a booking.
+  // Legacy bare-iframe Calendly emits no booking signal, so it can't be gated.
+  const requireCalendlyBooking =
+    !preview &&
+    pageInfo.include_meeting &&
+    pageInfo.meeting_integration === 'calendly' &&
+    !!pageInfo.calendly_url &&
+    !!pageInfo.slug
+  const bookingMissing = requireCalendlyBooking && !calendlyBooked
 
   // Required-field check for the fields on a given step.
   const firstMissing = (stepFields: CaptureField[]): string | null => {
@@ -209,22 +228,47 @@ export function CaptureFormBody({
     const buttonText =
       (pageInfo.success_button_text && pageInfo.success_button_text.trim()) ||
       'Access Your Free Resource'
+    const isFileMagnet = leadMagnetType === 'file'
+    const btnClass =
+      'inline-flex items-center justify-center px-4 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 w-full transition-opacity'
+    const btnStyle = { backgroundColor: accent, backgroundImage: 'none' }
+
+    // Uploaded files: open the file in a new tab (so they can read it) AND
+    // push a download to their device. Supabase storage honours ?download for
+    // the Content-Disposition: attachment header. External links just open.
+    const openFileMagnet = () => {
+      if (!leadMagnetUrl) return
+      window.open(leadMagnetUrl, '_blank', 'noopener,noreferrer')
+      const dlUrl = leadMagnetUrl + (leadMagnetUrl.includes('?') ? '&' : '?') + 'download'
+      const a = document.createElement('a')
+      a.href = dlUrl
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+
     return (
       <div className="space-y-4">
         <p className="text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-lg text-sm text-center">
           {successMessage}
         </p>
-        {leadMagnetUrl && (
-          <a
-            href={leadMagnetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ backgroundColor: accent, backgroundImage: 'none' }}
-            className="inline-flex items-center justify-center px-4 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 w-full transition-opacity"
-          >
-            {buttonText}
-          </a>
-        )}
+        {leadMagnetUrl &&
+          (isFileMagnet ? (
+            <button type="button" onClick={openFileMagnet} style={btnStyle} className={btnClass}>
+              {buttonText}
+            </button>
+          ) : (
+            <a
+              href={leadMagnetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={btnStyle}
+              className={btnClass}
+            >
+              {buttonText}
+            </a>
+          ))}
       </div>
     )
   }
@@ -560,6 +604,10 @@ export function CaptureFormBody({
               name: values['name'] || undefined,
               email: values['email'] || undefined,
             }}
+            onBooked={() => {
+              setCalendlyBooked(true)
+              setBookingPrompt(false)
+            }}
           />
         ) : isCalendlyIntegration && pageInfo.calendly_url ? (
           // No slug = the builder preview. Show a plain embed so Calendly is
@@ -663,6 +711,15 @@ export function CaptureFormBody({
             }
           }
         }
+        // Calendly forms can't be submitted until the lead actually books.
+        // Guard here too so an Enter-key submit can't bypass the disabled
+        // button.
+        if (bookingMissing) {
+          e.preventDefault()
+          setStep(steps.length - 1)
+          setBookingPrompt(true)
+          return
+        }
         setTriedSubmit(false)
         onSubmit(e)
       }}
@@ -687,6 +744,18 @@ export function CaptureFormBody({
 
       {missingLabel && <p className="text-sm text-red-500">Please fill: {missingLabel}</p>}
       {isLast && error && <p className="text-sm text-red-500">{error}</p>}
+
+      {/* Calendly booking gate: prompt while unbooked, confirm once booked. */}
+      {isLast && bookingMissing && (
+        <p className={`text-sm ${bookingPrompt ? 'text-red-500' : 'text-[var(--text-tertiary)]'}`}>
+          Please pick a time above to book your call before submitting.
+        </p>
+      )}
+      {isLast && requireCalendlyBooking && calendlyBooked && (
+        <p className="flex items-center gap-1.5 text-sm text-green-600">
+          <Check className="h-4 w-4" /> Your call is booked. You can submit now.
+        </p>
+      )}
 
       <div className="flex items-center gap-3">
         {isMultiStep && step > 0 && (
@@ -715,6 +784,7 @@ export function CaptureFormBody({
             className="w-full"
             size="lg"
             isLoading={isSubmitting}
+            disabled={bookingMissing}
             style={{ backgroundColor: accent, backgroundImage: 'none' }}
           >
             Submit

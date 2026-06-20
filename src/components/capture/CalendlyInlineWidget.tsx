@@ -24,10 +24,20 @@ interface Props {
   /** Optional name/email prefill so visitors don't retype what they
    *  already entered in the form above the embed. */
   prefill?: { name?: string; email?: string }
+  /** Fired when the visitor completes a booking. The capture form uses
+   *  this to unlock its Submit button so a lead can't submit without
+   *  actually scheduling the call. */
+  onBooked?: () => void
 }
 
-export function CalendlyInlineWidget({ url, slug, prefill }: Props) {
+export function CalendlyInlineWidget({ url, slug, prefill, onBooked }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  // Keep the latest onBooked in a ref so the message listener (subscribed
+  // once per slug) always calls the current callback without re-subscribing.
+  const onBookedRef = useRef(onBooked)
+  useEffect(() => {
+    onBookedRef.current = onBooked
+  }, [onBooked])
 
   // Build the data-url with optional prefill query params. Calendly
   // supports name + email out of the box; other prefills (custom
@@ -71,6 +81,9 @@ export function CalendlyInlineWidget({ url, slug, prefill }: Props) {
       const eventUri = data.payload?.event?.uri
       const inviteeUri = data.payload?.invitee?.uri
       if (!eventUri || !inviteeUri) return
+
+      // Unlock the form's Submit button now that a real booking happened.
+      onBookedRef.current?.()
 
       // Fire-and-forget. The server is idempotent on (provider,
       // external_id), so a retry on the visitor's next navigation

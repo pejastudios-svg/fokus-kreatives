@@ -496,6 +496,14 @@ export default function ClientProfilePage() {
                         await handleRegenerateIntake()
                       }}
                     />
+                    <MenuItem
+                      icon={Download}
+                      label="Export brand book"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        window.open(`/clients/${clientId}/brand-export`, '_blank')
+                      }}
+                    />
                     {canArchive && !client.archived_at && (
                       <MenuItem
                         icon={ArchiveIcon}

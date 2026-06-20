@@ -96,6 +96,10 @@ function doPost(e) {
         handleLeadCreated(payload);
         break;
 
+      case 'lead_magnet':
+        handleLeadMagnet(payload);
+        break;
+
       case 'workspace_invite':
         handleInviteEmail(payload, 'workspace');
         break;
@@ -395,6 +399,65 @@ function handleInvoiceSent(payload) {
 }
 
 // ========== AGREEMENTS ==========
+
+// Delivers a capture page's lead magnet to the person who submitted the form.
+// Two flavours, set by the app via payload.magnetType:
+//   - 'url':  a button linking to an external resource (link only).
+//   - 'file': same button (pointing at the uploaded file's public URL) PLUS
+//             the file attached to the email, fetched from payload.attachUrl.
+// White-labeled with the client's brand name. Attachment failures degrade
+// gracefully to a link-only email so the lead always gets something.
+
+function handleLeadMagnet(payload) {
+  var recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleLeadMagnet: no recipients'); return }
+
+  var leadName = payload.leadName || 'there'
+  var url = payload.magnetUrl || ''
+  var brand = payload.clientName || 'Fokus Kreatives'
+  var buttonText = payload.buttonText || 'Access your resource'
+  var intro = payload.message
+    ? escapeHtml(payload.message)
+    : 'Thanks for signing up. Here is the resource you requested.'
+
+  var body =
+    paraHtml('Hi ' + escapeHtml(leadName) + ',') +
+    paraHtml(intro) +
+    (url ? buttonHtml(url, escapeHtml(buttonText)) : '')
+
+  var html = baseTemplate('Your resource from ' + escapeHtml(brand), body, payload.clientName)
+
+  // Attach the uploaded file when one was provided. Capped to keep under
+  // Gmail's ~25MB attachment limit; oversize or failed fetches fall back to
+  // the link in the email body.
+  var attachments = []
+  if (payload.attachUrl) {
+    try {
+      var resp = UrlFetchApp.fetch(payload.attachUrl, { muteHttpExceptions: true, followRedirects: true })
+      if (resp.getResponseCode() === 200) {
+        var blob = resp.getBlob()
+        if (blob.getBytes().length <= 20 * 1024 * 1024) {
+          var fname = (payload.fileName || 'resource').replace(/[^\w.\- ]+/g, '').slice(0, 120)
+          blob.setName(fname)
+          attachments.push(blob)
+        } else {
+          Logger.log('handleLeadMagnet: file too large to attach, sending link only')
+        }
+      }
+    } catch (e) {
+      Logger.log('handleLeadMagnet: attach failed, sending link only: ' + e)
+    }
+  }
+
+  var subject = payload.subject || ('Your resource from ' + brand)
+  var msg = { to: recipients, subject: subject, htmlBody: html }
+  // No fromName from the capture route, so brand the sender with the client.
+  if (payload.fromName) msg.name = payload.fromName
+  else if (payload.clientName) msg.name = payload.clientName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  if (attachments.length) msg.attachments = attachments
+  MailApp.sendEmail(msg)
+}
 
 function handleAgreementSent(payload) {
   const recipients = normalizeRecipients(payload.to)

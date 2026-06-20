@@ -446,6 +446,14 @@ export default function ClientDetailPage() {
           </Link>
 
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => window.open(`/clients/${clientId}/brand-export`, '_blank')}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export brand book
+            </Button>
+
             <Button onClick={handleCreateContent}>
               <Sparkles className="h-4 w-4 mr-2" />
               Create Content

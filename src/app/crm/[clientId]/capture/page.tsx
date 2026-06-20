@@ -32,6 +32,7 @@ import {
   Package,
   ListChecks,
   FileDown,
+  FileText,
   Info,
   RotateCcw,
 } from 'lucide-react'
@@ -127,6 +128,10 @@ interface CapturePage {
   headline: string | null
   description: string | null
   lead_magnet_url: string | null
+  /** 'url' (external link) or 'file' (uploaded PDF/doc in the uploads
+   *  bucket). Drives open-vs-download on the public page and whether the
+   *  lead-magnet email attaches the file. Null/legacy = treated as 'url'. */
+  lead_magnet_type: string | null
   is_active: boolean
   logo_url: string | null
   banner_url: string | null
@@ -395,6 +400,7 @@ export default function CRMCapturePages() {
     headline: string
     description: string
     lead_magnet_url: string
+    lead_magnet_type: 'url' | 'file'
     logo_url: string
     banner_url: string
     is_active: boolean
@@ -416,6 +422,7 @@ export default function CRMCapturePages() {
     headline: '',
     description: '',
     lead_magnet_url: '',
+    lead_magnet_type: 'url',
     logo_url: '',
     banner_url: '',
     is_active: true,
@@ -567,6 +574,7 @@ export default function CRMCapturePages() {
       headline: '',
       description: '',
       lead_magnet_url: '',
+      lead_magnet_type: 'url',
       logo_url: '',
       banner_url: '',
       is_active: true,
@@ -595,6 +603,7 @@ export default function CRMCapturePages() {
       headline: page.headline || '',
       description: page.description || '',
       lead_magnet_url: page.lead_magnet_url || '',
+      lead_magnet_type: page.lead_magnet_type === 'file' ? 'file' : 'url',
       logo_url: page.logo_url || '',
       banner_url: page.banner_url || '',
       is_active: page.is_active,
@@ -843,6 +852,7 @@ export default function CRMCapturePages() {
             headline: form.headline || null,
             description: form.description || null,
             lead_magnet_url: form.lead_magnet_url || null,
+            lead_magnet_type: form.lead_magnet_type,
             logo_url: form.logo_url || null,
             banner_url: form.banner_url || null,
             is_active: form.is_active,
@@ -909,6 +919,7 @@ export default function CRMCapturePages() {
           headline: form.headline || null,
           description: form.description || null,
           lead_magnet_url: form.lead_magnet_url || null,
+          lead_magnet_type: form.lead_magnet_type,
           logo_url: form.logo_url || null,
           banner_url: form.banner_url || null,
           is_active: form.is_active,
@@ -1725,13 +1736,71 @@ function CaptureSkeleton() {
                   />
                 </div>
 
-                <Input
-                  label="Lead Magnet URL (optional)"
-                  name="lead_magnet_url"
-                  value={form.lead_magnet_url}
-                  onChange={handleFormChange}
-                  placeholder="https://example.com/your-pdf-or-video"
-                />
+                {/* Lead magnet: an external link OR an uploaded PDF/doc.
+                    Switching type clears the value so the two never mix. The
+                    uploaded file's public URL is stored in lead_magnet_url
+                    just like a link; lead_magnet_type tells the public page
+                    and the delivery email how to treat it. */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                    Lead magnet (optional)
+                  </label>
+                  <div className="inline-flex rounded-lg border border-[var(--border-primary)] p-0.5 mb-2">
+                    {(['url', 'file'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) =>
+                            prev.lead_magnet_type === t
+                              ? prev
+                              : { ...prev, lead_magnet_type: t, lead_magnet_url: '' },
+                          )
+                        }
+                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                          form.lead_magnet_type === t
+                            ? 'bg-[#2B79F7] text-white'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                        }`}
+                      >
+                        {t === 'url' ? 'Link' : 'Upload file'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {form.lead_magnet_type === 'url' ? (
+                    <Input
+                      name="lead_magnet_url"
+                      value={form.lead_magnet_url}
+                      onChange={handleFormChange}
+                      placeholder="https://example.com/your-pdf-or-video"
+                    />
+                  ) : form.lead_magnet_url ? (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                      <FileText className="h-4 w-4 text-[#2B79F7] shrink-0" />
+                      <span className="text-sm text-[var(--text-primary)] flex-1 truncate">
+                        {decodeURIComponent(form.lead_magnet_url.split('/').pop() || 'Uploaded file').replace(
+                          /^\d+-/,
+                          '',
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, lead_magnet_url: '' }))}
+                        className="text-xs text-red-500 hover:underline shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <FileUpload
+                      folder="capture-pages/lead-magnets"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.key,.pages,.epub,.zip"
+                      label="Upload a PDF or document"
+                      onUpload={(url) => setForm((prev) => ({ ...prev, lead_magnet_url: url }))}
+                    />
+                  )}
+                </div>
 
                 {/* CTA label after the visitor submits successfully.
                     Only shows when a lead-magnet URL is set (the
