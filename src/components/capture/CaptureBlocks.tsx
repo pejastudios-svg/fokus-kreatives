@@ -9,7 +9,7 @@
 // side by side (stacking on mobile) with an optional section background;
 // every other block is presentational.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Quote } from 'lucide-react'
 import { CaptureFormBody, detectEmbed } from './CaptureFormBody'
 import { buildCaptureThemeVars } from './colorUtils'
@@ -44,60 +44,85 @@ const textSize = (s?: string) =>
 
 const fontStyle = (f?: string): React.CSSProperties | undefined => (f ? { fontFamily: f } : undefined)
 
-// Auto-sliding testimonials carousel. Scrolls continuously and seamlessly
-// (the list is doubled and the scroll wraps at the halfway point); pauses on
-// hover / touch so visitors can read and scroll it by hand.
+// Auto-sliding testimonials carousel. A transform-based marquee (not a scroll
+// container) so it loops round forever no matter the card count. The set is
+// repeated enough times to always overflow the container (so there's never a
+// trailing gap), and the offset wraps at one set's width for a seamless loop.
+// Each card has an equal right margin (not flex gap) so every set is the same
+// width. Pauses on hover / touch.
 function TestimonialsCarousel({ items }: { items: TestimonialItem[] }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   const paused = useRef(false)
-  const list = items.length ? [...items, ...items] : []
+  const offset = useRef(0)
+  const [repeats, setRepeats] = useState(3)
+
+  // Grow `repeats` until one set's width + the container fits inside the
+  // track, so a full screen of cards is always visible (no end gap). Recheck
+  // on resize since the page is full-bleed and the width varies a lot.
+  useEffect(() => {
+    const measure = () => {
+      const track = trackRef.current
+      const wrap = wrapRef.current
+      if (!track || !wrap || items.length === 0) return
+      const oneSet = track.scrollWidth / repeats
+      if (oneSet <= 0) return
+      const needed = Math.ceil((wrap.clientWidth + oneSet) / oneSet) + 1
+      if (needed > repeats) setRepeats(needed)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [repeats, items.length])
 
   useEffect(() => {
-    const el = ref.current
-    if (!el || items.length === 0) return
+    const track = trackRef.current
+    if (!track || items.length === 0) return
     let raf = 0
     let last = 0
     const tick = (t: number) => {
-      if (last) {
+      if (last && !paused.current) {
         const dt = t - last
-        if (!paused.current && el.scrollWidth > el.clientWidth) {
-          el.scrollLeft += dt * 0.04 // ~40px / second
-          const half = el.scrollWidth / 2
-          if (el.scrollLeft >= half) el.scrollLeft -= half
-        }
+        offset.current -= dt * 0.04 // ~40px / second, leftward
+        const oneSet = track.scrollWidth / repeats
+        if (oneSet > 0 && -offset.current >= oneSet) offset.current += oneSet
+        track.style.transform = `translate3d(${offset.current}px, 0, 0)`
       }
       last = t
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [items.length])
+  }, [repeats, items.length])
 
   if (items.length === 0) return null
 
+  const list = Array.from({ length: repeats }, () => items).flat()
+
   return (
     <div
-      ref={ref}
+      ref={wrapRef}
+      className="overflow-hidden"
       onMouseEnter={() => (paused.current = true)}
       onMouseLeave={() => (paused.current = false)}
       onTouchStart={() => (paused.current = true)}
       onTouchEnd={() => (paused.current = false)}
-      className="flex items-start gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
-      style={{ scrollbarWidth: 'none' }}
     >
-      {list.map((it, i) =>
-        // Every card is the same fixed size. Image cards fit the whole image
-        // inside the box (object-contain, no crop, no stretch). Text cards
-        // pin the person to the bottom so the card fills evenly.
-        it.imageUrl ? (
-          <div key={i} className="shrink-0 w-72 sm:w-80 h-60 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] overflow-hidden flex items-center justify-center p-2">
-            <img src={it.imageUrl} alt={it.name || ''} className="max-w-full max-h-full object-contain rounded-lg" />
-          </div>
-        ) : (
-          <div
-            key={i}
-            className="shrink-0 w-72 sm:w-80 h-60 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-5 flex flex-col"
-          >
+      <div ref={trackRef} className="flex w-max items-start pb-2 will-change-transform">
+        {list.map((it, i) =>
+          // Every card is the same fixed size. Image cards fit the whole image
+          // inside the box (object-contain, no crop, no stretch). Text cards
+          // pin the person to the bottom so the card fills evenly. mr-4 (not
+          // flex gap) keeps both halves equal width for a seamless wrap.
+          it.imageUrl ? (
+            <div key={i} className="shrink-0 mr-4 w-72 sm:w-80 h-60 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] overflow-hidden flex items-center justify-center p-2">
+              <img src={it.imageUrl} alt={it.name || ''} className="max-w-full max-h-full object-contain rounded-lg" />
+            </div>
+          ) : (
+            <div
+              key={i}
+              className="shrink-0 mr-4 w-72 sm:w-80 h-60 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-5 flex flex-col"
+            >
             <div className="min-h-0 overflow-hidden">
               <Quote className="h-5 w-5 text-[var(--text-tertiary)]" />
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
@@ -118,8 +143,9 @@ function TestimonialsCarousel({ items }: { items: TestimonialItem[] }) {
               </div>
             </div>
           </div>
-        ),
-      )}
+          ),
+        )}
+      </div>
     </div>
   )
 }
