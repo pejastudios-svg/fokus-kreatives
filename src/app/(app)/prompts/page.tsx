@@ -8,6 +8,7 @@ import { ClientPicker } from '@/components/dashboard/ClientPicker'
 import { toast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeBrandProfile } from '@/components/clients/brandProfile'
+import { topicGroupIdFor } from '@/lib/questionForm/topicGroupId'
 import {
   buildPrompt,
   PROMPT_CARDS,
@@ -34,11 +35,26 @@ interface Client {
   profile_picture_url: string | null
 }
 
+interface FormAnswer {
+  input_type?: string
+  question?: string
+  answer: string
+}
+
+/** One of the client's question forms, offered as a Lead Magnet source. */
+interface FormOption {
+  id: string
+  label: string
+  submitted: boolean
+  topicIds: string[]
+}
+
 interface ClientData {
   brandProfileText: string
   existingTitles: string[]
   existingAnswers: string[]
-  formAnswers: { input_type?: string; question?: string; answer: string }[]
+  formAnswers: FormAnswer[]
+  forms: FormOption[]
   competitorInsights: string
   packageTier: PackageTier | null
 }
@@ -64,6 +80,13 @@ export default function PromptsPage() {
 
   const [clientData, setClientData] = useState<ClientData | null>(null)
   const [loadingData, setLoadingData] = useState(false)
+
+  // Lead-magnet source: '' = all of the client's answered forms (default,
+  // legacy behaviour). A form id scopes the magnet's material to just that
+  // question form's answers.
+  const [selectedFormId, setSelectedFormId] = useState('')
+  const [scopedAnswers, setScopedAnswers] = useState<FormAnswer[] | null>(null)
+  const [loadingScoped, setLoadingScoped] = useState(false)
 
   // Seed-topics controls. Manual count defaults to the full 100 bank; the
   // toggle switches to the client's package monthly count (top 4 / mid 2 / low 1).
@@ -113,7 +136,7 @@ export default function PromptsPage() {
             .single(),
           supabase
             .from('question_forms')
-            .select('topics')
+            .select('id, title, submitted_at, created_at, topics')
             .eq('client_id', clientId)
             .not('topics', 'is', null)
             .order('created_at', { ascending: false })
@@ -129,6 +152,38 @@ export default function PromptsPage() {
 
         const profile = normalizeBrandProfile(client?.brand_profile ?? null)
         const brandProfileText = JSON.stringify(profile, null, 2)
+
+        // Build the per-form picker options (topic forms only - their answers
+        // carry a topic_group_id we can scope by). Label by title, falling
+        // back to the created date.
+        const formOptions: FormOption[] = []
+        for (const row of forms ?? []) {
+          const f = row as {
+            id?: string
+            title?: string | null
+            submitted_at?: string | null
+            created_at?: string
+            topics?: unknown
+          }
+          if (!f.id) continue
+          const topicList = Array.isArray(f.topics) ? (f.topics as { id?: string }[]) : []
+          const topicIds = topicList.map((t) => t?.id).filter((id): id is string => !!id)
+          if (topicIds.length === 0) continue
+          const dateLabel = f.created_at
+            ? new Date(f.created_at).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : ''
+          const base = f.title?.trim() || (dateLabel ? `Form from ${dateLabel}` : 'Question form')
+          formOptions.push({
+            id: f.id,
+            label: f.submitted_at ? base : `${base} (not answered yet)`,
+            submitted: !!f.submitted_at,
+            topicIds,
+          })
+        }
 
         // Past topic titles from question_forms.topics jsonb.
         const seenTitle = new Set<string>()
@@ -184,6 +239,7 @@ export default function PromptsPage() {
           existingTitles,
           existingAnswers,
           formAnswers,
+          forms: formOptions,
           competitorInsights,
           packageTier,
         })
@@ -198,21 +254,86 @@ export default function PromptsPage() {
   )
 
   useEffect(() => {
+    // Reset the per-form choice whenever the client changes.
+    setSelectedFormId('')
+    setScopedAnswers(null)
     if (selectedClientId) loadClientData(selectedClientId)
     else setClientData(null)
   }, [selectedClientId, loadClientData])
+
+  // Load the chosen form's answers (scoped by topic_group_id) when a specific
+  // form is picked. '' falls back to the all-forms material already loaded.
+  useEffect(() => {
+    if (!selectedClientId || !selectedFormId || !clientData) {
+      setScopedAnswers(null)
+      return
+    }
+    const form = clientData.forms.find((f) => f.id === selectedFormId)
+    if (!form) {
+      setScopedAnswers(null)
+      return
+    }
+    let cancelled = false
+    setLoadingScoped(true)
+    ;(async () => {
+      try {
+        const groupIds = await Promise.all(
+          form.topicIds.map((tid) => topicGroupIdFor(selectedFormId, tid)),
+        )
+        const { data } = await supabase
+          .from('topics')
+          .select('answer, input_type, question, group_position')
+          .eq('client_id', selectedClientId)
+          .eq('source', 'form')
+          .in('topic_group_id', groupIds)
+          .order('topic_group_id', { ascending: true })
+          .order('group_position', { ascending: true })
+          .limit(120)
+
+        const seen = new Set<string>()
+        const out: FormAnswer[] = []
+        for (const r of data ?? []) {
+          const row = r as { answer?: string; input_type?: string; question?: string }
+          const raw = row.answer?.trim()
+          if (!raw) continue
+          const key = raw.slice(0, 80).toLowerCase().replace(/\s+/g, ' ')
+          if (seen.has(key)) continue
+          seen.add(key)
+          out.push({
+            input_type: typeof row.input_type === 'string' ? row.input_type : undefined,
+            question: typeof row.question === 'string' ? row.question : undefined,
+            answer: raw.length > 600 ? `${raw.slice(0, 597)}...` : raw,
+          })
+          if (out.length >= 50) break
+        }
+        if (!cancelled) setScopedAnswers(out)
+      } catch {
+        if (!cancelled) setScopedAnswers([])
+      } finally {
+        if (!cancelled) setLoadingScoped(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedClientId, selectedFormId, clientData, supabase])
 
   const handleGenerate = (card: PromptCardMeta) => {
     if (!clientData || !selectedClient) return
     setGenerating(card.type)
     try {
+      // The lead magnet's source material: scoped to one question form when
+      // chosen, otherwise all of the client's answered forms.
+      const leadMagnetAnswers =
+        selectedFormId ? scopedAnswers ?? [] : clientData.formAnswers
+
       const prompt = buildPrompt({
         type: card.type,
         brandProfileText: clientData.brandProfileText,
         count: effectiveSeedCount,
         existingTitles: clientData.existingTitles,
         existingAnswers: clientData.existingAnswers,
-        formAnswers: clientData.formAnswers,
+        formAnswers: leadMagnetAnswers,
         competitorInsights: clientData.competitorInsights,
       })
       const label = selectedClient.name || selectedClient.business_name || 'this client'
@@ -276,6 +397,56 @@ export default function PromptsPage() {
                   </span>
                 ) : null}
               </p>
+            )}
+
+            {/* Lead Magnet source picker. Scopes the magnet's material to one
+                question form, or uses every answered form (default). */}
+            {ready && clientData && clientData.forms.length > 0 && (
+              <div className="max-w-md pt-3">
+                <div className="flex items-center gap-1.5">
+                  <Magnet className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                  <label className="text-xs font-medium text-[var(--text-secondary)]">
+                    Lead Magnet source
+                  </label>
+                </div>
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5 mb-1.5">
+                  Build the Lead Magnet from one question form, or use every answered form.
+                </p>
+                <select
+                  value={selectedFormId}
+                  onChange={(e) => setSelectedFormId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                >
+                  <option value="">All answered forms</option>
+                  {clientData.forms.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedFormId && (
+                  <p className="text-xs pt-1 flex items-center gap-1.5">
+                    {loadingScoped ? (
+                      <span className="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Loading answers…
+                      </span>
+                    ) : (
+                      <span
+                        className={
+                          (scopedAnswers?.length ?? 0) > 0
+                            ? 'text-emerald-500 flex items-center gap-1.5'
+                            : 'text-amber-500 flex items-center gap-1.5'
+                        }
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        {(scopedAnswers?.length ?? 0) > 0
+                          ? `${scopedAnswers?.length} answers from this form`
+                          : 'No answers on this form yet'}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
