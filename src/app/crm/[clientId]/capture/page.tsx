@@ -35,6 +35,7 @@ import {
   FileText,
   Info,
   RotateCcw,
+  LayoutPanelTop,
 } from 'lucide-react'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -49,7 +50,8 @@ import { BrandImageUpload } from '@/components/capture/BrandImageUpload'
 import { ThemePicker } from '@/components/capture/ThemePicker'
 import { CaptureFieldRow } from '@/components/capture/CaptureFieldRow'
 import { CaptureAdvancedAnalytics } from '@/components/capture/CaptureAdvancedAnalytics'
-import type { LayoutTemplate, PackageOption } from '@/components/capture/types'
+import { CaptureBlocksEditor, defaultLandingBlocks } from '@/components/capture/CaptureBlocksEditor'
+import type { LayoutTemplate, PackageOption, CaptureBlock } from '@/components/capture/types'
 
 type FieldType =
   | 'text' | 'email' | 'phone' | 'url' | 'textarea'
@@ -153,6 +155,7 @@ interface CapturePage {
   meeting_duration_minutes: number
   fields: CaptureField[] | null
   sections: CaptureSection[] | null
+  blocks: CaptureBlock[] | null
   theme: CaptureTheme | null
   layout_template: LayoutTemplate | null
   created_at: string
@@ -414,6 +417,7 @@ export default function CRMCapturePages() {
     meeting_duration_minutes: number
     fields: CaptureField[]
     sections: CaptureSection[]
+    blocks: CaptureBlock[]
     theme: CaptureTheme
     layout_template: LayoutTemplate
   }>({
@@ -436,6 +440,7 @@ export default function CRMCapturePages() {
     meeting_duration_minutes: 30,
     fields: assignFieldsToSections(normalizeFields(makeDefaultFields()), makeDefaultSections()),
     sections: makeDefaultSections(),
+    blocks: [],
     theme: normalizeTheme(makeDefaultTheme()),
     layout_template: 'compact',
   })
@@ -588,6 +593,7 @@ export default function CRMCapturePages() {
       meeting_duration_minutes: 30,
       fields: assignFieldsToSections(makeDefaultFields(), makeDefaultSections()),
       sections: makeDefaultSections(),
+      blocks: [],
       theme: makeDefaultTheme(),
       layout_template: 'compact',
     })
@@ -620,6 +626,7 @@ export default function CRMCapturePages() {
           : 30,
       fields: assignFieldsToSections(normalizeFields(page.fields), normalizeSections(page.sections)),
       sections: normalizeSections(page.sections),
+      blocks: Array.isArray(page.blocks) ? page.blocks : [],
       theme: normalizeTheme(page.theme),
       layout_template: (page.layout_template ?? 'compact') as LayoutTemplate,
     })
@@ -866,6 +873,7 @@ export default function CRMCapturePages() {
             meeting_duration_minutes: form.meeting_duration_minutes || 30,
             fields: cleanFieldsForSave(form.fields),
             sections: form.sections,
+            blocks: form.blocks ?? [],
             theme: form.theme,
             layout_template: form.layout_template,
           })
@@ -933,6 +941,7 @@ export default function CRMCapturePages() {
           meeting_duration_minutes: form.meeting_duration_minutes || 30,
           fields: cleanFieldsForSave(form.fields),
           sections: form.sections,
+          blocks: form.blocks ?? [],
           theme: form.theme,
           layout_template: form.layout_template,
         })
@@ -1677,7 +1686,18 @@ function CaptureSkeleton() {
                           <button
                             key={t.key}
                             type="button"
-                            onClick={() => setForm((prev) => ({ ...prev, layout_template: t.key }))}
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                layout_template: t.key,
+                                // Seed the landing builder the first time it's
+                                // chosen so it's never an empty page.
+                                blocks:
+                                  t.key === 'landing' && (prev.blocks?.length ?? 0) === 0
+                                    ? defaultLandingBlocks(prev.headline, prev.description)
+                                    : prev.blocks ?? [],
+                              }))
+                            }
                             className={`text-left rounded-lg border p-2.5 transition-colors ${
                               active
                                 ? 'border-[#2B79F7] bg-[#2B79F7]/5'
@@ -1735,96 +1755,6 @@ function CaptureSkeleton() {
                     placeholder="Short description that appears on the page..."
                   />
                 </div>
-
-                {/* Lead magnet: an external link OR an uploaded PDF/doc.
-                    Switching type clears the value so the two never mix. The
-                    uploaded file's public URL is stored in lead_magnet_url
-                    just like a link; lead_magnet_type tells the public page
-                    and the delivery email how to treat it. */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-                    Lead magnet (optional)
-                  </label>
-                  <div className="inline-flex rounded-lg border border-[var(--border-primary)] p-0.5 mb-2">
-                    {(['url', 'file'] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() =>
-                          setForm((prev) =>
-                            prev.lead_magnet_type === t
-                              ? prev
-                              : { ...prev, lead_magnet_type: t, lead_magnet_url: '' },
-                          )
-                        }
-                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                          form.lead_magnet_type === t
-                            ? 'bg-[#2B79F7] text-white'
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                        }`}
-                      >
-                        {t === 'url' ? 'Link' : 'Upload file'}
-                      </button>
-                    ))}
-                  </div>
-
-                  {form.lead_magnet_type === 'url' ? (
-                    <Input
-                      name="lead_magnet_url"
-                      value={form.lead_magnet_url}
-                      onChange={handleFormChange}
-                      placeholder="https://example.com/your-pdf-or-video"
-                    />
-                  ) : form.lead_magnet_url ? (
-                    <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                      <FileText className="h-4 w-4 text-[#2B79F7] shrink-0" />
-                      <span className="text-sm text-[var(--text-primary)] flex-1 truncate">
-                        {decodeURIComponent(form.lead_magnet_url.split('/').pop() || 'Uploaded file').replace(
-                          /^\d+-/,
-                          '',
-                        )}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, lead_magnet_url: '' }))}
-                        className="text-xs text-red-500 hover:underline shrink-0"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <FileUpload
-                      folder="capture-pages/lead-magnets"
-                      accept=".pdf,.doc,.docx,.ppt,.pptx,.key,.pages,.epub,.zip"
-                      label="Upload a PDF or document"
-                      onUpload={(url) => setForm((prev) => ({ ...prev, lead_magnet_url: url }))}
-                    />
-                  )}
-                </div>
-
-                {/* CTA label after the visitor submits successfully.
-                    Only shows when a lead-magnet URL is set (the
-                    button itself is conditional on URL presence).
-                    Empty falls back to the legacy default at render. */}
-                {form.lead_magnet_url && (
-                  <Input
-                    label="Success button text"
-                    name="success_button_text"
-                    value={form.success_button_text}
-                    onChange={handleFormChange}
-                    placeholder="Access Your Free Resource"
-                  />
-                )}
-
-                {/* Custom success-state confirmation message. Empty
-                    falls back to "You're in! Let's Keep Going.". */}
-                <Input
-                  label="Success message"
-                  name="success_message"
-                  value={form.success_message}
-                  onChange={handleFormChange}
-                  placeholder="You're in! Let's Keep Going."
-                />
 
                 {/* Accent color drives every accented element on the public
                     page: Next/Submit + success buttons, and the package picker
@@ -1926,6 +1856,25 @@ function CaptureSkeleton() {
                   </div>
                 </div>
 
+                {/* Landing-page block builder. Only the 'landing' layout
+                    composes the page from drag-ordered content blocks; other
+                    layouts use the fixed headline/description + form. */}
+                {form.layout_template === 'landing' && (
+                  <div className="border-t border-[var(--border-primary)] pt-5">
+                    <div className="flex items-center gap-2 mb-1 text-[var(--text-primary)] font-semibold">
+                      <LayoutPanelTop className="h-4 w-4 text-[#2B79F7]" />
+                      Page elements
+                    </div>
+                    <p className="text-xs text-[var(--text-tertiary)] mb-3">
+                      Drag to reorder. Click an element to edit it. The lead form is always included.
+                    </p>
+                    <CaptureBlocksEditor
+                      blocks={form.blocks ?? []}
+                      onChange={(blocks) => setForm((prev) => ({ ...prev, blocks }))}
+                    />
+                  </div>
+                )}
+
                 {/* Colors / theme. Picker controls the PAGE background.
                     Card surface stays the app palette so submit/fields
                     stay readable across themes. */}
@@ -1944,6 +1893,97 @@ function CaptureSkeleton() {
                     <ListChecks className="h-4 w-4 text-[#2B79F7]" />
                     <span className="text-sm font-semibold text-[var(--text-primary)]">Form fields</span>
                   </div>
+
+                {/* Lead magnet + post-submit message live with form building. */}
+                {/* Lead magnet: an external link OR an uploaded PDF/doc.
+                    Switching type clears the value so the two never mix. The
+                    uploaded file's public URL is stored in lead_magnet_url
+                    just like a link; lead_magnet_type tells the public page
+                    and the delivery email how to treat it. */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                    Lead magnet (optional)
+                  </label>
+                  <div className="inline-flex rounded-lg border border-[var(--border-primary)] p-0.5 mb-2">
+                    {(['url', 'file'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) =>
+                            prev.lead_magnet_type === t
+                              ? prev
+                              : { ...prev, lead_magnet_type: t, lead_magnet_url: '' },
+                          )
+                        }
+                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                          form.lead_magnet_type === t
+                            ? 'bg-[#2B79F7] text-white'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                        }`}
+                      >
+                        {t === 'url' ? 'Link' : 'Upload file'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {form.lead_magnet_type === 'url' ? (
+                    <Input
+                      name="lead_magnet_url"
+                      value={form.lead_magnet_url}
+                      onChange={handleFormChange}
+                      placeholder="https://example.com/your-pdf-or-video"
+                    />
+                  ) : form.lead_magnet_url ? (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                      <FileText className="h-4 w-4 text-[#2B79F7] shrink-0" />
+                      <span className="text-sm text-[var(--text-primary)] flex-1 truncate">
+                        {decodeURIComponent(form.lead_magnet_url.split('/').pop() || 'Uploaded file').replace(
+                          /^\d+-/,
+                          '',
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, lead_magnet_url: '' }))}
+                        className="text-xs text-red-500 hover:underline shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <FileUpload
+                      folder="capture-pages/lead-magnets"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.key,.pages,.epub,.zip"
+                      label="Upload a PDF or document"
+                      onUpload={(url) => setForm((prev) => ({ ...prev, lead_magnet_url: url }))}
+                    />
+                  )}
+                </div>
+
+                {/* CTA label after the visitor submits successfully.
+                    Only shows when a lead-magnet URL is set (the
+                    button itself is conditional on URL presence).
+                    Empty falls back to the legacy default at render. */}
+                {form.lead_magnet_url && (
+                  <Input
+                    label="Success button text"
+                    name="success_button_text"
+                    value={form.success_button_text}
+                    onChange={handleFormChange}
+                    placeholder="Access Your Free Resource"
+                  />
+                )}
+
+                {/* Custom success-state confirmation message. Empty
+                    falls back to "You're in! Let's Keep Going.". */}
+                <Input
+                  label="Success message"
+                  name="success_message"
+                  value={form.success_message}
+                  onChange={handleFormChange}
+                  placeholder="You're in! Let's Keep Going."
+                />
 
                   {form.sections.length > 1 && (
                     <p className="text-xs text-[var(--text-tertiary)]">

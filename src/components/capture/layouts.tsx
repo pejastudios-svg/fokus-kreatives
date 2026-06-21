@@ -20,6 +20,7 @@
 
 import { Card, CardContent } from '@/components/ui/Card'
 import { CaptureFormBody } from './CaptureFormBody'
+import { CaptureBlocks } from './CaptureBlocks'
 import type {
   CapturePageInfo,
   CaptureFormBag,
@@ -341,6 +342,37 @@ function MinimalLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: Captur
 }
 
 // ---------------------------------------------------------------------------
+// LANDING - full-bleed marketing page. No card chrome; the page is composed
+// of drag-ordered content blocks (heading, text, buttons, media, cards) with
+// the lead form as one of the blocks. Falls back to headline/description +
+// form when the page has no blocks yet.
+// ---------------------------------------------------------------------------
+
+function LandingLayout({ pageInfo, form, bgStyle, cardStyle, fontClass }: CaptureLayoutProps) {
+  const accent = (pageInfo.accent_color && pageInfo.accent_color.trim()) || '#2B79F7'
+  // Full-bleed: content spans the whole width (edge to edge) rather than a
+  // centered column. Light page padding keeps text off the very edge; rows
+  // with a section background and the testimonials carousel run wall to wall.
+  return (
+    <div className={`min-h-screen ${fontClass}`} style={bgStyle}>
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-12 sm:py-20">
+        {pageInfo.logo_url && (
+          <div className="mb-8 flex justify-center">
+            <div className="h-14 w-14 rounded-full overflow-hidden ring-1 ring-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+              <img src={pageInfo.logo_url} alt={pageInfo.name || 'Logo'} className="h-full w-full object-cover" />
+            </div>
+          </div>
+        )}
+        <CaptureBlocks pageInfo={pageInfo} form={form} cardStyle={cardStyle} accent={accent} />
+        <p className="mt-10 text-xs text-[var(--capture-footer)] opacity-70 text-center">
+          Powered by Fokus Kreativez
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -357,6 +389,8 @@ export function CaptureLayout(props: CaptureLayoutProps) {
       return <BannerTopLayout {...props} />
     case 'minimal':
       return <MinimalLayout {...props} />
+    case 'landing':
+      return <LandingLayout {...props} />
     case 'compact':
     default:
       return <CompactLayout {...props} />
@@ -421,6 +455,14 @@ export const LAYOUT_TEMPLATES: Array<{
     key: 'minimal',
     label: 'Minimal',
     description: 'No image. Big typography + form.',
+    bannerAspect: 'N/A',
+    bannerSize: 'Not used',
+    usesBanner: false,
+  },
+  {
+    key: 'landing',
+    label: 'Landing page',
+    description: 'Full-width page you build from blocks.',
     bannerAspect: 'N/A',
     bannerSize: 'Not used',
     usesBanner: false,

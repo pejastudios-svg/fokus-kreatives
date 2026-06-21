@@ -13,6 +13,7 @@ import { isColorDark, relativeLuminance, buildCaptureThemeVars } from './colorUt
 import type {
   CaptureField,
   CaptureSection,
+  CaptureBlock,
   CapturePageInfo,
   CaptureFormBag,
   CaptureTheme,
@@ -36,6 +37,7 @@ interface FormShape {
   accent_color?: string
   fields: CaptureField[]
   sections?: CaptureSection[]
+  blocks?: CaptureBlock[]
   theme: CaptureTheme
   layout_template: LayoutTemplate
 }
@@ -66,6 +68,7 @@ export function CapturePagePreview({ form }: Props) {
     accent_color: form.accent_color || null,
     fields: form.fields,
     sections: form.sections || null,
+    blocks: form.blocks || null,
     theme: form.theme,
     layout_template: form.layout_template,
   }

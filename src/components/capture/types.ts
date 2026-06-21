@@ -93,6 +93,98 @@ export type LayoutTemplate =
   | 'hero-overlay'
   | 'banner-top'
   | 'minimal'
+  | 'landing'
+
+/** Content elements for the 'landing' layout's drag-and-drop builder. A
+ *  capture page stores an ordered array of these in `blocks`; the public
+ *  Landing layout renders them top to bottom. One block of type 'form'
+ *  renders the actual lead form (fields + meeting + submit). Props are kept
+ *  flat (all optional) so the editor can mutate any block in place. */
+export type CaptureBlockType =
+  | 'heading'
+  | 'text'
+  | 'button'
+  | 'image'
+  | 'embed'
+  | 'divider'
+  | 'spacer'
+  | 'logos'
+  | 'card'
+  | 'form'
+  | 'row'
+  | 'testimonials'
+  | 'gallery'
+
+export type BlockAlign = 'left' | 'center' | 'right'
+
+/** One quote in a testimonials carousel. When `imageUrl` is set the card shows
+ *  that image (e.g. a screenshot of a review) instead of the quote + profile. */
+export interface TestimonialItem {
+  quote: string
+  name: string
+  subtitle?: string
+  avatarUrl?: string
+  imageUrl?: string
+}
+
+/** One column inside a 'row' block. Holds its own stacked leaf blocks
+ *  (text, image, form, embed, button, etc.) so elements sit side by side. */
+export interface CaptureColumn {
+  id: string
+  blocks: CaptureBlock[]
+}
+
+export interface CaptureBlock {
+  id: string
+  type: CaptureBlockType
+  align?: BlockAlign
+  /** Optional font override (a CSS font-family stack from DOC_FONTS; empty =
+   *  inherit the page font). */
+  font?: string
+  /** heading / text body. */
+  content?: string
+  /** heading size. */
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  /** button: label + link; variant shared with card's button. */
+  label?: string
+  url?: string
+  variant?: 'solid' | 'outline'
+  /** image. */
+  alt?: string
+  maxWidth?: number
+  rounded?: boolean
+  /** embed caption (video/iframe). */
+  title?: string
+  /** spacer height. */
+  space?: 'sm' | 'md' | 'lg'
+  /** logos / trust row. */
+  logos?: { url: string }[]
+  caption?: string
+  /** card / panel: a styled container holding copy, an image and a CTA. */
+  heading?: string
+  text?: string
+  imageUrl?: string
+  /** card image display: 'natural' keeps the real aspect; 'banner' crops to a
+   *  wide banner strip. */
+  imageMode?: 'natural' | 'banner'
+  buttonLabel?: string
+  buttonUrl?: string
+  cardVariant?: 'soft' | 'bordered' | 'elevated'
+  /** row: side-by-side columns of blocks, with an optional section
+   *  background colour and vertical alignment. 1-3 columns; stacks on
+   *  mobile. */
+  columns?: CaptureColumn[]
+  bgColor?: string
+  vAlign?: 'top' | 'center'
+  /** row: draw a thin vertical divider between columns (desktop). */
+  vDividers?: boolean
+  /** testimonials: the quotes shown in the auto-sliding carousel. */
+  testimonials?: TestimonialItem[]
+  /** gallery (and card): a row of images (up to 5) at natural aspect. */
+  gallery?: { url: string }[]
+  /** card: embedded videos / links (up to 2) shown side by side. */
+  embeds?: { url: string; title?: string }[]
+}
 
 export interface CapturePageInfo {
   /** Capture page slug. Threaded into the renderer so the inline
@@ -131,6 +223,10 @@ export interface CapturePageInfo {
   /** Ordered multi-step sections. Empty / null = single-page form (legacy
    *  behaviour - every field on one page). */
   sections?: CaptureSection[] | null
+  /** Landing-layout content blocks (ordered). Empty/null on non-landing
+   *  pages; the Landing layout falls back to headline/description + form
+   *  when this is empty. */
+  blocks?: CaptureBlock[] | null
   theme?: CaptureTheme | null
   layout_template?: LayoutTemplate | null
 }

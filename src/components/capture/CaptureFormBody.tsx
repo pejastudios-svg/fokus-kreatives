@@ -30,7 +30,7 @@ const MAX_REPEAT_ENTRIES = 5
 // native video, a provider embed (YouTube / Vimeo / Loom / Drive / etc.),
 // or - when the source can't be framed - a plain link. Unknown URLs fall
 // back to a bare iframe so "any link" still has a chance of embedding.
-function detectEmbed(raw?: string) {
+export function detectEmbed(raw?: string) {
   const url = (raw || '').trim()
   if (!url) return { kind: 'none' as const, src: '' }
 

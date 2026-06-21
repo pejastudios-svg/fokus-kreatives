@@ -123,6 +123,7 @@ export default function PublicCapturePage() {
             accent_color: page.accent_color || null,
             fields: page.fields || null,
             sections: (page.sections as CapturePageInfo['sections']) || null,
+            blocks: (page.blocks as CapturePageInfo['blocks']) || null,
             layout_template: (page.layout_template ?? 'compact') as LayoutTemplate,
             theme: (() => {
               const t = page.theme

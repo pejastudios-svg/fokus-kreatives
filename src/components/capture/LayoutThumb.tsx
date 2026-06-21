@@ -88,5 +88,17 @@ export function LayoutThumb({ kind, active }: Props) {
           </div>
         </div>
       )
+    case 'landing':
+      return (
+        <div className={box}>
+          <div className="absolute inset-x-2 top-1.5 bottom-1.5 flex flex-col gap-0.5">
+            <div className={`h-1.5 rounded ${accent} w-2/3 mx-auto`} />
+            <div className={`h-0.5 rounded ${muted} w-1/2 mx-auto`} />
+            <div className={`mt-0.5 h-1.5 rounded ${accent} w-1/3 mx-auto`} />
+            <div className={`mt-1 h-2 rounded ${muted} w-full`} />
+            <div className={`mt-auto h-2.5 rounded bg-[var(--bg-card)] border border-[var(--border-primary)] w-full`} />
+          </div>
+        </div>
+      )
   }
 }
