@@ -19,6 +19,7 @@ import { DatePicker } from '@/components/ui/DatePicker'
 import { TimePicker } from '@/components/ui/TimePicker'
 import { AvailabilitySlotPicker } from './AvailabilitySlotPicker'
 import { CalendlyInlineWidget } from './CalendlyInlineWidget'
+import { CaptureVideoPlayer } from './CaptureVideoPlayer'
 import type { CaptureField, CaptureSection, CapturePageInfo, CaptureFormBag } from './types'
 
 // Field types that can carry multiple visitor entries when `repeatable`.
@@ -38,11 +39,13 @@ export function detectEmbed(raw?: string) {
   if (/\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i.test(url)) return { kind: 'image' as const, src: url }
   if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) return { kind: 'video' as const, src: url }
 
-  if (url.includes('drive.google.com')) {
-    const m1 = url.match(/\/file\/d\/([^/]+)/)
-    if (m1?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m1[1]}/preview` }
-    const m2 = url.match(/[?&]id=([^&]+)/)
-    if (m2?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m2[1]}/preview` }
+  if (url.includes('drive.google.com') || url.includes('drive.usercontent.google.com')) {
+    // Stream the raw file into our own player instead of Google's /preview
+    // iframe, whose mobile player stacks several control sets over the video.
+    // The usercontent download host serves the bytes with range support so a
+    // <video> can play + seek inline (file must be shared "Anyone with link").
+    const id = url.match(/\/file\/d\/([^/]+)/)?.[1] || url.match(/[?&]id=([^&]+)/)?.[1]
+    if (id) return { kind: 'video' as const, src: `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t` }
   }
   if (url.includes('youtube.com/watch')) {
     const m = url.match(/[?&]v=([^&]+)/)
@@ -285,17 +288,7 @@ export function CaptureFormBody({
           </div>
         )
       } else if (embed.kind === 'video') {
-        media = (
-          <div className="rounded-lg overflow-hidden flex justify-center bg-black">
-            <video
-              src={embed.src}
-              controls
-              playsInline
-              preload="metadata"
-              className="max-h-[70vh] max-w-full"
-            />
-          </div>
-        )
+        media = <CaptureVideoPlayer src={embed.src} />
       } else if (embed.kind === 'link') {
         media = (
           <div className="rounded-lg border border-[var(--border-primary)] p-4 bg-[var(--bg-tertiary)]">

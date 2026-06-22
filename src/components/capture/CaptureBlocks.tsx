@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Quote } from 'lucide-react'
 import { CaptureFormBody, detectEmbed } from './CaptureFormBody'
+import { CaptureVideoPlayer } from './CaptureVideoPlayer'
 import { buildCaptureThemeVars } from './colorUtils'
 import { DOC_FONTS_URL } from '@/components/agreements/docStyles'
 import type { CaptureBlock, CapturePageInfo, CaptureFormBag, BlockAlign, TestimonialItem } from './types'
@@ -207,20 +208,8 @@ function EmbedBlock({ url, title, aspect }: { url: string; title?: string; aspec
   if (embed.kind === 'image') {
     media = <img src={embed.src} alt={title || ''} className="w-full h-auto rounded-xl" />
   } else if (embed.kind === 'video') {
-    // Cap the video by height and centre it so a portrait clip doesn't blow
-    // up full-width on mobile (which made iOS render oversized controls).
-    // playsInline keeps it in the page instead of forcing fullscreen.
-    media = (
-      <div className="flex justify-center">
-        <video
-          src={embed.src}
-          controls
-          playsInline
-          preload="metadata"
-          className="max-h-[70vh] max-w-full rounded-xl bg-black"
-        />
-      </div>
-    )
+    // Custom player (not iOS's scattered native controls), centred and capped.
+    media = <CaptureVideoPlayer src={embed.src} />
   } else if (embed.kind === 'link') {
     media = (
       <a href={embed.src} target="_blank" rel="noopener noreferrer" className="text-sm underline break-all" style={{ color: '#2B79F7' }}>
