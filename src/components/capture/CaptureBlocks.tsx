@@ -196,9 +196,13 @@ function Button({ label, url, accent, variant }: { label: string; url: string; a
   )
 }
 
-function EmbedBlock({ url, title }: { url: string; title?: string }) {
+function EmbedBlock({ url, title, aspect }: { url: string; title?: string; aspect?: '16/9' | '9/16' | '1/1' }) {
   const embed = detectEmbed(url)
   if (embed.kind === 'none') return null
+  const ar = aspect === '9/16' ? '9 / 16' : aspect === '1/1' ? '1 / 1' : '16 / 9'
+  // Cap the frame by height (70vh) and derive the matching max width so a
+  // portrait frame stays narrow + centered instead of full-bleed.
+  const maxW = aspect === '9/16' ? 'calc(70vh * 9 / 16)' : aspect === '1/1' ? '70vh' : 'calc(70vh * 16 / 9)'
   let media: React.ReactNode
   if (embed.kind === 'image') {
     media = <img src={embed.src} alt={title || ''} className="w-full h-auto rounded-xl" />
@@ -224,12 +228,12 @@ function EmbedBlock({ url, title }: { url: string; title?: string }) {
       </a>
     )
   } else {
-    // Responsive 16:9 frame (capped on tall screens) instead of a fixed
-    // height, so it scales cleanly down to mobile widths.
+    // Responsive frame in the chosen orientation (capped on tall screens)
+    // instead of a fixed height, so it scales cleanly down to mobile widths.
     media = (
       <div
         className="relative w-full overflow-hidden rounded-xl border border-[var(--border-primary)] mx-auto"
-        style={{ aspectRatio: '16 / 9', maxHeight: '70vh', maxWidth: 'calc(70vh * 16 / 9)' }}
+        style={{ aspectRatio: ar, maxHeight: '70vh', maxWidth: maxW }}
       >
         <iframe
           src={embed.src}
@@ -291,7 +295,7 @@ function renderBlock(b: CaptureBlock, ctx: RenderCtx): React.ReactNode {
       )
 
     case 'embed':
-      return <EmbedBlock key={b.id} url={b.url || ''} title={b.title} />
+      return <EmbedBlock key={b.id} url={b.url || ''} title={b.title} aspect={b.embedAspect} />
 
     case 'divider':
       return <hr key={b.id} className="border-t border-[var(--border-primary)]" />
@@ -349,7 +353,7 @@ function renderBlock(b: CaptureBlock, ctx: RenderCtx): React.ReactNode {
             return (
               <div className={`mt-4 grid gap-3 ${eds.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                 {eds.map((e, i) => (
-                  <EmbedBlock key={i} url={e.url} title={e.title} />
+                  <EmbedBlock key={i} url={e.url} title={e.title} aspect={e.aspect} />
                 ))}
               </div>
             )

@@ -209,6 +209,11 @@ const SIZE_OPTS_TEXT: { v: NonNullable<CaptureBlock['size']>; label: string }[] 
   { v: 'md', label: 'M' },
   { v: 'lg', label: 'L' },
 ]
+const ASPECT_OPTS: { v: '16/9' | '9/16' | '1/1'; label: string }[] = [
+  { v: '16/9', label: 'Landscape' },
+  { v: '9/16', label: 'Portrait' },
+  { v: '1/1', label: 'Square' },
+]
 // Font dropdown reusing the agreements editor's curated Google-font list.
 function FontSelect({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
   return (
@@ -354,6 +359,10 @@ function BlockEditor({ block, onChange }: { block: CaptureBlock; onChange: (patc
         <div className="space-y-2">
           <input className={INPUT} value={b.url || ''} onChange={(e) => onChange({ url: e.target.value })} placeholder="YouTube, Loom, Vimeo, Drive, or image URL" />
           <input className={INPUT} value={b.title || ''} onChange={(e) => onChange({ title: e.target.value })} placeholder="Caption (optional)" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--text-tertiary)]">Shape</span>
+            <SegPicker value={b.embedAspect || '16/9'} options={ASPECT_OPTS} onChange={(v) => onChange({ embedAspect: v })} />
+          </div>
         </div>
       )
     case 'card':
@@ -399,17 +408,20 @@ function BlockEditor({ block, onChange }: { block: CaptureBlock; onChange: (patc
           })()}
           {(() => {
             const eds = b.embeds || []
-            const setEd = (i: number, p: Partial<{ url: string; title?: string }>) =>
+            const setEd = (i: number, p: Partial<{ url: string; title?: string; aspect?: '16/9' | '9/16' | '1/1' }>) =>
               onChange({ embeds: eds.map((e, j) => (j === i ? { ...e, ...p } : e)) })
             return (
               <div className="space-y-1.5">
                 <span className="text-xs text-[var(--text-tertiary)]">Videos / embeds (up to 2)</span>
                 {eds.map((e, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input className={INPUT} value={e.url} onChange={(ev) => setEd(i, { url: ev.target.value })} placeholder="YouTube, Loom, Vimeo, or link" />
-                    <button type="button" onClick={() => onChange({ embeds: eds.filter((_, j) => j !== i) })} className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-red-500 shrink-0">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <div key={i} className="space-y-1.5 rounded-lg border border-[var(--border-primary)] p-2">
+                    <div className="flex gap-2">
+                      <input className={INPUT} value={e.url} onChange={(ev) => setEd(i, { url: ev.target.value })} placeholder="YouTube, Loom, Vimeo, or link" />
+                      <button type="button" onClick={() => onChange({ embeds: eds.filter((_, j) => j !== i) })} className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-red-500 shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <SegPicker value={e.aspect || '16/9'} options={ASPECT_OPTS} onChange={(v) => setEd(i, { aspect: v })} />
                   </div>
                 ))}
                 {eds.length < 2 && (

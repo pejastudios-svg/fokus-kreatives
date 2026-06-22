@@ -155,6 +155,8 @@ export interface CaptureBlock {
   rounded?: boolean
   /** embed caption (video/iframe). */
   title?: string
+  /** embed frame orientation (iframes can't self-size). Default landscape. */
+  embedAspect?: '16/9' | '9/16' | '1/1'
   /** spacer height. */
   space?: 'sm' | 'md' | 'lg'
   /** logos / trust row. */
@@ -183,7 +185,7 @@ export interface CaptureBlock {
   /** gallery (and card): a row of images (up to 5) at natural aspect. */
   gallery?: { url: string }[]
   /** card: embedded videos / links (up to 2) shown side by side. */
-  embeds?: { url: string; title?: string }[]
+  embeds?: { url: string; title?: string; aspect?: '16/9' | '9/16' | '1/1' }[]
 }
 
 export interface CapturePageInfo {
