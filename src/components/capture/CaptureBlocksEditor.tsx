@@ -32,10 +32,12 @@ import {
   FormInput,
   Quote,
   GalleryHorizontal,
+  X,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { DOC_FONTS, DOC_FONTS_URL } from '@/components/agreements/docStyles'
 import { uploadFileDirect } from '@/lib/capture/uploadDirect'
+import { uploadToCloudinary, fileKind, type CloudinaryAsset } from '@/lib/cloudinary'
 import type { CaptureBlock, CaptureColumn, CaptureBlockType, BlockAlign, TestimonialItem } from './types'
 
 const uid = () => `blk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -234,7 +236,48 @@ function FontSelect({ value, onChange }: { value?: string; onChange: (v: string)
   )
 }
 
-function UploadButton({
+// Cloudinary stores a video in its uploaded format (an iPhone .mov stays
+// .mov, which Android Chrome can't decode). Forcing the delivery extension to
+// .mp4 makes Cloudinary transcode to H.264 mp4 on first request, so it plays
+// on every device - and the .mp4 URL is what detectEmbed routes to the clean
+// player.
+function cloudinaryDeliveryUrl(asset: CloudinaryAsset): string {
+  if (asset.resource_type !== 'video') return asset.secure_url
+  const marker = '/upload/'
+  const i = asset.secure_url.indexOf(marker)
+  if (i === -1) return asset.secure_url
+  const prefix = asset.secure_url.slice(0, i + marker.length)
+  // Force mp4 extension + let Cloudinary auto-pick format/quality, so the clip
+  // plays on every browser (an iPhone .mov gets served as H.264 mp4).
+  const rest = asset.secure_url.slice(i + marker.length).replace(new RegExp(`\\.${asset.format}$`, 'i'), '.mp4')
+  return `${prefix}f_auto,q_auto/${rest}`
+}
+
+const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1)
+
+// Small circular progress ring with the percentage in the middle.
+function ProgressRing({ pct }: { pct: number }) {
+  const r = 9
+  const c = 2 * Math.PI * r
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" className="shrink-0 -rotate-90">
+      <circle cx="12" cy="12" r={r} fill="none" stroke="var(--border-primary)" strokeWidth="3" />
+      <circle
+        cx="12"
+        cy="12"
+        r={r}
+        fill="none"
+        stroke="#2B79F7"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - pct / 100)}
+      />
+    </svg>
+  )
+}
+
+export function UploadButton({
   folder,
   onUrl,
   accept = 'image/*',
@@ -248,35 +291,85 @@ function UploadButton({
   const ref = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [pct, setPct] = useState<number | null>(null)
+  const [size, setSize] = useState(0)
+  const abortRef = useRef<AbortController | null>(null)
+
   const handle = async (file: File | null) => {
     if (!file) return
     setErr(null)
     setBusy(true)
+    setSize(file.size)
     try {
-      // Direct-to-storage upload so large videos aren't capped by the
-      // serverless body limit.
-      const url = await uploadFileDirect(file, folder)
-      onUrl(url)
+      if (fileKind(file) === 'video') {
+        // Videos go to Cloudinary: chunked upload (no serverless body cap),
+        // live progress, and mp4 transcoding so they play everywhere.
+        setPct(0)
+        const ctrl = new AbortController()
+        abortRef.current = ctrl
+        const asset = await uploadToCloudinary(file, { folder, onProgress: setPct, signal: ctrl.signal })
+        onUrl(cloudinaryDeliveryUrl(asset))
+      } else {
+        // Images stay on Supabase direct-upload (small, no transcoding needed).
+        const url = await uploadFileDirect(file, folder)
+        onUrl(url)
+      }
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Upload failed')
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        setErr(e instanceof Error ? e.message : 'Upload failed')
+      }
     } finally {
       setBusy(false)
+      setPct(null)
+      abortRef.current = null
     }
   }
+
+  // Uploading a video: show the progress ring + MB + % and a cancel button.
+  if (busy && pct !== null) {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-primary)] px-3 py-1.5 shrink-0">
+        <ProgressRing pct={pct} />
+        <div className="leading-tight">
+          <div className="text-xs font-medium text-[var(--text-primary)] tabular-nums">{pct}%</div>
+          <div className="text-[10px] text-[var(--text-tertiary)] tabular-nums">{mb(size * (pct / 100))} / {mb(size)} MB</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => abortRef.current?.abort()}
+          title="Cancel upload"
+          className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-red-500"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <>
+    <div className="relative shrink-0">
       <input ref={ref} type="file" accept={accept} className="hidden" onChange={(e) => handle(e.target.files?.[0] ?? null)} />
       <button
         type="button"
         onClick={() => ref.current?.click()}
         disabled={busy}
-        title={err || undefined}
-        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 shrink-0"
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
         {label}
       </button>
-    </>
+      {/* Error floats below the button (absolute) so a long message never
+          stretches or reflows the row it sits in. Click to dismiss. */}
+      {err && (
+        <button
+          type="button"
+          onClick={() => setErr(null)}
+          className="absolute right-0 top-full z-20 mt-1 w-60 rounded-md border border-red-300 bg-white p-2 text-left text-[11px] leading-snug text-red-600 shadow-lg"
+        >
+          {err}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -372,7 +465,11 @@ function BlockEditor({ block, onChange }: { block: CaptureBlock; onChange: (patc
     case 'embed':
       return (
         <div className="space-y-2">
-          <input className={INPUT} value={b.url || ''} onChange={(e) => onChange({ url: e.target.value })} placeholder="YouTube, Loom, Vimeo, Drive, or image URL" />
+          <div className="flex gap-2">
+            <input className={INPUT} value={b.url || ''} onChange={(e) => onChange({ url: e.target.value })} placeholder="Paste a link, or upload a video" />
+            <UploadButton folder="capture-pages/videos" accept="video/*,image/*" label="Upload" onUrl={(url) => onChange({ url })} />
+          </div>
+          <p className="text-[11px] text-[var(--text-tertiary)] leading-snug">Upload a video for the clean player. Or paste a YouTube / Loom / Vimeo / Drive link (Drive links use Google&apos;s own controls).</p>
           <input className={INPUT} value={b.title || ''} onChange={(e) => onChange({ title: e.target.value })} placeholder="Caption (optional)" />
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-[var(--text-tertiary)]">Shape</span>

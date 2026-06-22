@@ -5,8 +5,8 @@
 // video and looks scattered). One tidy bar: play, time, scrubber, mute,
 // fullscreen. Plays inline on mobile.
 
-import { useRef, useState } from 'react'
-import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react'
 
 export function CaptureVideoPlayer({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null)
@@ -15,6 +15,16 @@ export function CaptureVideoPlayer({ src }: { src: string }) {
   const [muted, setMuted] = useState(false)
   const [cur, setCur] = useState(0)
   const [dur, setDur] = useState(0)
+  const [fs, setFs] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  // Track fullscreen so we can center + fill the video instead of leaving it
+  // capped at 70vh in the top-left corner of a black screen.
+  useEffect(() => {
+    const onFs = () => setFs(document.fullscreenElement === wrapRef.current)
+    document.addEventListener('fullscreenchange', onFs)
+    return () => document.removeEventListener('fullscreenchange', onFs)
+  }, [])
 
   const fmt = (s: number) => {
     if (!isFinite(s) || s < 0) return '0:00'
@@ -42,6 +52,16 @@ export function CaptureVideoPlayer({ src }: { src: string }) {
     setMuted(v.muted)
   }
   const fullscreen = () => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element
+      webkitExitFullscreen?: () => void
+    }
+    // Already fullscreen → minimize back out.
+    if (document.fullscreenElement || doc.webkitFullscreenElement) {
+      if (document.exitFullscreen) void document.exitFullscreen()
+      else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen()
+      return
+    }
     const el = wrapRef.current
     const vid = ref.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null
     if (el?.requestFullscreen) void el.requestFullscreen()
@@ -49,19 +69,33 @@ export function CaptureVideoPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div ref={wrapRef} className="relative mx-auto w-fit max-w-full overflow-hidden rounded-xl bg-black">
+    <div
+      ref={wrapRef}
+      data-preview-interactive
+      className={`relative mx-auto max-w-full overflow-hidden bg-black ${
+        fs ? 'flex h-full w-full items-center justify-center rounded-none' : 'w-fit rounded-xl'
+      }`}
+    >
       <video
         ref={ref}
         src={src}
         playsInline
         preload="metadata"
-        className="block max-h-[70vh] max-w-full"
+        className={`block max-w-full object-contain ${fs ? 'h-full max-h-full' : 'max-h-[70vh]'}`}
         onClick={toggle}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onTimeUpdate={() => setCur(ref.current?.currentTime ?? 0)}
         onLoadedMetadata={() => setDur(ref.current?.duration ?? 0)}
+        onError={() => setFailed(true)}
+        onLoadStart={() => setFailed(false)}
       />
+      {failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-4 text-center text-sm text-white">
+          <p>This video couldn&apos;t load.</p>
+          <a href={src} target="_blank" rel="noopener noreferrer" className="underline opacity-80">Open in new tab</a>
+        </div>
+      )}
       {!playing && (
         <button type="button" onClick={toggle} aria-label="Play" className="absolute inset-0 flex items-center justify-center">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55">
@@ -81,8 +115,8 @@ export function CaptureVideoPlayer({ src }: { src: string }) {
         <button type="button" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="shrink-0">
           {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>
-        <button type="button" onClick={fullscreen} aria-label="Fullscreen" className="shrink-0">
-          <Maximize className="h-4 w-4" />
+        <button type="button" onClick={fullscreen} aria-label={fs ? 'Minimize' : 'Fullscreen'} className="shrink-0">
+          {fs ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </button>
       </div>
     </div>

@@ -10,6 +10,7 @@
 // overwhelming the picker.
 
 import { useRef, useState } from 'react'
+import { UploadButton } from './CaptureBlocksEditor'
 import {
   Type,
   ChevronDown,
@@ -345,22 +346,33 @@ export function CaptureFieldRow({
           )}
 
           {field.type === 'embed' && (
-            <div className="grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-3">
-              <Input
-                label="Embed URL"
-                value={field.embedUrl || ''}
-                onChange={(e) => onUpdate(field.id, { embedUrl: e.target.value })}
-                placeholder="https://..."
-              />
-              <Input
-                label="Height (px)"
-                type="number"
-                value={String(field.embedHeight || 520)}
-                onChange={(e) =>
-                  onUpdate(field.id, { embedHeight: Number(e.target.value) || 520 })
-                }
-                placeholder="520"
-              />
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-3">
+                <Input
+                  label="Embed URL"
+                  value={field.embedUrl || ''}
+                  onChange={(e) => onUpdate(field.id, { embedUrl: e.target.value })}
+                  placeholder="https://..."
+                />
+                <Input
+                  label="Height (px)"
+                  type="number"
+                  value={String(field.embedHeight || 520)}
+                  onChange={(e) =>
+                    onUpdate(field.id, { embedHeight: Number(e.target.value) || 520 })
+                  }
+                  placeholder="520"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <UploadButton
+                  folder="capture-pages/videos"
+                  accept="video/*,image/*"
+                  label="Upload video"
+                  onUrl={(url) => onUpdate(field.id, { embedUrl: url })}
+                />
+                <span className="text-[11px] text-[var(--text-tertiary)]">Upload for the clean player, or paste a YouTube / Loom / Vimeo / Drive link.</span>
+              </div>
             </div>
           )}
 

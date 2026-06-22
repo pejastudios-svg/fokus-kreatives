@@ -155,7 +155,9 @@ export function CapturePagePreview({ form }: Props) {
       // through the sections they're editing.
       onClickCapture={(e) => {
         const target = e.target as HTMLElement
-        if (target.closest('[data-preview-nav]')) return
+        // Allow the section Next/Back buttons AND anything that opts in as
+        // interactive (e.g. the video player's play / fullscreen controls).
+        if (target.closest('[data-preview-nav],[data-preview-interactive]')) return
         e.preventDefault()
         e.stopPropagation()
       }}

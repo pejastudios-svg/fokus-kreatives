@@ -39,13 +39,15 @@ export function detectEmbed(raw?: string) {
   if (/\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i.test(url)) return { kind: 'image' as const, src: url }
   if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url)) return { kind: 'video' as const, src: url }
 
-  if (url.includes('drive.google.com') || url.includes('drive.usercontent.google.com')) {
-    // Stream the raw file into our own player instead of Google's /preview
-    // iframe, whose mobile player stacks several control sets over the video.
-    // The usercontent download host serves the bytes with range support so a
-    // <video> can play + seek inline (file must be shared "Anyone with link").
-    const id = url.match(/\/file\/d\/([^/]+)/)?.[1] || url.match(/[?&]id=([^&]+)/)?.[1]
-    if (id) return { kind: 'video' as const, src: `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t` }
+  if (url.includes('drive.google.com')) {
+    // Drive can't be hot-linked into a <video> (its download host returns an
+    // HTML scan-warning page, not bytes), so we fall back to Google's /preview
+    // iframe. That player has cluttered native mobile controls - to get the
+    // clean custom player, upload the video file (it lands as a direct .mp4).
+    const m1 = url.match(/\/file\/d\/([^/]+)/)
+    if (m1?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m1[1]}/preview` }
+    const m2 = url.match(/[?&]id=([^&]+)/)
+    if (m2?.[1]) return { kind: 'iframe' as const, src: `https://drive.google.com/file/d/${m2[1]}/preview` }
   }
   if (url.includes('youtube.com/watch')) {
     const m = url.match(/[?&]v=([^&]+)/)
