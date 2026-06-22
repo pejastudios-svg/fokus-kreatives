@@ -286,8 +286,14 @@ export function CaptureFormBody({
         )
       } else if (embed.kind === 'video') {
         media = (
-          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden bg-black">
-            <video src={embed.src} controls className="w-full h-auto" />
+          <div className="rounded-lg overflow-hidden flex justify-center bg-black">
+            <video
+              src={embed.src}
+              controls
+              playsInline
+              preload="metadata"
+              className="max-h-[70vh] max-w-full"
+            />
           </div>
         )
       } else if (embed.kind === 'link') {

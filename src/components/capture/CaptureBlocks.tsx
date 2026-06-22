@@ -203,7 +203,20 @@ function EmbedBlock({ url, title }: { url: string; title?: string }) {
   if (embed.kind === 'image') {
     media = <img src={embed.src} alt={title || ''} className="w-full h-auto rounded-xl" />
   } else if (embed.kind === 'video') {
-    media = <video src={embed.src} controls className="w-full h-auto rounded-xl bg-black" />
+    // Cap the video by height and centre it so a portrait clip doesn't blow
+    // up full-width on mobile (which made iOS render oversized controls).
+    // playsInline keeps it in the page instead of forcing fullscreen.
+    media = (
+      <div className="flex justify-center">
+        <video
+          src={embed.src}
+          controls
+          playsInline
+          preload="metadata"
+          className="max-h-[70vh] max-w-full rounded-xl bg-black"
+        />
+      </div>
+    )
   } else if (embed.kind === 'link') {
     media = (
       <a href={embed.src} target="_blank" rel="noopener noreferrer" className="text-sm underline break-all" style={{ color: '#2B79F7' }}>
@@ -211,9 +224,21 @@ function EmbedBlock({ url, title }: { url: string; title?: string }) {
       </a>
     )
   } else {
+    // Responsive 16:9 frame (capped on tall screens) instead of a fixed
+    // height, so it scales cleanly down to mobile widths.
     media = (
-      <div className="rounded-xl overflow-hidden border border-[var(--border-primary)]">
-        <iframe src={embed.src} className="w-full border-0" style={{ height: 420 }} loading="lazy" title={title || 'Embed'} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+      <div
+        className="relative w-full overflow-hidden rounded-xl border border-[var(--border-primary)] mx-auto"
+        style={{ aspectRatio: '16 / 9', maxHeight: '70vh', maxWidth: 'calc(70vh * 16 / 9)' }}
+      >
+        <iframe
+          src={embed.src}
+          className="absolute inset-0 h-full w-full border-0"
+          loading="lazy"
+          title={title || 'Embed'}
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+        />
       </div>
     )
   }
