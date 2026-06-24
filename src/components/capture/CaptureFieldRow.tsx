@@ -30,9 +30,11 @@ import {
   Plus,
   Asterisk,
   GripVertical,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
-import type { PackageOption } from './types'
+import type { PackageOption, PackageUnitOption } from './types'
 
 type FieldType =
   | 'text'
@@ -52,6 +54,7 @@ interface CaptureField {
   type: FieldType
   label: string
   required: boolean
+  hidden?: boolean
   placeholder?: string
   description?: string
   options?: string[]
@@ -60,6 +63,11 @@ interface CaptureField {
   repeatable?: boolean
   mapToLead?: boolean
   packages?: PackageOption[]
+  packageUnits?: PackageUnitOption[]
+  packageCurrency?: string
+  packageBaseFee?: number
+  packagePerPieceFee?: number
+  packageShowPrices?: boolean
 }
 
 const REPEATABLE_TYPES = new Set<FieldType>(['text', 'email', 'phone', 'url'])
@@ -134,6 +142,21 @@ export function CaptureFieldRow({
   const removePackage = (i: number) =>
     onUpdate(field.id, { packages: (field.packages || []).filter((_, j) => j !== i) })
 
+  // Build-your-own (priced units) handlers.
+  const patchUnit = (i: number, patch: Partial<PackageUnitOption>) =>
+    onUpdate(field.id, {
+      packageUnits: (field.packageUnits || []).map((u, j) => (j === i ? { ...u, ...patch } : u)),
+    })
+  const addUnit = () =>
+    onUpdate(field.id, {
+      packageUnits: [
+        ...(field.packageUnits || []),
+        { id: crypto.randomUUID(), name: '', unitPrice: 0 },
+      ],
+    })
+  const removeUnit = (i: number) =>
+    onUpdate(field.id, { packageUnits: (field.packageUnits || []).filter((_, j) => j !== i) })
+
   return (
     <div
       ref={rowRef}
@@ -160,7 +183,7 @@ export function CaptureFieldRow({
       {/* Summary row - always visible. The drag handle is the only
           element with `draggable` - clicking elsewhere on the row
           toggles expansion as before, no accidental drags. */}
-      <div className="flex items-stretch hover:bg-[var(--bg-card-hover)] transition-colors">
+      <div className={`flex items-stretch hover:bg-[var(--bg-card-hover)] transition-colors ${field.hidden ? 'opacity-50' : ''}`}>
         {/* Drag handle: only this element is draggable. onDragStart
             walks up to the entire row ref and uses setDragImage so
             the user sees the WHOLE row floating with the cursor,
@@ -213,6 +236,14 @@ export function CaptureFieldRow({
         </button>
 
         <div className="flex items-center gap-1 pr-3">
+          <button
+            type="button"
+            onClick={() => onUpdate(field.id, { hidden: !field.hidden })}
+            className={`p-1.5 rounded hover:bg-[var(--bg-tertiary)] ${field.hidden ? 'text-[#2B79F7]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+            title={field.hidden ? 'Field is hidden - click to show' : 'Hide this field from the page'}
+          >
+            {field.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
           <button
             type="button"
             disabled={index === 0}
@@ -377,9 +408,88 @@ export function CaptureFieldRow({
           )}
 
           {field.type === 'package' && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Custom builder (optional). Shown ALONGSIDE preset packages -
+                  not instead of them. The visitor picks quantities and the
+                  total adds up live. */}
+              <div className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-sm font-medium text-[var(--text-primary)]">Custom builder (optional)</label>
+                    <span className="text-xs text-[var(--text-tertiary)]">Currency</span>
+                    <input
+                      value={field.packageCurrency ?? '$'}
+                      onChange={(e) => onUpdate(field.id, { packageCurrency: e.target.value.slice(0, 3) })}
+                      className="w-14 px-2 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                      placeholder="$"
+                    />
+                  </div>
+                  {/* Base operational costs folded into the total (not shown to
+                      the visitor as separate lines). */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <Input
+                      label={`Base fee, flat (${field.packageCurrency ?? '$'})`}
+                      type="number"
+                      value={String(field.packageBaseFee ?? 0)}
+                      onChange={(e) => onUpdate(field.id, { packageBaseFee: Math.max(0, Number(e.target.value) || 0) })}
+                      placeholder="500"
+                    />
+                    <Input
+                      label={`Per-piece fee (${field.packageCurrency ?? '$'})`}
+                      type="number"
+                      value={String(field.packagePerPieceFee ?? 0)}
+                      onChange={(e) => onUpdate(field.id, { packagePerPieceFee: Math.max(0, Number(e.target.value) || 0) })}
+                      placeholder="5"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)] leading-snug">
+                    Operational costs folded into the visitor&apos;s total once they pick at least one piece. Flat is added once; per-piece scales with the number of pieces. The visitor sees one total, not these lines.
+                  </p>
+                  <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={field.packageShowPrices ?? true}
+                      onChange={(e) => onUpdate(field.id, { packageShowPrices: e.target.checked })}
+                      className="h-4 w-4 rounded border-[var(--border-primary)] accent-[#2B79F7]"
+                    />
+                    Show each option&apos;s price to visitors (off = show only the running total)
+                  </label>
+                  {(field.packageUnits || []).map((u, i) => (
+                    <div key={u.id} className="rounded-lg border border-[var(--border-primary)] p-3 space-y-2 bg-[var(--bg-card)]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-[var(--text-tertiary)]">Option {i + 1}</span>
+                        <button type="button" onClick={() => removeUnit(i)} className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-500" title="Remove option">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-2">
+                        <Input label="Name" value={u.name} onChange={(e) => patchUnit(i, { name: e.target.value })} placeholder="Short-form reel" />
+                        <Input
+                          label={`Price per unit (${field.packageCurrency ?? '$'})`}
+                          type="number"
+                          value={String(u.unitPrice ?? 0)}
+                          onChange={(e) => patchUnit(i, { unitPrice: Math.max(0, Number(e.target.value) || 0) })}
+                          placeholder="50"
+                        />
+                      </div>
+                      <Input label="Description (optional)" value={u.description || ''} onChange={(e) => patchUnit(i, { description: e.target.value })} placeholder="60-second edited reel" />
+                      <Input
+                        label="Max quantity (optional, e.g. 1 for a yes/no add-on like CRM access; blank = no cap)"
+                        type="number"
+                        value={u.maxQty ? String(u.maxQty) : ''}
+                        onChange={(e) => patchUnit(i, { maxQty: Math.max(0, Number(e.target.value) || 0) || undefined })}
+                        placeholder="No cap"
+                      />
+                    </div>
+                  ))}
+                  <button type="button" onClick={addUnit} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700">
+                    <Plus className="h-4 w-4" /> Add option
+                  </button>
+                </div>
+
+              {/* Preset packages (optional) - the visitor picks one. */}
+              <div className="space-y-3 border-t border-[var(--border-primary)] pt-3">
               <label className="block text-sm font-medium text-[var(--text-primary)]">
-                Packages (the visitor picks one)
+                Preset packages (optional, visitor picks one)
               </label>
               {(field.packages || []).map((p, i) => (
                 <div
@@ -444,6 +554,7 @@ export function CaptureFieldRow({
               >
                 <Plus className="h-4 w-4" /> Add package
               </button>
+              </div>
             </div>
           )}
 

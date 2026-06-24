@@ -42,7 +42,7 @@ function isWeekendYmd(s: string): boolean {
   const dow = parseYmd(s).getUTCDay()
   return dow === 0 || dow === 6
 }
-import { TIER_CONFIG, type PackageTier } from '@/lib/campaignTiers'
+import { resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 
 import { plannerAdmin } from './db'
 import { loadAvailableTopicGroups } from './material'
@@ -68,7 +68,8 @@ interface ClientRow {
   id: string
   name: string | null
   business_name: string | null
-  package_tier: PackageTier | null
+  package_tier: TierKey | null
+  custom_config: CustomConfig | null
 }
 
 interface SettingsRow {
@@ -221,7 +222,7 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
 
   const { data: clientRow, error: clientErr } = await supabase
     .from('clients')
-    .select('id, name, business_name, package_tier')
+    .select('id, name, business_name, package_tier, custom_config')
     .eq('id', input.clientId)
     .maybeSingle()
   if (clientErr || !clientRow) throw new Error('Client not found')
@@ -301,8 +302,7 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
   //
   // This guarantees structural hook uniqueness within a stream within a
   // topic - no two SF pieces in topic T can share the same anchor.
-  const tier = (client.package_tier ?? 'lower') as PackageTier
-  const tierCfg = TIER_CONFIG[tier]
+  const tierCfg = resolveTierConfig(client)
   const numCampaigns = Math.min(
     allTopicGroups.length,
     tierCfg.campaignsPerMonth * monthsAhead,
@@ -819,7 +819,7 @@ export async function regenerateSlot(slotId: string): Promise<PlannerSlotRow> {
   // Re-run pickSlot for this single date.
   const { data: clientData } = await supabase
     .from('clients')
-    .select('id, name, business_name, package_tier')
+    .select('id, name, business_name, package_tier, custom_config')
     .eq('id', slot.client_id)
     .maybeSingle()
   const client = (clientData ?? null) as ClientRow | null

@@ -15,7 +15,7 @@ import {
   DEFAULT_SEED_COUNT,
   type PromptCardMeta,
 } from '@/lib/prompts/templates'
-import { TIER_CONFIG, type PackageTier } from '@/lib/campaignTiers'
+import { resolveTierConfig, TIER_KEY_LABEL, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import {
   Lightbulb,
   Magnet,
@@ -56,19 +56,15 @@ interface ClientData {
   formAnswers: FormAnswer[]
   forms: FormOption[]
   competitorInsights: string
-  packageTier: PackageTier | null
+  packageTier: TierKey | null
+  /** Resolved monthly campaign count (fixed or custom tier). */
+  campaignsPerMonth: number
 }
 
 const ICONS: Record<PromptCardMeta['icon'], typeof Lightbulb> = {
   Lightbulb,
   Magnet,
   Telescope,
-}
-
-const TIER_LABEL: Record<PackageTier, string> = {
-  top: 'Top (4/mo)',
-  middle: 'Middle (2/mo)',
-  lower: 'Lower (1/mo)',
 }
 
 export default function PromptsPage() {
@@ -99,11 +95,12 @@ export default function PromptsPage() {
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) || null
   const tier = clientData?.packageTier ?? null
+  const tierCampaigns = clientData?.campaignsPerMonth ?? 0
 
   // The count actually sent to the prompt: tier monthly count when the toggle
   // is on and a tier is known, otherwise the manual number.
   const effectiveSeedCount =
-    autoByTier && tier ? TIER_CONFIG[tier].campaignsPerMonth : seedCount
+    autoByTier && tier ? tierCampaigns : seedCount
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -131,7 +128,7 @@ export default function PromptsPage() {
         const [{ data: client }, { data: forms }, { data: topics }] = await Promise.all([
           supabase
             .from('clients')
-            .select('brand_profile, package_tier, competitor_insights')
+            .select('brand_profile, package_tier, custom_config, competitor_insights')
             .eq('id', clientId)
             .single(),
           supabase
@@ -229,7 +226,11 @@ export default function PromptsPage() {
           }
         }
 
-        const packageTier = (client?.package_tier as PackageTier | null) ?? null
+        const packageTier = (client?.package_tier as TierKey | null) ?? null
+        const campaignsPerMonth = resolveTierConfig({
+          package_tier: packageTier,
+          custom_config: (client?.custom_config as CustomConfig | null) ?? null,
+        }).campaignsPerMonth
         const competitorInsights =
           typeof (client as { competitor_insights?: string })?.competitor_insights === 'string'
             ? ((client as { competitor_insights?: string }).competitor_insights as string)
@@ -242,6 +243,7 @@ export default function PromptsPage() {
           forms: formOptions,
           competitorInsights,
           packageTier,
+          campaignsPerMonth,
         })
       } catch {
         toast.error('Could not load that client. Try again.')
@@ -491,7 +493,7 @@ export default function PromptsPage() {
                           type="number"
                           min={1}
                           max={200}
-                          value={autoByTier && tier ? TIER_CONFIG[tier].campaignsPerMonth : seedCount}
+                          value={autoByTier && tier ? tierCampaigns : seedCount}
                           disabled={autoByTier}
                           onChange={(e) => {
                             const n = parseInt(e.target.value, 10)
@@ -521,7 +523,7 @@ export default function PromptsPage() {
                       {autoByTier && (
                         <p className="text-[11px] text-[var(--text-tertiary)]">
                           {tier
-                            ? `Using ${TIER_LABEL[tier]} → ${TIER_CONFIG[tier].campaignsPerMonth} this month.`
+                            ? `Using ${TIER_KEY_LABEL[tier]} → ${tierCampaigns} this month.`
                             : 'No package tier set on this client. Set one in Edit client, or turn this off.'}
                         </p>
                       )}

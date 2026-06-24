@@ -50,6 +50,9 @@ const FORMAT_CRITICAL_INPUTS: Record<string, TopicInputType[]> = {
   'engagement_reel.tier_list_bait': ['opinion'],
   'engagement_reel.defend_this_take': ['opinion'],
   'engagement_reel.heros_journey_text': ['turning_point'],
+  // Framework-driven engagement reel: hard-gated on framework, not opinion, so
+  // it fills engagement volume when the opinion answer is thin.
+  'engagement_reel.caption_list': ['framework'],
   // Carousels.
   'carousel.heros_journey': ['turning_point'],
   'carousel.personal_learning': ['proof'],
@@ -95,6 +98,7 @@ const FORMAT_INPUT_REQUIREMENTS: Record<string, TopicInputType[]> = {
   'engagement_reel.tier_list_bait':    ['opinion'],
   'engagement_reel.defend_this_take':  ['opinion'],
   'engagement_reel.heros_journey_text':['scene', 'failed_attempt', 'turning_point', 'proof'],
+  'engagement_reel.caption_list':      ['framework'],
 
   // Carousels
   'carousel.framework':         ['framework'],
@@ -109,6 +113,8 @@ const FORMAT_INPUT_REQUIREMENTS: Record<string, TopicInputType[]> = {
   'story.behind_the_curtain':   ['scene', 'failed_attempt'],
   'story.question_for_audience':['opinion'],
   'story.vulnerable_share':     ['failed_attempt'],
+  'story.value_teaser':         ['framework', 'proof'],
+  'story.value_drop':           ['framework'],
 }
 
 // Stage-weight boosts per the spec. Empty entry = 0.

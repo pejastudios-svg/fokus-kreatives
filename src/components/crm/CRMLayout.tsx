@@ -24,6 +24,7 @@ import {
   Mail,
 } from 'lucide-react'
 import { createClient, ensureRealtimeAuth } from '@/lib/supabase/client'
+import { effectiveCrmTier, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import { Loading } from '@/components/ui/Loading'
 import { PageTransition } from '@/components/ui/PageTransition'
 import { CrmRoleProvider } from '@/components/crm/CrmRoleContext'
@@ -42,7 +43,8 @@ interface ClientInfo {
   name: string
   business_name: string
   archived_at?: string | null
-  package_tier?: 'top' | 'middle' | 'lower' | null
+  package_tier?: TierKey | null
+  custom_config?: CustomConfig | null
   profile_picture_url?: string | null
 }
 
@@ -228,10 +230,9 @@ useEffect(() => {
         return
       }
 
-      // Client portal users on the Lower tier shouldn't reach the CRM
-      // at all - bounce to the slim portal experience instead.
-      const tier = (json.client?.package_tier ?? null) as PackageTier | null
-      if (json.isClientUser && tier === 'lower') {
+      // Client portal users with no CRM access (Foundation, or a custom plan
+      // set to no CRM) shouldn't reach the CRM - bounce to the slim portal.
+      if (json.isClientUser && json.client && effectiveCrmTier(json.client) === 'lower') {
         router.push('/portal')
         return
       }
@@ -480,7 +481,11 @@ useEffect(() => {
     Team: ['top', 'middle'],
     'Capture Pages': ['top', 'middle'],
   }
-  const clientTier = (clientInfo?.package_tier ?? null) as PackageTier | null
+  // Null/unset tier keeps backwards-compatible full access. A set tier (incl.
+  // custom, which maps its CRM access onto a fixed tier's matrix) is enforced.
+  const clientTier: PackageTier | null = clientInfo?.package_tier
+    ? effectiveCrmTier(clientInfo)
+    : null
   const passesTier = (name: string) => {
     if (!isClientUser) return true
     if (clientTier === null) return true

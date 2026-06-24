@@ -36,6 +36,8 @@ import {
   Info,
   RotateCcw,
   LayoutPanelTop,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { KebabMenu } from '@/components/ui/KebabMenu'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -51,7 +53,7 @@ import { ThemePicker } from '@/components/capture/ThemePicker'
 import { CaptureFieldRow } from '@/components/capture/CaptureFieldRow'
 import { CaptureAdvancedAnalytics } from '@/components/capture/CaptureAdvancedAnalytics'
 import { CaptureBlocksEditor, defaultLandingBlocks } from '@/components/capture/CaptureBlocksEditor'
-import type { LayoutTemplate, PackageOption, CaptureBlock } from '@/components/capture/types'
+import type { LayoutTemplate, PackageOption, PackageUnitOption, CaptureBlock } from '@/components/capture/types'
 
 type FieldType =
   | 'text' | 'email' | 'phone' | 'url' | 'textarea'
@@ -62,6 +64,7 @@ type CaptureField = {
   type: FieldType
   label: string
   required: boolean
+  hidden?: boolean
   placeholder?: string
   description?: string
   options?: string[]
@@ -70,6 +73,11 @@ type CaptureField = {
   repeatable?: boolean
   mapToLead?: boolean
   packages?: PackageOption[]
+  packageUnits?: PackageUnitOption[]
+  packageCurrency?: string
+  packageBaseFee?: number
+  packagePerPieceFee?: number
+  packageShowPrices?: boolean
   sectionId?: string
 }
 
@@ -77,6 +85,9 @@ type CaptureSection = {
   id: string
   title?: string
   description?: string
+  /** Hidden sections stay in the editor but render on neither the public page
+   *  nor the preview. Toggled by the eye control. */
+  hidden?: boolean
 }
 
 const DEFAULT_SECTION_ID = 'section-1'
@@ -93,6 +104,7 @@ function normalizeSections(raw: unknown): CaptureSection[] {
         id: String(o.id || `section-${i + 1}`),
         title: o.title ? String(o.title) : '',
         description: o.description ? String(o.description) : '',
+        hidden: o.hidden ? true : undefined,
       }
     })
   }
@@ -241,6 +253,7 @@ interface RawField {
   type?: unknown;
   label?: unknown;
   required?: unknown;
+  hidden?: unknown;
   placeholder?: unknown;
   description?: unknown;
   options?: unknown;
@@ -249,6 +262,11 @@ interface RawField {
   repeatable?: unknown;
   mapToLead?: unknown;
   packages?: unknown;
+  packageUnits?: unknown;
+  packageCurrency?: unknown;
+  packageBaseFee?: unknown;
+  packagePerPieceFee?: unknown;
+  packageShowPrices?: unknown;
   sectionId?: unknown;
 }
 
@@ -262,6 +280,7 @@ function normalizeFields(f: unknown): CaptureField[] {
     type: (x.type as FieldType) || 'text',
     label: String(x.label || 'Field'),
     required: !!x.required,
+    hidden: x.hidden ? true : undefined,
     placeholder: x.placeholder ? String(x.placeholder) : undefined,
     description: x.description ? String(x.description) : undefined,
     options: Array.isArray(x.options) ? (x.options as unknown[]).map(String) : undefined,
@@ -280,6 +299,19 @@ function normalizeFields(f: unknown): CaptureField[] {
             : undefined,
         }))
       : undefined,
+    packageUnits: Array.isArray(x.packageUnits)
+      ? (x.packageUnits as Array<Record<string, unknown>>).map((u, i) => ({
+          id: String(u.id || `unit-${i}`),
+          name: String(u.name || ''),
+          unitPrice: Number(u.unitPrice) || 0,
+          description: u.description ? String(u.description) : undefined,
+          maxQty: u.maxQty != null ? Number(u.maxQty) || undefined : undefined,
+        }))
+      : undefined,
+    packageCurrency: x.packageCurrency ? String(x.packageCurrency) : undefined,
+    packageBaseFee: x.packageBaseFee != null ? Number(x.packageBaseFee) || 0 : undefined,
+    packagePerPieceFee: x.packagePerPieceFee != null ? Number(x.packagePerPieceFee) || 0 : undefined,
+    packageShowPrices: typeof x.packageShowPrices === 'boolean' ? x.packageShowPrices : undefined,
     sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
 }
@@ -1998,44 +2030,56 @@ function CaptureSkeleton() {
                     return (
                       <div
                         key={section.id}
-                        className={
-                          multi
-                            ? 'rounded-xl border border-[var(--border-primary)] p-3 space-y-3'
-                            : 'space-y-3'
-                        }
+                        className={`rounded-xl border border-[var(--border-primary)] p-3 space-y-3 ${section.hidden ? 'opacity-60' : ''}`}
                       >
-                        {multi && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                                Section {sIdx + 1}
-                                {sIdx === form.sections.length - 1 ? ' · has submit' : ''}
-                              </span>
+                        {/* Section control row. The eye toggle shows for EVERY
+                            section (single or multi) so any section can be
+                            hidden. Title/description/remove are multi-only. */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                              Section {sIdx + 1}
+                              {sIdx === form.sections.length - 1 ? ' · has submit' : ''}
+                              {section.hidden ? ' · hidden' : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateSection(section.id, { hidden: !section.hidden })}
+                              title={section.hidden ? 'Section is hidden - click to show' : 'Hide this section from the page'}
+                              className={`ml-auto p-1 rounded-md hover:bg-[var(--bg-tertiary)] ${section.hidden ? 'text-[#2B79F7]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+                            >
+                              {section.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </button>
+                            {multi && (
                               <button
                                 type="button"
                                 onClick={() => removeSection(section.id)}
                                 title="Remove section (its fields move to the previous section)"
-                                className="ml-auto p-1 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
+                                className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </button>
-                            </div>
-                            <input
-                              type="text"
-                              value={section.title || ''}
-                              onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                              placeholder="Section title (optional)"
-                              className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                            />
-                            <input
-                              type="text"
-                              value={section.description || ''}
-                              onChange={(e) => updateSection(section.id, { description: e.target.value })}
-                              placeholder="Section description (optional)"
-                              className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
-                            />
+                            )}
                           </div>
-                        )}
+                          {multi && (
+                            <>
+                              <input
+                                type="text"
+                                value={section.title || ''}
+                                onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                                placeholder="Section title (optional)"
+                                className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                              />
+                              <input
+                                type="text"
+                                value={section.description || ''}
+                                onChange={(e) => updateSection(section.id, { description: e.target.value })}
+                                placeholder="Section description (optional)"
+                                className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                              />
+                            </>
+                          )}
+                        </div>
 
                         <div className="space-y-2">
                           {sectionFields.map((f, idx) => (

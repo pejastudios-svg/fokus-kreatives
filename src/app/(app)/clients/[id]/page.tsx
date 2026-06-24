@@ -39,9 +39,9 @@ import { TopicsBank } from '@/components/clients/TopicsBank'
 import { StageBadge } from '@/components/planner/StageBadge'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeBrandProfile, type BrandProfile } from '@/components/clients/brandProfile'
+import { TIER_KEY_LABEL, type TierKey } from '@/lib/campaignTiers'
 
 type ContentTier = 'beginner' | 'mid' | 'advanced'
-type PackageTier = 'top' | 'middle' | 'lower'
 
 interface ClientRow {
   id: string
@@ -60,18 +60,12 @@ interface ClientRow {
   competitor_insights: string | null
   website_url: string | null
   content_tier: ContentTier | null
-  package_tier: PackageTier | null
+  package_tier: TierKey | null
   brand_profile: BrandProfile | null
   archived_at: string | null
   brand_intake_token: string | null
   brand_intake_submitted_at: string | null
   created_at: string
-}
-
-const PACKAGE_TIER_LABEL: Record<PackageTier, string> = {
-  top: 'Top (Authority Engine)',
-  middle: 'Middle (Growth)',
-  lower: 'Lower (Foundation)',
 }
 
 type TabKey = 'overview' | 'audience' | 'guidelines' | 'competitors' | 'team' | 'notes'
@@ -386,7 +380,7 @@ export default function ClientProfilePage() {
                 {client.package_tier && (
                   <span className="inline-flex items-center gap-1">
                     <Sparkles className="h-3.5 w-3.5" />
-                    {PACKAGE_TIER_LABEL[client.package_tier]}
+                    {TIER_KEY_LABEL[client.package_tier]}
                   </span>
                 )}
                 {client.website_url && (

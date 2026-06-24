@@ -31,6 +31,7 @@ interface RawFieldData {
   type?: unknown
   label?: unknown
   required?: unknown
+  hidden?: unknown
   placeholder?: unknown
   description?: unknown
   options?: unknown
@@ -38,6 +39,11 @@ interface RawFieldData {
   embedHeight?: unknown
   repeatable?: unknown
   packages?: unknown
+  packageUnits?: unknown
+  packageCurrency?: unknown
+  packageBaseFee?: unknown
+  packagePerPieceFee?: unknown
+  packageShowPrices?: unknown
   sectionId?: unknown
 }
 
@@ -48,6 +54,7 @@ function normalizeFields(f: unknown): CaptureField[] {
     type: (x.type as CaptureField['type']) || 'text',
     label: String(x.label || 'Field'),
     required: !!x.required,
+    hidden: x.hidden ? true : undefined,
     placeholder: x.placeholder ? String(x.placeholder) : undefined,
     description: x.description ? String(x.description) : undefined,
     options: Array.isArray(x.options) ? x.options.map(String) : undefined,
@@ -64,6 +71,20 @@ function normalizeFields(f: unknown): CaptureField[] {
           features: Array.isArray(p.features) ? (p.features as unknown[]).map(String) : undefined,
         }))
       : undefined,
+    // Preserve the custom builder config or it vanishes on the public page.
+    packageUnits: Array.isArray(x.packageUnits)
+      ? (x.packageUnits as Array<Record<string, unknown>>).map((u, i) => ({
+          id: String(u.id || `unit-${i}`),
+          name: String(u.name || ''),
+          unitPrice: Number(u.unitPrice) || 0,
+          description: u.description ? String(u.description) : undefined,
+          maxQty: u.maxQty != null ? Number(u.maxQty) || undefined : undefined,
+        }))
+      : undefined,
+    packageCurrency: x.packageCurrency ? String(x.packageCurrency) : undefined,
+    packageBaseFee: x.packageBaseFee != null ? Number(x.packageBaseFee) || 0 : undefined,
+    packagePerPieceFee: x.packagePerPieceFee != null ? Number(x.packagePerPieceFee) || 0 : undefined,
+    packageShowPrices: typeof x.packageShowPrices === 'boolean' ? x.packageShowPrices : undefined,
     sectionId: x.sectionId ? String(x.sectionId) : undefined,
   }))
 }

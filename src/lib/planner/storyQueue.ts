@@ -41,6 +41,7 @@ import type { ContentFormat } from '@/lib/contentFormats/types'
 import { plannerAdmin } from './db'
 import { loadAvailableTopicGroups } from './material'
 import { pickBestMaterial } from './scoring'
+import { selectHookAngles, renderHookAngleBlock } from './hookBank'
 import type { RawTopicAnswer, TopicGroup } from './types'
 
 const STORIES_PER_GROUP_CAP = 5
@@ -93,13 +94,22 @@ const NARRATIVE_ARCS: Record<FormatBucket, { hook: string; value: string; rehook
   },
 }
 
-function buildNarrativeArc(bucket: string): string {
+// Formats that deliver pure value with NO call-to-action. These generate a
+// 3-frame story (HOOK -> VALUE -> REHOOK) that ends on the takeaway. Every
+// other story format keeps the 4th DM/share/follow CTA frame.
+const NO_CTA_STORY_FORMATS = new Set<string>(['story.value_drop'])
+
+function buildNarrativeArc(bucket: string, noCta = false): string {
   const arc = NARRATIVE_ARCS[bucket as FormatBucket] ?? NARRATIVE_ARCS.storytelling
-  return `NARRATIVE ARC (the 4 frames must tell ONE story - same protagonist, same situation, same scene throughout):
-- HOOK   = ${arc.hook}
-- VALUE  = ${arc.value}
-- REHOOK = ${arc.rehook}
-- CTA    = ${arc.cta}`
+  const n = noCta ? 3 : 4
+  const lines = [
+    `- HOOK   = ${arc.hook}`,
+    `- VALUE  = ${arc.value}`,
+    `- REHOOK = ${arc.rehook}`,
+  ]
+  if (noCta) lines.push(`- (NO CTA) end on the REHOOK as a clean takeaway - do NOT add a 4th frame or any ask`)
+  else lines.push(`- CTA    = ${arc.cta}`)
+  return `NARRATIVE ARC (the ${n} frames must tell ONE story - same protagonist, same situation, same scene throughout):\n${lines.join('\n')}`
 }
 
 export interface RefillResult {
@@ -738,22 +748,33 @@ async function generateOneStoryBrief(opts: {
     ? `\nANCHOR IS RECYCLED. This topic doesn't have enough fresh answers to fill the campaign quota, so this anchor moment is being used a SECOND time across the brand's content. Your 4 frames MUST take a totally different angle than any prior piece using this same anchor: different hook framing, different value beat, different rehook, different CTA wording. Treat this as a separate post about the same situation, not a paraphrase.\n`
     : ''
 
-  const system = `You write Instagram story production briefs. The output is a 4-frame TEXT-FIRST story sequence. The viewer READS each frame silently for 5-7 seconds. There is NO voiceover. The on_screen_text is the message.
+  const noCta = NO_CTA_STORY_FORMATS.has(opts.format.slug)
+  const frameCount = noCta ? 3 : 4
+  const beatList = noCta ? 'HOOK, VALUE, REHOOK' : 'HOOK, VALUE, REHOOK, CTA'
+  const beatArrow = noCta ? 'HOOK -> VALUE -> REHOOK' : 'HOOK -> VALUE -> REHOOK -> CTA'
+  const ctaBeatJson = noCta
+    ? ''
+    : '\n    { "label": "REHOOK", "capture": "...", "on_screen_text": "..." },\n    { "label": "CTA",    "capture": "...", "on_screen_text": "..." }'
+  const beatsJson = noCta
+    ? `    { "label": "HOOK",   "capture": "talking head|text card|b-roll|screen recording", "on_screen_text": "..." },
+    { "label": "VALUE",  "capture": "...", "on_screen_text": "..." },
+    { "label": "REHOOK", "capture": "...", "on_screen_text": "..." }`
+    : `    { "label": "HOOK",   "capture": "talking head|text card|b-roll|screen recording", "on_screen_text": "..." },
+    { "label": "VALUE",  "capture": "...", "on_screen_text": "..." },${ctaBeatJson}`
+
+  const system = `You write Instagram story production briefs. The output is a ${frameCount}-frame TEXT-FIRST story sequence. The viewer READS each frame silently for 5-7 seconds. There is NO voiceover. The on_screen_text is the message.
 
 Output STRICT JSON:
 {
   "who_films": "agency" | "client",
   "beats": [
-    { "label": "HOOK",   "capture": "talking head|text card|b-roll|screen recording", "on_screen_text": "..." },
-    { "label": "VALUE",  "capture": "...", "on_screen_text": "..." },
-    { "label": "REHOOK", "capture": "...", "on_screen_text": "..." },
-    { "label": "CTA",    "capture": "...", "on_screen_text": "..." }
+${beatsJson}
   ]
 }
 
-EXACTLY 4 beats, in the order HOOK -> VALUE -> REHOOK -> CTA. No voiceover field. No prose paragraphs.
+EXACTLY ${frameCount} beats, in the order ${beatArrow}. No voiceover field. No prose paragraphs.
 
-${buildNarrativeArc(opts.format.bucket)}
+${buildNarrativeArc(opts.format.bucket, noCta)}
 
 ONE-SITUATION RULE (most-violated rule - read twice):
 - All 4 frames describe ONE specific situation, ONE protagonist, ONE scene. Do NOT pivot topics between frames.
@@ -812,14 +833,22 @@ Description: ${opts.format.description}
 Secret sauce: ${opts.format.secret_sauce}
 ${opts.format.hook_patterns.length ? `Hook patterns (use one for the HOOK beat - keep its grammatical shape, fill specifics from raw material):\n${opts.format.hook_patterns.map((h) => `- ${h.pattern} (e.g. ${h.example})`).join('\n')}` : ''}
 
-CTA RULES (this is the most-failed rule - read carefully):
+${renderHookAngleBlock(selectHookAngles({ bucket: opts.format.bucket, seed: anchor?.id ?? material.topic_group_id ?? opts.format.slug }))}
+
+${
+  noCta
+    ? `NO CTA (this format is pure value):
+- There is NO 4th frame and NO call-to-action. Do NOT add "DM me", "follow", "save", "share", or any ask.
+- The REHOOK is the final frame and must land as a clean takeaway the viewer keeps.`
+    : `CTA RULES (this is the most-failed rule - read carefully):
 ${dmRule.hardRule}
 - The CTA beat MUST be one of these shapes:
     1. DM-DRIVEN: "DM me ${KW} for [thing].", "DM me ${KW} to [verb].", "Reply ${KW} for [thing]."
     2. SHARE: "Send this to someone who [needs it]."
     3. FOLLOW: "Follow for [specific next thing]."
 - BANNED: "Save this", "Save it for later", "Bookmark this".
-- BANNED trail-off endings: "You're not alone", "Felt like time was running out". Rewrite as one of the valid CTAs above.
+- BANNED trail-off endings: "You're not alone", "Felt like time was running out". Rewrite as one of the valid CTAs above.`
+}
 
 WHO_FILMS (single value for the whole story - pick the one that MOST beats need):
 - "agency" when the agency can produce in-house: text cards, screenshots, b-roll, designed graphics.
@@ -831,11 +860,11 @@ ${captureAvoidBlock}${hookAvoidBlock}${recycledBlock}`
 - (${anchor.input_type}) ${anchor.answer}
 
 ${answers.length > 1 ? `SUPPORTING CONTEXT (use ONLY for body context if absolutely needed - your hook and rehook do NOT reference these):\n${answers.slice(1).map((a) => `- (${a.input_type}) ${a.answer}`).join('\n')}\n` : ''}
-${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly 4 beats (HOOK, VALUE, REHOOK, CTA). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
+${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly ${frameCount} beats (${beatList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
     : `RAW MATERIAL (anchor every specific to this; don't invent details not present here):
 ${answers.map((a) => `- (${a.input_type}) ${a.answer}`).join('\n')}
 
-${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly 4 beats (HOOK, VALUE, REHOOK, CTA). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
+${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly ${frameCount} beats (${beatList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
 
   try {
     const { content } = await generateScript({
@@ -897,7 +926,8 @@ ${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Gener
       }
     }
 
-    if (opts.dmKeywords.length > 0) {
+    // No-CTA formats have no CTA beat to inject a keyword into.
+    if (!noCta && opts.dmKeywords.length > 0) {
       enforceDmKeyword(beats, opts.dmKeywords)
     }
 

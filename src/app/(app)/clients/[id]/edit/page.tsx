@@ -24,6 +24,14 @@ import { StoryDmKeywords } from '@/components/clients/StoryDmKeywords'
 import { BrandDescriptionSettings } from '@/components/clients/BrandDescriptionSettings'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import {
+  defaultCustomConfig,
+  monthlyCounts,
+  resolveTierConfig,
+  type CrmAccess,
+  type CustomConfig,
+  type TierKey,
+} from '@/lib/campaignTiers'
 
 type BrandProfile = ReturnType<typeof defaultBrandProfile>
 type ContentTier = 'beginner' | 'mid' | 'advanced'
@@ -47,14 +55,13 @@ interface ClientRow {
   competitor_insights?: string | null
   website_url?: string | null
   content_tier?: ContentTier | null
-  package_tier?: PackageTier | null
+  package_tier?: TierKey | null
+  custom_config?: CustomConfig | null
   brand_profile?: BrandProfile | null
   archived_at?: string | null
   brand_intake_token?: string | null
   brand_intake_submitted_at?: string | null
 }
-
-type PackageTier = 'top' | 'middle' | 'lower'
 
 type ClientFormData = {
   name: string
@@ -72,8 +79,112 @@ type ClientFormData = {
   competitor_insights: string
   website_url: string
   content_tier: ContentTier
-  package_tier: PackageTier | ''
+  package_tier: TierKey | ''
+  custom_config: CustomConfig
   brand_profile: BrandProfile
+}
+
+const CUSTOM_CONTENT_ROWS: { key: keyof CustomConfig['content']; label: string }[] = [
+  { key: 'longForm', label: 'Long-form' },
+  { key: 'shortForm', label: 'Short-form reels' },
+  { key: 'engagementReels', label: 'Engagement reels' },
+  { key: 'carousels', label: 'Carousels' },
+  { key: 'stories', label: 'Stories' },
+]
+
+// Per-client custom plan editor. Weekly is the field the agency usually types
+// (auto-fills monthly = weekly x 4); monthly can still be overridden on its own.
+// Monthly is what actually drives generation - the "Generates" line shows the
+// effective monthly after the per-campaign split, so any rounding is visible.
+function CustomTierEditor({
+  config,
+  onChange,
+}: {
+  config: CustomConfig
+  onChange: (c: CustomConfig) => void
+}) {
+  const setRow = (key: keyof CustomConfig['content'], patch: Partial<{ weekly: number; monthly: number }>) =>
+    onChange({ ...config, content: { ...config.content, [key]: { ...config.content[key], ...patch } } })
+
+  const num = (v: string) => Math.max(0, Math.floor(Number(v) || 0))
+  const resolved = resolveTierConfig({ package_tier: 'custom', custom_config: config })
+  const per = resolved.perCampaign
+  const effective = monthlyCounts(resolved)
+  const totalMonthly =
+    effective.longForm + effective.shortForm + effective.engagementReels + effective.carousels + effective.stories
+  // Each campaign = one cycle: weekly (4/mo) means one campaign per week.
+  const cadenceLabel =
+    config.campaignsPerMonth === 4 ? 'one per week' : config.campaignsPerMonth === 2 ? 'one every 2 weeks' : 'one per month'
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Campaigns / month</label>
+          <select
+            value={config.campaignsPerMonth}
+            onChange={(e) => onChange({ ...config, campaignsPerMonth: Number(e.target.value) as 1 | 2 | 4 })}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          >
+            <option value={4}>Weekly (4 campaigns/mo)</option>
+            <option value={2}>Biweekly (2 campaigns/mo)</option>
+            <option value={1}>Monthly (1 campaign/mo)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">CRM access</label>
+          <select
+            value={config.crmAccess}
+            onChange={(e) => onChange({ ...config, crmAccess: e.target.value as CrmAccess })}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          >
+            <option value="none">None (portal only)</option>
+            <option value="growth">Growth (inbox, leads, meetings, team, capture)</option>
+            <option value="full">Full (everything)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1fr_5rem_5rem] items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Content</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] text-center">Week</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] text-center">Month</span>
+        {CUSTOM_CONTENT_ROWS.map(({ key, label }) => {
+          const row = config.content[key]
+          return (
+            <div key={key} className="contents">
+              <span className="text-sm text-[var(--text-primary)]">{label}</span>
+              <input
+                type="number"
+                min={0}
+                value={row.weekly}
+                // Typing a weekly count auto-fills the month (x4).
+                onChange={(e) => {
+                  const weekly = num(e.target.value)
+                  setRow(key, { weekly, monthly: weekly * 4 })
+                }}
+                className="w-full px-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              />
+              <input
+                type="number"
+                min={0}
+                value={row.monthly}
+                onChange={(e) => setRow(key, { monthly: num(e.target.value) })}
+                className="w-full px-2 py-1.5 rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              />
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-[11px] text-[var(--text-tertiary)] leading-snug">
+        {totalMonthly}/month across {config.campaignsPerMonth} campaign
+        {config.campaignsPerMonth === 1 ? '' : 's'} ({cadenceLabel}). Each campaign delivers{' '}
+        {per.shortForm} short-form, {per.engagementReels} engagement reels, {per.carousels} carousels, {per.stories} stories
+        {per.longForm > 0 ? `, ${per.longForm} long-form` : ''}. A campaign = one cycle (weekly = one campaign per week).
+      </p>
+    </div>
+  )
 }
 
 export default function ClientDetailPage() {
@@ -123,6 +234,7 @@ export default function ClientDetailPage() {
       website_url: '',
       content_tier: 'beginner',
       package_tier: '',
+      custom_config: defaultCustomConfig(),
       brand_profile: defaultBrandProfile(),
     },
   )
@@ -144,7 +256,8 @@ export default function ClientDetailPage() {
       competitor_insights: row.competitor_insights ?? '',
       website_url: row.website_url ?? '',
       content_tier: (row.content_tier ?? 'beginner') as ContentTier,
-      package_tier: (row.package_tier ?? '') as PackageTier | '',
+      package_tier: (row.package_tier ?? '') as TierKey | '',
+      custom_config: row.custom_config ?? defaultCustomConfig(),
       brand_profile: row.brand_profile ?? defaultBrandProfile(),
     }
   }, [])
@@ -305,6 +418,9 @@ export default function ClientDetailPage() {
       website_url: formData.website_url,
       content_tier: formData.content_tier,
       package_tier: formData.package_tier || null,
+      // Only persist the custom plan when the client is actually on Custom;
+      // clear it otherwise so a fixed tier never carries stale custom numbers.
+      custom_config: formData.package_tier === 'custom' ? (formData.custom_config ?? defaultCustomConfig()) : null,
       brand_profile: formData.brand_profile,
     }
 
@@ -626,19 +742,28 @@ export default function ClientDetailPage() {
                   name="package_tier"
                   value={formData.package_tier}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, package_tier: e.target.value as PackageTier | '' }))
+                    setFormData((prev) => ({ ...prev, package_tier: e.target.value as TierKey | '' }))
                   }
                   className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                 >
                   <option value="">Not set</option>
-                  <option value="top">Top (Authority Engine)</option>
-                  <option value="middle">Middle (Growth)</option>
-                  <option value="lower">Lower (Foundation)</option>
+                  <option value="lower">Foundation</option>
+                  <option value="middle">Growth</option>
+                  <option value="top">Authority Engine</option>
+                  <option value="custom">Custom</option>
                 </select>
 
                 <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                   Subscription level. Drives task deliverables and CRM access. Changes apply immediately.
                 </p>
+
+                {formData.package_tier === 'custom' && (
+                  <CustomTierEditor
+                    // Coalesce in case a persisted draft predates this field.
+                    config={formData.custom_config ?? defaultCustomConfig()}
+                    onChange={(custom_config) => setFormData((prev) => ({ ...prev, custom_config }))}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

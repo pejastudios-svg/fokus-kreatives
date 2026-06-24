@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { CalendarRange, Loader2, Search, Sparkles, X } from 'lucide-react'
+import { TIER_KEY_LABEL, type TierKey } from '@/lib/campaignTiers'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -20,7 +21,7 @@ interface ClientRow {
   name: string | null
   business_name: string | null
   profile_picture_url: string | null
-  package_tier: 'top' | 'middle' | 'lower' | null
+  package_tier: TierKey | null
   archived_at: string | null
   created_at: string | null
 }
@@ -31,10 +32,11 @@ interface ClientWithStats extends ClientRow {
   lastActivity: string | null
 }
 
-const TIER_TONE: Record<NonNullable<ClientRow['package_tier']>, 'success' | 'info' | 'warning'> = {
+const TIER_TONE: Record<TierKey, 'success' | 'info' | 'warning'> = {
   top: 'success',
   middle: 'info',
   lower: 'warning',
+  custom: 'info',
 }
 
 interface SearchResult {
@@ -313,7 +315,7 @@ export default function PlannerIndexPage() {
                       </h3>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
                         {c.package_tier && (
-                          <StatusPill tone={TIER_TONE[c.package_tier]}>{c.package_tier}</StatusPill>
+                          <StatusPill tone={TIER_TONE[c.package_tier]}>{TIER_KEY_LABEL[c.package_tier]}</StatusPill>
                         )}
                         <span className="text-[11px] text-[var(--text-tertiary)] tabular-nums">
                           {c.totalSlots === 0

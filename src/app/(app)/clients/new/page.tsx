@@ -39,7 +39,7 @@ type NewClientFormData = {
   brand_profile: BrandProfile
 }
 
-type PackageTier = 'top' | 'middle' | 'lower'
+type PackageTier = 'top' | 'middle' | 'lower' | 'custom'
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message
@@ -472,13 +472,15 @@ export default function NewClientPage() {
                   }
                 >
                   <option value="">Not set</option>
-                  <option value="top">Top (Authority Engine)</option>
-                  <option value="middle">Middle (Growth)</option>
-                  <option value="lower">Lower (Foundation)</option>
+                  <option value="lower">Foundation</option>
+                  <option value="middle">Growth</option>
+                  <option value="top">Authority Engine</option>
+                  <option value="custom">Custom</option>
                 </select>
 
                 <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                  Subscription level. Drives task deliverables and CRM access. Leave blank if not yet decided.
+                  Subscription level. Drives task deliverables and CRM access. Pick Custom here, then set its content
+                  counts on the client&apos;s edit page. Leave blank if not yet decided.
                 </p>
               </div>
             </CardContent>

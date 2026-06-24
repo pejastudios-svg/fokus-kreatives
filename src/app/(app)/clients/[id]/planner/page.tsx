@@ -18,6 +18,7 @@ import { TopicBatchPickerModal, type TopicBatch } from '@/components/planner/Top
 import { StoryQueuePanel } from '@/components/planner/StoryQueuePanel'
 import { SlotDetailDrawer } from '@/components/planner/SlotDetailDrawer'
 import { StageAdvancementBanner } from '@/components/planner/StageAdvancementBanner'
+import { ReadinessPanel } from '@/components/planner/ReadinessPanel'
 import type { PlannerData } from '@/components/planner/types'
 
 export default function ClientPlannerPage() {
@@ -995,6 +996,7 @@ export default function ClientPlannerPage() {
     [data, fromDate, toDate],
   )
 
+
   if (loading) {
     return (
       <>
@@ -1297,14 +1299,13 @@ export default function ClientPlannerPage() {
           </Card>
         )}
 
-        {/* Active-plans jump strip. Lists every month that has slots so
-            staff can navigate to plans outside the visible picker range
-            with one click. Hides itself when nothing has been generated
-            yet OR when there's only one month (no navigation value). */}
-        {monthsWithSlots.length > 1 && (
+        {/* Populated-slots badge strip. Always shows whenever the client has
+            ANY generated slots, listing each month with its slot count + date
+            range. Click to jump the calendar to that month. */}
+        {monthsWithSlots.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto py-1">
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold flex-shrink-0">
-              Active plans
+              Populated slots
             </span>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {monthsWithSlots.map((m) => {
@@ -1312,11 +1313,18 @@ export default function ClientPlannerPage() {
                 // picker - lets the user see which month they're looking
                 // at without doing date math in their head.
                 const isCurrent = m.firstDate <= toDate && m.lastDate >= fromDate
-                const monthLabel = new Date(`${m.ym}-01T00:00:00Z`).toLocaleDateString('en-US', {
+                const fmtDay = (ymd: string) =>
+                  new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: 'UTC',
+                  })
+                const monthName = new Date(`${m.ym}-01T00:00:00Z`).toLocaleDateString('en-US', {
                   month: 'short',
                   year: 'numeric',
                   timeZone: 'UTC',
                 })
+                const dateRange = `${monthName}: ${fmtDay(m.firstDate)} to ${fmtDay(m.lastDate)}`
                 return (
                   <button
                     key={m.ym}
@@ -1335,11 +1343,11 @@ export default function ClientPlannerPage() {
                         : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]',
                     ].join(' ')}
                   >
-                    {monthLabel}
+                    {dateRange}
                     <span
                       className={[
-                        'text-[10px] tabular-nums',
-                        isCurrent ? 'text-white/80' : 'text-[var(--text-tertiary)]',
+                        'text-[10px] tabular-nums rounded-full px-1.5',
+                        isCurrent ? 'bg-white/20 text-white' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]',
                       ].join(' ')}
                     >
                       {m.slotCount}
@@ -1350,6 +1358,21 @@ export default function ClientPlannerPage() {
             </div>
           </div>
         )}
+
+        {/* Material readiness: enough usable topics for the tier, and which
+            topics have thin/missing answers that will drop a stream's pieces. */}
+        <ReadinessPanel
+          clientId={clientId}
+          months={Math.max(
+            1,
+            Math.round(
+              ((new Date(`${toDate}T00:00:00Z`).getTime() - new Date(`${fromDate}T00:00:00Z`).getTime()) /
+                86_400_000 +
+                1) /
+                30.4,
+            ),
+          )}
+        />
 
         {/* Coverage bar */}
         <CoverageBar coverage={data.coverage.current} target={data.target} />

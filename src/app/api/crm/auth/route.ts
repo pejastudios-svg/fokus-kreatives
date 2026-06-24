@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
 
     const { data: client } = await admin
       .from('clients')
-      .select('id, name, business_name, archived_at, package_tier, profile_picture_url')
+      .select('id, name, business_name, archived_at, package_tier, custom_config, profile_picture_url')
       .eq('id', clientId)
       .maybeSingle()
 

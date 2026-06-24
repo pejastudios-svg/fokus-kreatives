@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic'
 interface ClientSummary {
   id: string
   name: string
-  tier: 'top' | 'middle' | 'lower' | null
+  tier: 'top' | 'middle' | 'lower' | 'custom' | null
   slotsActive: number
   spendThisMonth: number
 }
@@ -126,7 +126,7 @@ export async function GET() {
         id: string
         name: string | null
         business_name: string | null
-        package_tier: 'top' | 'middle' | 'lower' | null
+        package_tier: 'top' | 'middle' | 'lower' | 'custom' | null
       }
       return {
         id: row.id,

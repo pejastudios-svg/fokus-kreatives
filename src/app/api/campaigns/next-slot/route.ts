@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { nextCampaignSlot, type PackageTier } from '@/lib/campaignTiers'
+import { nextCampaignSlot, resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const { data: client } = await sb
       .from('clients')
-      .select('package_tier')
+      .select('package_tier, custom_config')
       .eq('id', clientId)
       .maybeSingle()
 
@@ -42,8 +42,12 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .maybeSingle()
 
+    const cfg = resolveTierConfig({
+      package_tier: (client?.package_tier as TierKey | null) ?? null,
+      custom_config: (client?.custom_config as CustomConfig | null) ?? null,
+    })
     const slot = nextCampaignSlot({
-      tier: (client?.package_tier as PackageTier | null) ?? null,
+      campaignsPerMonth: cfg.campaignsPerMonth,
       lastCampaign: (latest?.campaign_number as number | null) ?? null,
       lastMonth: (latest?.month_number as number | null) ?? null,
     })

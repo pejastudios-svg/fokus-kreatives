@@ -110,7 +110,7 @@ export interface PlannerData {
     id: string
     name: string | null
     business_name: string | null
-    package_tier: 'top' | 'middle' | 'lower' | null
+    package_tier: 'top' | 'middle' | 'lower' | 'custom' | null
   }
   stage: {
     currentStage: 'foundation' | 'growing' | 'established'

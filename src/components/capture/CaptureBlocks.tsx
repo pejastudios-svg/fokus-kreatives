@@ -405,7 +405,7 @@ function renderBlock(b: CaptureBlock, ctx: RenderCtx): React.ReactNode {
                   b.vDividers && ci > 0 ? 'md:border-l md:border-[var(--border-primary)] md:pl-8' : ''
                 }`}
               >
-                {(col.blocks || []).map((cb) => renderBlock(cb, ctx))}
+                {(col.blocks || []).filter((cb) => !cb.hidden).map((cb) => renderBlock(cb, ctx))}
               </div>
             ))}
           </div>
@@ -435,7 +435,7 @@ export function CaptureBlocks({ pageInfo, form, cardStyle, accent }: Props) {
       {/* Loads the same Google fonts the agreements editor offers, so a font
           picked per block renders on the public page. */}
       <link rel="stylesheet" href={DOC_FONTS_URL} />
-      {blocks.map((b) => renderBlock(b, ctx))}
+      {blocks.filter((b) => !b.hidden).map((b) => renderBlock(b, ctx))}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { TIER_CONFIG, type PackageTier } from '@/lib/campaignTiers'
+import { resolveTierConfig, type CustomConfig, type PackageTier, type TierKey } from '@/lib/campaignTiers'
 import {
   clickupConfigured,
   createClickUpFolder,
@@ -208,7 +208,8 @@ interface ClientRow {
   id: string
   name: string | null
   business_name: string | null
-  package_tier: PackageTier | null
+  package_tier: TierKey | null
+  custom_config: CustomConfig | null
   clickup_folder_id: string | null
   clickup_list_id: string | null
 }
@@ -278,7 +279,7 @@ export async function POST(req: NextRequest) {
 
     const { data: clientRaw, error: clientErr } = await sb
       .from('clients')
-      .select('id, name, business_name, package_tier, clickup_folder_id, clickup_list_id')
+      .select('id, name, business_name, package_tier, custom_config, clickup_folder_id, clickup_list_id')
       .eq('id', clientId)
       .maybeSingle()
     if (clientErr || !clientRaw) {
@@ -286,9 +287,9 @@ export async function POST(req: NextRequest) {
     }
     const client = clientRaw as ClientRow
 
-    // Per-tier deliverable counts; fall back to "lower" defaults if no tier
-    // is set so we still create something sensible.
-    const tierCfg = client.package_tier ? TIER_CONFIG[client.package_tier] : TIER_CONFIG.lower
+    // Per-tier deliverable counts; resolveTierConfig handles fixed + custom
+    // tiers and falls back to Foundation defaults if no tier is set.
+    const tierCfg = resolveTierConfig(client)
     const expected = tierCfg.perCampaign
 
     const campaignNumber = Number.isFinite(body.campaignNumber) ? Number(body.campaignNumber) : 1
@@ -412,14 +413,18 @@ export async function POST(req: NextRequest) {
             name: 'Script creation',
             description: SUBTASK_INSTRUCTIONS.scriptCreation,
           })
-          planned.push({
-            name: 'Create the long-form video',
-            description: SUBTASK_INSTRUCTIONS.longForm,
-          })
-          planned.push({
-            name: 'Create the YouTube thumbnail',
-            description: SUBTASK_INSTRUCTIONS.thumbnail,
-          })
+          // Long-form (and its YouTube thumbnail) only exist on custom plans
+          // that dial it in - the fixed tiers are reels/carousels/stories only.
+          if (expected.longForm > 0) {
+            planned.push({
+              name: expected.longForm === 1 ? 'Create the long-form video' : `Create ${expected.longForm} long-form videos`,
+              description: SUBTASK_INSTRUCTIONS.longForm,
+            })
+            planned.push({
+              name: 'Create the YouTube thumbnail',
+              description: SUBTASK_INSTRUCTIONS.thumbnail,
+            })
+          }
 
           const addBatch = (label: string, count: number, instruction: string) => {
             if (count <= 0) return

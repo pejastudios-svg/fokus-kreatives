@@ -47,7 +47,7 @@ interface OverviewResponse {
   clients: Array<{
     id: string
     name: string
-    tier: 'top' | 'middle' | 'lower' | null
+    tier: 'top' | 'middle' | 'lower' | 'custom' | null
     slotsActive: number
     spendThisMonth: number
   }>
@@ -131,10 +131,11 @@ const CATEGORY_DOT: Record<EventCategory, string> = {
   team: 'bg-rose-500',
 }
 
-const TIER_LABEL: Record<'top' | 'middle' | 'lower', string> = {
+const TIER_LABEL: Record<'top' | 'middle' | 'lower' | 'custom', string> = {
   top: 'top',
   middle: 'mid',
   lower: 'low',
+  custom: 'custom',
 }
 
 // Tabs for the activity feed - "All" is the implicit unfiltered view,

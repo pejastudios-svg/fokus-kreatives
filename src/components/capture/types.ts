@@ -27,11 +27,27 @@ export interface PackageOption {
   features?: string[]
 }
 
+/** One line item in a build-your-own (`packageMode: 'build'`) package. The
+ *  visitor picks a quantity per option; the running total updates live. */
+export interface PackageUnitOption {
+  id: string
+  name: string
+  /** Cost per unit (number; the field's packageCurrency prefixes it). */
+  unitPrice: number
+  description?: string
+  /** Max quantity the visitor can pick (e.g. 1 for a yes/no add-on like CRM
+   *  access). 0 or unset = no cap. */
+  maxQty?: number
+}
+
 export interface CaptureField {
   id: string
   type: FieldType
   label: string
   required?: boolean
+  /** When true, the field renders on neither the public page nor the preview.
+   *  Toggled by the editor's eye control. */
+  hidden?: boolean
   placeholder?: string
   description?: string
   options?: string[]
@@ -46,8 +62,22 @@ export interface CaptureField {
    *  submission's answer there. Existing lead values are never
    *  overwritten by later submissions from the same email. */
   mapToLead?: boolean
-  /** `package` fields only: the selectable plan cards. */
+  /** `package` fields: optional preset plan cards (visitor picks one). */
   packages?: PackageOption[]
+  /** `package` fields: optional custom builder - priced options the visitor
+   *  picks quantities of, with a live total. Can be shown ALONGSIDE presets. */
+  packageUnits?: PackageUnitOption[]
+  /** Currency symbol shown before custom-builder prices (default '$'). */
+  packageCurrency?: string
+  /** Custom builder: flat operational cost folded into the total once any
+   *  piece is selected. Not shown to the visitor as a separate line. */
+  packageBaseFee?: number
+  /** Custom builder: operational cost added per selected piece, folded into
+   *  the total. Not shown to the visitor as a separate line. */
+  packagePerPieceFee?: number
+  /** Custom builder: show each option's per-piece price to the visitor
+   *  (default true). When false, only the running total is shown. */
+  packageShowPrices?: boolean
   /** Which form section (multi-step page) this field belongs to. Empty
    *  / unknown means it falls into the first step. Pages with no sections
    *  ignore this and render every field on one page. */
@@ -63,6 +93,9 @@ export interface CaptureSection {
   title?: string
   /** Optional sub-text under the heading. */
   description?: string
+  /** When true, the section (and its fields) render on neither the public
+   *  page nor the preview. Toggled by the editor's eye control. */
+  hidden?: boolean
 }
 
 export interface CaptureTheme {
@@ -137,6 +170,9 @@ export interface CaptureColumn {
 export interface CaptureBlock {
   id: string
   type: CaptureBlockType
+  /** When true, the block renders on neither the public page nor the preview.
+   *  Toggled by the editor's eye control. */
+  hidden?: boolean
   align?: BlockAlign
   /** Optional font override (a CSS font-family stack from DOC_FONTS; empty =
    *  inherit the page font). */

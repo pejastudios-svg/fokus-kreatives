@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
-import { TIER_LABEL } from '@/lib/campaignTiers'
+import { TIER_KEY_LABEL, type TierKey } from '@/lib/campaignTiers'
 import {
   Sparkles,
   ExternalLink,
@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 
-type PackageTier = 'top' | 'middle' | 'lower'
+type PackageTier = TierKey
 
 type Status =
   | 'todo'
@@ -376,7 +376,7 @@ export default function CampaignsPage() {
                 />
                 {selectedClientId && pickedTier == null && (
                   <p className="mt-1 text-xs text-orange-600">
-                    No package tier set on this client. Defaults will use the Lower-tier deliverable counts.
+                    No package tier set on this client. Defaults will use the Foundation deliverable counts.
                   </p>
                 )}
               </div>
@@ -493,7 +493,7 @@ export default function CampaignsPage() {
                         </div>
                         <p className="text-xs text-[var(--text-tertiary)] mt-0.5 truncate">
                           {selectedClient?.business_name || selectedClient?.name || ''}
-                          {c.tier_at_creation ? ` · ${TIER_LABEL[c.tier_at_creation]}` : ''}
+                          {c.tier_at_creation ? ` · ${TIER_KEY_LABEL[c.tier_at_creation]}` : ''}
                           {' · '}
                           {created.toLocaleDateString(undefined, {
                             month: 'short',
@@ -867,7 +867,7 @@ function ClientCombobox({
                               : 'text-[var(--text-tertiary)]'
                           }`}
                         >
-                          {TIER_LABEL[c.package_tier]}
+                          {TIER_KEY_LABEL[c.package_tier]}
                         </span>
                       )}
                     </button>

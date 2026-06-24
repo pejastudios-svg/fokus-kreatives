@@ -27,7 +27,7 @@ import type {
   TopicInputType,
 } from '@/lib/types/questionForm'
 import type { TopicPillar } from '@/lib/types/topics'
-import type { PackageTier } from '@/lib/campaignTiers'
+import { defaultTopicCount, TIER_KEY_LABEL, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import { ClientPicker } from './ClientPicker'
 import { readStashedClientId, useApplyClientPreselect } from '@/hooks/useClientPreselect'
 
@@ -46,7 +46,8 @@ interface ClientRow {
   social_proof: string | null
   competitor_insights: string | null
   brand_profile: BrandProfile | null
-  package_tier: PackageTier | null
+  package_tier: TierKey | null
+  custom_config: CustomConfig | null
 }
 
 const PILLARS: { id: TopicPillar; label: string }[] = [
@@ -77,12 +78,11 @@ const INPUT_TYPE_LABEL: Record<TopicInputType, string> = {
   win_moment: 'Win',
 }
 
-// Doc 10.6 spec - tier-aware default topic counts.
-function defaultTopicCountForTier(tier: PackageTier | null | undefined): number {
-  if (tier === 'top') return 4
-  if (tier === 'middle') return 2
-  if (tier === 'lower') return 1
-  return 2
+// Default topic count = one topic per campaign (campaignsPerMonth), resolved
+// the same way for fixed and custom tiers.
+function defaultTopicCountForTier(client: ClientRow | null | undefined): number {
+  if (!client) return 2
+  return defaultTopicCount(client)
 }
 
 function buildProfileForClient(c: ClientRow): BrandProfile {
@@ -99,11 +99,8 @@ function buildProfileForClient(c: ClientRow): BrandProfile {
   }
 }
 
-function tierLabel(tier: PackageTier | null | undefined): string {
-  if (tier === 'top') return 'Top'
-  if (tier === 'middle') return 'Middle'
-  if (tier === 'lower') return 'Lower'
-  return 'Untiered'
+function tierLabel(tier: TierKey | null | undefined): string {
+  return tier ? TIER_KEY_LABEL[tier] : 'Untiered'
 }
 
 export function QuestionsFormEngine() {
@@ -152,7 +149,7 @@ export function QuestionsFormEngine() {
   // Sync default topic count when the selected client's tier changes.
   useEffect(() => {
     if (selectedClient) {
-      setTopicCount(defaultTopicCountForTier(selectedClient.package_tier))
+      setTopicCount(defaultTopicCountForTier(selectedClient))
     }
   }, [selectedClient])
 
@@ -407,7 +404,7 @@ export function QuestionsFormEngine() {
               {selectedClient && (
                 <p className="text-[11px] text-theme-tertiary mt-1">
                   Tier: {tierLabel(selectedClient.package_tier)} · default{' '}
-                  {defaultTopicCountForTier(selectedClient.package_tier)}
+                  {defaultTopicCountForTier(selectedClient)}
                 </p>
               )}
             </div>

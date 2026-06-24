@@ -33,6 +33,8 @@ import {
   Quote,
   GalleryHorizontal,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { DOC_FONTS, DOC_FONTS_URL } from '@/components/agreements/docStyles'
@@ -528,7 +530,8 @@ function BlockEditor({ block, onChange }: { block: CaptureBlock; onChange: (patc
                 {eds.map((e, i) => (
                   <div key={i} className="space-y-1.5 rounded-lg border border-[var(--border-primary)] p-2">
                     <div className="flex gap-2">
-                      <input className={INPUT} value={e.url} onChange={(ev) => setEd(i, { url: ev.target.value })} placeholder="Paste a YouTube / Loom / Vimeo link" />
+                      <input className={INPUT} value={e.url} onChange={(ev) => setEd(i, { url: ev.target.value })} placeholder="Paste a link, or upload a video" />
+                      <UploadButton folder="capture-pages/videos" accept="video/*,image/*" label="Upload" onUrl={(url) => setEd(i, { url })} />
                       <button type="button" onClick={() => onChange({ embeds: eds.filter((_, j) => j !== i) })} className="p-2 rounded-md text-[var(--text-tertiary)] hover:text-red-500 shrink-0">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -820,6 +823,7 @@ function BlockCard({
   dragging,
   subtitle,
   onToggle,
+  onToggleHidden,
   onDelete,
   onDragStartId,
   onDragEnd,
@@ -830,6 +834,7 @@ function BlockCard({
   dragging: boolean
   subtitle?: string
   onToggle: () => void
+  onToggleHidden: () => void
   onDelete: () => void
   onDragStartId: (id: string) => void
   onDragEnd: () => void
@@ -837,7 +842,7 @@ function BlockCard({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   return (
-    <div ref={ref} className={`rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] ${dragging ? 'opacity-40' : ''}`}>
+    <div ref={ref} className={`rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] ${dragging ? 'opacity-40' : ''} ${block.hidden ? 'opacity-50' : ''}`}>
       <div
         draggable
         onDragStart={(e) => {
@@ -852,8 +857,20 @@ function BlockCard({
         <GripVertical className="h-4 w-4 text-[var(--text-tertiary)] shrink-0" />
         <button type="button" onClick={onToggle} className="flex-1 text-left text-sm font-medium text-[var(--text-primary)] truncate">
           {blockLabel(block.type)}
+          {block.hidden ? <span className="ml-2 font-normal text-[var(--text-tertiary)]">· hidden</span> : null}
           {subtitle ? <span className="ml-2 font-normal text-[var(--text-tertiary)]">{subtitle}</span> : null}
         </button>
+        <Tooltip content={block.hidden ? 'Hidden - click to show' : 'Hide from page'}>
+          <button
+            type="button"
+            onClick={onToggleHidden}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            className={`${iconBtn} ${block.hidden ? 'text-[#2B79F7]' : ''}`}
+          >
+            {block.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </Tooltip>
         <Tooltip content="Delete">
           <button type="button" onClick={onDelete} draggable={false} onDragStart={(e) => e.preventDefault()} className={iconBtn}>
             <Trash2 className="h-4 w-4" />
@@ -982,6 +999,7 @@ export function CaptureBlocksEditor({ blocks, onChange }: Props) {
                     open={isOpen(cb.id)}
                     dragging={dragId === cb.id}
                     onToggle={() => toggle(cb.id)}
+                    onToggleHidden={() => patchColumn(b.id, col.id, (c) => ({ ...c, blocks: (c.blocks || []).map((x) => (x.id === cb.id ? { ...x, hidden: !x.hidden } : x)) }))}
                     onDelete={() => patchColumn(b.id, col.id, (c) => ({ ...c, blocks: (c.blocks || []).filter((x) => x.id !== cb.id) }))}
                     onDragStartId={setDragId}
                     onDragEnd={() => setDragId(null)}
@@ -1023,6 +1041,7 @@ export function CaptureBlocksEditor({ blocks, onChange }: Props) {
               dragging={dragId === b.id}
               subtitle={subtitle}
               onToggle={() => toggle(b.id)}
+              onToggleHidden={() => patch(b.id, { hidden: !b.hidden })}
               onDelete={() => remove(b.id)}
               onDragStartId={setDragId}
               onDragEnd={() => setDragId(null)}

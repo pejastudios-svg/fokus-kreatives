@@ -625,10 +625,10 @@ export default function BrandExportPage() {
                   {competitors.map((c, i) => (
                     <tr key={i} className="break-inside-avoid border-t border-gray-100 align-top">
                       <td className="px-3 py-2 font-medium text-gray-900">{c.name_or_handle}</td>
-                      <td className="px-3 py-2 text-gray-600">{c.follower_count || '—'}</td>
-                      <td className="px-3 py-2 text-gray-700">{c.does_well || '—'}</td>
-                      <td className="px-3 py-2 text-gray-700">{c.does_poorly || '—'}</td>
-                      <td className="px-3 py-2 text-gray-700">{c.differentiate || '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{c.follower_count || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{c.does_well || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{c.does_poorly || '-'}</td>
+                      <td className="px-3 py-2 text-gray-700">{c.differentiate || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

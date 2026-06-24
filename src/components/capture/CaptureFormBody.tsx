@@ -118,21 +118,28 @@ export function CaptureFormBody({
     "You're in! Let's Keep Going."
 
   // --- Build steps from sections -----------------------------------------
+  // Hidden fields render nowhere (and aren't required-validated).
+  const visibleFields = fields.filter((f) => !f.hidden)
   const sections = pageInfo.sections ?? []
   const steps: { section: CaptureSection | null; fields: CaptureField[] }[] =
     sections.length === 0
-      ? [{ section: null, fields }]
+      ? [{ section: null, fields: visibleFields }]
       : (() => {
+          // `known` includes ALL section ids (even hidden) so a hidden
+          // section's fields aren't mistaken for orphans and surfaced anyway.
           const known = new Set(sections.map((s) => s.id))
-          const grouped = sections.map((s) => ({
+          const visible = sections.filter((s) => !s.hidden)
+          const grouped = visible.map((s) => ({
             section: s,
-            fields: fields.filter((f) => f.sectionId === s.id),
+            fields: visibleFields.filter((f) => f.sectionId === s.id),
           }))
-          // Fields with no / unknown section fall into the first step.
-          const orphans = fields.filter((f) => !f.sectionId || !known.has(f.sectionId))
+          // Fields with no / unknown section fall into the first visible step.
+          const orphans = visibleFields.filter((f) => !f.sectionId || !known.has(f.sectionId))
           if (orphans.length && grouped.length) {
             grouped[0] = { section: grouped[0].section, fields: [...orphans, ...grouped[0].fields] }
           }
+          // If every section is hidden, fall back to showing orphans only.
+          if (grouped.length === 0) return [{ section: null, fields: orphans }]
           return grouped
         })()
 
@@ -155,6 +162,12 @@ export function CaptureFormBody({
   const [repeatLists, setRepeatLists] = useState<Record<string, string[]>>({})
   // Brief celebratory burst when a package card is selected.
   const [showConfetti, setShowConfetti] = useState(false)
+  // Build-your-own package state: per-field quantities and a "done" flag that
+  // collapses the builder into a summary (still re-openable via Edit).
+  const [buildQty, setBuildQty] = useState<Record<string, Record<string, number>>>({})
+  const [buildDone, setBuildDone] = useState<Record<string, boolean>>({})
+  // Selected preset plan name per package field (presets + custom can coexist).
+  const [pkgPreset, setPkgPreset] = useState<Record<string, string>>({})
   const current = steps[Math.min(step, steps.length - 1)]
   const isLast = step >= steps.length - 1
   const isMultiStep = steps.length > 1
@@ -221,12 +234,48 @@ export function CaptureFormBody({
     if (triedSubmit) setTriedSubmit(false)
   }
 
-  const selectPackage = (id: string, name: string) => {
-    handleSetValue(id, name)
+  const fireConfetti = () => {
     setShowConfetti(false)
-    // Next tick so re-selecting another card re-triggers the mount animation.
+    // Next tick so re-triggering re-mounts the animation.
     window.requestAnimationFrame(() => setShowConfetti(true))
     window.setTimeout(() => setShowConfetti(false), 2200)
+  }
+
+  // --- Package helpers (presets + custom builder can both be present) ---
+  const qtyFor = (fieldId: string, optId: string) => buildQty[fieldId]?.[optId] ?? 0
+  const setQty = (fieldId: string, optId: string, n: number) => {
+    setBuildQty((m) => ({ ...m, [fieldId]: { ...(m[fieldId] || {}), [optId]: Math.max(0, Math.min(999, n)) } }))
+    if (triedSubmit) setTriedSubmit(false)
+  }
+  const buildSummary = (f: CaptureField) => {
+    const cur = f.packageCurrency ?? '$'
+    const picked = (f.packageUnits || []).filter((u) => qtyFor(f.id, u.id) > 0)
+    const piecesSubtotal = picked.reduce((s, u) => s + qtyFor(f.id, u.id) * (u.unitPrice || 0), 0)
+    const totalQty = picked.reduce((s, u) => s + qtyFor(f.id, u.id), 0)
+    // Operational costs are folded into the total once at least one piece is
+    // picked: a flat base plus a per-piece amount. Not shown as separate lines.
+    const base = picked.length > 0 ? (f.packageBaseFee || 0) + (f.packagePerPieceFee || 0) * totalQty : 0
+    const total = piecesSubtotal + base
+    const line = picked.map((u) => `${qtyFor(f.id, u.id)}x ${u.name}`).join(', ')
+    return { cur, picked, total, summary: line ? `${line} | Total: ${cur}${total}` : '' }
+  }
+  // The field's saved value combines the chosen preset (if any) and the
+  // committed custom build (if any) so neither is lost when both are offered.
+  const combinedPackageValue = (f: CaptureField, presetName: string, customDone: boolean) => {
+    const custom = customDone ? buildSummary(f).summary : ''
+    return [presetName, custom].filter(Boolean).join(' + ')
+  }
+  const selectPackage = (f: CaptureField, name: string) => {
+    // Re-clicking the selected preset clears it.
+    const next = pkgPreset[f.id] === name ? '' : name
+    setPkgPreset((m) => ({ ...m, [f.id]: next }))
+    handleSetValue(f.id, combinedPackageValue(f, next, !!buildDone[f.id]))
+    if (next) fireConfetti()
+  }
+  const finishBuild = (f: CaptureField) => {
+    setBuildDone((m) => ({ ...m, [f.id]: true }))
+    handleSetValue(f.id, combinedPackageValue(f, pkgPreset[f.id] || '', true))
+    fireConfetti()
   }
 
   if (success) {
@@ -393,83 +442,159 @@ export function CaptureFormBody({
     // Package picker: selectable plan cards. Single-select; selecting shows a
     // check + a confetti pop and stays put (no auto-advance).
     if (f.type === 'package') {
-      const selected = values[f.id] || ''
+      const { cur, picked, total } = buildSummary(f)
+      const done = !!buildDone[f.id]
+      const units = f.packageUnits || []
       const pkgs = f.packages || []
+      const selectedPreset = pkgPreset[f.id] || ''
+      // Per-piece price shown to the visitor folds in the per-piece fee so the
+      // line math stays consistent; the flat base is the only folded add-on.
+      const showPrices = f.packageShowPrices ?? true
+      const effUnit = (u: { unitPrice: number }) => (u.unitPrice || 0) + (f.packagePerPieceFee || 0)
+      const header = (f.label || f.description) && (
+        <div className="mb-2">
+          {f.label && (
+            <label className="block text-sm font-medium text-[var(--text-secondary)]">
+              {f.label}
+              {f.required ? ' *' : ''}
+            </label>
+          )}
+          {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{f.description}</p>}
+        </div>
+      )
       return (
         <div key={f.id} className="min-w-0">
-          {(f.label || f.description) && (
-            <div className="mb-2">
-              {f.label && (
-                <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                  {f.label}
-                  {f.required ? ' *' : ''}
-                </label>
-              )}
-              {f.description && (
-                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{f.description}</p>
-              )}
+          {header}
+          {/* Preset plan cards (optional) - pick one. */}
+          {pkgs.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {pkgs.map((p) => {
+                const isSel = selectedPreset === p.name
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => selectPackage(f, p.name)}
+                    className="relative w-full text-left rounded-xl border-2 p-4 transition-all hover:shadow-md flex flex-col"
+                    style={{ borderColor: isSel ? accent : 'var(--border-primary)', backgroundColor: isSel ? `${accent}14` : 'var(--bg-input)' }}
+                  >
+                    {isSel && (
+                      <span className="absolute top-3 right-3 h-6 w-6 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: accent }}>
+                        <Check className="h-4 w-4" />
+                      </span>
+                    )}
+                    <p className="text-base font-bold text-[var(--text-primary)] pr-7">{p.name}</p>
+                    {p.subtitle && <p className="text-xs text-[var(--text-tertiary)]">{p.subtitle}</p>}
+                    {p.price && <p className="mt-2 text-2xl font-extrabold text-[var(--text-primary)]">{p.price}</p>}
+                    {(() => {
+                      const feats = (p.features || []).filter((ft) => ft.trim() !== '')
+                      if (feats.length === 0) return null
+                      return (
+                        <ul className="mt-3 space-y-1.5 flex-1">
+                          {feats.map((ft, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                              <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: accent }} />
+                              <span>{ft}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    })()}
+                    <span className="mt-4 inline-flex items-center justify-center w-full rounded-full px-4 py-2 text-sm font-semibold" style={isSel ? { backgroundColor: accent, color: '#fff' } : { border: `1px solid ${accent}`, color: accent }}>
+                      {isSel ? 'Selected' : 'Select'}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )}
-          <div className="flex flex-col gap-3">
-            {pkgs.map((p) => {
-              const isSel = selected === p.name
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => selectPackage(f.id, p.name)}
-                  className="relative w-full text-left rounded-xl border-2 p-4 transition-all hover:shadow-md flex flex-col"
-                  style={{
-                    borderColor: isSel ? accent : 'var(--border-primary)',
-                    backgroundColor: isSel ? `${accent}14` : 'var(--bg-input)',
-                  }}
-                >
-                  {isSel && (
-                    <span
-                      className="absolute top-3 right-3 h-6 w-6 rounded-full flex items-center justify-center text-white"
-                      style={{ backgroundColor: accent, backgroundImage: 'none' }}
-                    >
-                      <Check className="h-4 w-4" />
-                    </span>
-                  )}
-                  <p className="text-base font-bold text-[var(--text-primary)] pr-7">{p.name}</p>
-                  {p.subtitle && (
-                    <p className="text-xs text-[var(--text-tertiary)]">{p.subtitle}</p>
-                  )}
-                  {p.price && (
-                    <p className="mt-2 text-2xl font-extrabold text-[var(--text-primary)]">{p.price}</p>
-                  )}
-                  {(() => {
-                    const feats = (p.features || []).filter((ft) => ft.trim() !== '')
-                    if (feats.length === 0) return null
-                    return (
-                      <ul className="mt-3 space-y-1.5 flex-1">
-                        {feats.map((ft, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2 text-sm text-[var(--text-secondary)]"
-                          >
-                            <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: accent }} />
-                            <span>{ft}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )
-                  })()}
-                  <span
-                    className="mt-4 inline-flex items-center justify-center w-full rounded-full px-4 py-2 text-sm font-semibold"
-                    style={
-                      isSel
-                        ? { backgroundColor: accent, color: '#fff' }
-                        : { border: `1px solid ${accent}`, color: accent }
-                    }
-                  >
-                    {isSel ? 'Selected' : 'Select'}
-                  </span>
+          {/* Custom builder (optional) - shown alongside presets. */}
+          {units.length > 0 && (
+          <div className={pkgs.length > 0 ? 'mt-4' : ''}>
+          {pkgs.length > 0 && (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Or build your own</p>
+          )}
+          {done && picked.length > 0 ? (
+            // Selected: collapsed summary card (renders like a chosen plan), still editable.
+            <div className="rounded-xl border-2 p-4" style={{ borderColor: accent, backgroundColor: `${accent}14` }}>
+              <div className="flex items-center justify-between">
+                <p className="text-base font-bold text-[var(--text-primary)]">Your package</p>
+                <button type="button" onClick={() => setBuildDone((m) => ({ ...m, [f.id]: false }))} className="text-sm font-medium underline" style={{ color: accent }}>
+                  Edit
                 </button>
-              )
-            })}
+              </div>
+              <ul className="mt-3 space-y-1.5">
+                {picked.map((u) => (
+                  <li key={u.id} className="flex items-center justify-between text-sm text-[var(--text-secondary)]">
+                    <span>{qtyFor(f.id, u.id)}x {u.name}</span>
+                    {showPrices && <span className="tabular-nums">{cur}{qtyFor(f.id, u.id) * effUnit(u)}</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex items-center justify-between border-t border-[var(--border-primary)] pt-3 text-lg font-extrabold text-[var(--text-primary)]">
+                <span>Total</span>
+                <span className="tabular-nums">{cur}{total}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {units.map((u) => {
+                const q = qtyFor(f.id, u.id)
+                return (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 rounded-xl border-2 p-3 transition-colors"
+                    style={{
+                      borderColor: q > 0 ? accent : 'var(--border-primary)',
+                      backgroundColor: q > 0 ? `${accent}14` : 'var(--bg-input)',
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-[var(--text-primary)] break-words">{u.name}</p>
+                      {u.description && <p className="text-xs text-[var(--text-tertiary)] break-words">{u.description}</p>}
+                      {showPrices && (
+                        <p className="text-sm font-bold text-[var(--text-primary)]">
+                          {cur}{effUnit(u)}
+                          <span className="text-xs font-normal text-[var(--text-tertiary)]"> each</span>
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <button type="button" onClick={() => setQty(f.id, u.id, q - 1)} aria-label="Decrease" className="h-8 w-8 rounded-full border border-[var(--border-primary)] text-lg leading-none text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40" disabled={q === 0}>
+                        -
+                      </button>
+                      <span className="w-6 sm:w-7 text-center tabular-nums font-semibold text-[var(--text-primary)]">{q}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQty(f.id, u.id, u.maxQty && u.maxQty > 0 ? Math.min(q + 1, u.maxQty) : q + 1)}
+                        aria-label="Increase"
+                        disabled={!!u.maxQty && u.maxQty > 0 && q >= u.maxQty}
+                        className="h-8 w-8 rounded-full text-lg leading-none text-white disabled:opacity-40"
+                        style={{ backgroundColor: accent }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Total</span>
+                <span className="text-xl font-extrabold text-[var(--text-primary)] tabular-nums">{cur}{total}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => finishBuild(f)}
+                disabled={picked.length === 0}
+                className="w-full rounded-full px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: accent }}
+              >
+                Done
+              </button>
+            </div>
+          )}
           </div>
+          )}
         </div>
       )
     }

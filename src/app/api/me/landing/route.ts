@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { effectiveCrmTier, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 
 // Resolves where the signed-in user belongs. Used by both AuthGuard
 // and the login page so neither has to do its own RLS-bound lookups
@@ -84,10 +85,16 @@ export async function GET() {
   if (userRow.role === 'client' && userRow.client_id) {
     const { data: client } = await admin
       .from('clients')
-      .select('package_tier')
+      .select('package_tier, custom_config')
       .eq('id', userRow.client_id)
       .maybeSingle()
-    if (client?.package_tier === 'lower') {
+    // Foundation (lower) - and any custom plan with no CRM access - land on the
+    // slim portal; everyone else gets their full CRM dashboard.
+    const crmTier = effectiveCrmTier({
+      package_tier: (client?.package_tier as TierKey | null) ?? null,
+      custom_config: (client?.custom_config as CustomConfig | null) ?? null,
+    })
+    if (crmTier === 'lower') {
       return NextResponse.json<LandingResponse>({
         authed: true,
         destination: '/portal/approvals',

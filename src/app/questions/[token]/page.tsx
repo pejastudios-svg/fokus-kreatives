@@ -171,6 +171,24 @@ export default function QuestionFormPage() {
     return Object.values(answers).filter((v) => v && v.trim().length > 0).length
   }, [form, isTopicForm, answers, topicAnswers])
 
+  // Count answers that are filled in but read thin - the ones that may not
+  // turn into content. Drives the per-topic chip and the submit nudge.
+  const thinCount = useMemo(() => {
+    if (!form) return 0
+    if (isTopicForm) {
+      let n = 0
+      for (const t of form.topics) {
+        const ans = topicAnswers[t.id] || {}
+        for (const q of t.questions) {
+          const v = ans[q.id]
+          if (v && v.trim() && isThinAnswer(v)) n++
+        }
+      }
+      return n
+    }
+    return Object.values(answers).filter((v) => v && v.trim() && isThinAnswer(v)).length
+  }, [form, isTopicForm, answers, topicAnswers])
+
   const handleLegacyChange = (id: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [id]: value }))
   }
@@ -340,6 +358,10 @@ export default function QuestionFormPage() {
             const expanded = expandedTopics.has(topic.id)
             const topicAns = topicAnswers[topic.id] || {}
             const answeredHere = topic.questions.filter((q) => topicAns[q.id]?.trim()).length
+            const thinHere = topic.questions.filter((q) => {
+              const v = topicAns[q.id]
+              return !!v && !!v.trim() && isThinAnswer(v)
+            }).length
             return (
               <Card key={topic.id}>
                 <button
@@ -366,6 +388,14 @@ export default function QuestionFormPage() {
                             <span>
                               {answeredHere} of {topic.questions.length} answered
                             </span>
+                            {thinHere > 0 && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span className="text-amber-600 dark:text-amber-500 font-semibold">
+                                  {thinHere} need{thinHere === 1 ? 's' : ''} detail
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -429,9 +459,22 @@ export default function QuestionFormPage() {
           <div className="p-4 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
         )}
 
+        {thinCount > 0 && (
+          <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-3">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              {thinCount} answer{thinCount === 1 ? ' is' : 's are'} a little short and may not turn into content.
+              Add a specific moment, number, or name to each. You can still submit as is.
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between flex-wrap gap-3">
           <p className="text-sm text-[var(--text-tertiary)]">
             {answeredCount} of {totalQuestions} answered
+            {thinCount > 0 && (
+              <span className="text-amber-600 dark:text-amber-500"> · {thinCount} need detail</span>
+            )}
           </p>
           <Button
             onClick={handleSubmit}

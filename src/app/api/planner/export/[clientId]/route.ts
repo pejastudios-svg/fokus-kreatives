@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { TIER_CONFIG, type PackageTier } from '@/lib/campaignTiers'
+import { resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import { exportDoc, getGlobalShareList, type DocSegment, type CampaignSection, type AssetSubTab } from '@/lib/google/docExport'
 
 export const runtime = 'nodejs'
@@ -79,21 +79,24 @@ export async function POST(
 
     const { data: client, error: clientErr } = await admin
       .from('clients')
-      .select('id, business_name, name, package_tier')
+      .select('id, business_name, name, package_tier, custom_config')
       .eq('id', clientId)
       .maybeSingle()
     if (clientErr || !client) {
       return NextResponse.json({ success: false, error: 'Client not found' }, { status: 404 })
     }
 
-    const tier = client.package_tier as PackageTier | null
+    const tier = client.package_tier as TierKey | null
     if (!tier) {
       return NextResponse.json(
         { success: false, error: 'Client has no package_tier set. Set it before exporting.' },
         { status: 400 },
       )
     }
-    const tierCfg = TIER_CONFIG[tier]
+    const tierCfg = resolveTierConfig({
+      package_tier: tier,
+      custom_config: (client.custom_config as CustomConfig | null) ?? null,
+    })
     const brandName = killDashes(
       (client.business_name as string | null) || (client.name as string | null) || 'Brand',
     )

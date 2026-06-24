@@ -1,4 +1,5 @@
 import type { ContentFormat } from './types'
+import { selectHookAngles, renderHookAngleBlock } from '@/lib/planner/hookBank'
 
 // Renders a content_formats row as a system-prompt-ready text block.
 // Spec: docs/content_planner_buildout.md section 9.2.
@@ -56,6 +57,15 @@ export function buildFormatPromptBlock(
     })
     .join('\n\n')
 
+  // Hook angle bank for every non-long-form asset. Seeded by format slug so
+  // each format draws a consistent, bucket-appropriate angle subset; the
+  // generator expands + grounds them (never verbatim). Long-form opens on its
+  // own title/intro, so it's excluded.
+  const angleBlock =
+    stream === 'long_form'
+      ? ''
+      : renderHookAngleBlock(selectHookAngles({ bucket: format.bucket, seed: format.slug }))
+
   const hookBlock = format.hook_patterns.length
     ? [
         'HOOK PATTERNS (REQUIRED - pick or adapt one of these for the opening line. Do NOT freelance the hook. The hook is what decides whether anyone watches the rest):',
@@ -110,6 +120,7 @@ export function buildFormatPromptBlock(
     format.secret_sauce,
     '',
     hookBlock,
+    angleBlock,
     refBlock,
   )
 

@@ -550,6 +550,35 @@ async function generateScriptForSlotInner(
   })
   if (grammarFixed) cleanScript = grammarFixed
 
+  // 16c. Caption safety net. Short-form / engagement-reel / carousel posts
+  //      MUST ship with a [CAPTION], but unlike long-form there's no
+  //      required-section validator, so an occasional model omission (or a
+  //      post-step rewrite that drops it) slips through. If the caption is
+  //      missing or empty, generate one from the finished script and splice it
+  //      in before [HASHTAGS]. Long-form uses [DESCRIPTION], not [CAPTION].
+  if (stream === 'short_form' || stream === 'engagement_reel' || stream === 'carousel') {
+    if (!scriptHasCaption(cleanScript)) {
+      console.log(`[generateScript] caption missing for ${stream} - repairing.`)
+      const caption = await generateCaptionForScript({
+        script: cleanScript,
+        stream,
+        brandName: brandName ?? null,
+        clientId: slotData.client_id as string,
+      })
+      if (caption) cleanScript = spliceCaption(cleanScript, caption)
+    }
+    // Same safety net for [HASHTAGS] - the last section, so the most likely
+    // to be dropped or truncated.
+    if (!scriptHasHashtags(cleanScript)) {
+      console.log(`[generateScript] hashtags missing for ${stream} - repairing.`)
+      const hashtags = await generateHashtagsForScript({
+        script: cleanScript,
+        clientId: slotData.client_id as string,
+      })
+      if (hashtags) cleanScript = spliceHashtags(cleanScript, hashtags)
+    }
+  }
+
   // 17. For long-form, evaluate the checklist via a SEPARATE Pro call now
   //     that the script is fully post-processed and sanitized. Replaces
   //     the manual_check defaults from step 10 with real grades. For
@@ -1052,6 +1081,109 @@ function parseScriptOutput(content: string): {
     }
   }
   return { script, checklist: checklistRaw as unknown as ChecklistItem[] }
+}
+
+/** True when the script has a [CAPTION] section with non-empty content. */
+function scriptHasCaption(script: string): boolean {
+  const m = script.match(/\[CAPTION\][^\n]*((?:\n(?!\[[A-Z])[^\n]*)*)/i)
+  return !!m && m[1].trim().length > 0
+}
+
+/** Insert (or fill an empty) [CAPTION] section, before [HASHTAGS] when present. */
+function spliceCaption(script: string, caption: string): string {
+  const block = `[CAPTION]\n${caption.trim()}`
+  // Fill an existing (empty) [CAPTION] label in place.
+  if (/\[CAPTION\]/i.test(script)) {
+    return script.replace(/\[CAPTION\][^\n]*(?:\n(?!\[[A-Z])[^\n]*)*/i, block)
+  }
+  // Otherwise insert before [HASHTAGS].
+  const hashMatch = script.match(/\n?\[HASHTAGS\]/i)
+  if (hashMatch && hashMatch.index !== undefined) {
+    const i = hashMatch.index
+    return `${script.slice(0, i).trimEnd()}\n\n${block}\n\n${script.slice(i).replace(/^\n+/, '')}`
+  }
+  return `${script.trimEnd()}\n\n${block}`
+}
+
+/** Targeted caption generation for a finished non-long-form script. Used only
+ *  as a repair when the main generation dropped the [CAPTION] section. */
+async function generateCaptionForScript(opts: {
+  script: string
+  stream: SlotStream
+  brandName: string | null
+  clientId: string
+}): Promise<string | null> {
+  const lengthHint =
+    opts.stream === 'carousel'
+      ? 'A 40-80 word caption that complements the carousel and teaches the takeaway.'
+      : 'A 60-120 word caption that TEACHES the takeaway. Do NOT describe the video.'
+  const system = `You write the Instagram/TikTok post CAPTION for a finished ${opts.stream.replace('_', ' ')} script.${opts.brandName ? ` Brand: ${opts.brandName}.` : ''}
+- ${lengthHint}
+- Plain prose. No hashtags, no "link in bio".
+- No AI tells, no em dashes, no "the truth about", no rhetorical-question-then-fragment answers.
+- Return ONLY the caption text. No labels, no brackets, no surrounding quotes.`
+  const user = `SCRIPT:\n${opts.script}\n\nWrite the caption now.`
+  try {
+    const result = await generateScript({
+      system,
+      user,
+      temperature: 0.6,
+      maxTokens: 400,
+      quality: 'standard',
+      route: `planner.caption_repair.${opts.stream}`,
+      clientId: opts.clientId,
+    })
+    const text = (result.content || '').trim().replace(/^["'[]+|["'\]]+$/g, '').trim()
+    return text.length > 0 ? text : null
+  } catch (e) {
+    console.warn('[generateScript] caption repair failed:', e)
+    return null
+  }
+}
+
+/** True when the script has a [HASHTAGS] section with at least one tag. */
+function scriptHasHashtags(script: string): boolean {
+  const m = script.match(/\[HASHTAGS\][^\n]*((?:\n(?!\[[A-Z])[^\n]*)*)/i)
+  if (!m) return false
+  return /#\w/.test(`${m[0]}`)
+}
+
+/** Insert (or fill an empty) [HASHTAGS] section at the end of the script. */
+function spliceHashtags(script: string, hashtags: string): string {
+  const block = `[HASHTAGS]\n${hashtags.trim()}`
+  if (/\[HASHTAGS\]/i.test(script)) {
+    return script.replace(/\[HASHTAGS\][^\n]*(?:\n(?!\[[A-Z])[^\n]*)*/i, block)
+  }
+  return `${script.trimEnd()}\n\n${block}`
+}
+
+/** Targeted hashtag generation, used only when the main generation dropped
+ *  the [HASHTAGS] section. Returns a single space-separated line of tags. */
+async function generateHashtagsForScript(opts: {
+  script: string
+  clientId: string
+}): Promise<string | null> {
+  const system = `You write the hashtag set for a finished Instagram/TikTok post.
+- Return 8-14 unique, relevant hashtags on ONE line, space-separated, each starting with #.
+- Mix broad and niche tags drawn from the script's topic. No banned/spammy tags, no duplicates.
+- Return ONLY the hashtag line. No labels, no brackets, no commentary.`
+  const user = `SCRIPT:\n${opts.script}\n\nWrite the hashtags now.`
+  try {
+    const result = await generateScript({
+      system,
+      user,
+      temperature: 0.5,
+      maxTokens: 150,
+      quality: 'cheap',
+      route: 'planner.hashtag_repair',
+      clientId: opts.clientId,
+    })
+    const text = (result.content || '').trim().replace(/^["'[]+|["'\]]+$/g, '').trim()
+    return /#\w/.test(text) ? text : null
+  } catch (e) {
+    console.warn('[generateScript] hashtag repair failed:', e)
+    return null
+  }
 }
 
 /** Pull the HOOK line from each saved script in `client + same stream`,
