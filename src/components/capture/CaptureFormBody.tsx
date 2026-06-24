@@ -259,22 +259,24 @@ export function CaptureFormBody({
     const line = picked.map((u) => `${qtyFor(f.id, u.id)}x ${u.name}`).join(', ')
     return { cur, picked, total, summary: line ? `${line} | Total: ${cur}${total}` : '' }
   }
-  // The field's saved value combines the chosen preset (if any) and the
-  // committed custom build (if any) so neither is lost when both are offered.
-  const combinedPackageValue = (f: CaptureField, presetName: string, customDone: boolean) => {
-    const custom = customDone ? buildSummary(f).summary : ''
-    return [presetName, custom].filter(Boolean).join(' + ')
-  }
+  // A package field holds ONE choice at a time: either a preset OR a custom
+  // build. Picking a preset clears any custom build; finishing a custom build
+  // clears the preset.
   const selectPackage = (f: CaptureField, name: string) => {
     // Re-clicking the selected preset clears it.
     const next = pkgPreset[f.id] === name ? '' : name
     setPkgPreset((m) => ({ ...m, [f.id]: next }))
-    handleSetValue(f.id, combinedPackageValue(f, next, !!buildDone[f.id]))
+    // Choosing a preset wipes any custom build in progress / done.
+    setBuildQty((m) => ({ ...m, [f.id]: {} }))
+    setBuildDone((m) => ({ ...m, [f.id]: false }))
+    handleSetValue(f.id, next)
     if (next) fireConfetti()
   }
   const finishBuild = (f: CaptureField) => {
     setBuildDone((m) => ({ ...m, [f.id]: true }))
-    handleSetValue(f.id, combinedPackageValue(f, pkgPreset[f.id] || '', true))
+    // Finishing a custom build deselects any chosen preset.
+    setPkgPreset((m) => ({ ...m, [f.id]: '' }))
+    handleSetValue(f.id, buildSummary(f).summary)
     fireConfetti()
   }
 
