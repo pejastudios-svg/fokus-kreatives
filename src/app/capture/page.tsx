@@ -779,30 +779,7 @@ function FormBuilderModal({ form, onSave, onClose, isSaving }: {
                 <p className="text-sm text-[var(--text-tertiary)] mb-4">Enable meeting booking in your forms</p>
                 
                 <div className="space-y-4">
-                  <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.settings.integrations.zoom}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        settings: { 
-                          ...prev.settings, 
-                          integrations: { ...prev.settings.integrations, zoom: e.target.checked } 
-                        } 
-                      }))}
-                      className="rounded bg-[var(--bg-input)] border-[var(--border-primary)] text-[#2B79F7] h-5 w-5"
-                    />
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <Video className="h-5 w-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <span className="text-white font-medium">Zoom</span>
-                        <p className="text-sm text-[var(--text-tertiary)]">Schedule Zoom meetings directly from forms</p>
-                      </div>
-                    </div>
-                  </label>
-                  
+                  {/* Zoom archived - removed as a meeting platform option. */}
                   <label className="flex items-center gap-3 p-4 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl cursor-pointer">
                     <input
                       type="checkbox"

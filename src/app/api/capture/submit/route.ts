@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
     // 1) Find the capture page
     const { data: page, error: pageError } = await supabase
       .from('capture_pages')
-      .select('id, client_id, name, slug, headline, description, lead_magnet_url, lead_magnet_type, success_message, success_button_text, include_meeting, calendly_url, meeting_integration, block_duplicate_emails, meeting_duration_minutes, fields')
+      .select('id, client_id, name, slug, headline, description, lead_magnet_url, lead_magnet_type, success_message, success_button_text, thank_you_enabled, thank_you_subject, thank_you_body, include_meeting, calendly_url, meeting_integration, block_duplicate_emails, meeting_duration_minutes, fields')
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
@@ -858,6 +858,56 @@ const submissionData = {
       }
     } catch (magnetErr) {
       console.error('Capture lead magnet email error:', magnetErr)
+    }
+
+    // 8) Optional thank-you email to the submitter. Custom subject + body with
+    //    {{Field}} merge tokens resolved from their answers, sent from the
+    //    connected account via Apps Script (same path as the lead magnet).
+    try {
+      const scriptUrl = process.env.APPS_SCRIPT_WEBHOOK_URL
+      const secret = process.env.APPS_SCRIPT_SECRET
+      const recipient = submissionData.email ? String(submissionData.email).trim() : ''
+      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)
+      const tyEnabled = (page as { thank_you_enabled?: boolean }).thank_you_enabled === true
+
+      if (scriptUrl && secret && tyEnabled && validEmail) {
+        const { fillThankYouTemplate, escapeHtml } = await import('@/lib/capture/thankYouEmail')
+        const ctx = {
+          values: v as Record<string, unknown>,
+          fieldLabels,
+          name: (submissionData.name as string | null) ?? null,
+          email: (submissionData.email as string | null) ?? null,
+          phone: (submissionData.phone as string | null) ?? null,
+        }
+        const tySubjectRaw = (page as { thank_you_subject?: string | null }).thank_you_subject || 'Thank you'
+        const tyBodyRaw = (page as { thank_you_body?: string | null }).thank_you_body || ''
+        const subject = fillThankYouTemplate(String(tySubjectRaw), ctx).trim() || 'Thank you'
+        const bodyText = fillThankYouTemplate(String(tyBodyRaw), ctx)
+
+        if (bodyText.trim()) {
+          const html =
+            `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;white-space:pre-wrap;">` +
+            `${escapeHtml(bodyText)}</div>`
+          const res = await fetch(scriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              secret,
+              type: 'thank_you',
+              payload: { to: recipient, subject, html, clientName: clientDisplayName },
+            }),
+          })
+          const text = await res.text()
+          if (res.ok && !text.startsWith('Error:') && !text.startsWith('Unauthorized')) {
+            const { logEmailSend } = await import('@/lib/email/sendLog')
+            void logEmailSend({ clientId, channel: 'apps_script', type: 'thank_you', count: 1 })
+          } else {
+            console.error('Capture thank_you email error:', text.slice(0, 300))
+          }
+        }
+      }
+    } catch (thankErr) {
+      console.error('Capture thank-you email error:', thankErr)
     }
 
     return NextResponse.json({

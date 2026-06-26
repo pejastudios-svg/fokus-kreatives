@@ -202,7 +202,11 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
             Loading…
           </div>
         ) : (
-          PROVIDERS.map((p) => {
+          PROVIDERS
+            // Zoom is archived: hidden from the connect list, but still shown
+            // if a client already has it connected so they can disconnect.
+            .filter((p) => p.key !== 'zoom' || !!connectionFor(p.key))
+            .map((p) => {
             const conn = connectionFor(p.key)
             const isConnected = conn?.status === 'connected'
             return (

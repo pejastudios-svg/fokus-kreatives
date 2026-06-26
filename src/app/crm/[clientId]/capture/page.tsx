@@ -157,6 +157,11 @@ interface CapturePage {
    *  don't change their copy. */
   success_button_text: string | null
   success_message: string | null
+  /** Optional thank-you email sent to the submitter on submit. Body/subject
+   *  support {{field}} merge tokens resolved from their answers. */
+  thank_you_enabled: boolean | null
+  thank_you_subject: string | null
+  thank_you_body: string | null
   accent_color: string | null
   /** When true, the public submit endpoint rejects a second submission
    *  from an email that's already been captured on this page. Default
@@ -444,6 +449,9 @@ export default function CRMCapturePages() {
     meeting_integration: MeetingIntegration
     success_button_text: string
     success_message: string
+    thank_you_enabled: boolean
+    thank_you_subject: string
+    thank_you_body: string
     accent_color: string
     block_duplicate_emails: boolean
     meeting_duration_minutes: number
@@ -467,6 +475,9 @@ export default function CRMCapturePages() {
     meeting_integration: null,
     success_button_text: '',
     success_message: '',
+    thank_you_enabled: false,
+    thank_you_subject: '',
+    thank_you_body: '',
     accent_color: '',
     block_duplicate_emails: false,
     meeting_duration_minutes: 30,
@@ -476,6 +487,28 @@ export default function CRMCapturePages() {
     theme: normalizeTheme(makeDefaultTheme()),
     layout_template: 'compact',
   })
+
+  // Thank-you email body textarea, so "Insert field" can drop a {{token}} at
+  // the cursor rather than appending to the end.
+  const thankBodyRef = useRef<HTMLTextAreaElement | null>(null)
+  const insertThankToken = (token: string) => {
+    const el = thankBodyRef.current
+    const body = form.thank_you_body || ''
+    if (!el) {
+      setForm((prev) => ({ ...prev, thank_you_body: `${prev.thank_you_body || ''}${token}` }))
+      return
+    }
+    const start = el.selectionStart ?? body.length
+    const end = el.selectionEnd ?? body.length
+    const next = body.slice(0, start) + token + body.slice(end)
+    setForm((prev) => ({ ...prev, thank_you_body: next }))
+    // Restore caret just after the inserted token on the next tick.
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = start + token.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
 
   // Connected meeting integrations for THIS CRM. Used by the editor's
   // Meeting section to populate the integration picker (only providers
@@ -620,6 +653,9 @@ export default function CRMCapturePages() {
       meeting_integration: null,
       success_button_text: '',
       success_message: '',
+      thank_you_enabled: false,
+      thank_you_subject: '',
+      thank_you_body: '',
       accent_color: '',
       block_duplicate_emails: false,
       meeting_duration_minutes: 30,
@@ -650,6 +686,9 @@ export default function CRMCapturePages() {
       meeting_integration: page.meeting_integration ?? null,
       success_button_text: page.success_button_text || '',
       success_message: page.success_message || '',
+      thank_you_enabled: !!page.thank_you_enabled,
+      thank_you_subject: page.thank_you_subject || '',
+      thank_you_body: page.thank_you_body || '',
       accent_color: page.accent_color || '',
       block_duplicate_emails: !!page.block_duplicate_emails,
       meeting_duration_minutes:
@@ -900,6 +939,9 @@ export default function CRMCapturePages() {
             meeting_integration: form.meeting_integration,
             success_button_text: form.success_button_text || null,
             success_message: form.success_message || null,
+            thank_you_enabled: form.thank_you_enabled,
+            thank_you_subject: form.thank_you_subject || null,
+            thank_you_body: form.thank_you_body || null,
             accent_color: form.accent_color || null,
             block_duplicate_emails: form.block_duplicate_emails,
             meeting_duration_minutes: form.meeting_duration_minutes || 30,
@@ -968,6 +1010,9 @@ export default function CRMCapturePages() {
           meeting_integration: form.meeting_integration,
           success_button_text: form.success_button_text || null,
           success_message: form.success_message || null,
+          thank_you_enabled: form.thank_you_enabled,
+          thank_you_subject: form.thank_you_subject || null,
+          thank_you_body: form.thank_you_body || null,
           accent_color: form.accent_color || null,
           block_duplicate_emails: form.block_duplicate_emails,
           meeting_duration_minutes: form.meeting_duration_minutes || 30,
@@ -2017,6 +2062,61 @@ function CaptureSkeleton() {
                   placeholder="You're in! Let's Keep Going."
                 />
 
+                {/* Optional thank-you email to the submitter. Subject + body
+                    support {{Field}} merge tokens resolved from their answers. */}
+                <div className="space-y-2 rounded-lg border border-[var(--border-primary)] p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!form.thank_you_enabled}
+                      onChange={(e) => setForm((prev) => ({ ...prev, thank_you_enabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[var(--border-primary)] accent-[#2B79F7]"
+                    />
+                    Send a thank-you email when someone submits
+                  </label>
+                  {form.thank_you_enabled && (
+                    <div className="space-y-2">
+                      <Input
+                        label="Email subject"
+                        name="thank_you_subject"
+                        value={form.thank_you_subject || ''}
+                        onChange={handleFormChange}
+                        placeholder="Thanks for reaching out, {{Name}}!"
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium text-[var(--text-primary)]">Email body</label>
+                        <select
+                          value=""
+                          onChange={(e) => { if (e.target.value) { insertThankToken(e.target.value); e.target.value = '' } }}
+                          className="text-xs px-2 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] focus:outline-none"
+                          title="Insert a form answer into the email"
+                        >
+                          <option value="">Insert field…</option>
+                          <option value="{{Name}}">Name</option>
+                          <option value="{{Email}}">Email</option>
+                          <option value="{{Phone}}">Phone</option>
+                          {form.fields
+                            .filter((f) => f.label && f.type !== 'embed')
+                            .map((f) => (
+                              <option key={f.id} value={`{{${f.label}}}`}>{f.label}</option>
+                            ))}
+                        </select>
+                      </div>
+                      <textarea
+                        ref={thankBodyRef}
+                        value={form.thank_you_body || ''}
+                        onChange={(e) => setForm((prev) => ({ ...prev, thank_you_body: e.target.value }))}
+                        rows={6}
+                        placeholder={"Hi {{Name}},\n\nThanks for filling out our form. We'll be in touch soon."}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--bg-input)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-y"
+                      />
+                      <p className="text-[11px] text-[var(--text-tertiary)] leading-snug">
+                        Sent from your connected email to the address the visitor enters. Use Insert field to drop their answers in. Only sends if the form collects an email.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                   {form.sections.length > 1 && (
                     <p className="text-xs text-[var(--text-tertiary)]">
                       Visitors move through one section per step (Next). The last section has the
@@ -2226,15 +2326,8 @@ function CaptureSkeleton() {
                               ? ''
                               : ' (not connected - see Settings)'}
                           </option>
-                          <option
-                            value="zoom"
-                            disabled={!connectedIntegrations.includes('zoom')}
-                          >
-                            Zoom
-                            {connectedIntegrations.includes('zoom')
-                              ? ''
-                              : ' (not connected - see Settings)'}
-                          </option>
+                          {/* Zoom archived - removed as a selectable option.
+                              Existing Zoom-configured pages keep working. */}
                         </select>
                         <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
                           {form.meeting_integration === 'calendly'

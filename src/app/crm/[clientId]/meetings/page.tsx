@@ -1044,17 +1044,7 @@ export default function CRMMeetingsPage() {
                     Location
                   </label>
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setLocationType('zoom')}
-                      className={`px-3 py-2 text-xs rounded-lg border ${
-                        locationType === 'zoom'
-                          ? 'border-[#2B79F7] bg-[#2B79F7]/20 text-[#2B79F7]'
-                          : 'border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
-                      }`}
-                    >
-                      Zoom
-                    </button>
+                    {/* Zoom archived - removed as a selectable location. */}
                     <button
                       type="button"
                       onClick={() => setLocationType('google_meet')}

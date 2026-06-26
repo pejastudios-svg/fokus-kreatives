@@ -1,15 +1,3 @@
-// ============================================================================
-// FOKUS KREATIVES - APPS SCRIPT (complete, redesigned emails)
-//
-// Full replacement for Code.gs. Logic (doPost, dedupe, Supabase helpers,
-// recipients, cron runners, daily summaries) is identical to the previous
-// version; only the email HTML changed.
-//
-// Design language matches the public agreement and invoice pages: neutral
-// background, one white card, small uppercase brand line, hairline rules,
-// a single modest pill button. No gradients, no color bands, no em dashes.
-// ============================================================================
-
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -98,6 +86,10 @@ function doPost(e) {
 
       case 'lead_magnet':
         handleLeadMagnet(payload);
+        break;
+
+      case 'thank_you':
+        handleThankYou(payload);
         break;
 
       case 'workspace_invite':
@@ -204,6 +196,8 @@ function quotaProbe() {
   });
   Logger.log('after: ' + MailApp.getRemainingDailyQuota());
 }
+
+
 
 
 // ========== SHARED HELPERS ==========
@@ -852,6 +846,31 @@ function handleLeadCreated(payload) {
   )
 
   MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html })
+}
+
+// Custom "thanks for filling out the form" email sent to the person who
+// submitted a capture page (only when the page has it toggled on). The app
+// fills {{Field}} merge tokens from the submitter's answers and passes the
+// finished subject + body html, so this handler just wraps the body in the
+// white-labeled shell and sends it. MailApp sends from the script owner's
+// connected Google account, so it goes out as the connected email.
+function handleThankYou(payload) {
+  var recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleThankYou: no recipients'); return }
+
+  var bodyHtml = payload.html || ''
+  if (!bodyHtml) { Logger.log('handleThankYou: no body'); return }
+
+  var subject = payload.subject || 'Thank you'
+  // Empty title - the agency's own copy carries the greeting/message, so we
+  // don't stack a heading on top of it. Brand = the client (white-label).
+  var html = baseTemplate('', bodyHtml, payload.clientName)
+
+  var msg = { to: recipients, subject: subject, htmlBody: html }
+  if (payload.fromName) msg.name = payload.fromName
+  else if (payload.clientName) msg.name = payload.clientName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  MailApp.sendEmail(msg)
 }
 
 // ========== APPROVALS ==========
