@@ -156,6 +156,12 @@ export function CaptureFormBody({
   // live check (missingLabel below), so it never shows on load and clears the
   // instant the field is filled.
   const [triedSubmit, setTriedSubmit] = useState(false)
+  // Fields the visitor has left (blurred) at least once. A field's validation
+  // error shows once it's been touched OR after a submit attempt - so a bad
+  // email surfaces the moment you move off it, before clicking Next.
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+  const markTouched = (id: string) =>
+    setTouched((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
   // Per-field entry lists for repeatable fields. Derived from the stored
   // (newline-joined) value on first touch, then owned locally so empty rows
   // can exist while typing without being stripped from the saved value.
@@ -183,26 +189,40 @@ export function CaptureFormBody({
     !!pageInfo.slug
   const bookingMissing = requireCalendlyBooking && !calendlyBooked
 
-  // Required-field check for the fields on a given step.
-  const firstMissing = (stepFields: CaptureField[]): string | null => {
+  // Per-field validation: required (empty) AND format (email / phone / link).
+  // Returns the error message to show, or null when the field is fine.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const URL_RE = /^https?:\/\/[^\s.]+\.[^\s]+$/i
+  const fieldError = (f: CaptureField): string | null => {
+    if (f.type === 'embed') return null
+    const raw = values[f.id]
+    const v = raw === undefined || raw === null ? '' : String(raw).trim()
+    if (!v) return f.required ? `${f.label} is required` : null
+    // Format checks apply to any filled value, required or not.
+    if (f.type === 'email' && !EMAIL_RE.test(v)) return 'Enter a valid email, like name@gmail.com'
+    if (f.type === 'url' && !URL_RE.test(v)) return 'Enter a valid link starting with https://'
+    if (f.type === 'phone' && v.replace(/\D/g, '').length < 7) return 'Enter a valid phone number'
+    return null
+  }
+
+  // First field on a step that fails validation. Returns its message, or null
+  // when the whole step is valid.
+  const firstError = (stepFields: CaptureField[]): string | null => {
     for (const f of stepFields) {
-      if (f.type === 'embed') continue
-      if (!f.required) continue
-      const v = values[f.id]
-      if (v === undefined || v === null || String(v).trim() === '') return f.label
+      const err = fieldError(f)
+      if (err) return err
     }
     return null
   }
 
-  // Only after an attempt, and only while a field on the current step is
-  // actually still empty. Recomputed every render, so filling the field hides
-  // it automatically.
-  const missingLabel = triedSubmit ? firstMissing(current.fields) : null
+  // Only after a submit attempt, and recomputed every render so fixing the
+  // field clears the message automatically.
+  const stepError = triedSubmit ? firstError(current.fields) : null
 
   const goNext = () => {
     // In the editor preview we let the builder click through every section
-    // regardless of required fields.
-    if (!preview && firstMissing(current.fields)) {
+    // regardless of required / format validation.
+    if (!preview && firstError(current.fields)) {
       setTriedSubmit(true)
       return
     }
@@ -331,6 +351,11 @@ export function CaptureFormBody({
 
   // --- Single field renderer (reused on every step) ----------------------
   const renderField = (f: CaptureField) => {
+    // Inline validation message: once the field has been left (blurred) or a
+    // submit was attempted. Recomputed each render, so it clears as soon as
+    // the value becomes valid.
+    const fErr = triedSubmit || touched.has(f.id) ? fieldError(f) : null
+    const errLine = fErr ? <p className="text-xs text-red-500 mt-1">{fErr}</p> : null
     if (f.type === 'embed') {
       const embed = detectEmbed(f.embedUrl)
       let media: React.ReactNode
@@ -612,11 +637,13 @@ export function CaptureFormBody({
             value={values[f.id] || ''}
             onChange={(e) => handleSetValue(f.id, e.target.value)}
             onFocus={focusHandler(f.id)}
+            onBlur={() => markTouched(f.id)}
             rows={3}
             className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none text-sm"
             placeholder={f.placeholder || ''}
           />
           {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
+          {errLine}
         </div>
       )
     }
@@ -630,8 +657,9 @@ export function CaptureFormBody({
           </label>
           <select
             value={values[f.id] || ''}
-            onChange={(e) => handleSetValue(f.id, e.target.value)}
+            onChange={(e) => { handleSetValue(f.id, e.target.value); markTouched(f.id) }}
             onFocus={focusHandler(f.id)}
+            onBlur={() => markTouched(f.id)}
             className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           >
             <option value="">Select…</option>
@@ -644,6 +672,7 @@ export function CaptureFormBody({
               ))}
           </select>
           {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
+          {errLine}
         </div>
       )
     }
@@ -682,13 +711,18 @@ export function CaptureFormBody({
         </label>
         <input
           type={f.type === 'phone' ? 'tel' : f.type}
+          inputMode={f.type === 'phone' ? 'tel' : undefined}
           value={values[f.id] || ''}
           onChange={(e) => handleSetValue(f.id, e.target.value)}
           onFocus={focusHandler(f.id)}
+          onBlur={() => markTouched(f.id)}
           placeholder={f.placeholder || ''}
-          className="w-full max-w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+          className={`w-full max-w-full px-4 py-2.5 rounded-lg border bg-[var(--bg-input)] text-[var(--text-primary)] focus:outline-none focus:ring-2 ${
+            fErr ? 'border-red-500 focus:ring-red-500' : 'border-[var(--border-primary)] focus:ring-[#2B79F7]'
+          }`}
         />
         {f.description && <p className="text-xs text-[var(--text-tertiary)] mt-1">{f.description}</p>}
+        {errLine}
       </div>
     )
   }
@@ -831,7 +865,7 @@ export function CaptureFormBody({
         // exact field instead of a message on a step they can't act on.
         if (!preview) {
           for (let i = 0; i < steps.length; i++) {
-            if (firstMissing(steps[i].fields)) {
+            if (firstError(steps[i].fields)) {
               e.preventDefault()
               setStep(i)
               setTriedSubmit(true)
@@ -870,7 +904,7 @@ export function CaptureFormBody({
 
       {isLast && renderMeeting()}
 
-      {missingLabel && <p className="text-sm text-red-500">Please fill: {missingLabel}</p>}
+      {stepError && <p className="text-sm text-red-500">{stepError}</p>}
       {isLast && error && <p className="text-sm text-red-500">{error}</p>}
 
       {/* Calendly booking gate: prompt while unbooked, confirm once booked. */}
