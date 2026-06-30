@@ -40,25 +40,36 @@ export function ClientPicker({
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   // Position the portaled menu under the trigger, flipping above if there's
-  // not enough room below.
+  // not enough room below. While open we re-measure on every animation frame
+  // and re-position only when the trigger's rect actually changes. This follows
+  // layout shifts that fire neither scroll nor resize AND don't change the
+  // trigger's *size* - e.g. the sidebar reflow re-centering a max-w-capped
+  // container moves the trigger's position while its width stays the same, so a
+  // ResizeObserver would miss it. The frame loop also makes the menu glide with
+  // the content instead of snapping.
   useLayoutEffect(() => {
     if (!open) return
-    const update = () => {
+    let raf = 0
+    let lastKey = ''
+    const measure = () => {
       const el = triggerRef.current
       if (!el) return
       const r = el.getBoundingClientRect()
+      const key = `${r.top}|${r.left}|${r.width}`
+      if (key === lastKey) return
+      lastKey = key
       const MENU_MAX = 320
       const below = window.innerHeight - r.bottom
       const top = below < MENU_MAX && r.top > below ? Math.max(8, r.top - MENU_MAX - 4) : r.bottom + 4
       setPos({ top, left: r.left, width: r.width })
     }
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
+    measure() // synchronous initial position (before paint - no flash)
+    const tick = () => {
+      measure()
+      raf = requestAnimationFrame(tick)
     }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
   }, [open])
 
   // Close on outside click (trigger + portaled menu both count as "inside")

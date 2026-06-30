@@ -81,8 +81,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <aside
           onMouseLeave={() => setSuppressHover(false)}
           className={cn(
-            'group/sidebar hidden md:block fixed inset-y-0 left-0 z-40',
-            'transition-[width] duration-300 ease-out will-change-[width]',
+            // `peer/sidebar` lets the main column reflow in sync with the
+            // hover-expand below (so the expanded rail pushes content instead
+            // of floating over it).
+            'group/sidebar peer/sidebar hidden md:block fixed inset-y-0 left-0 z-40',
+            // easeOutExpo: motion arrives fast, residual settle is sub-pixel -
+            // kills the draggy ease-out tail. Must match the content column below
+            // so the rail + content stay in sync.
+            'transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width]',
             collapsed
               ? suppressHover
                 ? 'w-16'
@@ -116,12 +122,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <Sidebar mobile />
         </aside>
 
-        {/* Main column - left padding matches the desktop sidebar's fixed width. */}
+        {/* Main column - left padding matches the desktop sidebar's fixed
+            width, including its hover-expand. `peer-hover/sidebar` makes the
+            content reflow (push right) when the collapsed rail expands on
+            hover, so the rail never floats over the content. */}
         <div
           className={cn(
             'min-h-screen flex flex-col',
-            'transition-[padding] duration-300 ease-out',
-            collapsed ? 'md:pl-16' : 'md:pl-64',
+            // easeOutExpo - must match the rail's transition above so the
+            // content reflows in lockstep with the rail (no draggy tail).
+            'transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+            collapsed
+              ? suppressHover
+                ? 'md:pl-16'
+                : 'md:pl-16 peer-hover/sidebar:md:pl-64'
+              : 'md:pl-64',
           )}
         >
           <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 glass-topbar">
