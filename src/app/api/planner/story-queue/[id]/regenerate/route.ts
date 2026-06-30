@@ -1,6 +1,6 @@
 // Regenerate (redo) a single story prompt in place. Picks fresh raw material
-// and overwrites the structured frames + who_films + summary text. The id
-// and pinned_to_date are preserved so the calendar position doesn't move.
+// and overwrites the structured frames + summary text. The id and
+// pinned_to_date are preserved so the calendar position doesn't move.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { regenerateStoryPrompt } from '@/lib/planner/storyQueue'

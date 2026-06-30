@@ -28,7 +28,6 @@ export interface PlannerSlot {
 }
 
 export type StoryFrameBeat = 'HOOK' | 'BODY' | 'OUTRO'
-export type WhoFilms = 'agency' | 'client'
 
 export interface StoryFrame {
   beat: StoryFrameBeat
@@ -207,8 +206,6 @@ export interface StoryQueueItem {
   /** Structured per-frame production brief. Null on legacy rows; populated on
    *  rows generated after the structured-prompt migration. */
   frames?: StoryFrame[] | null
-  /** Which side produces the asset. Null on legacy rows. */
-  who_films?: WhoFilms | null
   /** Carrier (video / slides / sticker). Null on legacy rows - those use
    *  the multi-frame `frames` shape instead of the new beat shape. */
   carrier?: StoryCarrier | null

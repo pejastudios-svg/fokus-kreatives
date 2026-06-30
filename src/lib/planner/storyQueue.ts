@@ -403,7 +403,6 @@ export async function refillStoryQueue(
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
       frames: generated.frames,
-      who_films: generated.who_films,
       raw_material_refs: generated.refs,
     })
     if (error) {
@@ -496,7 +495,6 @@ export async function generateStoryPrompt(input: GenerateStoryPromptInput): Prom
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
       frames: generated.frames,
-      who_films: generated.who_films,
       raw_material_refs: generated.refs,
       seed_text: input.seedText ?? null,
     })
@@ -614,7 +612,6 @@ export async function generateStoriesForPlan(input: {
     promptText: string
     visualDirection: string | null
     frames: StoryFrameV2[]
-    whoFilms: 'agency' | 'client'
     refs: string[]
     intent: StoryIntent
     campaign: StoryCampaign | null
@@ -707,7 +704,6 @@ export async function generateStoriesForPlan(input: {
           promptText: generated.prompt_text,
           visualDirection: generated.visual_direction,
           frames: generated.frames,
-          whoFilms: generated.who_films,
           refs: generated.refs,
           intent: generated.intent,
           campaign: generated.campaign,
@@ -736,7 +732,6 @@ export async function generateStoriesForPlan(input: {
         prompt_text: r.promptText,
         visual_direction: r.visualDirection,
         frames: r.frames,
-        who_films: r.whoFilms,
         raw_material_refs: r.refs,
         pinned_to_date: r.date,
       })),
@@ -826,7 +821,6 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
       frames: generated.frames,
-      who_films: generated.who_films,
       raw_material_refs: generated.refs,
       source_format_id: format.id,
       carrier: generated.intent === 'engage' ? 'sticker' : 'video',
@@ -864,13 +858,10 @@ async function loadCarrierPools(): Promise<CarrierPools> {
   }
 }
 
-type WhoFilmsOut = 'agency' | 'client'
-
 interface GeneratedBrief {
   prompt_text: string
   visual_direction: string | null
   frames: StoryFrameV2[]
-  who_films: WhoFilmsOut
   refs: string[]
   topic_group_id: string | null
   intent: StoryIntent
@@ -1077,7 +1068,6 @@ async function generateOneStoryBrief(opts: {
 
 Output STRICT JSON:
 {
-  "who_films": "agency" | "client",
   "frames": [
 ${buildFramesSchema(roleSpecs)}
   ]
@@ -1151,10 +1141,6 @@ ${dmRule.hardRule}
     ${dmAltLine}
 - BANNED: "Save this", "Save it for later", "Bookmark this".
 - BANNED trail-off endings: "You're not alone", "Felt like time was running out". Rewrite as one of the valid CTAs above.
-
-WHO_FILMS (single value for the whole story - pick the one that MOST frames need):
-- "agency" when the agency can produce in-house: text cards, screenshots, b-roll, designed graphics.
-- "client" when the client must physically be on camera (talking head needed for >= 2 frames).
 ${captureAvoidBlock}${hookAvoidBlock}${recycledBlock}`
 
   const taskLine = `TASK: Generate the structured JSON brief now. Exactly ${frameCount} frames (${roleList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
@@ -1183,9 +1169,6 @@ ${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}$
     })
     const parsed = safeParseJson(content)
     if (!parsed) return null
-
-    const whoRaw = typeof parsed.who_films === 'string' ? parsed.who_films.toLowerCase() : ''
-    const who_films: WhoFilmsOut = whoRaw === 'client' ? 'client' : 'agency'
 
     const expectedRoles = new Set<FrameRole>(roleSpecs.map((s) => s.role))
     const rawFrames = Array.isArray(parsed.frames)
@@ -1255,7 +1238,6 @@ ${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}$
       prompt_text: deriveBriefSummary(frames),
       visual_direction: deriveBriefVisual(frames),
       frames,
-      who_films,
       refs: material.refs,
       topic_group_id: material.topic_group_id,
       intent,
@@ -1538,7 +1520,6 @@ TASK: Output the JSON now.`
       prompt_text: question,
       visual_direction: `Sticker story (${stickerKind})`,
       frames,
-      who_films: 'agency',
       refs: material.refs,
       topic_group_id: material.topic_group_id,
       intent: 'engage',

@@ -54,27 +54,34 @@ interface StoryRow {
   id: string
   frames: unknown
   intent: string | null
-  who_films: string | null
   prompt_text: string | null
   raw_material_refs: string[] | null
   pinned_to_date: string | null
   created_at: string
 }
 
+// Placement directions for asset-slot frames - wording matches the planner UI
+// so the editor reads the same instruction in the doc and the app.
 const ASSET_SLOT_LABEL: Record<string, string> = {
-  'screenshot-proof': 'Drop the proof screenshot',
-  'dm-testimonial': 'Paste the client DM / testimonial',
-  'result-graphic': 'Drop the result graphic',
+  'screenshot-proof': 'Drop the proof screenshot here',
+  'dm-testimonial': 'Paste the client DM / testimonial here',
+  'result-graphic': 'Drop the result graphic here',
+}
+
+/** A production direction (what to place / film / add, and where). Bracketed +
+ *  bold so it stands out from the overlay text the editor actually posts. The
+ *  brackets keep it legible even if a renderer drops the bold styling. */
+function directionSegment(text: string): DocSegment {
+  return { text: killDashes(`[ ${text} ]`), style: 'bold' }
 }
 
 /** Render a story's frames into doc segments. Uses normalizeFrame so legacy
- *  beats and v2 frames both render uniformly. */
+ *  beats and v2 frames both render uniformly. Every directional marker on a
+ *  frame (asset slot, visual/capture, sticker) is surfaced as a [ ... ]
+ *  direction so the team knows exactly what to place where. */
 function storyToSegments(story: StoryRow): DocSegment[] {
   const out: DocSegment[] = []
-  const metaBits: string[] = []
-  if (story.intent) metaBits.push(`Intent: ${story.intent}`)
-  if (story.who_films) metaBits.push(`Films: ${story.who_films}`)
-  if (metaBits.length) out.push({ text: killDashes(metaBits.join('  -  ')), style: 'plain' })
+  if (story.intent) out.push({ text: killDashes(`Intent: ${story.intent}`), style: 'plain' })
   out.push({ text: '', style: 'plain' })
 
   const rawFrames = Array.isArray(story.frames) ? (story.frames as unknown[]) : []
@@ -92,18 +99,19 @@ function storyToSegments(story: StoryRow): DocSegment[] {
 
   frames.forEach((f, i) => {
     out.push({ text: `Frame ${i + 1} - ${f.role}`, style: 'h3' })
+    // The overlay text the viewer actually reads.
     for (const b of f.textBlocks) {
       if (b.text.trim()) out.push({ text: killDashes(b.text.trim()), style: 'plain' })
     }
-    const visualLine = f.assetSlot
-      ? `[Asset] ${ASSET_SLOT_LABEL[f.assetSlot] ?? f.assetSlot}`
-      : f.visual
-        ? `Visual: ${f.visual}`
-        : ''
-    if (visualLine) out.push({ text: killDashes(visualLine), style: 'plain' })
+    // Directions: where to place what / what to film / what sticker to add.
+    if (f.assetSlot) {
+      out.push(directionSegment(ASSET_SLOT_LABEL[f.assetSlot] ?? f.assetSlot))
+    } else if (f.visual) {
+      out.push(directionSegment(`Visual: ${f.visual}`))
+    }
     if (f.sticker) {
-      const opts = f.sticker.options?.length ? ` (${f.sticker.options.join(' / ')})` : ''
-      out.push({ text: killDashes(`Sticker: ${f.sticker.type}${opts}`), style: 'plain' })
+      const opts = f.sticker.options?.length ? ` - ${f.sticker.options.join(' / ')}` : ''
+      out.push(directionSegment(`Add ${f.sticker.type} sticker${opts}`))
     }
     out.push({ text: '', style: 'plain' })
   })
@@ -219,7 +227,7 @@ export async function POST(
     {
       const { data: storyRows } = await admin
         .from('story_queue_items')
-        .select('id, frames, intent, who_films, prompt_text, raw_material_refs, pinned_to_date, created_at')
+        .select('id, frames, intent, prompt_text, raw_material_refs, pinned_to_date, created_at')
         .eq('client_id', clientId)
         .order('pinned_to_date', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })

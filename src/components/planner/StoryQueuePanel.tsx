@@ -17,8 +17,6 @@ import {
   Camera,
   Type as TypeIcon,
   Mic,
-  Film,
-  User as UserIcon,
   Trash2,
   Paperclip,
   Vote,
@@ -168,7 +166,6 @@ export function StoryQueuePanel({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <StoryHeaderLabel item={item} />
-                    {item.who_films && <WhoFilmsChip whoFilms={item.who_films} />}
                   </div>
                 </div>
 
@@ -462,24 +459,6 @@ function StoryHeaderLabel({ item }: { item: StoryQueueItem }) {
         <span className="text-[10px] text-[var(--text-tertiary)]">· {frameCount} frames</span>
       )}
     </>
-  )
-}
-
-function WhoFilmsChip({ whoFilms }: { whoFilms: 'agency' | 'client' }) {
-  const isClient = whoFilms === 'client'
-  return (
-    <span
-      className={[
-        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium',
-        isClient
-          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
-          : 'glass-chip',
-      ].join(' ')}
-      title={isClient ? 'Client must film this' : 'Agency produces in-house'}
-    >
-      {isClient ? <UserIcon className="h-3 w-3" /> : <Film className="h-3 w-3" />}
-      {isClient ? 'Client films' : 'Agency'}
-    </span>
   )
 }
 
