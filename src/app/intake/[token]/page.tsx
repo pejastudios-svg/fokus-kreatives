@@ -151,7 +151,7 @@ export default function BrandIntakePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+      <div className="min-h-screen form-canvas flex items-center justify-center">
         <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
@@ -159,7 +159,7 @@ export default function BrandIntakePage() {
 
   if (error && !client) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -173,7 +173,7 @@ export default function BrandIntakePage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -188,7 +188,7 @@ export default function BrandIntakePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-tertiary)]">
+    <div className="min-h-screen form-canvas">
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">

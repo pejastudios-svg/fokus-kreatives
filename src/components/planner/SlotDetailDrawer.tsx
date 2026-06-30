@@ -5,7 +5,7 @@
 // swap format, delete) + the M4 script editor and QA checklist panel.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Lock, Unlock, RefreshCw, Trash2, X, ArrowRightLeft, CheckCircle2, Sparkles } from 'lucide-react'
+import { Loader2, Lock, Unlock, RefreshCw, Trash2, X, ArrowRightLeft, CheckCircle2 } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -173,10 +173,10 @@ export function SlotDetailDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-2xl h-full overflow-y-auto bg-[var(--bg-card)] border-l border-[var(--border-primary)] shadow-premium-lg"
+        className="glass-pop w-full max-w-2xl h-full overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 px-5 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-card)] flex items-start justify-between gap-3">
+        <div className="sticky top-0 z-10 px-5 py-4 border-b border-[var(--glass-border)] bg-[var(--glass-bg-strong)] backdrop-blur-md flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className={`inline-block h-2 w-2 rounded-full ${palette.dot}`} />
@@ -188,7 +188,7 @@ export function SlotDetailDrawer({
               {slot.format_name ?? palette.label}
             </h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]">
+          <button onClick={onClose} className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:bg-white/5">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -238,7 +238,7 @@ export function SlotDetailDrawer({
             )}
           </div>
 
-          <div className="border-t border-[var(--border-primary)] pt-4">
+          <div className="border-t border-[var(--glass-border)] pt-4">
             <ScriptEditor
               slotId={slot.id}
               initialScript={script}
@@ -257,7 +257,7 @@ export function SlotDetailDrawer({
           </div>
 
           {hasScript && checklist.length > 0 && (
-            <div className="border-t border-[var(--border-primary)] pt-4">
+            <div className="border-t border-[var(--glass-border)] pt-4">
               <ChecklistPanel
                 slotId={slot.id}
                 items={checklist}
@@ -274,12 +274,12 @@ export function SlotDetailDrawer({
 
           {/* Review guide is static per-stream content - safe to show before
               the script exists so staff can review the rules ahead of time. */}
-          <div className="border-t border-[var(--border-primary)] pt-4">
+          <div className="border-t border-[var(--glass-border)] pt-4">
             <ReviewGuidePanel stream={slot.stream} />
           </div>
 
           {hasScript && (
-            <div className="border-t border-[var(--border-primary)] pt-4 space-y-2">
+            <div className="border-t border-[var(--glass-border)] pt-4 space-y-2">
               <button
                 disabled={!canApprove || busy}
                 onClick={() => setConfirmApprove(true)}
@@ -313,7 +313,7 @@ export function SlotDetailDrawer({
             </div>
           )}
 
-          <div className="border-t border-[var(--border-primary)] pt-4 space-y-2">
+          <div className="border-t border-[var(--glass-border)] pt-4 space-y-2">
             {/* Bulk-generate every slot in THIS campaign (same
                 topic_group_id) that doesn't yet have a script. The
                 parent dispatches N parallel /generate-script calls and
@@ -332,7 +332,7 @@ export function SlotDetailDrawer({
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md bg-[#2B79F7] text-white hover:bg-[#1f5fcc] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title={`Generate scripts for all ${campaignSlotsRemaining} slot${campaignSlotsRemaining === 1 ? '' : 's'} in this campaign that don't have one yet. Long-form + variants run in parallel.`}
               >
-                {campaignBulkInFlight ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {campaignBulkInFlight ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Generate {campaignSlotsRemaining} slot{campaignSlotsRemaining === 1 ? '' : 's'} in this campaign
               </button>
             )}
@@ -340,7 +340,7 @@ export function SlotDetailDrawer({
             <button
               disabled={busy || slot.status === 'approved'}
               onClick={() => handleAction('regenerate')}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Regenerate
@@ -349,7 +349,7 @@ export function SlotDetailDrawer({
             <button
               disabled={busy || slot.status === 'approved'}
               onClick={() => handleAction(slot.locked ? 'unlock' : 'lock')}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
             >
               {slot.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               {slot.locked ? 'Unlock' : 'Lock'}
@@ -359,7 +359,7 @@ export function SlotDetailDrawer({
               <button
                 disabled={busy || slot.status === 'approved'}
                 onClick={() => setShowSwap((v) => !v)}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
               >
                 <ArrowRightLeft className="h-4 w-4" />
                 {showSwap ? 'Hide formats' : 'Swap format'}
@@ -367,7 +367,7 @@ export function SlotDetailDrawer({
             )}
 
             {showSwap && (
-              <div className="space-y-1 max-h-60 overflow-y-auto border border-[var(--border-primary)] rounded-md p-2">
+              <div className="glass-inset space-y-1 max-h-60 overflow-y-auto rounded-md p-2">
                 {formatStreamMatches.map((f) => (
                   <button
                     key={f.id}
@@ -381,7 +381,7 @@ export function SlotDetailDrawer({
                       }
                     }}
                     disabled={busy || f.id === slot.format_id}
-                    className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                    className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-white/5 disabled:opacity-50"
                   >
                     <div className="font-semibold text-[var(--text-primary)]">{f.name}</div>
                     <div className="text-[var(--text-tertiary)]">{f.description.slice(0, 80)}{f.description.length > 80 ? '...' : ''}</div>

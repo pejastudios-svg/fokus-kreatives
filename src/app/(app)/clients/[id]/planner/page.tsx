@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Calendar as CalendarIcon, Loader2, Share2, Sparkles, X, FileText, ChevronDown, Copy, Check as CheckIcon } from 'lucide-react'
+import { Calendar as CalendarIcon, Loader2, Share2, X, FileText, ChevronDown, Copy, Check as CheckIcon } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -19,7 +19,7 @@ import { StoryQueuePanel } from '@/components/planner/StoryQueuePanel'
 import { SlotDetailDrawer } from '@/components/planner/SlotDetailDrawer'
 import { StageAdvancementBanner } from '@/components/planner/StageAdvancementBanner'
 import { ReadinessPanel } from '@/components/planner/ReadinessPanel'
-import type { PlannerData } from '@/components/planner/types'
+import type { PlannerData, StoryIntent } from '@/components/planner/types'
 
 export default function ClientPlannerPage() {
   const params = useParams()
@@ -734,11 +734,11 @@ export default function ClientPlannerPage() {
   )
 
   const handleStoryGenerate = useCallback(
-    async (seedText?: string) => {
+    async (seedText?: string, intent?: StoryIntent) => {
       const res = await fetch('/api/planner/story-queue/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, seedText: seedText || null }),
+        body: JSON.stringify({ clientId, seedText: seedText || null, intent: intent ?? null }),
       })
       const j = await res.json()
       if (!j.success) throw new Error(j.error || 'Generate failed')
@@ -1097,12 +1097,12 @@ export default function ClientPlannerPage() {
 
               {exportMenuOpen && (
                 <div
-                  className="absolute right-0 mt-1 z-50 w-72 max-w-[calc(100vw-1rem)] rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-premium-lg overflow-hidden"
+                  className="absolute right-0 mt-1 z-50 w-72 max-w-[calc(100vw-1rem)] glass-pop rounded-md overflow-hidden"
                   onMouseLeave={() => setExportMenuOpen(false)}
                 >
                   <button
                     onClick={() => handleExportToGoogleDoc(null)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 border-b border-[var(--glass-border)]"
                   >
                     <div className="font-semibold text-[var(--text-primary)]">All campaigns</div>
                     <div className="text-[var(--text-tertiary)]">Every campaign on its own Doc tab</div>
@@ -1120,7 +1120,7 @@ export default function ClientPlannerPage() {
                         key={c.id}
                         onClick={() => handleExportToGoogleDoc(c.topicGroupId)}
                         disabled={!c.topicGroupId}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)] last:border-b-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 border-b border-[var(--glass-border)] last:border-b-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={!c.topicGroupId ? 'Untyped slots cannot be exported individually' : undefined}
                       >
                         <div className="font-semibold text-[var(--text-primary)]">{c.label}</div>
@@ -1133,7 +1133,6 @@ export default function ClientPlannerPage() {
             </div>
 
             <Button size="sm" onClick={handleGenerateClick} disabled={genStatus === 'running' || pickerLoading}>
-              <Sparkles className="h-4 w-4 mr-1" />
               {data.slots.length > 0 ? 'Regenerate plan' : 'Generate plan'}
             </Button>
 
@@ -1194,7 +1193,7 @@ export default function ClientPlannerPage() {
                 </div>
                 <button
                   onClick={() => setLastExportDocs([])}
-                  className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                  className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5"
                   title="Dismiss"
                 >
                   <X className="h-4 w-4" />
@@ -1204,7 +1203,7 @@ export default function ClientPlannerPage() {
                 {lastExportDocs.map((doc) => (
                   <div
                     key={doc.docId}
-                    className="flex items-center justify-between gap-3 py-1.5 px-2 rounded-md hover:bg-[var(--bg-tertiary)]"
+                    className="flex items-center justify-between gap-3 py-1.5 px-2 rounded-md hover:bg-white/5"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold text-[var(--text-primary)] truncate">{doc.name}</div>
@@ -1228,7 +1227,7 @@ export default function ClientPlannerPage() {
                             setCopiedDocId(null)
                           }
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-secondary)]"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md glass-chip"
                         title="Copy doc URL"
                       >
                         {copiedDocId === doc.docId ? (
@@ -1283,7 +1282,7 @@ export default function ClientPlannerPage() {
                         {progress.failed > 0 ? ` (${progress.failed} failed)` : ''}
                       </span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+                    <div className="h-1.5 rounded-full glass-rail overflow-hidden">
                       <div
                         className={[
                           'h-full transition-all duration-300',
@@ -1338,16 +1337,14 @@ export default function ClientPlannerPage() {
                     title={`${m.firstDate} to ${m.lastDate} (${m.slotCount} slot${m.slotCount === 1 ? '' : 's'})`}
                     className={[
                       'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full transition-colors whitespace-nowrap',
-                      isCurrent
-                        ? 'bg-[#2B79F7] text-white'
-                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]',
+                      isCurrent ? 'glass-chip-active' : 'glass-chip',
                     ].join(' ')}
                   >
                     {dateRange}
                     <span
                       className={[
                         'text-[10px] tabular-nums rounded-full px-1.5',
-                        isCurrent ? 'bg-white/20 text-white' : 'bg-[var(--bg-card)] text-[var(--text-tertiary)]',
+                        isCurrent ? 'bg-white/20 text-white' : 'bg-white/10 text-[var(--text-tertiary)]',
                       ].join(' ')}
                     >
                       {m.slotCount}

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
-  Sparkles,
   Copy,
   Check,
   Link as LinkIcon,
@@ -404,10 +403,8 @@ export function SeriesFormEngine() {
                     key={f.id}
                     type="button"
                     onClick={() => setFraming(f.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      active
-                        ? 'bg-[#2B79F7] text-white border-[#2B79F7] shadow-sm hover:bg-[#1E54B7]'
-                        : 'bg-theme-card text-theme-secondary border-theme-primary hover:text-theme-primary hover:border-[#5A9AFF] hover:bg-theme-card-hover'
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                      active ? 'glass-chip-active' : 'glass-chip'
                     }`}
                   >
                     {f.label}
@@ -490,7 +487,6 @@ export function SeriesFormEngine() {
               isLoading={generating}
               disabled={!selectedClientId || !title.trim()}
             >
-              <Sparkles className="h-4 w-4 mr-2" />
               {draft.length ? 'Regenerate questions' : 'Generate questions'}
             </Button>
           </div>
@@ -707,7 +703,7 @@ export function SeriesFormEngine() {
                                 </>
                               ) : (
                                 <>
-                                  <Sparkles className="h-4 w-4 mr-1" /> Build prompt
+                                  Build prompt
                                 </>
                               )}
                             </Button>

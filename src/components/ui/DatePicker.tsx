@@ -172,7 +172,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 bg-theme-input border border-theme-primary rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-[#2B79F7] transition-all"
+        className="w-full flex items-center gap-3 px-4 py-2.5 glass-field text-left transition-all"
       >
         <Calendar className="h-4 w-4 text-theme-tertiary" />
         <span className={selectedDate ? 'text-theme-primary' : 'text-theme-tertiary'}>
@@ -188,7 +188,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date', class
         <div
           ref={popoverRef}
           style={{ position: 'fixed', top: coords.top, left: coords.left, width: POPOVER_WIDTH, zIndex: 1000 }}
-          className="bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-4 animate-in fade-in zoom-in duration-150"
+          className="glass-pop rounded-2xl p-4 animate-in fade-in zoom-in duration-150"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">

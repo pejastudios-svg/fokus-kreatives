@@ -1244,7 +1244,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
         </div>
       </div>
 
-      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+      <div className="glass-card rounded-2xl overflow-hidden">
         <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-3 w-24 sm:w-32 bg-[var(--bg-card-hover)] shrink-0" />
@@ -1290,7 +1290,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
             </div>
 
             {/* View Toggle - icons with on-hover tooltip labels */}
-            <div className="flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)] shrink-0">
+            <div className="glass-rail flex rounded-xl p-1 shrink-0">
               <Tooltip content="Table view" position="bottom">
                 <button
                   type="button"
@@ -1299,7 +1299,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   className={`p-2 sm:p-2.5 rounded-lg transition-all ${
                     view === 'table'
                       ? 'bg-[#2B79F7] text-white shadow-lg'
-                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5'
                   }`}
                 >
                   <Table2 className="h-4 w-4" />
@@ -1313,7 +1313,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   className={`p-2 sm:p-2.5 rounded-lg transition-all ${
                     view === 'board'
                       ? 'bg-[#2B79F7] text-white shadow-lg'
-                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5'
                   }`}
                 >
                   <Kanban className="h-4 w-4" />
@@ -1327,7 +1327,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   className={`p-2 sm:p-2.5 rounded-lg transition-all ${
                     view === 'chart'
                       ? 'bg-[#2B79F7] text-white shadow-lg'
-                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5'
                   }`}
                 >
                   <BarChart3 className="h-4 w-4" />
@@ -1400,11 +1400,11 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
         {/* Table View */}
         {view === 'table' && (
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden shadow-xl">
+          <div className="glass-card rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                  <tr className="border-b border-[var(--glass-border)] bg-white/[0.03]">
                     <th className="w-10 px-3 py-4" />
                     {fields.map((field) => {
                       // Center checkbox column headers so the property
@@ -1477,7 +1477,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                   onClick={() =>
                                     setShowFieldSettings(field)
                                   }
-                                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
+                                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white/5 rounded-lg transition-all"
                                 >
                                   <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
                                 </button>
@@ -1487,7 +1487,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           {isCheckbox && canEditWorkspace && (
                             <button
                               onClick={() => setShowFieldSettings(field)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--bg-card-hover)] rounded-lg transition-all"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white/5 rounded-lg transition-all"
                             >
                               <Settings2 className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
                             </button>
@@ -1495,21 +1495,21 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         </th>
                       )
                     })}
-                    <th className="w-12 px-3 py-4 bg-[var(--bg-secondary)]">
+                    <th className="w-12 px-3 py-4">
                       {canEditWorkspace && (
                         <button
                           onClick={() => setShowAddField(true)}
-                          className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
+                          className="p-2 hover:bg-white/5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
                           title="Add Property"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
                       )}
                     </th>
-                    <th className="w-10 px-3 py-4 bg-[var(--bg-secondary)]" />
+                    <th className="w-10 px-3 py-4" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border-primary)]">
+                <tbody className="divide-y divide-[var(--glass-border)]">
                   {filteredLeads.map((lead) => (
                     <tr
                       key={lead.id}
@@ -1531,7 +1531,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           ? 'opacity-40'
                           : dragOverRowId === lead.id
                             ? 'bg-[#2B79F7]/10'
-                            : 'hover:bg-[var(--bg-card-hover)]/50'
+                            : 'hover:bg-white/5'
                       }`}
                       onClick={() => setShowLeadDetail(lead)}
                       onDragOver={(e) => handleRowDragOver(e, lead.id)}
@@ -1541,7 +1541,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                       onDrop={(e) => handleRowDrop(e, lead.id)}
                     >
                       <td
-                        className="px-3 py-3 bg-[var(--bg-card)]"
+                        className="px-3 py-3"
                         draggable
                         onDragStart={(e) => {
                           // Use the entire row as the drag preview (ClickUp
@@ -1569,9 +1569,9 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         const isEditing = editingCell?.leadId === lead.id && editingCell?.fieldKey === field.field_key
 
                         return (
-                          <td 
-                            key={field.id} 
-                            className="px-4 py-3 bg-[var(--bg-card)]"
+                          <td
+                            key={field.id}
+                            className="px-4 py-3"
                             onClick={(e) => handleCellClick(e, lead.id, field.field_key, value, field.field_type)}
                           >
                             {isEditing && field.field_type === 'url' ? (
@@ -1673,7 +1673,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                               />
                             </div>
                           ) : (
-                            <span className="text-[var(--text-primary)] flex items-center gap-1.5 min-h-6 px-2 py-1 rounded hover:bg-[var(--bg-card-hover)] transition-colors">
+                            <span className="text-[var(--text-primary)] flex items-center gap-1.5 min-h-6 px-2 py-1 rounded hover:bg-white/5 transition-colors">
                               {(value as string) || <span className="text-[var(--text-tertiary)]">-</span>}
                               {field.field_key === 'name' &&
                                 (() => {
@@ -1699,8 +1699,8 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           </td>
                         )
                       })}
-                      <td className="bg-[var(--bg-card)]" />
-                      <td className="px-3 py-3 bg-[var(--bg-card)]">
+                      <td />
+                      <td className="px-3 py-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -1716,7 +1716,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   {/* Inline draft row - editable cells, no modal. */}
                   {inlineDraft && (
                     <tr
-                      className="bg-[var(--bg-secondary)]"
+                      className="bg-white/[0.03]"
                       onBlur={(e) => {
                         const next = e.relatedTarget as Node | null
                         if (!e.currentTarget.contains(next)) {
@@ -1741,7 +1741,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                         return (
                           <td
                             key={field.id}
-                            className="px-4 py-3 bg-[var(--bg-secondary)]"
+                            className="px-4 py-3"
                           >
                             {isStatusLike ? (
                               <select
@@ -1816,7 +1816,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     </tr>
                   )}
                   {/* "+ Add a lead" placeholder - always visible. */}
-                  <tr className="bg-[var(--bg-secondary)]">
+                  <tr className="bg-white/[0.03]">
                     <td />
                     <td colSpan={fields.length + 2} className="px-4 py-3">
                       <button
@@ -1867,11 +1867,11 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                     onDragLeave={() => setDragOverStatus(null)}
                     onDrop={(e) => handleDrop(e, status.value)}
                   >
-                    <div className={`bg-[var(--bg-card)] rounded-2xl border transition-colors shadow-xl ${
-                      isDragOver ? 'border-[#2B79F7] bg-[#2B79F7]/10' : 'border-[var(--border-primary)]'
+                    <div className={`glass-card rounded-2xl transition-colors ${
+                      isDragOver ? 'border-[#2B79F7] bg-[#2B79F7]/10' : ''
                     }`}>
                       {/* Column Header */}
-                      <div className="px-3 py-2.5 border-b border-[var(--border-primary)]">
+                      <div className="px-3 py-2.5 border-b border-[var(--glass-border)]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 min-w-0">
                             <div
@@ -1880,7 +1880,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             />
                             <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">{status.label}</h3>
                           </div>
-                          <span className="text-[10px] font-medium text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-2 py-0.5 rounded-full tabular-nums shrink-0">
+                          <span className="text-[10px] font-medium text-[var(--text-tertiary)] glass-chip px-2 py-0.5 rounded-full tabular-nums shrink-0">
                             {statusLeads.length}
                           </span>
                         </div>
@@ -1897,7 +1897,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                           return (
                             <div
                               key={lead.id}
-                              className={`group bg-[var(--bg-secondary)] rounded-lg p-2.5 border border-[var(--border-primary)] hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing ${
+                              className={`group glass-card rounded-lg p-2.5 hover:border-[#2B79F7] transition-all cursor-grab active:cursor-grabbing ${
                                 draggedLead?.id === lead.id ? 'opacity-50 rotate-2 scale-105' : ''
                               } ${pendingLeads.has(lead.id) ? 'opacity-50' : ''}`}
                               draggable
@@ -1956,7 +1956,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                             setNewLead({ [statusFieldKey]: status.value })
                             setShowAddLead(true)
                           }}
-                          className="w-full px-3 py-2 border border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] hover:bg-[var(--bg-card-hover)] transition-all flex items-center justify-center gap-1.5"
+                          className="w-full px-3 py-2 border border-dashed border-[var(--glass-border)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:text-[#2B79F7] hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           <span>Add Lead</span>
@@ -2064,7 +2064,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   The chart is full-width so the trend is actually
                   legible - the previous side-by-side layout squeezed it
                   into a 420px slot. */}
-              <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+              <div className="glass-card rounded-2xl p-5 sm:p-6">
                 {/* Stat strip - 3 quick metrics in one row */}
                 <div className="flex items-end justify-between gap-6 flex-wrap mb-4">
                   <div>
@@ -2121,7 +2121,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
                 {/* Full-width inflow chart: stacked bars by status +
                     conversion rate line on the secondary axis. */}
-                <div className="border-t border-[var(--border-primary)] pt-4">
+                <div className="border-t border-[var(--glass-border)] pt-4">
                   <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                     <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
                       Lead inflow by status · per {inflowBucketLabel}
@@ -2157,7 +2157,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
 
               {/* Pipeline funnel + status donut */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+                <div className="lg:col-span-2 glass-card rounded-2xl p-5 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">Pipeline</h3>
                     <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold">
@@ -2186,7 +2186,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                                 %
                               </span>
                             </div>
-                            <div className="h-2.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+                            <div className="glass-rail h-2.5 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full transition-all duration-500"
                                 style={{
@@ -2202,7 +2202,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                   )}
                 </div>
 
-                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-5 sm:p-6">
+                <div className="glass-card rounded-2xl p-5 sm:p-6">
                   <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
                     By status
                   </h3>
@@ -2237,7 +2237,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
             onClick={() => setUnsubPopup(null)}
           >
             <div
-              className="w-full max-w-sm rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] p-5"
+              className="glass-pop w-full max-w-sm rounded-xl p-5"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -2348,7 +2348,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 )
               })}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--glass-border)]">
               <Button variant="outline" onClick={() => { setShowAddLead(false); setNewLead({}) }}>Cancel</Button>
               <Button onClick={handleAddLead}>Add Lead</Button>
             </div>
@@ -2473,7 +2473,7 @@ const handleAddStatusOption = async (fieldId: string, option: StatusOption) => {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-primary)]">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--glass-border)]">
               <Button variant="outline" onClick={() => setShowAddField(false)}>Cancel</Button>
               <Button onClick={handleAddField}>Add Property</Button>
             </div>
@@ -2582,10 +2582,10 @@ function MultiSelectDropdown({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
+        className="glass-pop rounded-xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">
+        <div className="px-3 py-2 border-b border-[var(--glass-border)] mb-2">
           <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
             Select options
           </p>
@@ -2600,7 +2600,7 @@ function MultiSelectDropdown({
                 key={opt.value}
                 onClick={() => onToggle(opt.value)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  on ? 'bg-[#2B79F7]/10' : 'hover:bg-[var(--bg-card-hover)]'
+                  on ? 'bg-[#2B79F7]/10' : 'hover:bg-white/5'
                 }`}
               >
                 <span
@@ -2627,7 +2627,7 @@ function MultiSelectDropdown({
           <button
             key={v}
             onClick={() => onToggle(v)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--bg-card-hover)]/50 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-white/5 transition-colors"
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-transparent bg-[var(--text-tertiary)] text-[10px] font-bold text-white">
               ✓
@@ -2638,7 +2638,7 @@ function MultiSelectDropdown({
             </span>
           </button>
         ))}
-        <div className="border-t border-[var(--border-primary)] mt-2 pt-2 px-2 pb-1">
+        <div className="border-t border-[var(--glass-border)] mt-2 pt-2 px-2 pb-1">
           <button
             onClick={onClose}
             className="w-full rounded-lg bg-[#2B79F7] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
@@ -2761,14 +2761,14 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150"
+        className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border-primary)] shrink-0">
+        <div className="flex items-center justify-between p-6 border-b border-[var(--glass-border)] shrink-0">
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            className="p-2 hover:bg-white/5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -3049,12 +3049,12 @@ function FieldSettingsModal({
               {localOptions.map((opt, index) => (
                 <div 
                   key={opt.value} 
-                  className={`flex items-center gap-3 p-3 bg-[var(--bg-secondary)] border rounded-xl group transition-all ${
-                    draggedIndex === index 
-                      ? 'opacity-50 scale-95 border-[#2B79F7]' 
-                      : dragOverIndex === index 
-                        ? 'border-[#2B79F7] bg-[#2B79F7]/10' 
-                        : 'border-[var(--border-primary)]'
+                  className={`flex items-center gap-3 p-3 glass-inset rounded-xl group transition-all ${
+                    draggedIndex === index
+                      ? 'opacity-50 scale-95 border-[#2B79F7]'
+                      : dragOverIndex === index
+                        ? 'border-[#2B79F7] bg-[#2B79F7]/10'
+                        : ''
                   }`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
@@ -3103,7 +3103,7 @@ function FieldSettingsModal({
 
             {/* Color picker for editing */}
             {editingOption && (
-              <div className="mb-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl">
+              <div className="mb-4 p-3 glass-inset rounded-xl">
                 <p className="text-xs text-[var(--text-tertiary)] mb-2">Choose color:</p>
                 <div className="flex flex-wrap gap-2">
                   {colorPalette.map((color) => {
@@ -3166,7 +3166,7 @@ function FieldSettingsModal({
 
         {/* Delete */}
         {!field.is_default && (
-          <div className="pt-4 border-t border-[var(--border-primary)]">
+          <div className="pt-4 border-t border-[var(--glass-border)]">
             <button
               type="button"
               onClick={() => onDelete(field.id)}
@@ -3236,11 +3236,11 @@ function LeadDetailModal({
       onClick={onClose}
     >
       <div
-        className={`bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
+        className={`glass-pop rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-150 ${isPending ? 'opacity-50' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER STRIP - avatar + name + contact subline + status pill + actions */}
-        <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-[var(--border-primary)]">
+        <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-[var(--glass-border)]">
           <div className="flex items-start gap-4 min-w-0 flex-1">
             <div className="h-12 w-12 rounded-full bg-[#2B79F7]/15 text-[#2B79F7] flex items-center justify-center text-lg font-semibold shrink-0">
               {initial}
@@ -3279,7 +3279,7 @@ function LeadDetailModal({
                         className="fixed inset-0 z-10"
                         onClick={() => setStatusOpen(false)}
                       />
-                      <div className="absolute z-20 left-0 mt-1 w-56 max-w-[calc(100vw-1rem)] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1 max-h-64 overflow-y-auto">
+                      <div className="glass-pop absolute z-20 left-0 mt-1 w-56 max-w-[calc(100vw-1rem)] rounded-lg py-1 max-h-64 overflow-y-auto">
                         {getFieldOptions(statusField).map((opt) => (
                           <button
                             key={opt.value}
@@ -3288,7 +3288,7 @@ function LeadDetailModal({
                               onUpdate(lead.id, statusField.field_key, opt.value)
                               setStatusOpen(false)
                             }}
-                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-[var(--bg-card-hover)] transition-colors"
+                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors"
                           >
                             <span
                               className="w-2 h-2 rounded-full shrink-0"
@@ -3322,7 +3322,7 @@ function LeadDetailModal({
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[var(--bg-card-hover)] rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              className="p-2 hover:bg-white/5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
               title="Close"
             >
               <X className="h-4 w-4" />
@@ -3334,7 +3334,7 @@ function LeadDetailModal({
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr]">
             {/* LEFT: Properties rail */}
-            <div className="p-5 sm:p-6 md:border-r border-b md:border-b-0 border-[var(--border-primary)]">
+            <div className="p-5 sm:p-6 md:border-r border-b md:border-b-0 border-[var(--glass-border)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-3">
                 Properties
               </p>
@@ -3521,7 +3521,7 @@ function LeadPropertyRow({
         <select
           value={value}
           onChange={(e) => onUpdate(lead.id, field.field_key, e.target.value)}
-          className="flex-1 min-w-0 max-w-full truncate px-2 py-1 bg-transparent border-0 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2B79F7] cursor-pointer"
+          className="flex-1 min-w-0 max-w-full truncate px-2 py-1 bg-transparent border-0 text-sm text-[var(--text-primary)] hover:bg-white/5 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2B79F7] cursor-pointer"
         >
           <option value="">Empty</option>
           {options.map((o) => (
@@ -3633,7 +3633,7 @@ function LeadPropertyRow({
           <button
             type="button"
             onClick={startEdit}
-            className="w-full text-left px-2 py-1 -mx-2 rounded-md hover:bg-[var(--bg-card-hover)] transition-colors"
+            className="w-full text-left px-2 py-1 -mx-2 rounded-md hover:bg-white/5 transition-colors"
           >
             {field.field_type === 'url' &&
             (value || getFieldUrlDefault(field)) ? (
@@ -3678,7 +3678,7 @@ function StatusDropdown({
         className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
         onClick={onClose}
       >
-        <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-4">
+        <div className="glass-pop rounded-xl p-4">
           <p className="text-[var(--text-tertiary)]">No options available</p>
         </div>
       </div>
@@ -3691,10 +3691,10 @@ function StatusDropdown({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
+        className="glass-pop rounded-xl p-2 min-w-[250px] max-w-[min(92vw,440px)] max-h-[80vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-2 border-b border-[var(--border-primary)] mb-2">
+        <div className="px-3 py-2 border-b border-[var(--glass-border)] mb-2">
           <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Select Status</p>
         </div>
         {options.map((opt) => (
@@ -3702,9 +3702,9 @@ function StatusDropdown({
             key={opt.value}
             onClick={() => onSelect(opt.value)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              currentValue === opt.value 
-                ? 'bg-[#2B79F7]/20' 
-                : 'hover:bg-[var(--bg-card-hover)]'
+              currentValue === opt.value
+                ? 'bg-[#2B79F7]/20'
+                : 'hover:bg-white/5'
             }`}
           >
             <div 

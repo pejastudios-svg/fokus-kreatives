@@ -601,7 +601,7 @@ export default function CRMMeetingsPage() {
 
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 flex justify-between gap-3">
+          <div key={i} className="glass-card rounded-2xl p-4 flex justify-between gap-3">
             <div className="flex gap-3 min-w-0 flex-1">
               <Skeleton className="h-9 w-9 rounded-lg bg-[var(--bg-card-hover)] shrink-0" />
               <div className="space-y-2 min-w-0 flex-1">
@@ -757,7 +757,7 @@ export default function CRMMeetingsPage() {
             sheet below. */}
         {viewMode === 'calendar' ? (
           meetings.length === 0 ? (
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+            <div className="glass-card rounded-2xl p-8 text-center text-[var(--text-tertiary)]">
               <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
               <p className="text-sm">No meetings found.</p>
               <div className="mt-4 flex justify-center">
@@ -779,7 +779,7 @@ export default function CRMMeetingsPage() {
             cards). Each row keeps title + meta on the left, status + actions
             on the right, and collapses cleanly on mobile. */
         filteredMeetings.length === 0 ? (
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+          <div className="glass-card rounded-2xl p-8 text-center text-[var(--text-tertiary)]">
             <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
             <p className="text-sm">No meetings found.</p>
             {statusFilter !== 'past' && (
@@ -792,7 +792,7 @@ export default function CRMMeetingsPage() {
             )}
           </div>
         ) : (
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden divide-y divide-[var(--border-primary)]">
+          <div className="glass-card rounded-2xl overflow-hidden divide-y divide-[var(--border-primary)]">
             {filteredMeetings.map((m) => {
               const dt = new Date(m.date_time)
               const dateStr = dt.toLocaleDateString(undefined, {
@@ -950,8 +950,8 @@ export default function CRMMeetingsPage() {
 
         {/* Add Meeting Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-none">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="glass-pop rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-none">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">Add Meeting</h3>
                 <button
@@ -1125,8 +1125,8 @@ export default function CRMMeetingsPage() {
           </div>
         )}
         {meetingToDelete && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Meeting</h3>
         <button
@@ -1170,11 +1170,11 @@ export default function CRMMeetingsPage() {
             view is fully actionable. */}
         {selectedMeeting && (
           <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => { setSelectedMeeting(null); setRescheduleOpen(false) }}
           >
             <div
-              className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+              className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">

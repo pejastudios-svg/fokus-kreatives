@@ -87,13 +87,13 @@ export function PlanGenerationProgress({
       aria-live="polite"
       className={[
         'fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)]',
-        'rounded-xl border bg-[var(--bg-card)] shadow-premium-lg p-4',
+        'glass-pop rounded-xl shadow-premium-lg p-4',
         'transition-opacity duration-300',
         isSuccess
           ? 'border-emerald-500/40'
           : isError
             ? 'border-red-500/40'
-            : 'border-[var(--border-primary)]',
+            : '',
       ].join(' ')}
     >
       <div className="flex items-start gap-3">
@@ -112,7 +112,7 @@ export function PlanGenerationProgress({
             {!isRunning && (
               <button
                 onClick={onDismiss}
-                className="p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                className="p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -132,7 +132,7 @@ export function PlanGenerationProgress({
       </div>
 
       {/* Progress bar */}
-      <div className="mt-3 h-1.5 rounded-full overflow-hidden bg-[var(--bg-tertiary)]">
+      <div className="mt-3 h-1.5 rounded-full overflow-hidden glass-rail">
         <div
           className={[
             'h-full transition-[width] ease-out',

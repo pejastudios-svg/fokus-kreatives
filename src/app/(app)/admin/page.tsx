@@ -356,9 +356,9 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-secondary)] dark:bg-black text-[var(--text-primary)] overflow-x-hidden">
+    <div className="form-canvas min-h-screen bg-[var(--bg-secondary)] dark:bg-black text-[var(--text-primary)] overflow-x-hidden">
       {/* Header */}
-      <div className="border-b border-[var(--border-primary)] px-6 py-4 flex items-center justify-between">
+      <div className="border-b border-[var(--glass-border)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-[var(--text-tertiary)]" />
           <h1 className="text-sm font-medium tracking-wide uppercase text-[var(--text-tertiary)]">
@@ -379,7 +379,7 @@ export default function AdminPage() {
       </div>
 
       {/* OVERVIEW STRIP */}
-      <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+      <div className="px-6 py-4 border-b border-[var(--glass-border)]">
         <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-xs">
           <Stat label="Clients" value={overview?.counts.clients ?? '-'} />
           <Sep />
@@ -412,13 +412,13 @@ export default function AdminPage() {
       </div>
 
       {/* BIG CHART */}
-      <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+      <div className="px-6 py-4 border-b border-[var(--glass-border)]">
         <AdminChartPanel data={overview?.sparklines ?? null} />
       </div>
 
       {/* RUNNING NOW */}
       {running && running.running.length > 0 && (
-        <div className="px-6 py-3 border-b border-[var(--border-primary)]">
+        <div className="px-6 py-3 border-b border-[var(--glass-border)]">
           <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
             Running now · {running.running.length}
           </div>
@@ -427,7 +427,7 @@ export default function AdminPage() {
               <Link
                 key={r.slotId}
                 href={r.linkTarget}
-                className="flex items-center gap-3 text-xs py-1 hover:bg-[var(--bg-tertiary)] transition-colors -mx-2 px-2 rounded min-w-0"
+                className="flex items-center gap-3 text-xs py-1 hover:bg-white/5 transition-colors -mx-2 px-2 rounded min-w-0"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 <span className="text-[var(--text-primary)] tabular-nums truncate min-w-0">{r.clientName}</span>
@@ -445,8 +445,8 @@ export default function AdminPage() {
       {/* CLIENTS + TEAM side-by-side on md+, stacked on mobile.
           Row contents collapse on narrow screens (tier + spend hide
           first, then slots) so the client name always stays readable. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[var(--border-primary)]">
-        <div className="px-6 py-3 md:border-r border-[var(--border-primary)] min-w-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[var(--glass-border)]">
+        <div className="px-6 py-3 md:border-r border-[var(--glass-border)] min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
             Clients · {overview?.clients.length ?? 0}
           </div>
@@ -459,8 +459,8 @@ export default function AdminPage() {
                   onClick={() => setClientFilter(isFiltered ? null : c.id)}
                   className={`w-full flex items-center gap-2 text-xs py-1.5 px-2 -mx-2 rounded transition-colors text-left ${
                     isFiltered
-                      ? 'bg-[var(--bg-tertiary)]'
-                      : 'hover:bg-[var(--bg-tertiary)]'
+                      ? 'bg-white/5'
+                      : 'hover:bg-white/5'
                   }`}
                 >
                   <span className="text-[var(--text-primary)] truncate flex-1 min-w-0">{c.name}</span>
@@ -496,7 +496,7 @@ export default function AdminPage() {
             {(overview?.team ?? []).map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-2 text-xs py-1.5 px-2 -mx-2 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
+                className="flex items-center gap-2 text-xs py-1.5 px-2 -mx-2 rounded hover:bg-white/5 transition-colors"
               >
                 <span className="text-[var(--text-primary)] truncate flex-1 min-w-0">{t.name}</span>
                 <span className="hidden sm:inline-block text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] w-14 shrink-0">
@@ -531,7 +531,7 @@ export default function AdminPage() {
                 className={`px-2 py-0.5 text-[11px] rounded border transition-colors ${
                   range === r
                     ? 'border-[#2B79F7] text-[#2B79F7] bg-[#2B79F7]/10'
-                    : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                    : 'border-[var(--glass-border)] text-[var(--text-tertiary)] hover:bg-white/5'
                 }`}
               >
                 {r}
@@ -543,7 +543,7 @@ export default function AdminPage() {
         {/* Kind tabs (instant, client-side filtering). Wrap to multiple
             rows on narrow screens instead of horizontal-scroll so the
             tab strip never shows a scrollbar. */}
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 mb-3 border-b border-[var(--border-primary)]">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 mb-3 border-b border-[var(--glass-border)]">
           {KIND_TABS.map((t) => {
             const active = kindTab === t.key
             const count = tabCounts[t.key] ?? 0
@@ -601,7 +601,7 @@ export default function AdminPage() {
             <button
               onClick={handleExportCSV}
               disabled={!filteredEvents.length}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded border border-[var(--glass-border)] text-[var(--text-secondary)] hover:bg-white/5 disabled:opacity-40"
             >
               <Download className="h-3 w-3" />
               CSV
@@ -609,7 +609,7 @@ export default function AdminPage() {
             <button
               onClick={handleExportPDF}
               disabled={!filteredEvents.length || exportingPdf}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded border border-[var(--glass-border)] text-[var(--text-secondary)] hover:bg-white/5 disabled:opacity-40"
             >
               {exportingPdf ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -625,9 +625,9 @@ export default function AdminPage() {
             scrolls inside its own box on narrow screens instead of
             pushing the whole page wide. min-w on the inner grid
             preserves column alignment between header and rows. */}
-        <div className="border border-[var(--border-primary)] rounded-md overflow-x-auto">
+        <div className="glass-card rounded-md overflow-x-auto">
           <div className="min-w-[720px]">
-            <div className="grid grid-cols-[80px_24px_minmax(140px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(160px,2fr)_60px_28px] gap-2 px-3 py-1.5 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
+            <div className="grid grid-cols-[80px_24px_minmax(140px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(160px,2fr)_60px_28px] gap-2 px-3 py-1.5 border-b border-[var(--glass-border)] bg-white/[0.03] text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
               <span>Time</span>
               <span></span>
               <span>Action</span>
@@ -672,7 +672,7 @@ export default function AdminPage() {
 function ActivityRow({ event: e, onClick }: { event: AdminEvent; onClick: () => void }) {
   return (
     <div
-      className="grid grid-cols-[80px_24px_minmax(140px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(160px,2fr)_60px_28px] gap-2 px-3 py-1.5 border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-xs items-center last:border-b-0 cursor-pointer"
+      className="grid grid-cols-[80px_24px_minmax(140px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(160px,2fr)_60px_28px] gap-2 px-3 py-1.5 border-b border-[var(--glass-border)] hover:bg-white/5 transition-colors text-xs items-center last:border-b-0 cursor-pointer"
       onClick={onClick}
     >
       <span className="font-mono text-[10px] text-[var(--text-tertiary)] tabular-nums">

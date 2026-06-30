@@ -231,12 +231,12 @@ export function TaskChat({ taskId, members }: Props) {
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-30 w-full sm:w-96 bg-[var(--bg-card)] border-l border-[var(--border-primary)] shadow-xl flex flex-col transition-transform duration-300 ease-out ${
+        className={`glass-pop fixed inset-y-0 right-0 z-30 w-full sm:w-96 flex flex-col transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full pointer-events-none'
         }`}
         aria-hidden={!open}
       >
-        <header className="flex items-center justify-between px-4 h-14 border-b border-[var(--border-primary)] shrink-0">
+        <header className="flex items-center justify-between px-4 h-14 border-b border-[var(--glass-border)] shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-[#2B79F7]" />
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Task chat</h3>
@@ -244,14 +244,14 @@ export function TaskChat({ taskId, members }: Props) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5"
             aria-label="Close chat"
           >
             <X className="h-4 w-4" />
           </button>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[var(--bg-tertiary)]">
+        <div ref={scrollRef} className="glass-inset flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {isLoading ? (
             <p className="text-xs text-[var(--text-tertiary)] text-center py-4">Loading messages…</p>
           ) : messages.length === 0 ? (
@@ -298,15 +298,15 @@ export function TaskChat({ taskId, members }: Props) {
           )}
         </div>
 
-        <div className="relative border-t border-[var(--border-primary)] p-3 bg-[var(--bg-card)] shrink-0">
+        <div className="glass-inset relative border-t border-[var(--glass-border)] p-3 shrink-0">
           {mentionState && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg shadow-lg overflow-hidden z-10">
+            <div className="glass-pop absolute bottom-full left-3 right-3 mb-2 rounded-lg overflow-hidden z-10">
               {filteredMentions.map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => insertMention(m)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-tertiary)]"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5"
                 >
                   {m.profile_picture_url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
@@ -342,7 +342,7 @@ export function TaskChat({ taskId, members }: Props) {
                 onKeyDown={onKeyDown}
                 placeholder="Message… use @ to mention"
                 rows={2}
-                className="w-full resize-none px-3 py-2 pr-9 rounded-lg border border-[var(--border-primary)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
+                className="w-full resize-none px-3 py-2 pr-9 rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
               />
               <button
                 type="button"

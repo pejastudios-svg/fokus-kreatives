@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { VoiceTextarea } from '@/components/ui/VoiceTextarea'
-import { CheckCircle, AlertCircle, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertCircle, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import type {
   FormQuestion,
   FormTopic,
@@ -270,7 +270,7 @@ export default function QuestionFormPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+      <div className="min-h-screen form-canvas flex items-center justify-center">
         <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
@@ -278,7 +278,7 @@ export default function QuestionFormPage() {
 
   if (error && !form) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -292,7 +292,7 @@ export default function QuestionFormPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -313,7 +313,7 @@ export default function QuestionFormPage() {
   const submitLabel = form.already_submitted ? 'Update Answers' : 'Submit Answers'
 
   return (
-    <div className="min-h-screen bg-[var(--bg-tertiary)]">
+    <div className="min-h-screen form-canvas">
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -330,12 +330,9 @@ export default function QuestionFormPage() {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-                    {form.title || 'Content Braindump'}
-                  </h1>
-                </div>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+                  {form.title || 'Content Braindump'}
+                </h1>
                 <p className="text-sm text-[var(--text-tertiary)]">for {displayName}</p>
               </div>
             </div>

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
 import {
-  Sparkles,
   FileText,
   LayoutGrid,
   Zap,
@@ -441,7 +440,6 @@ export function ScriptPackageEngine() {
             disabled={!selectedClient || !selectedTopic}
             className="px-12"
           >
-            <Sparkles className="h-5 w-5 mr-2" />
             Generate Long-form Script
           </Button>
         </div>
@@ -491,7 +489,6 @@ export function ScriptPackageEngine() {
                 }
                 disabled={carousels.some((c) => c.status === 'loading')}
               >
-                <Sparkles className="h-4 w-4 mr-1" />
                 {carousels.length ? 'Regenerate all' : 'Generate 5 carousels'}
               </Button>
             </div>
@@ -534,7 +531,6 @@ export function ScriptPackageEngine() {
                 onClick={() => runRepurpose('/api/scripts/package/reel', setReels, 'reel', 5)}
                 disabled={reels.some((c) => c.status === 'loading')}
               >
-                <Sparkles className="h-4 w-4 mr-1" />
                 {reels.length ? 'Regenerate all' : 'Generate 5 reels'}
               </Button>
             </div>
@@ -577,7 +573,6 @@ export function ScriptPackageEngine() {
                 onClick={() => runRepurpose('/api/scripts/package/story', setStories, 'story', 5)}
                 disabled={stories.some((c) => c.status === 'loading')}
               >
-                <Sparkles className="h-4 w-4 mr-1" />
                 {stories.length ? 'Regenerate all' : 'Generate 5 stories'}
               </Button>
             </div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Bell, Trash2, X, CheckCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -19,6 +20,8 @@ interface NotificationRow {
   created_at: string
 }
 
+const NOTIF_WIDTH = 320
+
 export function Header({ title, subtitle }: HeaderProps) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
@@ -30,6 +33,8 @@ export function Header({ title, subtitle }: HeaderProps) {
   // Decoupled mount + open so we can run an exit animation before unmounting.
   const [notifMounted, setNotifMounted] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [notifPos, setNotifPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -130,11 +135,37 @@ export function Header({ title, subtitle }: HeaderProps) {
     return () => clearTimeout(t)
   }, [showNotif, notifMounted])
 
-  // Click-outside + ESC to close.
+  // Position the portaled panel under the bell, clamped to the viewport, and
+  // keep it anchored on scroll/resize. The panel is portaled to <body> so it
+  // escapes the glass topbar's stacking context (backdrop-filter) - otherwise
+  // its z-index is trapped at the header's level and page content paints over it.
+  useLayoutEffect(() => {
+    if (!notifMounted) return
+    const update = () => {
+      const el = wrapRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const left = Math.min(Math.max(r.right - NOTIF_WIDTH, 8), window.innerWidth - NOTIF_WIDTH - 8)
+      setNotifPos({ top: r.bottom + 8, left })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [notifMounted])
+
+  // Click-outside + ESC to close. The panel lives in a portal, so check both
+  // the bell wrapper and the panel itself.
   useEffect(() => {
     if (!showNotif) return
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setShowNotif(false)
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t)) return
+      if (panelRef.current?.contains(t)) return
+      setShowNotif(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShowNotif(false)
@@ -276,7 +307,7 @@ export function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="flex items-center justify-between h-14 px-4 md:px-6 gap-3">
+    <header className="md:sticky md:top-0 z-30 glass-topbar flex items-center justify-between h-14 px-4 md:px-6 gap-3">
       <div className="min-w-0 flex-1">
         <h1 className="text-sm md:text-base font-semibold text-[var(--text-primary)] truncate">{title}</h1>
         {subtitle && <p className="text-[11px] text-[var(--text-tertiary)] truncate">{subtitle}</p>}
@@ -286,7 +317,7 @@ export function Header({ title, subtitle }: HeaderProps) {
         <button
           type="button"
           onClick={() => setShowNotif((prev) => !prev)}
-          className="relative h-9 w-9 inline-flex items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+          className="relative h-9 w-9 inline-flex items-center justify-center rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] backdrop-blur-sm hover:bg-[var(--bg-card-hover)] transition-colors"
           aria-label="Notifications"
           aria-expanded={showNotif}
         >
@@ -298,9 +329,12 @@ export function Header({ title, subtitle }: HeaderProps) {
           )}
         </button>
 
-        {notifMounted && (
+        {notifMounted && notifPos && typeof window !== 'undefined' &&
+          createPortal(
           <div
-            className={`absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-[var(--bg-card)] rounded-xl shadow-2xl shadow-black/40 ring-1 ring-black/5 dark:ring-white/5 border border-[var(--border-primary)] z-50 origin-top-right transition-all duration-200 ease-out ${
+            ref={panelRef}
+            style={{ position: 'fixed', top: notifPos.top, left: notifPos.left, width: NOTIF_WIDTH }}
+            className={`glass-pop max-w-[calc(100vw-1rem)] rounded-xl z-[9999] origin-top-right transition-all duration-200 ease-out ${
               showNotif ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
             }`}
           >
@@ -355,7 +389,8 @@ export function Header({ title, subtitle }: HeaderProps) {
                 ))
               )}
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </header>

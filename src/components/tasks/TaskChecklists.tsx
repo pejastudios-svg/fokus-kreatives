@@ -188,8 +188,8 @@ export function TaskChecklists({ taskId }: Props) {
           const done = l.items.filter((it) => it.done).length
           const isRenaming = renamingId === l.id
           return (
-            <div key={l.id} className="border border-[var(--border-primary)] rounded-lg overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+            <div key={l.id} className="glass-inset rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border-b border-[var(--glass-border)]">
                 {isRenaming ? (
                   <input
                     autoFocus
@@ -240,7 +240,7 @@ export function TaskChecklists({ taskId }: Props) {
                 </button>
               </div>
 
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-[var(--glass-border)]">
                 {l.items.map((it) => (
                   <ChecklistItemRow
                     key={it.id}
@@ -280,7 +280,7 @@ function ChecklistItemRow({
   }, [item.label])
 
   return (
-    <li className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-tertiary)] group">
+    <li className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 group">
       <button
         type="button"
         onClick={() => onToggle(!item.done)}
@@ -338,7 +338,7 @@ function ChecklistItemRow({
 function ChecklistAddItem({ onAdd }: { onAdd: (label: string) => void }) {
   const [draft, setDraft] = useState('')
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--border-primary)]">
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--glass-border)]">
       <Plus className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
       <input
         type="text"

@@ -20,8 +20,17 @@ import {
   Film,
   User as UserIcon,
   Trash2,
+  Paperclip,
+  Vote,
 } from 'lucide-react'
-import type { StoryFrame, StoryQueueItem } from './types'
+import type {
+  AssetSlot,
+  NormalizedFrame,
+  StoryIntent,
+  StoryQueueItem,
+  TextEmphasis,
+} from './types'
+import { normalizeFrame } from './types'
 import { DatePopover } from '@/components/ui/DatePopover'
 
 interface Props {
@@ -29,7 +38,7 @@ interface Props {
   history?: StoryQueueItem[]
   /** used=true marks consumed; used=false unmarks (moves back to active queue). */
   onUse: (id: string, used: boolean) => Promise<void>
-  onGenerate: (seedText?: string) => Promise<void>
+  onGenerate: (seedText?: string, intent?: StoryIntent) => Promise<void>
   onRefill: () => Promise<void>
   onPin: (id: string, date: string | null) => Promise<void>
   /** Regenerates this prompt in place. Optional - falls back to no Redo button. */
@@ -49,6 +58,7 @@ export function StoryQueuePanel({
   onDelete,
 }: Props) {
   const [seed, setSeed] = useState('')
+  const [intent, setIntent] = useState<StoryIntent | undefined>(undefined)
   const [busy, setBusy] = useState<'generate' | 'refill' | null>(null)
   const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -64,7 +74,7 @@ export function StoryQueuePanel({
     setBusy('generate')
     setError('')
     try {
-      await onGenerate(seed.trim() || undefined)
+      await onGenerate(seed.trim() || undefined, intent)
       setSeed('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generate failed')
@@ -84,8 +94,8 @@ export function StoryQueuePanel({
     // controls stay frozen at the top; only the prompt list (below) scrolls
     // inside the panel. Without this, a long queue forced the user to
     // scroll the entire page to reach the bottom prompts.
-    <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between flex-shrink-0">
+    <div className="glass-card rounded-xl flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--glass-border)] flex items-center justify-between flex-shrink-0">
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Story queue</h3>
           <p className="text-[11px] text-[var(--text-tertiary)]">
@@ -99,8 +109,8 @@ export function StoryQueuePanel({
             className={[
               'p-1.5 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed',
               showHistory
-                ? 'bg-[#2B79F7]/15 text-[#2B79F7]'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]',
+                ? 'glass-chip-active'
+                : 'glass-chip',
             ].join(' ')}
             title={showHistory ? 'Hide history' : 'Show history'}
             aria-label={showHistory ? 'Hide history' : 'Show history'}
@@ -110,7 +120,7 @@ export function StoryQueuePanel({
           <button
             onClick={handleRefill}
             disabled={busy !== null}
-            className="p-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+            className="glass-chip p-1.5 rounded-md disabled:opacity-50"
             title="Refill queue"
           >
             {busy === 'refill' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -118,14 +128,15 @@ export function StoryQueuePanel({
         </div>
       </div>
 
-      <div className="px-4 py-3 border-b border-[var(--border-primary)] space-y-2 flex-shrink-0">
+      <div className="px-4 py-3 border-b border-[var(--glass-border)] space-y-2 flex-shrink-0">
         <textarea
           value={seed}
           onChange={(e) => setSeed(e.target.value)}
           placeholder="Optional seed idea..."
           rows={2}
-          className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] resize-none"
+          className="glass-field w-full px-2.5 py-1.5 text-xs rounded-md text-[var(--text-primary)] resize-none"
         />
+        <IntentPicker value={intent} onChange={setIntent} />
         <button
           onClick={handleGenerate}
           disabled={busy !== null}
@@ -147,7 +158,7 @@ export function StoryQueuePanel({
             No prompts queued yet. Click New prompt or Refill to start.
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--border-primary)]">
+          <ul className="divide-y divide-[var(--glass-border)]">
             {items.map((item) => (
               <li
                 key={item.id}
@@ -175,7 +186,7 @@ export function StoryQueuePanel({
                       }
                     }}
                     disabled={usingItem === item.id}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="glass-chip inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {usingItem === item.id ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -204,8 +215,8 @@ export function StoryQueuePanel({
                       className={[
                         'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
                         item.pinned_to_date
-                          ? 'bg-[#2B79F7]/15 text-[#2B79F7] hover:bg-[#2B79F7]/25'
-                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]',
+                          ? 'glass-chip-active'
+                          : 'glass-chip',
                         pinningItem === item.id ? 'opacity-50 cursor-not-allowed' : '',
                       ].join(' ')}
                     >
@@ -237,7 +248,7 @@ export function StoryQueuePanel({
                         }
                       }}
                       disabled={regenerating === item.id}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                      className="glass-chip inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md disabled:opacity-50"
                       title="Regenerate this prompt"
                     >
                       {regenerating === item.id ? (
@@ -279,10 +290,10 @@ export function StoryQueuePanel({
 
         {showHistory && history.length > 0 && (
           <>
-            <div className="px-4 py-2 text-[10px] uppercase tracking-wider font-semibold text-[var(--text-tertiary)] bg-[var(--bg-secondary)] border-y border-[var(--border-primary)]">
+            <div className="px-4 py-2 text-[10px] uppercase tracking-wider font-semibold text-[var(--text-tertiary)] border-y border-[var(--glass-border)]">
               History
             </div>
-            <ul className="divide-y divide-[var(--border-primary)]">
+            <ul className="divide-y divide-[var(--glass-border)]">
               {history.map((item) => (
                 <li key={item.id} id={`story-${item.id}`} className="px-4 py-3 space-y-1.5 opacity-75 hover:opacity-100 transition-opacity">
                   <div className="flex items-start justify-between gap-2">
@@ -308,7 +319,7 @@ export function StoryQueuePanel({
                         }
                       }}
                       disabled={usingItem === item.id}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="glass-chip inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Move back to the active queue"
                     >
                       {usingItem === item.id ? (
@@ -343,14 +354,83 @@ function formatRelativeShort(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const INTENT_LABELS: Record<StoryIntent, string> = {
+  teach: 'Teach',
+  prove: 'Prove',
+  launch: 'Launch',
+  engage: 'Engage',
+  bts_invite: 'BTS',
+}
+
+function IntentBadge({ intent }: { intent: StoryIntent }) {
+  const isLaunch = intent === 'launch'
+  return (
+    <span
+      className={[
+        'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide',
+        isLaunch
+          ? 'bg-[#2B79F7]/15 text-[#2B79F7] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]'
+          : 'glass-chip text-[var(--text-secondary)]',
+      ].join(' ')}
+    >
+      {INTENT_LABELS[intent]}
+    </span>
+  )
+}
+
+function IntentPicker({
+  value,
+  onChange,
+}: {
+  value: StoryIntent | undefined
+  onChange: (v: StoryIntent | undefined) => void
+}) {
+  const options: Array<{ key: string; label: string; value: StoryIntent | undefined }> = [
+    { key: 'auto', label: 'Auto', value: undefined },
+    { key: 'teach', label: 'Teach', value: 'teach' },
+    { key: 'prove', label: 'Prove', value: 'prove' },
+    { key: 'launch', label: 'Launch', value: 'launch' },
+    { key: 'engage', label: 'Engage', value: 'engage' },
+    { key: 'bts_invite', label: 'BTS', value: 'bts_invite' },
+  ]
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((o) => {
+        const active = value === o.value
+        return (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={[
+              'px-2 py-0.5 text-[11px] rounded-full transition-colors',
+              active ? 'glass-chip-active' : 'glass-chip text-[var(--text-secondary)]',
+            ].join(' ')}
+            title={o.value === undefined ? 'Auto-pick the archetype' : `Generate a ${o.label} story`}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function StoryHeaderLabel({ item }: { item: StoryQueueItem }) {
+  // v2: an explicit intent badge leads when present.
+  const intentBadge = item.intent ? <IntentBadge intent={item.intent} /> : null
+  const frameCount = Array.isArray(item.frames) ? item.frames.length : 0
+
   // New shape - shows the carrier + the source format being compressed.
   if (item.carrier) {
     if (item.carrier === 'sticker') {
       return (
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
-          Sticker Story
-        </span>
+        <>
+          {intentBadge}
+          <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
+            Sticker Story
+          </span>
+        </>
       )
     }
     // Unified frame model: a story is just "Story · {source format}".
@@ -358,13 +438,15 @@ function StoryHeaderLabel({ item }: { item: StoryQueueItem }) {
     const sourceName = item.source_format_name
     return (
       <>
+        {intentBadge}
         <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
           Story
         </span>
         {sourceName && (
-          <span className="text-[10px] text-[var(--text-tertiary)]">
-            · {sourceName}
-          </span>
+          <span className="text-[10px] text-[var(--text-tertiary)]">· {sourceName}</span>
+        )}
+        {frameCount > 1 && (
+          <span className="text-[10px] text-[var(--text-tertiary)]">· {frameCount} frames</span>
         )}
       </>
     )
@@ -372,13 +454,12 @@ function StoryHeaderLabel({ item }: { item: StoryQueueItem }) {
   // Legacy shape - just shows the old story-native format name.
   return (
     <>
+      {intentBadge}
       <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
         {item.format_name ?? 'Story'}
       </span>
-      {item.frames && item.frames.length > 1 && (
-        <span className="text-[10px] text-[var(--text-tertiary)]">
-          · {item.frames.length} frames
-        </span>
+      {frameCount > 1 && (
+        <span className="text-[10px] text-[var(--text-tertiary)]">· {frameCount} frames</span>
       )}
     </>
   )
@@ -391,8 +472,8 @@ function WhoFilmsChip({ whoFilms }: { whoFilms: 'agency' | 'client' }) {
       className={[
         'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium',
         isClient
-          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-          : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
+          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
+          : 'glass-chip',
       ].join(' ')}
       title={isClient ? 'Client must film this' : 'Agency produces in-house'}
     >
@@ -402,39 +483,47 @@ function WhoFilmsChip({ whoFilms }: { whoFilms: 'agency' | 'client' }) {
   )
 }
 
-/** Renders the production brief. New rows have structured `frames`; legacy
- *  rows fall back to the old prompt_text + visual_direction shape. */
-function StoryBriefView({ item }: { item: StoryQueueItem }) {
-  // New shape: carrier is set, frames jsonb actually holds beats
-  // (HOOK / VALUE / REHOOK / CTA in the unified frame model).
-  if (item.carrier && Array.isArray(item.frames) && item.frames.length > 0) {
-    return (
-      <div className="space-y-2">
-        {item.carrier === 'sticker' ? (
-          <StickerBriefView item={item} />
-        ) : (
-          item.frames.map((beat, idx) => (
-            <BeatView
-              key={idx}
-              beat={beat as unknown as { label: string; capture: string; on_screen_text: string; voiceover: string }}
-              index={idx}
-            />
-          ))
-        )}
-      </div>
-    )
+const ASSET_SLOT_LABELS: Record<AssetSlot, string> = {
+  'screenshot-proof': 'Drop the proof screenshot here',
+  'dm-testimonial': 'Paste the client DM / testimonial here',
+  'result-graphic': 'Drop the result graphic here',
+}
+
+function emphasisClass(emphasis?: TextEmphasis): string {
+  switch (emphasis) {
+    case 'big':
+      return 'text-base font-semibold text-[var(--text-primary)] leading-snug'
+    case 'highlight':
+      return 'inline-block text-sm font-medium text-[var(--text-primary)] leading-snug bg-[#2B79F7]/15 px-1 rounded'
+    default:
+      return 'text-sm text-[var(--text-primary)] leading-snug'
   }
-  // Legacy multi-frame shape (rows generated before the carrier redesign).
-  if (Array.isArray(item.frames) && item.frames.length > 0) {
+}
+
+/** Renders the production brief. All on-disk shapes (legacy StoryFrame,
+ *  current StoryBeat, v2 StoryFrameV2) collapse through normalizeFrame() into
+ *  one structured path; the oldest text-only rows fall back to prompt_text. */
+function StoryBriefView({ item }: { item: StoryQueueItem }) {
+  const rawFrames = Array.isArray(item.frames) ? (item.frames as unknown[]) : []
+  const normalized = rawFrames
+    .map(normalizeFrame)
+    .filter((f): f is NormalizedFrame => f !== null)
+
+  if (normalized.length > 0) {
+    // engage / sticker stays a compact single block.
+    if (item.carrier === 'sticker' || item.intent === 'engage') {
+      return <StickerBriefView frames={normalized} />
+    }
     return (
       <div className="space-y-2">
-        {item.frames.map((frame, idx) => (
-          <FrameView key={idx} frame={frame} index={idx} total={item.frames!.length} />
+        {normalized.map((f, idx) => (
+          <FrameCard key={idx} frame={f} index={idx} total={normalized.length} />
         ))}
       </div>
     )
   }
-  // Even older legacy: just text + visual direction.
+
+  // Oldest legacy: just text + visual direction.
   return (
     <div className="space-y-1">
       <p className="text-sm text-[var(--text-primary)] leading-snug">{item.prompt_text}</p>
@@ -445,87 +534,83 @@ function StoryBriefView({ item }: { item: StoryQueueItem }) {
   )
 }
 
-function BeatView({
-  beat,
-  index,
-}: {
-  beat: { label: string; capture: string; on_screen_text: string; voiceover: string }
-  index: number
-}) {
-  // Unified frame model: every beat is a labelled text-first frame. We
-  // always show the on-screen text + the visual hint, and only show the
-  // voiceover line for legacy rows that still have one (new rows write '').
-  const labelText = `FRAME ${index + 1} · ${beat.label}`
+/** Renders one normalized frame: stacked text overlays, then the visual hint
+ *  OR an asset-slot "drop asset" chip, then any sticker, then a legacy
+ *  voiceover line. */
+function FrameCard({ frame, index, total }: { frame: NormalizedFrame; index: number; total: number }) {
+  const showFrameNum = total > 1
   return (
-    <div className="rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-2.5 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
-        <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
-          {labelText}
-        </span>
-      </div>
-      {beat.on_screen_text && (
-        <FrameField icon={<TypeIcon className="h-3 w-3" />} label="On-screen" value={beat.on_screen_text} />
-      )}
-      {beat.capture && (
-        <FrameField icon={<Camera className="h-3 w-3" />} label="Visual" value={beat.capture} />
-      )}
-      {beat.voiceover && (
-        <FrameField icon={<Mic className="h-3 w-3" />} label="Voiceover (legacy)" value={beat.voiceover} />
-      )}
-    </div>
-  )
-}
-
-function StickerBriefView({ item }: { item: StoryQueueItem }) {
-  // Sticker stories are HOOK + CTA (the sticker IS the CTA). Render as a
-  // single visual block since the two beats are conceptually one frame.
-  const beats = (item.frames ?? []) as unknown as Array<{
-    label: string
-    capture: string
-    on_screen_text: string
-  }>
-  const hook = beats.find((b) => b.label === 'HOOK')
-  const cta = beats.find((b) => b.label === 'CTA')
-  return (
-    <div className="rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-2.5 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
-        <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
-          STICKER STORY
-        </span>
-      </div>
-      {hook?.capture && (
-        <FrameField icon={<Camera className="h-3 w-3" />} label="Visual" value={hook.capture} />
-      )}
-      {hook?.on_screen_text && (
-        <FrameField icon={<TypeIcon className="h-3 w-3" />} label="Question" value={hook.on_screen_text} />
-      )}
-      {cta?.on_screen_text && (
-        <FrameField icon={<TypeIcon className="h-3 w-3" />} label="CTA" value={cta.on_screen_text} />
-      )}
-    </div>
-  )
-}
-
-function FrameView({ frame, index, total }: { frame: StoryFrame; index: number; total: number }) {
-  const showFrameLabel = total > 1
-  return (
-    <div className="rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-2.5 space-y-1.5">
+    <div className="glass-inset rounded-md p-2.5 space-y-1.5">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
-        {showFrameLabel && <span>Frame {index + 1}</span>}
-        <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
-          {frame.beat}
-        </span>
+        {showFrameNum && <span>Frame {index + 1}</span>}
+        <span className="glass-chip px-1.5 py-0.5 rounded-full">{frame.role}</span>
       </div>
 
-      {frame.capture && (
-        <FrameField icon={<Camera className="h-3 w-3" />} label="Capture" value={frame.capture} />
+      {frame.textBlocks.length > 0 && (
+        <div className="space-y-1">
+          {frame.textBlocks.map((b, i) => (
+            <p key={i} className={emphasisClass(b.emphasis)}>
+              {b.text}
+            </p>
+          ))}
+        </div>
       )}
-      {frame.on_screen_text && (
-        <FrameField icon={<TypeIcon className="h-3 w-3" />} label="On-screen" value={frame.on_screen_text} />
+
+      {frame.assetSlot ? (
+        <div className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-md border border-dashed border-[var(--glass-border)] text-[var(--text-secondary)]">
+          <Paperclip className="h-3 w-3 shrink-0" />
+          <span>{ASSET_SLOT_LABELS[frame.assetSlot]}</span>
+        </div>
+      ) : (
+        frame.visual && (
+          <FrameField icon={<Camera className="h-3 w-3" />} label="Visual" value={frame.visual} />
+        )
       )}
+
+      {frame.sticker && (
+        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+          <Vote className="h-3 w-3 shrink-0" />
+          <span className="capitalize">{frame.sticker.type}</span>
+          {frame.sticker.options && frame.sticker.options.length > 0 ? (
+            <span className="text-[var(--text-tertiary)]">· {frame.sticker.options.join(' / ')}</span>
+          ) : (
+            frame.sticker.label && (
+              <span className="text-[var(--text-tertiary)]">· {frame.sticker.label}</span>
+            )
+          )}
+        </div>
+      )}
+
       {frame.voiceover && (
-        <FrameField icon={<Mic className="h-3 w-3" />} label="Voiceover" value={frame.voiceover} />
+        <FrameField icon={<Mic className="h-3 w-3" />} label="Voiceover (legacy)" value={frame.voiceover} />
       )}
+    </div>
+  )
+}
+
+function StickerBriefView({ frames }: { frames: NormalizedFrame[] }) {
+  // Sticker stories are HOOK + CTA (the sticker IS the CTA). Render as a
+  // single block since the two frames are conceptually one.
+  const hook = frames.find((f) => f.role === 'HOOK') ?? frames[0]
+  const cta = frames.find((f) => f.role === 'CTA')
+  const sticker = frames.find((f) => f.sticker)?.sticker
+  const hookText = hook?.textBlocks[0]?.text
+  const ctaText = cta?.textBlocks[0]?.text
+  return (
+    <div className="glass-inset rounded-md p-2.5 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
+        <span className="glass-chip px-1.5 py-0.5 rounded-full">STICKER STORY</span>
+      </div>
+      {hook?.visual && (
+        <FrameField icon={<Camera className="h-3 w-3" />} label="Visual" value={hook.visual} />
+      )}
+      {hookText && (
+        <FrameField icon={<TypeIcon className="h-3 w-3" />} label="Question" value={hookText} />
+      )}
+      {sticker && (
+        <FrameField icon={<Vote className="h-3 w-3" />} label="Sticker" value={sticker.type} />
+      )}
+      {ctaText && <FrameField icon={<TypeIcon className="h-3 w-3" />} label="CTA" value={ctaText} />}
     </div>
   )
 }

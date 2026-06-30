@@ -41,10 +41,10 @@ export function EventDrawer({ event, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl h-full overflow-y-auto bg-[var(--bg-card)] border-l border-[var(--border-primary)]"
+        className="glass-pop w-full max-w-xl h-full overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-card)] flex items-center justify-between">
+        <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--glass-border)] bg-[var(--glass-bg-strong)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
               {event.category} · {event.status}
@@ -52,7 +52,7 @@ export function EventDrawer({ event, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded"
+            className="p-1 text-[var(--text-tertiary)] hover:bg-white/5 rounded"
           >
             <X className="h-4 w-4" />
           </button>
@@ -96,7 +96,7 @@ export function EventDrawer({ event, onClose }: Props) {
             <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
               Raw meta
             </div>
-            <pre className="text-[11px] font-mono leading-relaxed text-[var(--text-secondary)] bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="glass-inset text-[11px] font-mono leading-relaxed text-[var(--text-secondary)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
               {JSON.stringify(event.meta, null, 2)}
             </pre>
           </div>

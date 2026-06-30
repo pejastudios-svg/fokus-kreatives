@@ -17,7 +17,7 @@ export function LegalPage({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-[var(--bg-secondary)]">
+    <div className="min-h-screen form-canvas">
       <header
         className="px-6 py-5"
         style={{ background: 'linear-gradient(135deg,#2B79F7 0%,#1E54B7 55%,#143A80 100%)' }}

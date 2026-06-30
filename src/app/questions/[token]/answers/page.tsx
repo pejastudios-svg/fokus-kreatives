@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
-import { AlertCircle, Sparkles, ClipboardList, AlertTriangle } from 'lucide-react'
+import { AlertCircle, ClipboardList, AlertTriangle } from 'lucide-react'
 import type { TopicInputType } from '@/lib/types/questionForm'
 
 interface PublicClient {
@@ -127,7 +127,7 @@ export default function AnswersViewerPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="form-canvas min-h-screen flex items-center justify-center p-4">
         <p className="text-sm text-[var(--text-tertiary)]">Loading answers...</p>
       </div>
     )
@@ -135,7 +135,7 @@ export default function AnswersViewerPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="form-canvas min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -153,7 +153,7 @@ export default function AnswersViewerPage() {
     : legacyAnswers.filter((a) => a.answer).length
 
   return (
-    <div className="min-h-screen bg-[var(--bg-tertiary)]">
+    <div className="form-canvas min-h-screen">
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -170,10 +170,7 @@ export default function AnswersViewerPage() {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">{title}</h1>
-                </div>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)]">{title}</h1>
                 <p className="text-sm text-[var(--text-tertiary)]">for {displayName}</p>
               </div>
             </div>
@@ -192,7 +189,7 @@ export default function AnswersViewerPage() {
                 <button
                   type="button"
                   onClick={() => setThinOnly((v) => !v)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5 ${
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${
                     thinOnly
                       ? 'bg-amber-500 text-white border-amber-500'
                       : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20'
@@ -212,7 +209,7 @@ export default function AnswersViewerPage() {
               <Card key={topic.id}>
                 <CardHeader>
                   <div className="flex items-start gap-3">
-                    <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
+                    <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                       {tIdx + 1}
                     </span>
                     <div className="flex-1">
@@ -224,7 +221,7 @@ export default function AnswersViewerPage() {
                           {PILLAR_LABEL[topic.pillar_hint] || topic.pillar_hint}
                         </span>
                         {topic.thin_count > 0 && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                             <AlertTriangle className="h-2.5 w-2.5" />
                             {topic.thin_count} thin
                           </span>
@@ -235,13 +232,13 @@ export default function AnswersViewerPage() {
                 </CardHeader>
                 <CardContent className="pt-0 space-y-4">
                   {topic.questions.map((q) => (
-                    <div key={q.id} className="border-l-2 border-[var(--border-primary)] pl-3">
+                    <div key={q.id} className="border-l-2 border-[var(--glass-border)] pl-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] capitalize">
+                        <span className="glass-chip text-[10px] px-2 py-0.5 rounded-full capitalize">
                           {INPUT_TYPE_LABEL[q.input_type] || q.input_type}
                         </span>
                         {q.thin_flag && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                             <AlertTriangle className="h-2.5 w-2.5" />
                             thin
                           </span>
@@ -264,19 +261,19 @@ export default function AnswersViewerPage() {
               <Card key={a.id || idx}>
                 <CardHeader>
                   <div className="flex items-start gap-3">
-                    <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center">
+                    <span className="shrink-0 h-7 w-7 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-semibold flex items-center justify-center shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                       {idx + 1}
                     </span>
                     <div className="flex-1">
                       <h3 className="text-base font-semibold text-[var(--text-primary)]">{a.text}</h3>
                       <div className="mt-1 flex items-center gap-2">
                         {a.pillar && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] capitalize">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] capitalize shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                             {PILLAR_LABEL[a.pillar] || a.pillar}
                           </span>
                         )}
                         {a.thin_flag && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 inline-flex items-center gap-1 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
                             <AlertTriangle className="h-2.5 w-2.5" />
                             thin
                           </span>

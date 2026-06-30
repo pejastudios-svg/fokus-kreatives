@@ -589,18 +589,18 @@ useEffect(() => {
   const badgeValue = (count: number) => (count > 9 ? '9+' : String(count))
 
   return (
-    <div className="agency-scope flex flex-col h-screen min-h-0 bg-[var(--bg-secondary)] dark:bg-black">
+    <div className="agency-scope flex flex-col h-screen min-h-0">
       {/* Top nav - three-zone layout: left = brand, center = nav, right = actions.
           The center zone uses `flex-1 justify-center` so the nav stays
           visually centered regardless of how much space the side groups take. */}
-      <header className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-primary)]">
+      <header className="sticky top-0 z-30 glass-topbar">
         <div className="flex items-center h-16 px-4 sm:px-6 gap-2 md:gap-4">
           {/* LEFT: burger (mobile) + logo + workspace */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="md:hidden p-2 -ml-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              className="md:hidden p-2 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] backdrop-blur-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)] transition-colors"
               aria-label="Open navigation"
             >
               <Menu className="h-5 w-5" />
@@ -657,7 +657,7 @@ useEffect(() => {
                   className={cn(
                     'inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 shrink-0',
                     isActive
-                      ? 'bg-[#2B79F7] text-white shadow-md shadow-[#2B79F7]/30'
+                      ? 'bg-gradient-to-b from-[#3B82F6] to-[#2B79F7] text-white shadow-[0_8px_20px_-8px_rgba(43,121,247,0.7),inset_0_1px_0_rgba(255,255,255,0.25)]'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]',
                   )}
                 >
@@ -696,7 +696,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => setShowUserMenu((v) => !v)}
-                className="flex items-center gap-1 p-1 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors"
+                className="flex items-center gap-1 p-1 pr-1.5 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] backdrop-blur-sm hover:bg-[var(--bg-card-hover)] transition-colors"
                 aria-label="Profile menu"
               >
                 {userPicture ? (
@@ -724,7 +724,7 @@ useEffect(() => {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowUserMenu(false)}
                   />
-                  <div className="absolute top-full right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] z-50 bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-[var(--border-primary)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="glass-pop absolute top-full right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] z-50 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     <div className="px-4 py-3 border-b border-[var(--border-primary)]">
                       <p className="text-[var(--text-primary)] text-sm font-semibold truncate">{userName || 'Signed in'}</p>
                       {userEmail && (
@@ -767,7 +767,7 @@ useEffect(() => {
           onClick={() => setMobileNavOpen(false)}
         >
           <div
-            className="bg-[var(--bg-primary)] w-72 max-w-[85vw] h-full border-r border-[var(--border-primary)] flex flex-col animate-in slide-in-from-left duration-200"
+            className="glass-pop w-72 max-w-[85vw] h-full flex flex-col animate-in slide-in-from-left duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--border-primary)]">
@@ -868,7 +868,7 @@ useEffect(() => {
           appears, and the bar sits at the screen edge rather than next to
           the cards. */}
       <main
-        className="flex-1 min-h-0 overflow-auto"
+        className="flex-1 min-h-0 overflow-auto dash-canvas"
         style={{ scrollbarGutter: 'stable' }}
       >
         <PageTransition>
@@ -893,7 +893,7 @@ useEffect(() => {
         {/* Local CRM popup (leads/meetings) */}
         {popup && createPortal(
           <div className="fixed bottom-4 right-4 z-[90] max-w-sm">
-            <div className="bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-xl px-4 py-3 shadow-theme-lg flex items-start gap-3">
+            <div className="glass-pop rounded-xl px-4 py-3 flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{popup.title}</p>
                 {popup.subtitle && <p className="text-xs text-[var(--text-tertiary)] mt-1 truncate">{popup.subtitle}</p>}

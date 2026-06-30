@@ -149,11 +149,11 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
       ) : subtasks.length === 0 ? (
         <p className="text-xs text-[var(--text-tertiary)] italic">No subtasks yet.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 border border-[var(--border-primary)] rounded-lg overflow-hidden">
+        <ul className="glass-inset divide-y divide-[var(--glass-border)] rounded-lg overflow-hidden">
           {subtasks.map((s) => (
             <li
               key={s.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-tertiary)] group"
+              className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 group"
             >
               <span
                 className="h-2 w-2 rounded-full shrink-0"

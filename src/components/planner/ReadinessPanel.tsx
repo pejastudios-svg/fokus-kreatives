@@ -65,7 +65,7 @@ export function ReadinessPanel({ clientId, months }: { clientId: string; months:
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
+      <div className="glass-card flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-[var(--text-tertiary)]">
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking material readiness…
       </div>
     )
@@ -78,10 +78,10 @@ export function ReadinessPanel({ clientId, months }: { clientId: string; months:
 
   return (
     <div
-      className={`rounded-lg border px-3 py-2 text-xs ${
+      className={`rounded-lg border px-3 py-2 text-xs shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${
         allClear
-          ? 'border-green-300 bg-green-50 dark:border-green-900 dark:bg-green-950/40'
-          : 'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
+          ? 'border-green-300/60 bg-green-50 dark:border-green-900/60 dark:bg-green-950/40'
+          : 'border-amber-300/60 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/40'
       }`}
     >
       <button
@@ -105,7 +105,7 @@ export function ReadinessPanel({ clientId, months }: { clientId: string; months:
       </button>
 
       {open && (
-        <div className="mt-2 space-y-2 border-t border-[var(--border-primary)]/60 pt-2">
+        <div className="mt-2 space-y-2 border-t border-[var(--glass-border)] pt-2">
           {report.shortfall > 0 && (
             <p className="text-[var(--text-secondary)]">
               This tier needs {report.topicsNeeded} topic{report.topicsNeeded === 1 ? '' : 's'} of material;{' '}

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { CalendarRange, Loader2, Search, Sparkles, X } from 'lucide-react'
+import { CalendarRange, Loader2, Search, X } from 'lucide-react'
 import { TIER_KEY_LABEL, type TierKey } from '@/lib/campaignTiers'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -333,7 +333,6 @@ export default function PlannerIndexPage() {
         )}
 
         <div className="text-xs text-[var(--text-tertiary)] flex items-center gap-1.5 px-1">
-          <Sparkles className="h-3.5 w-3.5" />
           The planner generates per-client content calendars from typed topic answers. Open a client to generate or review their plan.
         </div>
       </div>

@@ -147,20 +147,20 @@ export function TaskCustomFields({ taskId }: Props) {
       </div>
 
       {showCreate && (
-        <div className="border border-[var(--border-primary)] rounded-lg p-3 space-y-3 bg-[var(--bg-tertiary)]">
+        <div className="glass-inset rounded-lg p-3 space-y-3">
           <input
             autoFocus
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             placeholder="Field name (e.g. Long form 1)"
-            className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           />
           <div className="grid grid-cols-2 gap-2">
             <select
               value={draftType}
               onChange={(e) => setDraftType(e.target.value as FieldType)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {TYPE_OPTIONS.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -171,7 +171,7 @@ export function TaskCustomFields({ taskId }: Props) {
             <select
               value={draftRole}
               onChange={(e) => setDraftRole(e.target.value as FieldRole)}
-              className="pl-3 pr-9 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="pl-3 pr-9 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -187,7 +187,7 @@ export function TaskCustomFields({ taskId }: Props) {
                 setShowCreate(false)
                 setDraftName('')
               }}
-              className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
+              className="glass-chip px-3 py-1.5 rounded-lg text-xs"
             >
               Cancel
             </button>
@@ -255,7 +255,7 @@ function FieldRow({
   }
 
   return (
-    <li className="border border-[var(--border-primary)] rounded-lg p-3 space-y-2 group">
+    <li className="glass-inset rounded-lg p-3 space-y-2 group">
       <div className="flex items-center gap-2 flex-wrap">
         <input
           type="text"
@@ -301,7 +301,7 @@ function FieldRow({
           onBlur={() => commitValue(value)}
           rows={2}
           placeholder="Enter text…"
-          className="w-full text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
+          className="w-full text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
         />
       )}
       {(field.type === 'url' || field.type === 'folder') && (
@@ -312,7 +312,7 @@ function FieldRow({
             onChange={(e) => setValue(e.target.value)}
             onBlur={() => commitValue(value || null)}
             placeholder={field.type === 'folder' ? 'Drive / folder link…' : 'https://…'}
-            className="flex-1 text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded border border-[var(--border-primary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
+            className="flex-1 text-sm text-[var(--text-secondary)] px-2 py-1.5 rounded focus:outline-none focus:ring-2 focus:ring-[#2B79F7] placeholder:text-[var(--text-tertiary)]"
           />
           {value && (
             <a
@@ -330,7 +330,7 @@ function FieldRow({
       {field.type === 'file' && (
         <div className="space-y-2">
           {value ? (
-            <div className="flex items-center gap-2 p-2 rounded bg-green-50 border border-green-100">
+            <div className="flex items-center gap-2 p-2 rounded bg-green-50 border border-green-100 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
               <FileText className="h-4 w-4 text-green-600 shrink-0" />
               <a
                 href={value}
@@ -372,7 +372,7 @@ function FieldRow({
             onChange={(e) =>
               onUpdate({ parent_field_id: e.target.value || null })
             }
-            className="flex-1 pl-2 pr-7 py-1 rounded border border-[var(--border-primary)] bg-[var(--bg-input)] text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+            className="flex-1 pl-2 pr-7 py-1 rounded text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
           >
             <option value="">Not paired</option>
             {pairTargets.map((t) => (

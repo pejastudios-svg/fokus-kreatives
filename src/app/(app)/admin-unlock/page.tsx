@@ -68,10 +68,10 @@ export default function AdminUnlockPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-6">
+    <div className="form-canvas min-h-screen flex items-center justify-center px-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm border border-[var(--border-primary)] bg-[var(--bg-card)] rounded-md p-6 space-y-4"
+        className="glass-card w-full max-w-sm rounded-md p-6 space-y-4"
       >
         <div className="flex items-center gap-2 text-[var(--text-tertiary)]">
           <ShieldCheck className="h-3.5 w-3.5" />
@@ -102,7 +102,7 @@ export default function AdminUnlockPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             disabled={busy}
-            className="w-full text-sm rounded border border-[var(--border-primary)] bg-[var(--bg-input)] px-2.5 py-2 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] disabled:opacity-50"
+            className="w-full text-sm rounded px-2.5 py-2 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] disabled:opacity-50"
           />
         </div>
 
@@ -115,7 +115,7 @@ export default function AdminUnlockPage() {
             type="button"
             onClick={() => router.replace('/dashboard')}
             disabled={busy}
-            className="px-3 py-1.5 text-xs rounded text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+            className="px-3 py-1.5 text-xs rounded text-[var(--text-tertiary)] hover:bg-white/5 disabled:opacity-50"
           >
             Cancel
           </button>

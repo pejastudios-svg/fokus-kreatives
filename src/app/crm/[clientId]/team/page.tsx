@@ -758,7 +758,7 @@ export default function CRMTeamPage() {
         count={filteredMembers.length}
         icon={<Users className="h-4 w-4 text-[#2B79F7]" />}
       />
-      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden mb-6">
+      <div className="glass-card rounded-2xl overflow-hidden mb-6">
         {filteredMembers.length === 0 ? (
           <div className="p-10 text-center text-[var(--text-tertiary)]">
             <Users className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
@@ -840,7 +840,7 @@ export default function CRMTeamPage() {
         count={filteredInvites.length}
         icon={<Mail className="h-4 w-4 text-[#2B79F7]" />}
       />
-      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+      <div className="glass-card rounded-2xl overflow-hidden">
         {filteredInvites.length === 0 ? (
           <div className="p-10 text-center text-[var(--text-tertiary)]">
             <Mail className="h-10 w-10 mx-auto mb-3 text-[var(--text-tertiary)]" />
@@ -1241,7 +1241,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl animate-in zoom-in-95"
+        className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
@@ -1281,7 +1281,7 @@ function TeamSkeleton() {
       {[1, 2].map((section) => (
         <div key={section} className="mb-6">
           <Skeleton className="h-4 w-32 mb-2 bg-[var(--bg-card-hover)]" />
-          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+          <div className="glass-card rounded-2xl overflow-hidden">
             <div className="divide-y divide-[var(--border-primary)]">
               {[1, 2, 3].map((i) => (
                 <div

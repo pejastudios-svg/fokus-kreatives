@@ -198,7 +198,7 @@ export default function AgreementSignPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4]">
+      <div className="min-h-screen flex items-center justify-center form-canvas">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     )
@@ -207,7 +207,7 @@ export default function AgreementSignPage() {
   // Soft-deleted: link is dead (the signature, if any, still legally stands).
   if (gone) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+      <div className="min-h-screen flex items-center justify-center form-canvas p-6">
         <div className="bg-white rounded-xl border border-[#e5e3df] px-8 py-10 text-center max-w-sm shadow-sm">
           <p className="text-slate-800 font-semibold">No longer available</p>
           <p className="text-slate-500 text-sm mt-1">
@@ -221,7 +221,7 @@ export default function AgreementSignPage() {
   // Password-locked: prompt before showing anything.
   if (locked && !info) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+      <div className="min-h-screen flex items-center justify-center form-canvas p-6">
         <div className="bg-white rounded-xl border border-[#e5e3df] px-8 py-9 max-w-sm w-full shadow-sm">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2B79F7]/10 mx-auto">
             <Lock className="h-5 w-5 text-[#2B79F7]" />
@@ -261,7 +261,7 @@ export default function AgreementSignPage() {
 
   if (error && !info) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+      <div className="min-h-screen flex items-center justify-center form-canvas p-6">
         <div className="bg-white rounded-xl border border-[#e5e3df] px-8 py-10 text-center max-w-sm shadow-sm">
           <p className="text-slate-800 font-semibold">Agreement unavailable</p>
           <p className="text-slate-500 text-sm mt-1">
@@ -279,7 +279,7 @@ export default function AgreementSignPage() {
   const signedCount = info.signers.filter((s) => s.signedAt).length
 
   return (
-    <div className="min-h-screen bg-[#f6f5f4]">
+    <div className="min-h-screen form-canvas">
       { }
       <link rel="stylesheet" href={DOC_FONTS_URL} />
       <style dangerouslySetInnerHTML={{ __html: AGREEMENT_DOC_CSS }} />

@@ -70,9 +70,9 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-[var(--bg-tertiary)]">
+    <div className="flex h-screen">
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto dash-canvas">
         {children}
       </main>
 

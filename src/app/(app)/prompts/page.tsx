@@ -20,7 +20,6 @@ import {
   Lightbulb,
   Magnet,
   Telescope,
-  Sparkles,
   Copy,
   Check,
   X,
@@ -536,7 +535,6 @@ export default function PromptsPage() {
                     isLoading={isGenerating}
                     className="w-full"
                   >
-                    {!isGenerating && <Sparkles className="mr-2 h-4 w-4" />}
                     {ready ? 'Generate' : 'Select a client'}
                   </Button>
                 </CardContent>
@@ -549,11 +547,11 @@ export default function PromptsPage() {
       {/* Generated-prompt modal */}
       {modal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setModal(null)}
         >
           <div
-            className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-2xl overflow-hidden"
+            className="glass-pop w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border-primary)]">

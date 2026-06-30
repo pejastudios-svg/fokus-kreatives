@@ -13,7 +13,6 @@ import {
   AlertCircle,
   ThumbsUp,
   ThumbsDown,
-  Sparkles,
   Lightbulb,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -521,7 +520,6 @@ function AnalysisView({ a }: { a: CompetitorAnalysis }) {
       <Card className="bg-[#F5F9FF] border-[#B3D1FF]">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#2B79F7]" />
             <h3 className="text-lg font-semibold text-[var(--text-primary)]">Takeaways for Your Client</h3>
           </div>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Plug these into your client&apos;s next scripts.</p>

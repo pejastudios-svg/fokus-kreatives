@@ -294,10 +294,10 @@ if (!data?.success) {
         {showCreate && (
           <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
             <div className="min-h-full flex items-start justify-center p-4 py-8">
-              <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col">
+              <Card className="glass-pop w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <h3 className="text-lg font-semibold text-[var(--text-primary)]">Create Calendar</h3>
-                  <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)]">
+                  <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-white/5">
                     <X className="h-5 w-5 text-[var(--text-tertiary)]" />
                   </button>
                 </CardHeader>
@@ -342,10 +342,10 @@ if (!data?.success) {
                           key={p}
                           type="button"
                           onClick={() => togglePlatform(p)}
-                          className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                          className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
                             platforms.includes(p)
-                              ? 'bg-[#E8F1FF] dark:bg-[#1E3A6F] border-[#2B79F7] text-[#2B79F7] dark:text-[#93C5FD] hover:bg-[#5A9AFF]/20'
-                              : 'bg-[var(--bg-card)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[#5A9AFF] hover:bg-[var(--bg-card-hover)]'
+                              ? 'glass-chip-active'
+                              : 'glass-chip'
                           }`}
                         >
                           {p}

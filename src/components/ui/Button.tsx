@@ -17,13 +17,20 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#2B79F7] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
-  
+  const baseStyles = 'relative inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B79F7]/70 disabled:opacity-50 disabled:cursor-not-allowed'
+
   const variants = {
-    primary: 'bg-brand-gradient text-white hover:opacity-90 shadow-premium hover:shadow-premium-lg',
-    secondary: 'bg-[#E8F1FF] text-[#2B79F7] hover:bg-[#5A9AFF] hover:text-white',
-    outline: 'border-2 border-[#2B79F7] text-[#2B79F7] hover:bg-[#2B79F7] hover:text-white',
-    ghost: 'text-[#2B79F7] hover:bg-[#E8F1FF]',
+    // Vertical brand gradient with a lit top edge + soft brand glow, so the
+    // primary action reads as a raised glass control on the dark canvas.
+    primary:
+      'btn-premium text-white bg-gradient-to-b from-[#3B82F6] to-[#2B79F7] border border-[#2B79F7]/50 shadow-[0_8px_20px_-6px_rgba(43,121,247,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] hover:from-[#4A8BFF] hover:to-[#357CF5] hover:shadow-[0_12px_28px_-6px_rgba(43,121,247,0.7),inset_0_1px_0_rgba(255,255,255,0.4)]',
+    // Secondary + outline are frosted glass chips: translucent surface, hairline
+    // border, lit top edge - so card/page actions read as glass on the canvas.
+    secondary:
+      'bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:border-[#2B79F7]/50 shadow-[inset_0_1px_0_var(--glass-highlight)]',
+    outline:
+      'bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:text-[#2B79F7] hover:bg-[var(--bg-card-hover)] hover:border-[#2B79F7]/50 shadow-[inset_0_1px_0_var(--glass-highlight)]',
+    ghost: 'text-[#2B79F7] hover:bg-[#2B79F7]/10',
   }
 
   const sizes = {

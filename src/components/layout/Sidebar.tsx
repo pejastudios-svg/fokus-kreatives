@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -57,6 +57,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
   const [userPicture, setUserPicture] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
 
   // Auto-close the profile dropdown whenever the sidebar collapses (e.g. on
@@ -65,6 +66,25 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
   useEffect(() => {
     if (collapsed) setShowUserMenu(false)
   }, [collapsed])
+
+  // Close the profile dropdown on any click outside it, or on Escape.
+  useEffect(() => {
+    if (!showUserMenu) return
+    const onDown = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowUserMenu(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showUserMenu])
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -114,7 +134,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
 
   return (
     <div
-      className="flex flex-col h-full w-full bg-brand-gradient dark:border-r dark:border-[var(--border-primary)] overflow-hidden"
+      className="flex flex-col h-full w-full glass-sidebar overflow-hidden"
       onMouseLeave={() => {
         // When the desktop sidebar is in collapse-on-hover mode and the
         // cursor leaves it, the rail shrinks back to icon-only. The profile
@@ -167,8 +187,8 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
                 'flex items-center py-3 rounded-xl text-sm font-medium transition-all duration-200',
                 rowLayoutClasses,
                 isActive
-                  ? 'bg-white text-[#2B79F7] dark:bg-[#2B79F7] dark:text-white shadow-lg'
-                  : 'text-white/80 hover:bg-white/10 hover:text-white',
+                  ? 'bg-gradient-to-r from-[#2B79F7] to-[#3B82F6] text-white shadow-[0_8px_20px_-8px_rgba(43,121,247,0.7),inset_0_1px_0_rgba(255,255,255,0.25)]'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white',
               )}
             >
               <item.icon className="h-5 w-5 shrink-0" />
@@ -180,7 +200,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
 
       {/* User Menu */}
       <div className="px-3 py-4 border-t border-white/10 shrink-0">
-        <div className="relative">
+        <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className={cn(
@@ -216,7 +236,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
           </button>
 
           {showUserMenu && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <div className="glass-pop absolute bottom-full left-0 right-0 mb-2 rounded-xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
               <button
                 type="button"
                 onClick={() => toggleTheme()}

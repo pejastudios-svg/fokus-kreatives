@@ -55,14 +55,14 @@ export function StageBadge({ clientId }: Props) {
 
   return (
     <div className="inline-flex items-center gap-2 flex-wrap justify-center">
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${tone.chip} ${tone.text}`}>
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-current/25 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] transition-transform hover:-translate-y-px ${tone.chip} ${tone.text}`}>
         <Sparkles className={`h-3 w-3 ${tone.text}`} />
         {cap(data.currentStage)}
       </span>
       <span className="text-xs text-[var(--text-tertiary)]">{note}</span>
       <Link
         href={`/clients/${clientId}/planner`}
-        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-medium hover:bg-[#5A9AFF]/20 transition-colors"
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] text-xs font-medium shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-[#5A9AFF]/20 hover:-translate-y-px transition-all"
       >
         <CalendarIcon className="h-3 w-3" />
         Open planner

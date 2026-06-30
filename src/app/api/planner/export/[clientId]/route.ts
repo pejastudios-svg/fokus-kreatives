@@ -18,6 +18,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import { exportDoc, getGlobalShareList, type DocSegment, type CampaignSection, type AssetSubTab } from '@/lib/google/docExport'
+import { normalizeFrame, type NormalizedFrame } from '@/components/planner/types'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,68 @@ interface SlotRow {
  *  needs its own scrub. */
 function killDashes(s: string): string {
   return s.replace(/[—–]/g, '-')
+}
+
+// Stories live in story_queue_items (NOT content_plan_slots) and carry their
+// content as a `frames` jsonb array (v2 StoryFrameV2 or legacy beats).
+interface StoryRow {
+  id: string
+  frames: unknown
+  intent: string | null
+  who_films: string | null
+  prompt_text: string | null
+  raw_material_refs: string[] | null
+  pinned_to_date: string | null
+  created_at: string
+}
+
+const ASSET_SLOT_LABEL: Record<string, string> = {
+  'screenshot-proof': 'Drop the proof screenshot',
+  'dm-testimonial': 'Paste the client DM / testimonial',
+  'result-graphic': 'Drop the result graphic',
+}
+
+/** Render a story's frames into doc segments. Uses normalizeFrame so legacy
+ *  beats and v2 frames both render uniformly. */
+function storyToSegments(story: StoryRow): DocSegment[] {
+  const out: DocSegment[] = []
+  const metaBits: string[] = []
+  if (story.intent) metaBits.push(`Intent: ${story.intent}`)
+  if (story.who_films) metaBits.push(`Films: ${story.who_films}`)
+  if (metaBits.length) out.push({ text: killDashes(metaBits.join('  -  ')), style: 'plain' })
+  out.push({ text: '', style: 'plain' })
+
+  const rawFrames = Array.isArray(story.frames) ? (story.frames as unknown[]) : []
+  const frames = rawFrames
+    .map(normalizeFrame)
+    .filter((f): f is NormalizedFrame => f !== null)
+
+  if (frames.length === 0) {
+    out.push({
+      text: killDashes(story.prompt_text || 'No story content generated yet.'),
+      style: 'plain',
+    })
+    return out
+  }
+
+  frames.forEach((f, i) => {
+    out.push({ text: `Frame ${i + 1} - ${f.role}`, style: 'h3' })
+    for (const b of f.textBlocks) {
+      if (b.text.trim()) out.push({ text: killDashes(b.text.trim()), style: 'plain' })
+    }
+    const visualLine = f.assetSlot
+      ? `[Asset] ${ASSET_SLOT_LABEL[f.assetSlot] ?? f.assetSlot}`
+      : f.visual
+        ? `Visual: ${f.visual}`
+        : ''
+    if (visualLine) out.push({ text: killDashes(visualLine), style: 'plain' })
+    if (f.sticker) {
+      const opts = f.sticker.options?.length ? ` (${f.sticker.options.join(' / ')})` : ''
+      out.push({ text: killDashes(`Sticker: ${f.sticker.type}${opts}`), style: 'plain' })
+    }
+    out.push({ text: '', style: 'plain' })
+  })
+  return out
 }
 
 export async function POST(
@@ -146,6 +209,50 @@ export async function POST(
         firstDate: rows.map((r) => r.scheduled_date).sort()[0],
       }))
       .sort((a, b) => a.firstDate.localeCompare(b.firstDate))
+
+    // ---- Stories ----
+    // Stories aren't in content_plan_slots, so load them from story_queue_items
+    // and attach to campaigns. A story's campaign is resolved from its first
+    // raw_material_ref -> topics.topic_group_id.
+    const campaignIds = new Set(campaigns.map((c) => c.id))
+    const storiesByGroup = new Map<string, StoryRow[]>()
+    {
+      const { data: storyRows } = await admin
+        .from('story_queue_items')
+        .select('id, frames, intent, who_films, prompt_text, raw_material_refs, pinned_to_date, created_at')
+        .eq('client_id', clientId)
+        .order('pinned_to_date', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      const stories = (storyRows ?? []) as StoryRow[]
+
+      const allRefs = Array.from(
+        new Set(stories.flatMap((s) => (Array.isArray(s.raw_material_refs) ? s.raw_material_refs : []))),
+      )
+      const refToGroup = new Map<string, string>()
+      if (allRefs.length > 0) {
+        const { data: topicRows } = await admin
+          .from('topics')
+          .select('id, topic_group_id')
+          .in('id', allRefs)
+        for (const t of topicRows ?? []) {
+          if (t.topic_group_id) refToGroup.set(t.id as string, t.topic_group_id as string)
+        }
+      }
+
+      for (const story of stories) {
+        const refs = Array.isArray(story.raw_material_refs) ? story.raw_material_refs : []
+        const groupId = refs.map((r) => refToGroup.get(r)).find(Boolean)
+        if (!groupId) continue
+        if (body.campaignId && groupId !== body.campaignId) continue
+        if (!campaignIds.has(groupId)) continue
+        // Match the slot month filter: drop pinned stories outside the month;
+        // keep unpinned ones (they belong to the campaign regardless of date).
+        if (body.month && story.pinned_to_date && !story.pinned_to_date.startsWith(body.month)) continue
+        const arr = storiesByGroup.get(groupId) ?? []
+        arr.push(story)
+        storiesByGroup.set(groupId, arr)
+      }
+    }
 
     // Build per-campaign sections in the new shape:
     //   - top-level tab body = long-form script
@@ -270,12 +377,13 @@ export async function POST(
       }
 
       // ---- Child tabs - one per non-long-form asset ----
+      // Stories are handled separately (below) because their content lives in
+      // story_queue_items, not in content_plan_slots.
       const childTabs: AssetSubTab[] = []
-      const otherStreams: Exclude<SlotStream, 'long_form'>[] = [
+      const otherStreams: Exclude<SlotStream, 'long_form' | 'story'>[] = [
         'short_form',
         'engagement_reel',
         'carousel',
-        'story',
       ]
       for (const stream of otherStreams) {
         const actual = byStream[stream]
@@ -325,6 +433,14 @@ export async function POST(
           childTabs.push({ name: tabName, stream, segments })
         }
       }
+
+      // ---- Story sub-tabs (from story_queue_items, grouped by campaign) ----
+      const campaignStories = storiesByGroup.get(campaign.id) ?? []
+      campaignStories.forEach((story, i) => {
+        const dateLabel = story.pinned_to_date ?? story.created_at?.slice(0, 10) ?? ''
+        const tabName = killDashes(`Story #${i + 1}${dateLabel ? ` - ${dateLabel}` : ''}`)
+        childTabs.push({ name: tabName, stream: 'story', segments: storyToSegments(story) })
+      })
 
       return {
         name: killDashes(`Campaign ${idx + 1} (${campaign.firstDate})`),

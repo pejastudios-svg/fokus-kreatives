@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
-  Sparkles,
   Copy,
   Check,
   Link as LinkIcon,
@@ -487,7 +486,6 @@ export function QuestionsFormEngine() {
               isLoading={generating}
               disabled={!selectedClient}
             >
-              <Sparkles className="h-4 w-4 mr-2" />
               {draftTopics.length ? 'Regenerate Batch' : 'Generate Batch'}
             </Button>
           </div>

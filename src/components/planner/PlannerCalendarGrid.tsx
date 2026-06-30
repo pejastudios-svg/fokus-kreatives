@@ -275,21 +275,21 @@ function MonthBlock({
   }
 
   return (
-    <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between">
+    <div className="glass-card rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--glass-border)] flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">{monthLabel}</h3>
         {warning && (
           <span className="text-xs text-amber-500">{warning}</span>
         )}
       </div>
 
-      <div className="grid grid-cols-7 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] bg-[var(--bg-secondary)]">
+      <div className="grid grid-cols-7 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--glass-border)]">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div key={d} className="px-2 py-1.5 text-center">{d}</div>
+          <div key={d} className="px-2 py-2 text-center">{d}</div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 border-t border-[var(--border-primary)]">
+      <div className="grid grid-cols-7">
         {grid.map((cell, idx) => {
           const cellSlots = slotsByDate.get(cell.date) ?? []
           const cellStories = storiesByDate.get(cell.date) ?? []
@@ -302,10 +302,10 @@ function MonthBlock({
               onDragLeave={() => setDragOver((d) => (d === cell.date ? null : d))}
               onDrop={(e) => handleCellDrop(cell.date, e)}
               className={[
-                'min-h-[110px] border-b border-r border-[var(--border-primary)] p-1.5 flex flex-col gap-1',
+                'min-h-[112px] border-b border-r border-[var(--glass-border)] p-1.5 flex flex-col gap-1 transition-colors',
                 cell.inMonth ? '' : 'opacity-40',
-                cell.isWeekend && cell.inMonth ? 'bg-[var(--bg-secondary)]' : '',
-                isDragOver ? 'bg-[#2B79F7]/10 ring-1 ring-[#2B79F7] ring-inset' : '',
+                cell.isWeekend && cell.inMonth ? 'bg-black/[0.04] dark:bg-white/[0.02]' : '',
+                isDragOver ? 'bg-[#2B79F7]/15 ring-1 ring-[#2B79F7] ring-inset' : '',
               ].join(' ')}
             >
               <div className="flex items-center justify-between">
@@ -388,7 +388,10 @@ function PinnedStoryCard({
       }
       onClick={onClick}
       className={[
-        'group rounded-md px-2 py-1.5 text-[11px] leading-tight bg-slate-500/15 text-slate-500 dark:text-slate-300 hover:brightness-110 transition text-left',
+        'group rounded-lg px-2 py-1.5 text-[11px] leading-tight text-left border border-current/20',
+        'bg-slate-500/15 text-slate-500 dark:text-slate-300',
+        'shadow-[0_2px_8px_-3px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)]',
+        'hover:brightness-110 hover:-translate-y-px transition',
         draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
       ].join(' ')}
       title={story.prompt_text}
@@ -446,10 +449,13 @@ function SlotCard({
       onDrop={onCardDrop}
       onClick={onClick}
       className={[
-        'relative group rounded-md px-2 py-1.5 text-[11px] leading-tight',
+        // Raised glass chip: stream tint + stream-colored hairline + soft drop
+        // shadow + lit top edge (emboss) so it reads as a glass card on the grid.
+        'relative group rounded-lg px-2 py-1.5 text-[11px] leading-tight border border-current/25',
+        'shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]',
         palette.bg,
         palette.text,
-        'hover:brightness-110 transition',
+        'hover:brightness-110 hover:-translate-y-px hover:shadow-[0_5px_14px_-4px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.18)] transition',
         isApproved ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
       ].join(' ')}
       title={slot.hook_preview ?? ''}

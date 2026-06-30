@@ -9,7 +9,7 @@
 // generate API.
 
 import { useEffect, useState } from 'react'
-import { Loader2, X, Sparkles } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
@@ -79,7 +79,7 @@ export function TopicBatchPickerModal({ open, batches, loading, onConfirm, onClo
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-premium-lg"
+        className="glass-pop relative w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -174,7 +174,6 @@ export function TopicBatchPickerModal({ open, batches, loading, onConfirm, onClo
                 Cancel
               </Button>
               <Button size="sm" onClick={handleConfirm} disabled={selectedCount === 0 || usableTotal === 0}>
-                <Sparkles className="h-4 w-4 mr-1" />
                 Continue
               </Button>
             </div>

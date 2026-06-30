@@ -428,7 +428,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => setShowLog((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg"
+              className="glass-chip inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg"
             >
               <History className="h-4 w-4" />
               History
@@ -436,7 +436,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => setShowSaveTemplate(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg"
+              className="glass-chip inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg"
             >
               <Bookmark className="h-4 w-4" />
               Save as template
@@ -445,7 +445,7 @@ export default function TaskDetailPage() {
               type="button"
               onClick={() => void handleDuplicate()}
               disabled={isDuplicating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg disabled:opacity-50"
+              className="glass-chip inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg disabled:opacity-50"
             >
               <Copy className="h-4 w-4" />
               {isDuplicating ? 'Duplicating…' : 'Duplicate'}
@@ -463,7 +463,7 @@ export default function TaskDetailPage() {
 
         {notification && (
           <div
-            className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
+            className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-sm shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${
               notification.type === 'success'
                 ? 'bg-green-50 text-green-700'
                 : 'bg-red-50 text-red-700'
@@ -502,7 +502,7 @@ export default function TaskDetailPage() {
                 <button
                   type="button"
                   onClick={() => setStatusOpen((v) => !v)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg ${currentStatus.pill} hover:opacity-90 transition`}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${currentStatus.pill} hover:opacity-90 transition`}
                 >
                   <span className="inline-flex items-center gap-2">
                     <span
@@ -516,7 +516,7 @@ export default function TaskDetailPage() {
                   />
                 </button>
                 {statusOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="glass-pop absolute z-30 left-0 right-0 mt-2 rounded-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     {STATUSES.map((s) => {
                       const active = s.id === status
                       return (
@@ -524,7 +524,7 @@ export default function TaskDetailPage() {
                           key={s.id}
                           type="button"
                           onClick={() => onStatusChange(s.id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] ${
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5 ${
                             active ? 'bg-[#E8F1FF]' : ''
                           }`}
                         >
@@ -552,7 +552,7 @@ export default function TaskDetailPage() {
                     setAssigneePopoverOpen((v) => !v)
                     setAssigneeQuery('')
                   }}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[var(--border-primary)] hover:border-[var(--border-primary)] transition bg-[var(--bg-card)]"
+                  className="glass-chip w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition"
                 >
                   {assigneeMembers.length === 0 ? (
                     <span className="text-sm text-[var(--text-tertiary)]">Add assignees</span>
@@ -576,8 +576,8 @@ export default function TaskDetailPage() {
                   />
                 </button>
                 {assigneePopoverOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                    <div className="p-2 border-b border-[var(--border-primary)]">
+                  <div className="glass-pop absolute z-30 left-0 right-0 mt-2 rounded-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="p-2 border-b border-[var(--glass-border)]">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
                         <input
@@ -601,7 +601,7 @@ export default function TaskDetailPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleAssignee(m.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--bg-tertiary)] ${
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-white/5 ${
                                   selected ? 'bg-[#E8F1FF]' : ''
                                 }`}
                               >
@@ -699,7 +699,7 @@ export default function TaskDetailPage() {
               onBlur={onDescriptionBlur}
               placeholder="Add a description…"
               rows={4}
-              className="w-full text-sm text-[var(--text-secondary)] bg-transparent border border-[var(--border-primary)] rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
+              className="w-full text-sm text-[var(--text-secondary)] bg-transparent border border-[var(--glass-border)] rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none placeholder:text-[var(--text-tertiary)]"
             />
           </CardContent>
         </Card>
@@ -749,7 +749,7 @@ export default function TaskDetailPage() {
                   {statusLog.map((entry) => (
                     <li
                       key={entry.id}
-                      className="flex items-center justify-between gap-3 text-sm py-2 border-b border-[var(--border-primary)] last:border-0"
+                      className="flex items-center justify-between gap-3 text-sm py-2 border-b border-[var(--glass-border)] last:border-0"
                     >
                       <span className="inline-flex items-center gap-2">
                         {entry.from_status ? (
@@ -824,7 +824,7 @@ function StatusPill({ status, muted }: { status: TaskStatus; muted?: boolean }) 
   const s = STATUS_BY_ID[status]
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${s.pill} ${muted ? 'opacity-60' : ''}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${s.pill} ${muted ? 'opacity-60' : ''}`}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.dot }} />
       {s.label}

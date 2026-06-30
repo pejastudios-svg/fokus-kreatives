@@ -471,13 +471,13 @@ function TeamSkeleton() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
+            <div className="glass-rail inline-flex items-center rounded-xl p-1">
               <button
                 type="button"
                 onClick={() => setView('grid')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'grid'
-                    ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
+                    ? 'glass-thumb text-white'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="Grid view"
@@ -490,7 +490,7 @@ function TeamSkeleton() {
                 onClick={() => setView('list')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'list'
-                    ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
+                    ? 'glass-thumb text-white'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="List view"
@@ -657,7 +657,7 @@ function TeamSkeleton() {
                         </button>
 
                         {isMenuOpen && (
-                          <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="glass-pop absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                             <div className="px-4 py-3 space-y-2 border-b border-[var(--border-primary)]">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-xs text-[var(--text-tertiary)]">Role</span>
@@ -759,8 +759,8 @@ function TeamSkeleton() {
         )}
 
         {showInviteModal && canInvite && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">Invite Team Member</h3>
                 <button onClick={() => setShowInviteModal(false)} className="p-1 hover:bg-[var(--bg-tertiary)] rounded">

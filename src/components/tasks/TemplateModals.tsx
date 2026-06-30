@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Save, Trash2, Sparkles } from 'lucide-react'
+import { X, Save, Trash2 } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 interface TaskTemplate {
@@ -93,12 +93,12 @@ export function SaveTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
+        className="glass-pop relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-primary)]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--glass-border)]">
           <div className="flex items-center gap-2">
             <Save className="h-4 w-4 text-[#2B79F7]" />
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Save as template</h3>
@@ -106,7 +106,7 @@ export function SaveTemplateModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -123,7 +123,7 @@ export function SaveTemplateModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Monthly content package"
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+              className="mt-1 w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
             />
           </div>
           <div>
@@ -135,7 +135,7 @@ export function SaveTemplateModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="What's in this template?"
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+              className="mt-1 w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
             />
           </div>
           <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
@@ -149,11 +149,11 @@ export function SaveTemplateModal({
           </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-primary)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--glass-border)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            className="glass-chip px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)]"
           >
             Cancel
           </button>
@@ -253,20 +253,19 @@ export function ApplyTemplateModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl bg-[var(--bg-card)] shadow-xl border border-[var(--border-primary)]"
+        className="glass-pop relative w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-primary)]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--glass-border)]">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#2B79F7]" />
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">Use a template</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/5"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -281,9 +280,9 @@ export function ApplyTemplateModal({
               No templates saved yet. Open a task and use &ldquo;Save as template&rdquo;.
             </p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-[var(--glass-border)]">
               {templates.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--bg-tertiary)] group">
+                <li key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 group">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">{t.name}</p>
                     {t.description && (

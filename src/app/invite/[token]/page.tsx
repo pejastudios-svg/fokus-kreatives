@@ -169,7 +169,7 @@ export default function InvitePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-brand-gradient flex items-center justify-center">
+      <div className="form-canvas min-h-screen flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     )
@@ -177,7 +177,7 @@ export default function InvitePage() {
 
   if (error && !userData) {
     return (
-      <div className="min-h-screen bg-brand-gradient flex items-center justify-center p-4">
+      <div className="form-canvas min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -194,7 +194,7 @@ export default function InvitePage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-brand-gradient flex items-center justify-center p-4">
+      <div className="form-canvas min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -207,7 +207,7 @@ export default function InvitePage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-gradient flex flex-col items-center justify-center p-4 gap-4">
+    <div className="form-canvas min-h-screen flex flex-col items-center justify-center p-4 gap-4">
       <Card className="w-full max-w-md">
         <CardContent className="p-8">
           <div className="flex justify-center mb-6">
@@ -225,7 +225,7 @@ export default function InvitePage() {
           </h2>
           <p className="text-center text-[var(--text-tertiary)] mb-6">Set your password to activate your account</p>
 
-          <div className="bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] px-4 py-2 rounded-lg text-center text-sm mb-6 capitalize">
+          <div className="bg-[#E8F1FF] text-[#2B79F7] dark:bg-[#1E3A6F] dark:text-[#93C5FD] px-4 py-2 rounded-lg text-center text-sm mb-6 capitalize shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]">
             {crmInviteInfo ? (
               <>
                 You&rsquo;re joining{' '}

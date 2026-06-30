@@ -193,10 +193,10 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
         onClick={() => openWithFocus('from')}
         className={[
           'inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-l-lg border border-r-0',
-          'bg-[var(--bg-card)] text-[var(--text-primary)]',
+          'bg-[var(--field-bg)] text-[var(--text-primary)] backdrop-blur-sm',
           open && focused === 'from'
             ? 'border-[#2B79F7] ring-2 ring-[#2B79F7]/20'
-            : 'border-[var(--border-primary)]',
+            : 'border-[var(--glass-border)]',
         ].join(' ')}
         aria-label="From date"
       >
@@ -210,10 +210,10 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
         onClick={() => openWithFocus('to')}
         className={[
           'inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-r-lg border',
-          'bg-[var(--bg-card)] text-[var(--text-primary)]',
+          'bg-[var(--field-bg)] text-[var(--text-primary)] backdrop-blur-sm',
           open && focused === 'to'
             ? 'border-[#2B79F7] ring-2 ring-[#2B79F7]/20'
-            : 'border-[var(--border-primary)]',
+            : 'border-[var(--glass-border)]',
         ].join(' ')}
         aria-label="To date"
       >
@@ -224,12 +224,12 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
 
       {open && (
         <div
-          className="absolute z-50 mt-2 top-full left-0 w-[560px] max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-premium-lg overflow-hidden"
+          className="absolute z-50 mt-2 top-full left-0 w-[560px] max-w-[calc(100vw-2rem)] glass-pop rounded-xl overflow-hidden"
           role="dialog"
         >
           <div className="grid grid-cols-[180px_1fr]">
             {/* Quick options column */}
-            <div className="border-r border-[var(--border-primary)] py-1.5">
+            <div className="border-r border-[var(--glass-border)] py-1.5">
               {quickOptions.map((opt) => (
                 <button
                   key={opt.label}
@@ -240,7 +240,7 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
                     commit(v)
                   }}
                   disabled={isDisabled(opt.resolve())}
-                  className="w-full px-3 py-1.5 flex items-center justify-between text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-1.5 flex items-center justify-between text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="text-[var(--text-primary)]">{opt.label}</span>
                   <span className="text-[11px] text-[var(--text-tertiary)] tabular-nums">{opt.trailing}</span>
@@ -256,14 +256,14 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
                   <button
                     type="button"
                     onClick={jumpToToday}
-                    className="px-2 py-0.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded"
+                    className="px-2 py-0.5 text-[11px] text-[var(--text-secondary)] hover:bg-white/5 rounded"
                   >
                     Today
                   </button>
                   <button
                     type="button"
                     onClick={() => stepMonth(-1)}
-                    className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                    className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)]"
                     aria-label="Previous month"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -271,7 +271,7 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
                   <button
                     type="button"
                     onClick={() => stepMonth(1)}
-                    className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                    className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)]"
                     aria-label="Next month"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -307,7 +307,7 @@ export function DateRangePicker({ from, to, onChange, minDate, className }: Date
                         'transition-colors',
                         !cell.inMonth && 'opacity-40',
                         disabled && 'opacity-30 cursor-not-allowed',
-                        !disabled && !endpoint && !inSelected && !inPreview && 'hover:bg-[var(--bg-tertiary)]',
+                        !disabled && !endpoint && !inSelected && !inPreview && 'hover:bg-white/5',
                         endpoint && 'bg-[#2B79F7] text-white font-semibold',
                         !endpoint && inSelected && 'bg-[#2B79F7]/15 text-[var(--text-primary)]',
                         !endpoint && inPreview && 'bg-[#2B79F7]/10 text-[var(--text-primary)]',

@@ -1,13 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
-  MoreVertical,
   Sparkles,
   Pencil,
   Archive as ArchiveIcon,
@@ -34,6 +33,7 @@ import { useAgencyUser } from '@/components/auth/AgencyUserContext'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { KebabMenu, type KebabMenuItem } from '@/components/ui/KebabMenu'
 import { ClientAssignees } from '@/components/clients/ClientAssignees'
 import { TopicsBank } from '@/components/clients/TopicsBank'
 import { StageBadge } from '@/components/planner/StageBadge'
@@ -112,25 +112,6 @@ export default function ClientProfilePage() {
     setNotification({ type, message })
     setTimeout(() => setNotification(null), ms)
   }, [])
-
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
 
   const refresh = useCallback(async () => {
     if (!clientId) return
@@ -301,12 +282,57 @@ export default function ClientProfilePage() {
     ? new Date(client.brand_intake_submitted_at)
     : null
 
+  const menuItems: KebabMenuItem[] = [
+    { label: 'Create content', icon: <Sparkles className="h-4 w-4" />, onClick: handleCreateContent },
+    {
+      label: 'Edit profile',
+      icon: <Pencil className="h-4 w-4" />,
+      onClick: () => router.push(`/clients/${clientId}/edit`),
+    },
+    {
+      label: intakeLink ? 'Copy intake link' : 'Generate intake link',
+      icon: <Copy className="h-4 w-4" />,
+      onClick: () => {
+        if (intakeLink) void handleCopyIntake()
+        else void handleRegenerateIntake()
+      },
+    },
+    {
+      label: 'Regenerate intake link',
+      icon: <RefreshCw className="h-4 w-4" />,
+      disabled: isGeneratingIntake,
+      onClick: () => {
+        void handleRegenerateIntake()
+      },
+    },
+    {
+      label: 'Export brand book',
+      icon: <Download className="h-4 w-4" />,
+      onClick: () => window.open(`/clients/${clientId}/brand-export`, '_blank'),
+    },
+  ]
+  if (canArchive && !client.archived_at) {
+    menuItems.push({
+      label: 'Archive client',
+      icon: <ArchiveIcon className="h-4 w-4" />,
+      onClick: () => setConfirmKind('archive'),
+    })
+  }
+  if (canDelete) {
+    menuItems.push({
+      label: 'Delete client',
+      icon: <Trash2 className="h-4 w-4" />,
+      tone: 'destructive',
+      onClick: () => setConfirmKind('delete'),
+    })
+  }
+
   return (
     <>
       <Header title="Client profile" subtitle={client.business_name || client.name || ''} />
-      <div className="p-4 md:p-8 max-w-5xl mx-auto">
-        {/* Back + notification - sticky so Back stays reachable while scrolling */}
-        <div className="sticky top-14 md:top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between gap-3 bg-[var(--bg-secondary)] dark:bg-black border-b border-[var(--border-primary)]">
+      {/* Back bar - full-width frosted banner, sticky below the header. */}
+      <div className="sticky top-14 z-30 glass-topbar">
+        <div className="max-w-5xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-3">
           <Link
             href="/clients"
             className="inline-flex items-center text-[#2B79F7] hover:underline text-sm"
@@ -321,7 +347,9 @@ export default function ClientProfilePage() {
             </span>
           )}
         </div>
+      </div>
 
+      <div className="p-4 md:p-8 max-w-5xl mx-auto">
         {notification && (
           <div
             className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
@@ -443,84 +471,10 @@ export default function ClientProfilePage() {
             </div>
 
             {/* 3-dot menu - anchored top-right so it doesn't push the hero
-                content off-center. */}
-            <div className="absolute top-3 right-3 md:top-4 md:right-4" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((v) => !v)}
-                  className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                  aria-label="Client actions"
-                  aria-expanded={menuOpen}
-                >
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                    <MenuItem
-                      icon={Sparkles}
-                      label="Create content"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        handleCreateContent()
-                      }}
-                    />
-                    <MenuItem
-                      icon={Pencil}
-                      label="Edit profile"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        router.push(`/clients/${clientId}/edit`)
-                      }}
-                    />
-                    <MenuItem
-                      icon={Copy}
-                      label={intakeLink ? 'Copy intake link' : 'Generate intake link'}
-                      onClick={async () => {
-                        setMenuOpen(false)
-                        if (intakeLink) await handleCopyIntake()
-                        else await handleRegenerateIntake()
-                      }}
-                    />
-                    <MenuItem
-                      icon={RefreshCw}
-                      label="Regenerate intake link"
-                      disabled={isGeneratingIntake}
-                      onClick={async () => {
-                        setMenuOpen(false)
-                        await handleRegenerateIntake()
-                      }}
-                    />
-                    <MenuItem
-                      icon={Download}
-                      label="Export brand book"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        window.open(`/clients/${clientId}/brand-export`, '_blank')
-                      }}
-                    />
-                    {canArchive && !client.archived_at && (
-                      <MenuItem
-                        icon={ArchiveIcon}
-                        label="Archive client"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setConfirmKind('archive')
-                        }}
-                      />
-                    )}
-                    {canDelete && (
-                      <MenuItem
-                        icon={Trash2}
-                        label="Delete client"
-                        tone="danger"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setConfirmKind('delete')
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
+                content off-center. Portaled (KebabMenu) so it isn't clipped by
+                the glass-card's stacking context. */}
+            <div className="absolute top-3 right-3 md:top-4 md:right-4">
+              <KebabMenu items={menuItems} label="Client actions" align="right" />
             </div>
           </CardContent>
         </Card>
@@ -700,36 +654,6 @@ function ClientProfileSkeleton() {
         ))}
       </div>
     </div>
-  )
-}
-
-function MenuItem({
-  icon: Icon,
-  label,
-  onClick,
-  tone,
-  disabled,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  onClick: () => void | Promise<void>
-  tone?: 'danger'
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-        tone === 'danger'
-          ? 'text-red-600 hover:bg-red-500/10'
-          : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-      } disabled:opacity-50 disabled:cursor-not-allowed`}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </button>
   )
 }
 

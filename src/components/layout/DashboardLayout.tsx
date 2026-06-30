@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar'
 import { NotificationPopupListener } from '@/components/notifications/NotificationPopupListener'
 import { PageTransition } from '@/components/ui/PageTransition'
 import { AuthGuard } from '@/components/auth/AuthGuard'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { cn } from '@/lib/utils'
 
 interface DashboardLayoutProps {
@@ -46,15 +47,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [mobileOpen])
 
-  useEffect(() => {
-    if (mobileOpen) {
-      const prev = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = prev
-      }
-    }
-  }, [mobileOpen])
+  // Lock background scroll while the mobile drawer is open. Go through the
+  // shared ref counter (same as modals + the ModalScrollLock observer) rather
+  // than touching body.style directly. The drawer renders a `.fixed.inset-0
+  // bg-black` backdrop, which the observer ALSO locks on - when this used to
+  // set body overflow directly, the observer captured that already-'hidden'
+  // value as its "original" and restored it on close, leaving the page stuck
+  // locked until refresh. Sharing the counter removes that race entirely.
+  useBodyScrollLock(mobileOpen)
 
   const toggleCollapse = () => {
     setCollapsed((prev) => {
@@ -75,13 +75,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <AuthGuard>
-      <div className="agency-scope min-h-screen bg-[var(--bg-secondary)] dark:bg-black">
+      <div className="agency-scope min-h-screen">
         {/* Desktop sidebar - fixed-positioned, only this controls actual width.
             `group/sidebar` lets labels inside fade on hover via group-hover. */}
         <aside
           onMouseLeave={() => setSuppressHover(false)}
           className={cn(
-            'group/sidebar hidden md:block fixed inset-y-0 left-0 z-30',
+            'group/sidebar hidden md:block fixed inset-y-0 left-0 z-40',
             'transition-[width] duration-300 ease-out will-change-[width]',
             collapsed
               ? suppressHover
@@ -124,7 +124,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             collapsed ? 'md:pl-16' : 'md:pl-64',
           )}
         >
-          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
+          <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 glass-topbar">
             <BurgerButton open={mobileOpen} onClick={() => setMobileOpen((o) => !o)} />
             <Image
               src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
@@ -142,7 +142,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               that never actually scrolls, which silently breaks `position: sticky`
               for anything inside a page. Wide content self-manages its own
               overflow (planner grid, tables). */}
-          <main className="flex-1 bg-[var(--bg-secondary)] dark:bg-black">
+          <main className="flex-1 dash-canvas">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>

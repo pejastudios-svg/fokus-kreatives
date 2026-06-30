@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -1543,7 +1544,7 @@ function CaptureSkeleton() {
                     <select
                       value={subPageId}
                       onChange={(e) => setSubPageId(e.target.value)}
-                      className="w-full md:w-96 px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                      className="w-full md:w-96 px-4 py-2.5 glass-inset rounded-lg text-[var(--text-primary)]"
                     >
                       <option value="">All pages</option>
                       {pages.map((p) => (
@@ -1562,7 +1563,7 @@ function CaptureSkeleton() {
                         value={subSearch}
                         onChange={(e) => setSubSearch(e.target.value)}
                         placeholder="Search submissions..."
-                        className="w-full md:w-80 pl-9 pr-3 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                        className="w-full md:w-80 pl-9 pr-3 py-2.5 glass-inset rounded-lg text-[var(--text-primary)]"
                       />
                     </div>
                   </div>
@@ -1703,9 +1704,9 @@ function CaptureSkeleton() {
         {/* Builder Modal - split-view: builder on left, live preview on
             right. Preview reflects the current form state in real time
             so you see exactly what visitors will see before saving. */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-7xl h-[92vh] shadow-2xl flex flex-col overflow-hidden">
+        {showModal && createPortal(
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-pop rounded-2xl w-full max-w-7xl h-[92vh] shadow-2xl flex flex-col overflow-hidden">
               <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[var(--border-primary)] shrink-0">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   {editingPage ? 'Edit Capture Page' : 'New Capture Page'}
@@ -1828,7 +1829,7 @@ function CaptureSkeleton() {
                     value={form.description}
                     onChange={handleFormChange}
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
+                    className="w-full px-4 py-2.5 glass-inset rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7] resize-none"
                     placeholder="Short description that appears on the page..."
                   />
                 </div>
@@ -1880,7 +1881,7 @@ function CaptureSkeleton() {
                     blips, "I want to update my answer"). Turn on for
                     one-shot signups (giveaways, event RSVPs) where a
                     duplicate is almost always a mistake. */}
-                <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                <div className="glass-inset rounded-lg p-3">
                   <Toggle
                     checked={form.block_duplicate_emails}
                     onChange={(v) =>
@@ -2012,7 +2013,7 @@ function CaptureSkeleton() {
                       placeholder="https://example.com/your-pdf-or-video"
                     />
                   ) : form.lead_magnet_url ? (
-                    <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                    <div className="flex items-center gap-3 p-3 glass-inset rounded-lg">
                       <FileText className="h-4 w-4 text-[#2B79F7] shrink-0" />
                       <span className="text-sm text-[var(--text-primary)] flex-1 truncate">
                         {decodeURIComponent(form.lead_magnet_url.split('/').pop() || 'Uploaded file').replace(
@@ -2305,7 +2306,7 @@ function CaptureSkeleton() {
                                 next === 'calendly' ? prev.calendly_url : '',
                             }))
                           }}
-                          className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                          className="w-full px-4 py-2.5 glass-inset rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                         >
                           <option value="">None - manual date/time only</option>
                           <option
@@ -2362,7 +2363,7 @@ function CaptureSkeleton() {
                                 onChange={(e) =>
                                   setForm((prev) => ({ ...prev, calendly_url: e.target.value }))
                                 }
-                                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                                className="w-full px-4 py-2.5 glass-inset rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                               >
                                 <option value={mainSchedulingUrl}>
                                   Main scheduling page (visitor picks an event)
@@ -2416,7 +2417,7 @@ function CaptureSkeleton() {
                                 meeting_duration_minutes: parseInt(e.target.value, 10) || 30,
                               }))
                             }
-                            className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                            className="w-full px-4 py-2.5 glass-inset rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
                           >
                             <option value={15}>15 minutes</option>
                             <option value={30}>30 minutes</option>
@@ -2475,13 +2476,14 @@ function CaptureSkeleton() {
                 </Button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
 
         {/* Delete confirm */}
-        {pageToDelete && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
+        {pageToDelete && createPortal(
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-pop rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Capture Page</h3>
                 <button
@@ -2510,11 +2512,12 @@ function CaptureSkeleton() {
                 </Button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
-         {selectedSubmission && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+         {selectedSubmission && createPortal(
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Submission Details</h3>
         <button
@@ -2530,7 +2533,7 @@ function CaptureSkeleton() {
           Submitted: {new Date(selectedSubmission.created_at).toLocaleString()}
         </p>
 
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
+        <div className="glass-inset rounded-xl p-4">
           <p className="text-sm font-semibold text-[var(--text-primary)] mb-3">All fields</p>
           <div className="space-y-2">
             {(() => {
@@ -2560,11 +2563,12 @@ function CaptureSkeleton() {
         </div>
       </div>
     </div>
-  </div>
+  </div>,
+  document.body,
 )}
-{submissionToDelete && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+{submissionToDelete && createPortal(
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-md shadow-2xl">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Submission</h3>
         <button
@@ -2592,12 +2596,13 @@ function CaptureSkeleton() {
         </Button>
       </div>
     </div>
-  </div>
+  </div>,
+  document.body,
 )}
 
-{confirmResetAnalytics && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-md shadow-2xl">
+{confirmResetAnalytics && createPortal(
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-md shadow-2xl">
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Reset analytics</h3>
         <button
@@ -2627,7 +2632,8 @@ function CaptureSkeleton() {
         </Button>
       </div>
     </div>
-  </div>
+  </div>,
+  document.body,
 )}
 </div>
 }

@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import { TIER_KEY_LABEL, type TierKey } from '@/lib/campaignTiers'
 import {
-  Sparkles,
   ExternalLink,
   Plus,
   CheckCircle,
@@ -357,10 +356,7 @@ export default function CampaignsPage() {
             with 50+ clients can find one fast. */}
         <Card>
           <CardContent className="py-5 space-y-4">
-            <div className="flex items-center gap-2 text-[#2B79F7]">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Create campaign</span>
-            </div>
+            <div className="glass-eyebrow">Create campaign</div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -542,7 +538,7 @@ export default function CampaignsPage() {
           onClick={() => deleteMode == null && setPendingDelete(null)}
         >
           <div
-            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
+            className="glass-pop relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -625,7 +621,7 @@ export default function CampaignsPage() {
           onClick={() => duplicateMode == null && setPendingDuplicate(null)}
         >
           <div
-            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl"
+            className="glass-pop relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none rounded-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"

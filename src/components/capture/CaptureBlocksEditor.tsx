@@ -58,7 +58,7 @@ function countForms(blocks: CaptureBlock[]): number {
 }
 
 const INPUT =
-  'w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]'
+  'glass-field w-full px-3 py-2 text-[var(--text-primary)] text-sm'
 
 // Blocks the user can add. 'form' is intentionally excluded - a landing page
 // has exactly one lead form, seeded by the editor and not duplicable.
@@ -366,7 +366,7 @@ export function UploadButton({
         <button
           type="button"
           onClick={() => setErr(null)}
-          className="absolute right-0 top-full z-20 mt-1 w-60 rounded-md border border-red-300 bg-white p-2 text-left text-[11px] leading-snug text-red-600 shadow-lg"
+          className="absolute right-0 top-full z-30 mt-1 w-60 rounded-md border border-red-300 bg-white p-2 text-left text-[11px] leading-snug text-red-600 shadow-lg"
         >
           {err}
         </button>
@@ -842,7 +842,7 @@ function BlockCard({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   return (
-    <div ref={ref} className={`rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] ${dragging ? 'opacity-40' : ''} ${block.hidden ? 'opacity-50' : ''}`}>
+    <div ref={ref} className={`glass-inset rounded-lg ${dragging ? 'opacity-40' : ''} ${block.hidden ? 'opacity-50' : ''}`}>
       <div
         draggable
         onDragStart={(e) => {

@@ -30,11 +30,11 @@ export function ReviewGuidePanel({ stream }: ReviewGuidePanelProps) {
   if (!guide) return null
 
   return (
-    <div className="rounded-md border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+    <div className="glass-inset rounded-md">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 rounded-md transition-colors"
       >
         <BookOpen className="h-3.5 w-3.5 text-[var(--text-tertiary)] shrink-0" />
         <span className="flex-1 text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
@@ -82,7 +82,7 @@ function GuideSectionRow({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="rounded border border-[var(--border-primary)] bg-[var(--bg-card)]">
+    <div className="glass-inset rounded">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}

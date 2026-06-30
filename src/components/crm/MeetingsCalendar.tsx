@@ -120,7 +120,7 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
   }
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+    <div className="glass-card rounded-2xl overflow-hidden">
       {/* Month navigation */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-primary)]">
         <div className="flex items-center gap-1.5">
@@ -257,7 +257,7 @@ export function MeetingsCalendar<T extends CalendarMeeting>({
           detail modal (via onSelectMeeting) and closes this one. */}
       {dayModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setDayModal(null)}
         >
           <div

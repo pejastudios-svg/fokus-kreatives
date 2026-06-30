@@ -6,7 +6,7 @@
 // by the parent drawer (separate buttons since they have different costs).
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Save, Sparkles } from 'lucide-react'
+import { Loader2, Save } from 'lucide-react'
 
 export interface ScriptEditorProps {
   slotId: string
@@ -87,11 +87,11 @@ export function ScriptEditor({
           onChange={(e) => setDraft(e.target.value)}
           disabled={disabled || saving}
           rows={Math.min(20, Math.max(6, draft.split('\n').length + 1))}
-          className="w-full text-sm font-mono leading-relaxed rounded border border-[var(--border-primary)] bg-[var(--bg-input)] p-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7] disabled:opacity-50"
+          className="glass-field w-full text-sm font-mono leading-relaxed rounded p-2.5 text-[var(--text-primary)] focus:outline-none disabled:opacity-50"
           placeholder="Generated script will appear here..."
         />
       ) : (
-        <div className="rounded border border-dashed border-[var(--border-primary)] p-4 text-center">
+        <div className="glass-inset rounded border-dashed p-4 text-center">
           <p className="text-xs text-[var(--text-tertiary)]">No script yet for this slot.</p>
         </div>
       )}
@@ -109,7 +109,7 @@ export function ScriptEditor({
             {isGenerating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Sparkles className="h-4 w-4" />
+              null
             )}
             {isGenerating ? 'Generating...' : 'Generate script'}
           </button>
@@ -119,7 +119,7 @@ export function ScriptEditor({
               type="button"
               onClick={handleSave}
               disabled={saving || !dirty || disabled}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              className="glass-chip flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -132,13 +132,13 @@ export function ScriptEditor({
               type="button"
               onClick={onGenerate}
               disabled={isGenerating || disabled}
-              className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              className="glass-chip inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
               title="Regenerate from scratch (replaces edits)"
             >
               {isGenerating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                null
               )}
               Regenerate
             </button>

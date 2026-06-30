@@ -47,14 +47,14 @@ export function RowMenu({ actions }: Props) {
           e.stopPropagation()
           setOpen((v) => !v)
         }}
-        className="p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+        className="p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5"
         aria-label="Row actions"
       >
         <MoreVertical className="h-3.5 w-3.5" />
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-30 min-w-[180px] max-w-[calc(100vw-1rem)] rounded-md border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1"
+          className="glass-pop absolute right-0 top-full mt-1 z-30 min-w-[180px] max-w-[calc(100vw-1rem)] rounded-md py-1"
           onClick={(e) => e.stopPropagation()}
         >
           {actions.map((a, i) => (
@@ -66,7 +66,7 @@ export function RowMenu({ actions }: Props) {
                 a.onClick()
                 setOpen(false)
               }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed text-left"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-primary)] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed text-left"
             >
               <span className="text-[var(--text-tertiary)] shrink-0">{a.icon}</span>
               {a.label}

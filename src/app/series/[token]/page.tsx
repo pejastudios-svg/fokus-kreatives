@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { VoiceTextarea } from '@/components/ui/VoiceTextarea'
 import { Button } from '@/components/ui/Button'
-import { CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 import type {
   SeriesFormat,
   SeriesFraming,
@@ -161,7 +161,7 @@ export default function SeriesFormPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center">
+      <div className="min-h-screen form-canvas flex items-center justify-center">
         <p className="text-[var(--text-tertiary)]">Loading…</p>
       </div>
     )
@@ -169,7 +169,7 @@ export default function SeriesFormPage() {
 
   if (error && !form) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -183,7 +183,7 @@ export default function SeriesFormPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[var(--bg-tertiary)] flex items-center justify-center p-4">
+      <div className="min-h-screen form-canvas flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -203,7 +203,7 @@ export default function SeriesFormPage() {
   const labelLower = form.series_label.toLowerCase()
 
   return (
-    <div className="min-h-screen bg-[var(--bg-tertiary)]">
+    <div className="min-h-screen form-canvas">
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -220,10 +220,7 @@ export default function SeriesFormPage() {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[#2B79F7]" />
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">{form.title}</h1>
-                </div>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)]">{form.title}</h1>
                 <p className="text-sm text-[var(--text-tertiary)]">for {displayName}</p>
               </div>
             </div>
@@ -297,7 +294,7 @@ export default function SeriesFormPage() {
           <div className="p-4 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
         )}
 
-        <div className="flex items-center justify-between flex-wrap gap-3 sticky bottom-4 bg-[var(--bg-tertiary)]/95 py-2">
+        <div className="glass-pop flex items-center justify-between flex-wrap gap-3 sticky bottom-4 rounded-xl px-4 py-3">
           <p className="text-sm text-[var(--text-tertiary)]">
             {answeredCount} of {sortedQuestions.length} answered
           </p>

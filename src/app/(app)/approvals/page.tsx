@@ -891,7 +891,7 @@ function ClientFilterCombobox({
       </button>
 
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-2 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] shadow-lg overflow-hidden">
+        <div className="glass-pop absolute z-30 left-0 right-0 mt-2 rounded-lg overflow-hidden">
           <div className="p-2 border-b border-[var(--border-primary)]">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-tertiary)]" />
@@ -1036,13 +1036,13 @@ function ApprovalsBoardSkeleton() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
+            <div className="glass-rail inline-flex items-center rounded-xl p-1">
               <button
                 type="button"
                 onClick={() => setView('board')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'board'
-                    ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
+                    ? 'glass-thumb text-white'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="Board view"
@@ -1055,7 +1055,7 @@ function ApprovalsBoardSkeleton() {
                 onClick={() => setView('list')}
                 className={`p-1.5 rounded-lg transition-colors ${
                   viewMode === 'list'
-                    ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm'
+                    ? 'glass-thumb text-white'
                     : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
                 aria-label="List view"
@@ -1077,7 +1077,7 @@ function ApprovalsBoardSkeleton() {
         </div>
 
         {/* Status tabs - All / Pending / Approved with live counts. */}
-        <div className="mb-4 inline-flex items-center bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-primary)]">
+        <div className="mb-4 glass-rail inline-flex items-center rounded-xl p-1">
           {([
             { id: 'all', label: 'All', count: counts.all },
             { id: 'pending', label: 'Pending', count: counts.pending },
@@ -1091,7 +1091,7 @@ function ApprovalsBoardSkeleton() {
                 onClick={() => setStatusTab(tab.id)}
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   active
-                    ? 'bg-[#E8F1FF] text-[#2B79F7] shadow-sm font-medium'
+                    ? 'glass-thumb text-white font-medium'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
                 }`}
               >
@@ -1172,7 +1172,7 @@ function ApprovalsBoardSkeleton() {
 
         {/* Create Approval Modal */}
         {showModal && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
       {/* Indeterminate progress bar - shows while we POST the approval. */}
       <div className="relative h-1 bg-[var(--bg-tertiary)] overflow-hidden">
@@ -1636,8 +1636,8 @@ function ApprovalsBoardSkeleton() {
         )}
       </div>
       {confirmAction && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none">
       <div className="px-4 py-3 border-b border-[var(--border-primary)]">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">
           {confirmAction.mode === 'approve'
@@ -1681,8 +1681,8 @@ function ApprovalsBoardSkeleton() {
 )}
 
 {deleteConfirm && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none shadow-2xl">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-60 p-4">
+    <div className="glass-pop rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto scrollbar-none">
       <div className="px-4 py-3 border-b border-[var(--border-primary)] flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete Approval?</h3>
         <button

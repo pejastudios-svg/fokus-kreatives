@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
-import { Copy, Check, Sparkles } from 'lucide-react'
+import { Copy, Check } from 'lucide-react'
 
 type ClientRow = {
   id: string
@@ -166,7 +166,6 @@ export default function BioTemplatesPage() {
             </div>
 
             <Button onClick={generate} isLoading={isGenerating} disabled={!selectedClientId}>
-              <Sparkles className="h-4 w-4 mr-2" />
               Generate Bio Options
             </Button>
 

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/Input'
 import { Toggle } from '@/components/ui/Toggle'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
-  Sparkles,
   FileText,
   Film,
   LayoutGrid,
@@ -860,7 +859,6 @@ export function ContentCreationEngine() {
             disabled={!selectedClientId || !selectedType || !selectedPillar}
             className="px-12 w-full sm:w-auto"
           >
-            <Sparkles className="h-5 w-5 mr-2" />
             {externalPrompt ? 'Rebuild Prompt' : 'Build Prompt'}
           </Button>
         ) : (
@@ -871,7 +869,6 @@ export function ContentCreationEngine() {
             disabled={!selectedClientId || !selectedType || !selectedPillar}
             className="px-12 w-full sm:w-auto"
           >
-            <Sparkles className={`h-5 w-5 mr-2 ${isGenerating ? 'animate-pulse' : ''}`} />
             {isGenerating ? 'Generating...' : 'Generate Content'}
           </Button>
         )}

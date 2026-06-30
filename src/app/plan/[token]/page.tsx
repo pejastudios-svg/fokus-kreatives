@@ -122,7 +122,7 @@ export default function PublicPlanPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-secondary)] text-[var(--text-tertiary)]">
+      <div className="form-canvas min-h-screen flex items-center justify-center text-[var(--text-tertiary)]">
         <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading plan...
       </div>
     )
@@ -130,7 +130,7 @@ export default function PublicPlanPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-secondary)] p-6">
+      <div className="form-canvas min-h-screen flex items-center justify-center p-6">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Plan unavailable</h1>
           <p className="text-sm text-[var(--text-secondary)]">{error || 'This link is no longer valid.'}</p>
@@ -140,8 +140,8 @@ export default function PublicPlanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-secondary)]">
-      <header className="bg-[var(--bg-card)] border-b border-[var(--border-primary)] px-6 py-4">
+    <div className="form-canvas min-h-screen">
+      <header className="glass-card rounded-none border-x-0 border-t-0 px-6 py-4">
         <div className="max-w-6xl mx-auto">
           <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">Content plan</p>
           <h1 className="text-xl font-semibold text-[var(--text-primary)] mt-0.5">{data.client.name}</h1>
@@ -150,7 +150,7 @@ export default function PublicPlanPage() {
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
         {data.slots.length === 0 && (
-          <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+          <div className="glass-card rounded-xl p-8 text-center text-[var(--text-tertiary)]">
             No content scheduled yet.
           </div>
         )}
@@ -159,23 +159,23 @@ export default function PublicPlanPage() {
           const grid = buildMonthGrid(monthStart)
           const monthLabel = grid.find((c) => c.monthLabel)?.monthLabel
           return (
-            <div key={monthStart} className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] overflow-hidden">
-              <div className="px-4 py-3 border-b border-[var(--border-primary)]">
+            <div key={monthStart} className="glass-card rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--glass-border)]">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">{monthLabel}</h3>
               </div>
-              <div className="grid grid-cols-7 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] bg-[var(--bg-secondary)]">
+              <div className="grid grid-cols-7 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] bg-white/[0.03]">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                   <div key={d} className="px-2 py-1.5 text-center">{d}</div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 border-t border-[var(--border-primary)]">
+              <div className="grid grid-cols-7 border-t border-[var(--glass-border)]">
                 {grid.map((cell, idx) => {
                   const cellSlots = slotsByDate.get(cell.date) ?? []
                   return (
                     <div
                       key={`${cell.date}-${idx}`}
                       className={[
-                        'min-h-[110px] border-b border-r border-[var(--border-primary)] p-1.5 flex flex-col gap-1',
+                        'min-h-[110px] border-b border-r border-[var(--glass-border)] p-1.5 flex flex-col gap-1',
                         cell.inMonth ? '' : 'opacity-40',
                       ].join(' ')}
                     >

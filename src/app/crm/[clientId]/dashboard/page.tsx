@@ -1492,7 +1492,7 @@ function SoftCard({
 }) {
   return (
     <div
-      className={`bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-[0_2px_10px_rgb(0_0_0/0.04),inset_0_1px_0_rgb(255_255_255/0.05)] ${className}`}
+      className={`glass-card rounded-2xl shadow-[0_2px_10px_rgb(0_0_0/0.04),inset_0_1px_0_rgb(255_255_255/0.05)] ${className}`}
     >
       {children}
     </div>

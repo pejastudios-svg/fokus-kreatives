@@ -217,7 +217,7 @@ export function NotificationPopupListener() {
   // would re-anchor position:fixed and strand the toast off-screen.
   return createPortal(
     <div className="fixed bottom-4 right-4 z-[90] max-w-sm">
-      <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-xl shadow-lg overflow-hidden">
+      <div className="glass-pop rounded-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
         <div className="flex items-start gap-3 px-4 py-3">
           <button
             type="button"

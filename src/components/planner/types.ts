@@ -67,6 +67,136 @@ export interface StoryBeat {
   voiceover: string
 }
 
+// ---------------------------------------------------------------------------
+// Story Set v2 - flexible intents.
+//
+// A story is no longer a fixed 4-beat sequence. It's a Story Set: an `intent`
+// selecting a variable-length sequence (3-8) of frames. Each frame stacks 1-4
+// text overlays, carries a visual hint OR an asset-slot, and may hold a
+// sticker. The variable array lives in the SAME `frames` jsonb column the
+// legacy/4-beat rows use - the element shape just evolved. Back-compat is
+// handled entirely by normalizeFrame() below, so no DB backfill is needed.
+// ---------------------------------------------------------------------------
+
+/** The archetype. Selects the role sequence + per-role guidance. */
+export type StoryIntent = 'teach' | 'prove' | 'launch' | 'engage' | 'bts_invite'
+
+/** Frame roles across all intents. Superset of the legacy beat labels;
+ *  normalizeFrame() maps old labels onto these. */
+export type FrameRole =
+  | 'HOOK' | 'CONTEXT' | 'VALUE' | 'STEP'
+  | 'PROOF' | 'ESCALATE' | 'REHOOK' | 'CTA'
+
+export type TextEmphasis = 'normal' | 'highlight' | 'big'
+
+/** One stacked overlay line on a frame. 1-4 per frame. */
+export interface TextBlock {
+  text: string
+  emphasis?: TextEmphasis // default 'normal'
+}
+
+/** Asset-slot markers: when `visual` equals one of these, the renderer shows a
+ *  "drop asset" chip instead of a capture hint - staff paste a REAL screenshot
+ *  / DM / result graphic. Any other `visual` string renders as a capture hint. */
+export type AssetSlot = 'screenshot-proof' | 'dm-testimonial' | 'result-graphic'
+
+export type StickerKind = 'poll' | 'question' | 'slider' | 'quiz' | 'countdown' | 'link'
+
+export interface FrameSticker {
+  type: StickerKind
+  /** Free-form sticker config: slider label, countdown date, link url, etc. */
+  label?: string
+  options?: string[]
+}
+
+/** v2 frame. Stored as an element of the `frames` jsonb array. */
+export interface StoryFrameV2 {
+  role: FrameRole
+  /** 1-4 stacked overlays. Replaces the single on_screen_text. */
+  text_blocks: TextBlock[]
+  /** Capture hint ("talking head", "text card", ...) OR an AssetSlot string. */
+  visual: string
+  sticker?: FrameSticker
+}
+
+export type StoryMechanic = 'reply' | 'dm'
+
+/** Launch campaign metadata. Sourced from brand_content_settings.story_campaign
+ *  and copied onto launch story rows. */
+export interface StoryCampaign {
+  offer: string
+  event_date?: string | null
+  keyword?: string | null
+  mechanic: StoryMechanic // default 'reply'
+}
+
+/** Unified render shape the FrameCard consumes. normalizeFrame() collapses all
+ *  three on-disk shapes (legacy StoryFrame, current StoryBeat, v2 StoryFrameV2)
+ *  into this. */
+export interface NormalizedFrame {
+  role: FrameRole
+  textBlocks: TextBlock[]
+  visual: string
+  assetSlot: AssetSlot | null
+  sticker?: FrameSticker
+  /** Legacy voiceover line, '' on v2 rows. Rendered only when non-empty. */
+  voiceover: string
+}
+
+const LEGACY_LABEL_TO_ROLE: Record<string, FrameRole> = {
+  HOOK: 'HOOK',
+  VALUE: 'VALUE',
+  REHOOK: 'REHOOK',
+  CTA: 'CTA',
+  POLL: 'CTA', // legacy POLL beat was the ask
+  BODY: 'VALUE', // oldest StoryFrame.beat values
+  OUTRO: 'CTA',
+}
+
+const ASSET_SLOTS = new Set<AssetSlot>(['screenshot-proof', 'dm-testimonial', 'result-graphic'])
+
+/** The entire renderer back-compat strategy. Maps any of the three on-disk
+ *  frame shapes to NormalizedFrame. Returns null for unusable rows. */
+export function normalizeFrame(raw: unknown): NormalizedFrame | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+
+  // v2 shape: has `role` + `text_blocks`.
+  if (typeof r.role === 'string' && Array.isArray(r.text_blocks)) {
+    const visual = typeof r.visual === 'string' ? r.visual : ''
+    const textBlocks = (r.text_blocks as unknown[])
+      .map((b) => (b && typeof b === 'object' ? (b as Record<string, unknown>) : null))
+      .filter((b): b is Record<string, unknown> => !!b && typeof b.text === 'string')
+      .map((b) => ({
+        text: b.text as string,
+        emphasis: (b.emphasis as TextEmphasis) ?? 'normal',
+      }))
+    return {
+      role: r.role as FrameRole,
+      textBlocks,
+      visual,
+      assetSlot: ASSET_SLOTS.has(visual as AssetSlot) ? (visual as AssetSlot) : null,
+      sticker: (r.sticker as FrameSticker) ?? undefined,
+      voiceover: '',
+    }
+  }
+
+  // Legacy StoryBeat {label,...} or oldest StoryFrame {beat,...}.
+  const labelStr =
+    typeof r.label === 'string' ? r.label : typeof r.beat === 'string' ? r.beat : ''
+  const role = LEGACY_LABEL_TO_ROLE[labelStr.toUpperCase()] ?? 'VALUE'
+  const ost = typeof r.on_screen_text === 'string' ? r.on_screen_text : ''
+  const capture = typeof r.capture === 'string' ? r.capture : ''
+  return {
+    role,
+    textBlocks: ost ? [{ text: ost, emphasis: 'normal' }] : [],
+    visual: capture,
+    assetSlot: null,
+    sticker: undefined,
+    voiceover: typeof r.voiceover === 'string' ? r.voiceover : '',
+  }
+}
+
 export interface StoryQueueItem {
   id: string
   format_id: string | null
@@ -90,6 +220,14 @@ export interface StoryQueueItem {
   source_format_slug?: string | null
   /** New beat structure (HOOK / VALUE / CTA). Used when carrier is set. */
   beats?: StoryBeat[] | null
+  /** v2: the archetype. Null/undefined on legacy + current 4-beat rows. The
+   *  renderer reads `frames` (which may now hold StoryFrameV2 elements) and
+   *  normalizes element shape; `intent` only drives the header badge. */
+  intent?: StoryIntent | null
+  /** v2: launch campaign metadata. Null except on launch rows. */
+  campaign?: StoryCampaign | null
+  /** v2: default CTA mechanic for this story ('reply' | 'dm'). */
+  mechanic?: StoryMechanic | null
   raw_material_refs: string[]
   pinned_to_date: string | null
   seed_text: string | null

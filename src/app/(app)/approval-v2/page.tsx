@@ -71,7 +71,7 @@ export default function ApprovalV2ListPage() {
         subtitle="Rebuilt renderer: same data, fixed video pipeline"
       />
 
-      <div className="p-4 md:p-8">
+      <div className="form-canvas p-4 md:p-8">
         <div className="mb-4 text-xs text-[var(--text-tertiary)]">
           This page reads the same data as <code>/approvals</code>. Click any
           row to open it in the v2 detail view, which uses the rebuilt
@@ -88,7 +88,7 @@ export default function ApprovalV2ListPage() {
               <Link
                 key={a.id}
                 href={`/approval-v2/${a.id}`}
-                className="block p-3 rounded-lg border border-[var(--border-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+                className="glass-card block p-3 rounded-lg hover:bg-white/5 transition-colors"
               >
                 <div className="font-medium text-[var(--text-primary)]">
                   {a.title}

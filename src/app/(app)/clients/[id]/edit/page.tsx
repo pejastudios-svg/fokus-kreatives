@@ -13,7 +13,8 @@ import { FileUpload } from '@/components/ui/FileUpload'
 import { ProfilePictureUpload } from '@/components/ui/ProfilePictureUpload'
 import { Skeleton } from '@/components/ui/Loading'
 
-import { ArrowLeft, Save, Trash2, Sparkles, CheckCircle, AlertCircle, ExternalLink, Download, Link as LinkIcon, FileText } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, CheckCircle, AlertCircle, ExternalLink, Download, Link as LinkIcon, FileText, Archive } from 'lucide-react'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { createClient } from '@/lib/supabase/client'
 
 import { BrandProfileForm } from '@/components/clients/BrandProfileForm'
@@ -21,6 +22,7 @@ import { defaultBrandProfile } from '@/components/clients/brandProfile'
 import { TopicsBank } from '@/components/clients/TopicsBank'
 import { ClientAssignees } from '@/components/clients/ClientAssignees'
 import { StoryDmKeywords } from '@/components/clients/StoryDmKeywords'
+import { StoryCampaignSettings } from '@/components/clients/StoryCampaignSettings'
 import { BrandDescriptionSettings } from '@/components/clients/BrandDescriptionSettings'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -554,52 +556,65 @@ export default function ClientDetailPage() {
     <>
       <Header title={client.name ?? ''} subtitle={client.business_name ?? ''} />
 
-      <div className="p-4 md:p-8 max-w-4xl mx-auto">
-        <div className="sticky top-14 md:top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between gap-3 bg-[var(--bg-secondary)] dark:bg-black border-b border-[var(--border-primary)]">
+      {/* Back bar - full-width frosted banner, sticky below the header. */}
+      <div className="sticky top-14 z-30 glass-topbar">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-3">
           <Link href={`/clients/${clientId}`} className="inline-flex items-center text-[#2B79F7] hover:underline shrink-0">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to profile
           </Link>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => window.open(`/clients/${clientId}/brand-export`, '_blank')}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export brand book
-            </Button>
+          <div className="flex items-center gap-2">
+            <Tooltip content="Export brand book" position="bottom">
+              <Button
+                variant="outline"
+                size="sm"
+                className="p-2"
+                aria-label="Export brand book"
+                onClick={() => window.open(`/clients/${clientId}/brand-export`, '_blank')}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </Tooltip>
 
             <Button onClick={handleCreateContent}>
-              <Sparkles className="h-4 w-4 mr-2" />
               Create Content
             </Button>
 
             {canArchiveClient && (
-              <Button
-                variant="ghost"
-                onClick={() => setConfirmKind('archive')}
-                isLoading={isArchiving}
-                className="text-yellow-500 hover:bg-yellow-500/10"
-              >
-                Archive
-              </Button>
+              <Tooltip content="Archive client" position="bottom">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-2 text-yellow-500 hover:bg-yellow-500/10"
+                  aria-label="Archive client"
+                  onClick={() => setConfirmKind('archive')}
+                  isLoading={isArchiving}
+                >
+                  <Archive className="h-4 w-4" />
+                </Button>
+              </Tooltip>
             )}
 
             {canDeleteClient && (
-              <Button
-                variant="ghost"
-                onClick={() => setConfirmKind('delete')}
-                isLoading={isDeleting}
-                className="text-red-500 hover:bg-red-500/10"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              <Tooltip content="Delete client" position="bottom">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-2 text-red-500 hover:bg-red-500/10"
+                  aria-label="Delete client"
+                  onClick={() => setConfirmKind('delete')}
+                  isLoading={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Tooltip>
             )}
           </div>
         </div>
+      </div>
 
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
         {notification && (
           <div
             role="status"
@@ -957,6 +972,8 @@ export default function ClientDetailPage() {
           <TopicsBank clientId={clientId} />
 
           <StoryDmKeywords clientId={clientId} />
+
+          <StoryCampaignSettings clientId={clientId} />
 
           <BrandDescriptionSettings clientId={clientId} />
 

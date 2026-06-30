@@ -159,12 +159,12 @@ function ChecklistRow({
   return (
     <div
       className={[
-        'rounded-md border p-2.5',
+        'rounded-md p-2.5',
         resolved
-          ? 'border-green-500/30 bg-green-500/5'
+          ? 'border border-green-500/30 bg-green-500/5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
           : item.status === 'flag'
-          ? 'border-amber-500/40 bg-amber-500/5'
-          : 'border-[var(--border-primary)] bg-[var(--bg-secondary)]',
+          ? 'border border-amber-500/40 bg-amber-500/5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
+          : 'glass-inset',
       ].join(' ')}
     >
       <button
@@ -198,7 +198,7 @@ function ChecklistRow({
                 type="button"
                 disabled={!isReady}
                 onClick={handleRecheck}
-                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded glass-chip disabled:opacity-50"
               >
                 {rechecking ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 Re-check
@@ -207,7 +207,7 @@ function ChecklistRow({
                 type="button"
                 disabled={disabled}
                 onClick={handleMarkFixed}
-                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-green-500/40 text-green-600 hover:bg-green-500/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-green-500/40 text-green-600 hover:bg-green-500/10 disabled:opacity-50 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] hover:-translate-y-px"
               >
                 <CheckCircle2 className="h-3 w-3" />
                 Mark fixed
@@ -216,7 +216,7 @@ function ChecklistRow({
                 type="button"
                 disabled={disabled}
                 onClick={() => setShowWaive((v) => !v)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-amber-500/40 text-amber-600 hover:bg-amber-500/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-amber-500/40 text-amber-600 hover:bg-amber-500/10 disabled:opacity-50 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] hover:-translate-y-px"
               >
                 Waive
               </button>
@@ -230,7 +230,7 @@ function ChecklistRow({
                 onChange={(e) => setWaiveReason(e.target.value)}
                 placeholder="Reason for waiving (required - audit trail)"
                 rows={2}
-                className="w-full text-xs rounded border border-[var(--border-primary)] bg-[var(--bg-input)] p-1.5 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#2B79F7]"
+                className="w-full text-xs rounded glass-field p-1.5 text-[var(--text-primary)]"
               />
               <div className="flex gap-1.5">
                 <button
@@ -248,7 +248,7 @@ function ChecklistRow({
                     setWaiveReason('')
                     setError(null)
                   }}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded glass-chip text-[var(--text-tertiary)]"
                 >
                   <X className="h-3 w-3" />
                   Cancel

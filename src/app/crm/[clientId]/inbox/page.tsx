@@ -439,11 +439,11 @@ export default function CRMInboxPage() {
       {showCleared && <Confetti />}
       {showCleared && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-in fade-in"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
           onClick={() => setShowCleared(false)}
         >
           <div
-            className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-2xl px-8 py-8 text-center w-full max-w-sm animate-in zoom-in-95 fade-in"
+            className="glass-pop rounded-2xl shadow-2xl px-8 py-8 text-center w-full max-w-sm animate-in zoom-in-95 fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#2B79F7]/10">

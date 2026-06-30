@@ -233,6 +233,7 @@ function LoginForm() {
 
               <form onSubmit={handleLogin} className="space-y-6">
                 <Input
+                  className="glass-field"
                   label="Email"
                   type="email"
                   placeholder="you@example.com"
@@ -242,6 +243,7 @@ function LoginForm() {
                 />
 
                 <Input
+                  className="glass-field"
                   label="Password"
                   type="password"
                   placeholder="Enter your password"
@@ -296,6 +298,7 @@ function LoginForm() {
 
               <form onSubmit={handleSendResetCode} className="space-y-6">
                 <Input
+                  className="glass-field"
                   label="Email"
                   type="email"
                   placeholder="you@example.com"
@@ -333,6 +336,7 @@ function LoginForm() {
 
               <form onSubmit={handleVerifyAndReset} className="space-y-5">
                 <Input
+                  className="glass-field"
                   label="6-digit code"
                   type="text"
                   inputMode="numeric"
@@ -346,6 +350,7 @@ function LoginForm() {
                 />
 
                 <Input
+                  className="glass-field"
                   label="New password"
                   type="password"
                   placeholder="At least 8 characters"
@@ -355,6 +360,7 @@ function LoginForm() {
                 />
 
                 <Input
+                  className="glass-field"
                   label="Confirm new password"
                   type="password"
                   placeholder="Re-enter password"

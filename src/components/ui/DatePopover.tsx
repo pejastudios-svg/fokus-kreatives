@@ -169,11 +169,11 @@ export function DatePopover({
 
       {open && (
         <div
-          className={`absolute z-50 mt-2 top-full ${align === 'right' ? 'right-0' : 'left-0'} w-[480px] max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-premium-lg overflow-hidden`}
+          className={`absolute z-50 mt-2 top-full ${align === 'right' ? 'right-0' : 'left-0'} w-[480px] max-w-[calc(100vw-2rem)] glass-pop rounded-xl overflow-hidden`}
           role="dialog"
         >
           <div className="grid grid-cols-[160px_1fr]">
-            <div className="border-r border-[var(--border-primary)] py-1.5 flex flex-col">
+            <div className="border-r border-[var(--glass-border)] py-1.5 flex flex-col">
               {quickOptions.map((opt) => (
                 <button
                   key={opt.label}
@@ -184,7 +184,7 @@ export function DatePopover({
                     commit(v)
                   }}
                   disabled={isDisabled(opt.resolve())}
-                  className="w-full px-3 py-1.5 flex items-center justify-between text-sm hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-1.5 flex items-center justify-between text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="text-[var(--text-primary)]">{opt.label}</span>
                   <span className="text-[11px] text-[var(--text-tertiary)] tabular-nums">{opt.trailing}</span>
@@ -209,14 +209,14 @@ export function DatePopover({
                   <button
                     type="button"
                     onClick={jumpToToday}
-                    className="px-2 py-0.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded"
+                    className="px-2 py-0.5 text-[11px] text-[var(--text-secondary)] hover:bg-white/5 rounded"
                   >
                     Today
                   </button>
                   <button
                     type="button"
                     onClick={() => stepMonth(-1)}
-                    className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                    className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)]"
                     aria-label="Previous month"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -224,7 +224,7 @@ export function DatePopover({
                   <button
                     type="button"
                     onClick={() => stepMonth(1)}
-                    className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                    className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)]"
                     aria-label="Next month"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -253,7 +253,7 @@ export function DatePopover({
                         'h-8 w-8 mx-auto text-xs tabular-nums rounded transition-colors',
                         !cell.inMonth && 'opacity-40',
                         disabled && 'opacity-30 cursor-not-allowed',
-                        !disabled && !isSelected && 'hover:bg-[var(--bg-tertiary)]',
+                        !disabled && !isSelected && 'hover:bg-white/5',
                         isSelected && 'bg-[#2B79F7] text-white font-semibold',
                         !isSelected && isToday && 'ring-1 ring-[#2B79F7] text-[#2B79F7]',
                       ].filter(Boolean).join(' ')}

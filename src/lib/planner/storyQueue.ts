@@ -37,6 +37,18 @@
 import { generateScript } from '@/lib/ai/provider'
 import { listFormats } from '@/lib/contentFormats'
 import type { ContentFormat } from '@/lib/contentFormats/types'
+import type {
+  AssetSlot,
+  FrameRole,
+  FrameSticker,
+  StickerKind,
+  StoryCampaign,
+  StoryFrameV2,
+  StoryIntent,
+  StoryMechanic,
+  TextBlock,
+  TextEmphasis,
+} from '@/components/planner/types'
 
 import { plannerAdmin } from './db'
 import { loadAvailableTopicGroups } from './material'
@@ -48,23 +60,29 @@ const STORIES_PER_GROUP_CAP = 5
 const MATERIAL_FIT_THRESHOLD = 5
 const CAPTURE_ROTATION_WINDOW = 8
 
-// Word budgets per beat label. The prompt asks the AI to respect these,
-// and the post-processor truncates only when WAY over (>1.5x). Slight
-// overshoot is allowed if it preserves a sentence boundary - hard-cutting
-// at exactly the budget produces broken sentences like "Got this DM: How
-// do I get clients without a." (a real failure case from production).
-const WORD_BUDGETS: Record<StoryBeatLabel, number> = {
-  HOOK: 10,
+// Per-frame word budget (combined across stacked text_blocks) used by the
+// post-processor. The prompt asks the AI to respect these; the post-processor
+// truncates only when WAY over (>1.5x), preserving sentence boundaries -
+// hard-cutting at exactly the budget produces broken sentences like "Got this
+// DM: How do I get clients without a." (a real failure case from production).
+const ROLE_WORD_BUDGETS: Record<FrameRole, number> = {
+  HOOK: 12,
+  CONTEXT: 14,
   VALUE: 15,
+  STEP: 16,
+  PROOF: 14,
+  ESCALATE: 26,
   REHOOK: 12,
-  CTA: 10,
-  POLL: 14,
+  CTA: 14,
 }
+// Per stacked overlay line. ESCALATE stacks several short lines; this caps any
+// single one so the frame stays readable.
+const MAX_BLOCK_WORDS = 12
 
-// Per-bucket narrative arc. The four frames must form ONE story, not four
-// disconnected lines. This template tells the AI what each label is for in
-// the context of the format's bucket, replacing the vague strategy_beats
-// dump that produced incoherent stories before.
+// Per-bucket narrative arc for the teach/prove intents. The frames must form
+// ONE story, not disconnected lines. The cta strings are mechanic-NEUTRAL (the
+// actual "Reply '{KW}'..." vs "DM..." shape comes from the CTA RULES block +
+// the per-role CTA guidance) so flipping the default mechanic touches one place.
 type FormatBucket = 'storytelling' | 'educational' | 'opinion' | 'proof_community'
 
 const NARRATIVE_ARCS: Record<FormatBucket, { hook: string; value: string; rehook: string; cta: string }> = {
@@ -78,38 +96,170 @@ const NARRATIVE_ARCS: Record<FormatBucket, { hook: string; value: string; rehook
     hook: 'the problem framed as a real situation the viewer recognizes - not abstract.',
     value: 'ONE punchy piece of the framework - the single most useful idea, complete on its own. Not a list of three.',
     rehook: 'the angle most people miss - reframe what the value beat just said with a sharper take.',
-    cta: 'invite a DM for the full framework.',
+    cta: 'invite the viewer to ask for the full framework.',
   },
   opinion: {
     hook: 'the spicy take - one sentence that splits the room. Pick a side.',
     value: 'ONE piece of evidence or reasoning that defends the take. Specific, not generic.',
     rehook: 'frame the opposite side as wrong (or shaky) and dare the viewer to disagree.',
-    cta: 'invite a DM, share, or follow to continue the debate.',
+    cta: 'invite the viewer to reply, share, or follow to continue the debate.',
   },
   proof_community: {
     hook: 'the win/result - a specific outcome from the raw material. Quote it verbatim if a number exists; do NOT invent numbers.',
     value: 'the ONE lever that produced the result - the specific thing that mattered.',
     rehook: 'what this means for the viewer (the implication, not a generic platitude).',
-    cta: 'invite a DM for the breakdown.',
+    cta: 'invite the viewer to ask for the breakdown.',
   },
 }
 
-// Formats that deliver pure value with NO call-to-action. These generate a
-// 3-frame story (HOOK -> VALUE -> REHOOK) that ends on the takeaway. Every
-// other story format keeps the 4th DM/share/follow CTA frame.
-const NO_CTA_STORY_FORMATS = new Set<string>(['story.value_drop'])
+// ---------------------------------------------------------------------------
+// INTENT ROUTER
+//
+// A story is a Story Set: an `intent` selects a variable-length sequence of
+// frames (RoleSpec[]). Each RoleSpec carries per-role guidance (parameterized
+// by bucket/campaign), a word budget, and a max stacked-text-block count.
+// `engage` routes to the sticker generator; the other four flow through
+// generateOneStoryBrief's prompt builder.
+// ---------------------------------------------------------------------------
 
-function buildNarrativeArc(bucket: string, noCta = false): string {
-  const arc = NARRATIVE_ARCS[bucket as FormatBucket] ?? NARRATIVE_ARCS.storytelling
-  const n = noCta ? 3 : 4
-  const lines = [
-    `- HOOK   = ${arc.hook}`,
-    `- VALUE  = ${arc.value}`,
-    `- REHOOK = ${arc.rehook}`,
-  ]
-  if (noCta) lines.push(`- (NO CTA) end on the REHOOK as a clean takeaway - do NOT add a 4th frame or any ask`)
-  else lines.push(`- CTA    = ${arc.cta}`)
-  return `NARRATIVE ARC (the ${n} frames must tell ONE story - same protagonist, same situation, same scene throughout):\n${lines.join('\n')}`
+interface ArcCtx {
+  bucket: FormatBucket
+  arc: { hook: string; value: string; rehook: string; cta: string }
+  KW: string
+  mechanic: StoryMechanic
+  campaign: StoryCampaign | null
+}
+
+interface RoleSpec {
+  role: FrameRole
+  guidance: (ctx: ArcCtx) => string
+  /** Combined word budget across this frame's text_blocks. */
+  wordBudget: number
+  /** Max stacked overlays. 1 for most; up to 4 for ESCALATE. */
+  maxBlocks: number
+  /** When set, this frame is an asset-slot frame (PROOF). */
+  assetSlot?: AssetSlot
+}
+
+const replyOrDm = (c: ArcCtx) =>
+  c.mechanic === 'dm' ? `DM '${c.KW}'` : `Reply '${c.KW}' to this story`
+
+const HOOK_SPEC: RoleSpec = { role: 'HOOK', wordBudget: 12, maxBlocks: 1, guidance: (c) => c.arc.hook }
+const VALUE_SPEC: RoleSpec = { role: 'VALUE', wordBudget: 15, maxBlocks: 1, guidance: (c) => c.arc.value }
+const REHOOK_SPEC: RoleSpec = { role: 'REHOOK', wordBudget: 12, maxBlocks: 1, guidance: (c) => c.arc.rehook }
+const CTA_SPEC: RoleSpec = {
+  role: 'CTA',
+  wordBudget: 14,
+  maxBlocks: 1,
+  guidance: (c) => `${c.arc.cta} Phrase as the ${c.mechanic === 'dm' ? 'DM' : 'reply-to-story'} CTA: "${replyOrDm(c)} for [the thing]."`,
+}
+
+const PROOF_SPEC: RoleSpec = {
+  role: 'PROOF',
+  wordBudget: 14,
+  maxBlocks: 2,
+  guidance: () =>
+    `built around a REAL asset the staff will paste in. Set "visual" to EXACTLY one of: "screenshot-proof", "dm-testimonial", or "result-graphic" (whichever fits the proof). The text_blocks are 1-2 short caption lines AROUND that asset, drawn ONLY from raw material. Do NOT invent the number/quote shown in the asset; if raw material has no specific number, keep the caption qualitative ("the result", "what they said").`,
+}
+
+const HOOK_PSA_SPEC: RoleSpec = {
+  role: 'HOOK',
+  wordBudget: 14,
+  maxBlocks: 2,
+  guidance: (c) =>
+    `an announcement / heads-up opener (a "PSA"-style line), NOT a story scene. Name what's happening${c.campaign?.event_date ? ` and when (${c.campaign.event_date})` : ''}. Punchy. You may stack a short second line.`,
+}
+const ESCALATE_SPEC: RoleSpec = {
+  role: 'ESCALATE',
+  wordBudget: 26,
+  maxBlocks: 4,
+  guidance: () =>
+    `2-4 SHORT stacked text_blocks that build momentum in this order of feeling: announce -> why it matters to the viewer -> ONE proof point (only if a real number/result is in raw material) -> urgency. Each block is one short line (<= 12 words). Do NOT use a "good news / better news / best news" or numbered-tier template - that reads as a formula. Vary the phrasing. Mark the announce and urgency blocks with "emphasis":"big" or "highlight".`,
+}
+const CTA_LAUNCH_SPEC: RoleSpec = {
+  role: 'CTA',
+  wordBudget: 16,
+  maxBlocks: 1,
+  guidance: (c) => {
+    const offer = c.campaign?.offer ? ` to get ${c.campaign.offer}` : ' for the details'
+    const when = c.campaign?.event_date ? ` Reference the date (${c.campaign.event_date}) for urgency.` : ''
+    return `the ask: "${replyOrDm(c)}${offer}."${when}`
+  },
+}
+
+const CONTEXT_SPEC: RoleSpec = {
+  role: 'CONTEXT',
+  wordBudget: 14,
+  maxBlocks: 1,
+  guidance: () =>
+    `a casual REAL behind-the-scenes moment from raw material - what's happening right now, low-key and human. No selling yet.`,
+}
+const BTW_PIVOT_SPEC: RoleSpec = {
+  role: 'STEP',
+  wordBudget: 16,
+  maxBlocks: 2,
+  guidance: (c) =>
+    `a soft pivot that opens like an afterthought ("btw", "quick thing", "almost forgot") into the offer${c.campaign?.offer ? ` (${c.campaign.offer})` : ''}. Low pressure, friendly.`,
+}
+const CTA_SOFT_SPEC: RoleSpec = {
+  role: 'CTA',
+  wordBudget: 14,
+  maxBlocks: 1,
+  guidance: (c) => `a SOFT invite, never a hard sell: "${replyOrDm(c)} if you want in." Keep it casual.`,
+}
+
+const INTENT_ROLES: Record<StoryIntent, RoleSpec[]> = {
+  teach: [HOOK_SPEC, VALUE_SPEC, REHOOK_SPEC, CTA_SPEC],
+  prove: [HOOK_SPEC, PROOF_SPEC, REHOOK_SPEC, CTA_SPEC],
+  launch: [HOOK_PSA_SPEC, ESCALATE_SPEC, PROOF_SPEC, CTA_LAUNCH_SPEC],
+  engage: [HOOK_SPEC], // routed to generateStickerBrief; sequence is informational
+  bts_invite: [CONTEXT_SPEC, BTW_PIVOT_SPEC, CTA_SOFT_SPEC],
+}
+
+function roleOrder(specs: RoleSpec[], role: FrameRole): number {
+  const i = specs.findIndex((s) => s.role === role)
+  return i < 0 ? 99 : i
+}
+
+/** The JSON `frames` schema shown to the model, derived from the role specs. */
+function buildFramesSchema(specs: RoleSpec[]): string {
+  return specs
+    .map((s) => {
+      const blocks =
+        s.maxBlocks > 1
+          ? `[{ "text": "...", "emphasis": "normal|highlight|big" }, ... up to ${s.maxBlocks}]`
+          : `[{ "text": "...", "emphasis": "normal" }]`
+      const visual =
+        s.role === 'PROOF'
+          ? `"screenshot-proof|dm-testimonial|result-graphic"`
+          : `"talking head|text card|b-roll|screen recording"`
+      return `    { "role": "${s.role}", "text_blocks": ${blocks}, "visual": ${visual} }`
+    })
+    .join(',\n')
+}
+
+/** The per-role guidance block (replaces the old fixed NARRATIVE ARC). */
+function buildRoleGuidance(specs: RoleSpec[], ctx: ArcCtx): string {
+  const order = specs.map((s) => s.role).join(' -> ')
+  const lines = specs.map((s) => {
+    const blocksNote = s.maxBlocks > 1 ? `, up to ${s.maxBlocks} stacked text_blocks` : ''
+    return `- ${s.role} (~${s.wordBudget} words${blocksNote}) = ${s.guidance(ctx)}`
+  })
+  return `FRAME SEQUENCE (exactly ${specs.length} frame${specs.length === 1 ? '' : 's'}, in order ${order}):\n${lines.join('\n')}`
+}
+
+/** Intent-aware coherence rule. Narrative intents anchor to ONE moment; launch
+ *  anchors to ONE offer. */
+function buildCoherenceRule(intent: StoryIntent): string {
+  if (intent === 'launch') {
+    return `ONE-OFFER RULE (read twice):
+- Every frame serves ONE offer. Do NOT drift to other topics. The announce, the escalation, the proof, and the CTA all point at the SAME single offer.
+- The proof frame must support THIS offer, not a tangent.`
+  }
+  return `ONE-SITUATION RULE (most-violated rule - read twice):
+- All frames describe ONE specific situation, ONE protagonist, ONE scene. Do NOT pivot topics between frames.
+- If the opener is about "creator's block on Tuesday morning", the rest must stay anchored to THAT moment - not jump to "first time filming" or some other angle.
+- Pick the single moment from raw material that best supports the sequence above. Build every frame from THAT moment. Stories that pivot read as disconnected slogans.`
 }
 
 export interface RefillResult {
@@ -132,6 +282,49 @@ async function loadDmKeywords(clientId: string): Promise<string[]> {
   const out = raw.map((k) => (typeof k === 'string' ? k.trim() : '')).filter(Boolean)
   console.log(`[story_brief] loadDmKeywords client=${clientId} ->`, JSON.stringify(out))
   return out
+}
+
+/** The brand's active launch campaign, or null. Returns null when unset,
+ *  toggled off, or the event_date has passed - so auto-launch only fires for a
+ *  real, current offer (never an invented one). */
+async function loadActiveCampaign(clientId: string): Promise<StoryCampaign | null> {
+  const supabase = plannerAdmin()
+  const { data, error } = await supabase
+    .from('brand_content_settings')
+    .select('story_campaign')
+    .eq('client_id', clientId)
+    .maybeSingle()
+  if (error) {
+    console.error('[story_brief] loadActiveCampaign error:', error.message)
+    return null
+  }
+  const raw = data?.story_campaign as Record<string, unknown> | null
+  if (!raw || typeof raw !== 'object') return null
+  if (raw.active === false) return null
+  const offer = typeof raw.offer === 'string' ? raw.offer.trim() : ''
+  if (!offer) return null
+  const eventDate =
+    typeof raw.event_date === 'string' && raw.event_date.trim() ? raw.event_date.trim() : null
+  if (eventDate && eventDate < new Date().toISOString().slice(0, 10)) return null // expired
+  const keyword = typeof raw.keyword === 'string' && raw.keyword.trim() ? raw.keyword.trim() : null
+  const mechanic: StoryMechanic = raw.mechanic === 'dm' ? 'dm' : 'reply'
+  return { offer, event_date: eventDate, keyword, mechanic }
+}
+
+/** Auto-mix the story archetype for plan-time / refill generation.
+ *  - launch only when the brand has an active campaign (else it would invent an offer)
+ *  - prove only for proof_community formats (where real proof material exists)
+ *  - engage (sticker) and bts_invite sprinkled on a rotation; teach is the default */
+function pickAutoIntent(
+  format: ContentFormat,
+  rotation: number,
+  hasActiveCampaign: boolean,
+): StoryIntent {
+  if (hasActiveCampaign && rotation % 6 === 3) return 'launch'
+  if (rotation % 5 === 4) return 'engage'
+  if (rotation % 7 === 6) return 'bts_invite'
+  if (format.bucket === 'proof_community') return 'prove'
+  return 'teach'
 }
 
 export async function refillStoryQueue(
@@ -169,6 +362,8 @@ export async function refillStoryQueue(
   }
 
   const dmKeywords = await loadDmKeywords(clientId)
+  const campaign = await loadActiveCampaign(clientId)
+  const hasActiveCampaign = !!campaign
   const brandName = clientRow?.business_name ?? clientRow?.name ?? null
   let created = 0
   const recentCaptures: string[] = []
@@ -177,15 +372,21 @@ export async function refillStoryQueue(
 
   for (let i = 0; i < needed; i++) {
     const format = sortedFormats[i % sortedFormats.length]
-    const generated = await generateOneStoryBrief({
-      clientId,
-      brandName,
-      format,
-      topicGroups,
-      dmKeywords,
-      recentCaptures: [...recentCaptures],
-      recentHooks: [...recentHooks],
-    })
+    const intent = pickAutoIntent(format, i, hasActiveCampaign)
+    const generated =
+      intent === 'engage'
+        ? await generateStickerBrief({ clientId, brandName, format, topicGroups, dmKeywords })
+        : await generateOneStoryBrief({
+            clientId,
+            brandName,
+            format,
+            topicGroups,
+            dmKeywords,
+            recentCaptures: [...recentCaptures],
+            recentHooks: [...recentHooks],
+            intent,
+            campaign: intent === 'launch' ? campaign : null,
+          })
     if (!generated) {
       skipped.push(`${format.slug}: generation failed`)
       continue
@@ -195,10 +396,13 @@ export async function refillStoryQueue(
       client_id: clientId,
       format_id: format.id,
       source_format_id: format.id,
-      carrier: 'video', // unified frame model reuses 'video' carrier (no enum migration)
+      carrier: generated.intent === 'engage' ? 'sticker' : 'video',
+      intent: generated.intent,
+      campaign: generated.campaign,
+      mechanic: generated.mechanic,
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
-      frames: generated.beats,
+      frames: generated.frames,
       who_films: generated.who_films,
       raw_material_refs: generated.refs,
     })
@@ -208,9 +412,11 @@ export async function refillStoryQueue(
     }
     created += 1
 
-    for (const b of generated.beats) {
-      if (b.capture) recentCaptures.push(b.capture)
-      if (b.label === 'HOOK' && b.on_screen_text) recentHooks.push(b.on_screen_text)
+    for (const f of generated.frames) {
+      if (f.visual && !ASSET_SLOT_SET.has(f.visual as AssetSlot)) recentCaptures.push(f.visual)
+      if ((f.role === 'HOOK' || f.role === 'CONTEXT') && f.text_blocks[0]?.text) {
+        recentHooks.push(f.text_blocks[0].text)
+      }
     }
     while (recentCaptures.length > CAPTURE_ROTATION_WINDOW) recentCaptures.shift()
     while (recentHooks.length > CAPTURE_ROTATION_WINDOW) recentHooks.shift()
@@ -228,6 +434,8 @@ export interface GenerateStoryPromptInput {
   seedText?: string | null
   /** Optional: override the format pick. */
   formatId?: string | null
+  /** Optional: the archetype to generate. Defaults to 'teach'. */
+  intent?: StoryIntent
 }
 
 export async function generateStoryPrompt(input: GenerateStoryPromptInput): Promise<{ promptId: string }> {
@@ -255,16 +463,23 @@ export async function generateStoryPrompt(input: GenerateStoryPromptInput): Prom
 
   const dmKeywords = await loadDmKeywords(input.clientId)
   const brandName = clientRow?.business_name ?? clientRow?.name ?? null
-  const generated = await generateOneStoryBrief({
-    clientId: input.clientId,
-    brandName,
-    format,
-    topicGroups,
-    seedText: input.seedText ?? null,
-    dmKeywords,
-    recentCaptures: [],
-    recentHooks: [],
-  })
+  const intent: StoryIntent = input.intent ?? 'teach'
+  const campaign = intent === 'launch' ? await loadActiveCampaign(input.clientId) : null
+  const generated =
+    intent === 'engage'
+      ? await generateStickerBrief({ clientId: input.clientId, brandName, format, topicGroups, dmKeywords })
+      : await generateOneStoryBrief({
+          clientId: input.clientId,
+          brandName,
+          format,
+          topicGroups,
+          seedText: input.seedText ?? null,
+          dmKeywords,
+          recentCaptures: [],
+          recentHooks: [],
+          intent,
+          campaign,
+        })
 
   if (!generated) throw new Error('Story prompt generation failed')
 
@@ -274,10 +489,13 @@ export async function generateStoryPrompt(input: GenerateStoryPromptInput): Prom
       client_id: input.clientId,
       format_id: format.id,
       source_format_id: format.id,
-      carrier: 'video',
+      carrier: generated.intent === 'engage' ? 'sticker' : 'video',
+      intent: generated.intent,
+      campaign: generated.campaign,
+      mechanic: generated.mechanic,
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
-      frames: generated.beats,
+      frames: generated.frames,
       who_films: generated.who_films,
       raw_material_refs: generated.refs,
       seed_text: input.seedText ?? null,
@@ -336,6 +554,9 @@ export async function generateStoriesForPlan(input: {
 
   const dmKeywords = await loadDmKeywords(input.clientId)
   console.log(`[story_brief] generateStoriesForPlan: loaded ${dmKeywords.length} dm_keywords:`, JSON.stringify(dmKeywords))
+  const campaign = await loadActiveCampaign(input.clientId)
+  const hasActiveCampaign = !!campaign
+  console.log(`[story_brief] generateStoriesForPlan: active campaign =`, campaign ? campaign.offer : 'none')
 
   // Build Mon-Fri dates in the horizon.
   const dates: string[] = []
@@ -392,9 +613,12 @@ export async function generateStoriesForPlan(input: {
     sourceFormatId: string
     promptText: string
     visualDirection: string | null
-    beats: StoryBeatOut[]
+    frames: StoryFrameV2[]
     whoFilms: 'agency' | 'client'
     refs: string[]
+    intent: StoryIntent
+    campaign: StoryCampaign | null
+    mechanic: StoryMechanic
   }
   const inserts: PendingInsert[] = []
   const BATCH = 6
@@ -453,26 +677,41 @@ export async function generateStoriesForPlan(input: {
         const pool = fittingFormats.length > 0 ? fittingFormats : sortedFormats
         const format = pool[unit.formatRotation % pool.length]
 
-        const generated = await generateOneStoryBrief({
-          clientId: input.clientId,
-          brandName,
-          format,
-          topicGroups: [unit.topic],
-          dmKeywords,
-          anchorAnswer: unit.anchor,
-          recycled: unit.recycled,
-          recentCaptures: [],
-          recentHooks: [],
-        })
+        const intent = pickAutoIntent(format, unit.formatRotation, hasActiveCampaign)
+        const generated =
+          intent === 'engage'
+            ? await generateStickerBrief({
+                clientId: input.clientId,
+                brandName,
+                format,
+                topicGroups: [unit.topic],
+                dmKeywords,
+              })
+            : await generateOneStoryBrief({
+                clientId: input.clientId,
+                brandName,
+                format,
+                topicGroups: [unit.topic],
+                dmKeywords,
+                anchorAnswer: unit.anchor,
+                recycled: unit.recycled,
+                recentCaptures: [],
+                recentHooks: [],
+                intent,
+                campaign: intent === 'launch' ? campaign : null,
+              })
         if (!generated) return null
         return {
           date: unit.date,
           sourceFormatId: format.id,
           promptText: generated.prompt_text,
           visualDirection: generated.visual_direction,
-          beats: generated.beats,
+          frames: generated.frames,
           whoFilms: generated.who_films,
           refs: generated.refs,
+          intent: generated.intent,
+          campaign: generated.campaign,
+          mechanic: generated.mechanic,
         }
       }),
     )
@@ -490,10 +729,13 @@ export async function generateStoriesForPlan(input: {
         client_id: input.clientId,
         format_id: r.sourceFormatId,
         source_format_id: r.sourceFormatId,
-        carrier: 'video', // unified frame model
+        carrier: r.intent === 'engage' ? 'sticker' : 'video',
+        intent: r.intent,
+        campaign: r.campaign,
+        mechanic: r.mechanic,
         prompt_text: r.promptText,
         visual_direction: r.visualDirection,
-        frames: r.beats,
+        frames: r.frames,
         who_films: r.whoFilms,
         raw_material_refs: r.refs,
         pinned_to_date: r.date,
@@ -513,13 +755,16 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
   const supabase = plannerAdmin()
   const { data: row } = await supabase
     .from('story_queue_items')
-    .select('id, client_id, format_id, source_format_id, carrier, seed_text')
+    .select('id, client_id, format_id, source_format_id, carrier, intent, campaign, seed_text')
     .eq('id', itemId)
     .maybeSingle()
   if (!row) return null
 
   const carrierRaw = row.carrier as string | null
-  const isSticker = carrierRaw === 'sticker'
+  // Preserve the archetype on redo. Legacy rows (no intent) infer from carrier.
+  const storedIntent = (row.intent as StoryIntent | null) ?? null
+  const intent: StoryIntent = storedIntent ?? (carrierRaw === 'sticker' ? 'engage' : 'teach')
+  const isSticker = intent === 'engage'
   const sourceFormatId = (row.source_format_id as string | null) ?? (row.format_id as string | null)
 
   const pools = await loadCarrierPools()
@@ -546,6 +791,13 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
   const brandName = clientRow?.business_name ?? clientRow?.name ?? null
   const dmKeywords = await loadDmKeywords(row.client_id as string)
 
+  // Launch redo reuses the row's stored campaign snapshot, falling back to the
+  // brand's current active campaign.
+  const campaign =
+    intent === 'launch'
+      ? ((row.campaign as StoryCampaign | null) ?? (await loadActiveCampaign(row.client_id as string)))
+      : null
+
   const generated = isSticker
     ? await generateStickerBrief({
         clientId: row.client_id as string,
@@ -563,6 +815,8 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
         dmKeywords,
         recentCaptures: [],
         recentHooks: [],
+        intent,
+        campaign,
       })
   if (!generated) return null
 
@@ -571,11 +825,14 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
     .update({
       prompt_text: generated.prompt_text,
       visual_direction: generated.visual_direction,
-      frames: generated.beats,
+      frames: generated.frames,
       who_films: generated.who_films,
       raw_material_refs: generated.refs,
       source_format_id: format.id,
-      carrier: isSticker ? 'sticker' : 'video',
+      carrier: generated.intent === 'engage' ? 'sticker' : 'video',
+      intent: generated.intent,
+      campaign: generated.campaign,
+      mechanic: generated.mechanic,
     })
     .eq('id', itemId)
   if (error) return null
@@ -608,34 +865,37 @@ async function loadCarrierPools(): Promise<CarrierPools> {
 }
 
 type WhoFilmsOut = 'agency' | 'client'
-type StoryBeatLabel = 'HOOK' | 'VALUE' | 'REHOOK' | 'CTA' | 'POLL'
-
-interface StoryBeatOut {
-  label: StoryBeatLabel
-  capture: string
-  on_screen_text: string
-  voiceover: string // always '' on new rows; preserved for legacy compat
-}
 
 interface GeneratedBrief {
   prompt_text: string
   visual_direction: string | null
-  beats: StoryBeatOut[]
+  frames: StoryFrameV2[]
   who_films: WhoFilmsOut
   refs: string[]
   topic_group_id: string | null
+  intent: StoryIntent
+  campaign: StoryCampaign | null
+  mechanic: StoryMechanic
 }
 
-function deriveBriefSummary(beats: StoryBeatOut[]): string {
-  const hook = beats.find((b) => b.label === 'HOOK')
-  if (!hook) return ''
-  return (hook.on_screen_text || hook.capture).trim()
+const ASSET_SLOT_SET = new Set<AssetSlot>(['screenshot-proof', 'dm-testimonial', 'result-graphic'])
+
+function firstText(frame: StoryFrameV2 | undefined): string {
+  return (frame?.text_blocks?.[0]?.text ?? '').trim()
 }
 
-function deriveBriefVisual(beats: StoryBeatOut[]): string | null {
-  const captures = beats.map((b) => b.capture?.trim()).filter((c): c is string => !!c)
-  if (captures.length === 0) return null
-  return captures.join(' / ')
+function deriveBriefSummary(frames: StoryFrameV2[]): string {
+  const lead = frames.find((f) => f.role === 'HOOK' || f.role === 'CONTEXT') ?? frames[0]
+  if (!lead) return ''
+  return (firstText(lead) || lead.visual || '').trim()
+}
+
+function deriveBriefVisual(frames: StoryFrameV2[]): string | null {
+  const visuals = frames
+    .map((f) => (ASSET_SLOT_SET.has(f.visual as AssetSlot) ? 'proof asset' : f.visual?.trim()))
+    .filter((c): c is string => !!c)
+  if (visuals.length === 0) return null
+  return visuals.join(' / ')
 }
 
 interface DmKeywordRule {
@@ -643,31 +903,40 @@ interface DmKeywordRule {
   hardRule: string
 }
 
-function buildDmKeywordRules(dmKeywords: string[]): DmKeywordRule {
+function buildDmKeywordRules(dmKeywords: string[], lockedKeyword?: string | null): DmKeywordRule {
+  // A launch campaign keyword (if set) takes priority over the brand's
+  // standing dm_keywords for THIS story.
+  if (lockedKeyword && lockedKeyword.trim()) {
+    const kw = lockedKeyword.trim().toUpperCase()
+    return {
+      placeholder: kw,
+      hardRule: `- KEYWORD IS LOCKED to "${kw}" (this campaign's keyword). Use it verbatim in uppercase. Do NOT substitute any other word.`,
+    }
+  }
   if (dmKeywords.length === 0) {
     return {
       placeholder: '[KEYWORD]',
-      hardRule: `- The DM keyword is a short uppercase word the brand picks (e.g. "PLAYBOOK", "FRAMEWORK"). Pick something topical to THIS story's value beat, not a generic word.`,
+      hardRule: `- The keyword is a short uppercase word the brand picks (e.g. "PLAYBOOK", "FRAMEWORK"). Pick something topical to THIS story's value beat, not a generic word.`,
     }
   }
   if (dmKeywords.length === 1) {
     const kw = dmKeywords[0]
     return {
       placeholder: kw,
-      hardRule: `- DM KEYWORD IS LOCKED. The ONLY valid DM keyword for this brand is "${kw}". Use it verbatim in uppercase. Do NOT substitute SYSTEM, FRAMEWORK, SCRIPT, SKELETON, FORMULA, PLAN, STRATEGY, VOICE, VALUE, or any other word - even if the format's hook patterns or secret sauce reference them.`,
+      hardRule: `- KEYWORD IS LOCKED. The ONLY valid keyword for this brand is "${kw}". Use it verbatim in uppercase. Do NOT substitute SYSTEM, FRAMEWORK, SCRIPT, SKELETON, FORMULA, PLAN, STRATEGY, VOICE, VALUE, or any other word - even if the format's hook patterns or secret sauce reference them.`,
     }
   }
   const list = dmKeywords.map((k) => `"${k}"`).join(' or ')
   return {
     placeholder: dmKeywords[0],
-    hardRule: `- DM KEYWORD IS LOCKED to one of: ${list}. Pick whichever fits this story's value beat. Do NOT invent or substitute any other keyword.`,
+    hardRule: `- KEYWORD IS LOCKED to one of: ${list}. Pick whichever fits this story's value beat. Do NOT invent or substitute any other keyword.`,
   }
 }
 
 function buildCaptureAvoidBlock(recentCaptures: string[]): string {
   if (recentCaptures.length === 0) return ''
   const trimmed = recentCaptures.slice(-CAPTURE_ROTATION_WINDOW).map((c) => `- ${c}`)
-  return `\nRECENT VISUAL HINTS TO AVOID (the last ${trimmed.length} stories already used these - pick a different visual for at least 2 of your 4 beats):\n${trimmed.join('\n')}\n`
+  return `\nRECENT VISUAL HINTS TO AVOID (the last ${trimmed.length} stories already used these - pick a different visual for at least 2 of your frames):\n${trimmed.join('\n')}\n`
 }
 
 function buildHookAvoidBlock(recentHooks: string[]): string {
@@ -676,15 +945,58 @@ function buildHookAvoidBlock(recentHooks: string[]): string {
   return `\nRECENT HOOKS TO AVOID (already used in this batch - your HOOK must anchor on a DIFFERENT moment from raw material):\n${trimmed.join('\n')}\n`
 }
 
+function normalizeEmphasis(v: unknown): TextEmphasis {
+  return v === 'big' || v === 'highlight' ? v : 'normal'
+}
+
+const VALID_STICKER_KINDS: StickerKind[] = ['poll', 'question', 'slider', 'quiz', 'countdown', 'link']
+
+function parseStickerOut(v: unknown): FrameSticker | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const r = v as Record<string, unknown>
+  const type =
+    typeof r.type === 'string' && (VALID_STICKER_KINDS as string[]).includes(r.type)
+      ? (r.type as StickerKind)
+      : null
+  if (!type) return undefined
+  const out: FrameSticker = { type }
+  if (typeof r.label === 'string' && r.label.trim()) out.label = r.label.trim()
+  if (Array.isArray(r.options)) {
+    const opts = r.options
+      .filter((o): o is string => typeof o === 'string' && o.trim().length > 0)
+      .map((o) => o.trim())
+    if (opts.length) out.options = opts
+  }
+  return out
+}
+
+/** Per-block cap, then per-frame cap (single-block frames only). */
+function applyFrameBudgets(frames: StoryFrameV2[]): void {
+  for (const frame of frames) {
+    const budget = ROLE_WORD_BUDGETS[frame.role] ?? 15
+    frame.text_blocks = frame.text_blocks.map((b) => ({
+      ...b,
+      text: truncateToWordBudget(b.text, MAX_BLOCK_WORDS),
+    }))
+    if (frame.text_blocks.length === 1 && frame.text_blocks[0]) {
+      frame.text_blocks[0] = {
+        ...frame.text_blocks[0],
+        text: truncateToWordBudget(frame.text_blocks[0].text, budget),
+      }
+    }
+  }
+}
+
 /**
- * Generate one 4-frame text-first story brief. The AI takes a short-form,
- * engagement-reel, or carousel format and produces 4 beats: HOOK -> VALUE
- * -> REHOOK -> CTA. Each beat has on_screen_text (what the viewer reads)
- * and a one-phrase visual hint. No voiceover.
+ * Generate one text-first Story Set. `intent` selects the role sequence (3-8
+ * frames); each frame stacks 1-4 text overlays, carries a visual hint OR an
+ * asset-slot, and may hold a sticker. No voiceover. `engage` is NOT generated
+ * here (it routes to generateStickerBrief).
  *
  * STORY CTA RULES:
  *   - "Save this" is INVALID (Instagram stories cannot be saved)
- *   - Brand DM keywords (when set) anchor DM CTAs
+ *   - The default CTA mechanic is REPLY-TO-STORY ("Reply 'KEYWORD'...")
+ *   - A launch campaign supplies the offer / event date / keyword
  */
 async function generateOneStoryBrief(opts: {
   clientId: string
@@ -694,20 +1006,19 @@ async function generateOneStoryBrief(opts: {
   seedText?: string | null
   dmKeywords: string[]
   recentCaptures: string[]
-  /** HOOK on_screen_text strings from recently-generated stories in the
-   *  same batch. Passed to the AI as an "AVOID these openers" list. With
-   *  the answer-indexed model this is mostly a fallback - structural
-   *  anchor uniqueness already prevents duplicate hooks. */
   recentHooks: string[]
-  /** Specific answer this story must anchor on. When set, all 4 frames
-   *  build on THIS one moment (not just whichever one pickBestMaterial
-   *  picks). This is how the campaign model forces hook uniqueness. */
   anchorAnswer?: RawTopicAnswer | null
-  /** True when the anchor is being reused because the topic doesn't have
-   *  enough fresh answers to fill the campaign quota. Triggers a
-   *  "must use a totally different angle" rule in the prompt. */
   recycled?: boolean
+  /** The archetype. Defaults to 'teach' (the legacy 4-beat shape). */
+  intent?: StoryIntent
+  /** Launch campaign (offer / event / keyword). Only meaningful for launch. */
+  campaign?: StoryCampaign | null
 }): Promise<GeneratedBrief | null> {
+  const intent: StoryIntent = opts.intent ?? 'teach'
+  const roleSpecs = INTENT_ROLES[intent] ?? INTENT_ROLES.teach
+  const campaign = opts.campaign ?? null
+  const mechanic: StoryMechanic = campaign?.mechanic ?? 'reply'
+
   const material = pickBestMaterial(opts.format, opts.topicGroups)
   if (material.refs.length === 0) {
     const fallback = opts.topicGroups[0]?.answers[0]
@@ -722,10 +1033,6 @@ async function generateOneStoryBrief(opts: {
       .find((g) => g.topic_group_id === material.topic_group_id)
       ?.answers.find((a) => material.refs.includes(a.id)) ?? null
   const anchor = opts.anchorAnswer ?? fallbackAnchor
-  // Build the answers list: anchor first, then everything else from the
-  // same topic for supporting context. The prompt will explicitly tell the
-  // AI to ANCHOR all 4 frames on the first answer and treat the rest as
-  // supporting context only.
   const groupAnswers = opts.topicGroups
     .find((g) => g.topic_group_id === material.topic_group_id)
     ?.answers ?? []
@@ -740,46 +1047,53 @@ async function generateOneStoryBrief(opts: {
     material.refs = [anchor.id, ...otherRefs]
   }
 
-  const dmRule = buildDmKeywordRules(opts.dmKeywords)
+  // The launch campaign keyword (if set) locks the CTA keyword; otherwise the
+  // brand's standing dm_keywords apply.
+  const dmRule = buildDmKeywordRules(opts.dmKeywords, campaign?.keyword)
   const captureAvoidBlock = buildCaptureAvoidBlock(opts.recentCaptures)
   const hookAvoidBlock = buildHookAvoidBlock(opts.recentHooks)
   const KW = dmRule.placeholder
   const recycledBlock = opts.recycled
-    ? `\nANCHOR IS RECYCLED. This topic doesn't have enough fresh answers to fill the campaign quota, so this anchor moment is being used a SECOND time across the brand's content. Your 4 frames MUST take a totally different angle than any prior piece using this same anchor: different hook framing, different value beat, different rehook, different CTA wording. Treat this as a separate post about the same situation, not a paraphrase.\n`
+    ? `\nANCHOR IS RECYCLED. This topic doesn't have enough fresh answers to fill the campaign quota, so this anchor moment is being used a SECOND time across the brand's content. Your frames MUST take a totally different angle than any prior piece using this same anchor: different opener, different value, different CTA wording. Treat this as a separate post about the same situation, not a paraphrase.\n`
     : ''
 
-  const noCta = NO_CTA_STORY_FORMATS.has(opts.format.slug)
-  const frameCount = noCta ? 3 : 4
-  const beatList = noCta ? 'HOOK, VALUE, REHOOK' : 'HOOK, VALUE, REHOOK, CTA'
-  const beatArrow = noCta ? 'HOOK -> VALUE -> REHOOK' : 'HOOK -> VALUE -> REHOOK -> CTA'
-  const ctaBeatJson = noCta
-    ? ''
-    : '\n    { "label": "REHOOK", "capture": "...", "on_screen_text": "..." },\n    { "label": "CTA",    "capture": "...", "on_screen_text": "..." }'
-  const beatsJson = noCta
-    ? `    { "label": "HOOK",   "capture": "talking head|text card|b-roll|screen recording", "on_screen_text": "..." },
-    { "label": "VALUE",  "capture": "...", "on_screen_text": "..." },
-    { "label": "REHOOK", "capture": "...", "on_screen_text": "..." }`
-    : `    { "label": "HOOK",   "capture": "talking head|text card|b-roll|screen recording", "on_screen_text": "..." },
-    { "label": "VALUE",  "capture": "...", "on_screen_text": "..." },${ctaBeatJson}`
+  const arcCtx: ArcCtx = {
+    bucket: (opts.format.bucket as FormatBucket) ?? 'storytelling',
+    arc: NARRATIVE_ARCS[opts.format.bucket as FormatBucket] ?? NARRATIVE_ARCS.storytelling,
+    KW,
+    mechanic,
+    campaign,
+  }
 
-  const system = `You write Instagram story production briefs. The output is a ${frameCount}-frame TEXT-FIRST story sequence. The viewer READS each frame silently for 5-7 seconds. There is NO voiceover. The on_screen_text is the message.
+  const frameCount = roleSpecs.length
+  const roleList = roleSpecs.map((s) => s.role).join(', ')
+  const replyShape = mechanic === 'dm' ? `DM me '${KW}'` : `Reply '${KW}' to this story`
+  const dmAltLine =
+    mechanic === 'dm'
+      ? `(This brand prefers DM, so DM is fine here.)`
+      : `(DM is allowed only if a brand explicitly prefers it; default to REPLY.)`
+
+  const system = `You write Instagram story production briefs. The output is a ${frameCount}-frame TEXT-FIRST story sequence. The viewer READS each frame silently for 5-7 seconds. There is NO voiceover. The text_blocks are the message.
 
 Output STRICT JSON:
 {
   "who_films": "agency" | "client",
-  "beats": [
-${beatsJson}
+  "frames": [
+${buildFramesSchema(roleSpecs)}
   ]
 }
 
-EXACTLY ${frameCount} beats, in the order ${beatArrow}. No voiceover field. No prose paragraphs.
+EXACTLY ${frameCount} frames, in order: ${roleList}. No voiceover field. No prose paragraphs.
 
-${buildNarrativeArc(opts.format.bucket, noCta)}
+${buildRoleGuidance(roleSpecs, arcCtx)}
 
-ONE-SITUATION RULE (most-violated rule - read twice):
-- All 4 frames describe ONE specific situation, ONE protagonist, ONE scene. Do NOT pivot topics between frames.
-- If HOOK is about "creator's block on Tuesday morning", VALUE/REHOOK/CTA must stay anchored to THAT moment - not jump to "first time filming" or "imposter syndrome" or some other angle.
-- Pick the single moment from raw material that best supports the narrative arc above. Build all 4 frames from THAT moment. Stories that pivot read as 4 disconnected slogans.
+STACKED TEXT (text_blocks):
+- Each frame's "text_blocks" is an ordered list of short overlay lines the viewer reads top to bottom. Most frames have ONE block.
+- A frame marked "up to N stacked text_blocks" may use 2-N short lines that build on each other.
+- "emphasis":"big" or "highlight" makes a line stand out - use sparingly, for the single punchiest line. Default "normal".
+- Each block is <= 12 words.
+
+${buildCoherenceRule(intent)}
 
 ANTI-INVENTION RULE (zero tolerance):
 - Every name, brand, tool, product, number, date, and quote MUST appear in the raw material below.
@@ -792,34 +1106,27 @@ ANTI-INVENTION RULE (zero tolerance):
 - When you need a comparison and raw material doesn't supply one, ask the question generically ("the right tool", "the framework you'll actually use") instead of inventing brand names.
 
 CONTINUOUS-MONOLOGUE RULE:
-- The 4 frames are ONE PERSON SPEAKING in sequence, not 4 independent slogans. Read frames 1-4 aloud - they should sound like one person finishing one thought, then the next, then the next.
-- Frames 2-4 should each open with a connective so they LINK to the previous frame: "but", "so", "then", "that's when", "instead", "here's what", "what changed:", "so I tried", "the result:".
+- The frames are ONE voice in sequence, not independent slogans. Read them in order - they should sound like one person finishing one thought, then the next.
+- Each frame after the opener should LINK to the previous one with a connective: "but", "so", "then", "that's when", "instead", "here's what", "what changed:", "so I tried", "the result:".
 - WRONG (disconnected): "Creator's block hit hard." / "A/B testing this content format proved it works." / "That's how I knew to trust it."
 - RIGHT (linked): "Creator's block hit hard." / "So I started A/B testing the format." / "That's when I knew it actually worked."
-- The HOOK does not need a connective (it opens the story). All other frames should.
+- The opener does not need a connective. Every later frame should.
 
 BANNED LANGUAGE PATTERNS (these are AI tells - do NOT use them):
 - Rhetorical question + fragment answer: "That one story? It's 8 posts." / "The real difference? Not features." / "The fix? Real stories." Rewrite as ONE statement.
 - Sentence opening with "Now, ..." or "And here's the thing,". Just say the thing.
 - Em-dash for dramatic reframe ("--it's the one that fits YOUR brain").
 - Formulaic three-item lists with Oxford "and": "We analyze, craft, and handle." Drop the formula or pick ONE specific verb.
+- "good news / better news / best news" or numbered-tier escalation - that reads as a template.
 - "Game-changer", "level up", "unlock the secret", "the truth about", "this changes everything".
-- Generic "system" / "framework" / "playbook" without specifics. Stories that just say "DM for the system" are weak. The CTA should hint at WHAT the system actually delivers (drawn from raw material).
+- Generic "system" / "framework" / "playbook" without specifics. The CTA should hint at WHAT it actually delivers (drawn from raw material).
 
-WORD BUDGETS (count words before output - over-budget output gets truncated):
-- HOOK   ~10 words. Drop the viewer mid-thought. Specific, sharp, no greetings.
-- VALUE  ~15 words. The single punchiest piece of the format. ONE idea. Not the whole arc.
-- REHOOK ~12 words. Stops the swipe - reframe what they just read or tease the CTA's payoff.
-- CTA    ~10 words. Drive a DM, share, or follow. NEVER "save this".
+WORD BUDGETS: each frame lists its target above. Count words before output - over-budget output gets truncated mid-sentence.
 
-CAPTURE FIELD (one short phrase only - 2-5 words):
-Pick ONE per beat from these options (or an obvious variant):
-- "talking head"        : the client/founder on camera silently, viewer reads overlay
-- "talking head, b-roll": cuts away to b-roll while text overlay plays
-- "text card"           : designed text overlay on solid/gradient background
-- "screen recording"    : phone/laptop screen showing the thing being discussed
-- "b-roll"              : silent b-roll footage
-DO NOT write paragraph-length production directions. DO NOT describe choreography. DO NOT mix multiple options on one beat (pick one).
+VISUAL FIELD (one short phrase per frame):
+- For a normal frame pick ONE: "talking head", "talking head, b-roll", "text card", "screen recording", "b-roll".
+- For a PROOF frame, set "visual" to EXACTLY one asset-slot keyword: "screenshot-proof", "dm-testimonial", or "result-graphic" - the staff paste the REAL asset there.
+- DO NOT write paragraph-length production directions. DO NOT describe choreography. DO NOT mix multiple options on one frame.
 
 WRITING STYLE:
 - Conversational, contractions, fragments OK. ${opts.brandName ? `Brand: ${opts.brandName}.` : ''}
@@ -831,52 +1138,48 @@ SOURCE FORMAT (the angle - shapes WHICH moment from raw material to anchor on):
 Name: ${opts.format.name}
 Description: ${opts.format.description}
 Secret sauce: ${opts.format.secret_sauce}
-${opts.format.hook_patterns.length ? `Hook patterns (use one for the HOOK beat - keep its grammatical shape, fill specifics from raw material):\n${opts.format.hook_patterns.map((h) => `- ${h.pattern} (e.g. ${h.example})`).join('\n')}` : ''}
+${opts.format.hook_patterns.length ? `Hook patterns (use one for the opener - keep its grammatical shape, fill specifics from raw material):\n${opts.format.hook_patterns.map((h) => `- ${h.pattern} (e.g. ${h.example})`).join('\n')}` : ''}
 
 ${renderHookAngleBlock(selectHookAngles({ bucket: opts.format.bucket, seed: anchor?.id ?? material.topic_group_id ?? opts.format.slug }))}
 
-${
-  noCta
-    ? `NO CTA (this format is pure value):
-- There is NO 4th frame and NO call-to-action. Do NOT add "DM me", "follow", "save", "share", or any ask.
-- The REHOOK is the final frame and must land as a clean takeaway the viewer keeps.`
-    : `CTA RULES (this is the most-failed rule - read carefully):
+CTA RULES (this is the most-failed rule - read carefully):
 ${dmRule.hardRule}
-- The CTA beat MUST be one of these shapes:
-    1. DM-DRIVEN: "DM me ${KW} for [thing].", "DM me ${KW} to [verb].", "Reply ${KW} for [thing]."
+- The CTA frame MUST be one of these shapes (REPLY-TO-STORY is the default for stories):
+    1. REPLY-DRIVEN (default): "${replyShape} for [thing].", "${replyShape} to [verb]."
     2. SHARE: "Send this to someone who [needs it]."
     3. FOLLOW: "Follow for [specific next thing]."
+    ${dmAltLine}
 - BANNED: "Save this", "Save it for later", "Bookmark this".
-- BANNED trail-off endings: "You're not alone", "Felt like time was running out". Rewrite as one of the valid CTAs above.`
-}
+- BANNED trail-off endings: "You're not alone", "Felt like time was running out". Rewrite as one of the valid CTAs above.
 
-WHO_FILMS (single value for the whole story - pick the one that MOST beats need):
+WHO_FILMS (single value for the whole story - pick the one that MOST frames need):
 - "agency" when the agency can produce in-house: text cards, screenshots, b-roll, designed graphics.
-- "client" when the client must physically be on camera (talking head needed for >= 2 beats).
+- "client" when the client must physically be on camera (talking head needed for >= 2 frames).
 ${captureAvoidBlock}${hookAvoidBlock}${recycledBlock}`
 
+  const taskLine = `TASK: Generate the structured JSON brief now. Exactly ${frameCount} frames (${roleList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
+
   const user = anchor
-    ? `ANCHOR MOMENT (your 4 frames MUST be built around THIS one specific moment - this is THE moment the story is about; do not pivot to other moments):
+    ? `ANCHOR MOMENT (your frames MUST be built around THIS one specific moment - this is THE moment the story is about; do not pivot to other moments):
 - (${anchor.input_type}) ${anchor.answer}
 
-${answers.length > 1 ? `SUPPORTING CONTEXT (use ONLY for body context if absolutely needed - your hook and rehook do NOT reference these):\n${answers.slice(1).map((a) => `- (${a.input_type}) ${a.answer}`).join('\n')}\n` : ''}
-${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly ${frameCount} beats (${beatList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
+${answers.length > 1 ? `SUPPORTING CONTEXT (use ONLY for body context if absolutely needed - your opener and CTA do NOT reference these):\n${answers.slice(1).map((a) => `- (${a.input_type}) ${a.answer}`).join('\n')}\n` : ''}${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}${campaign.event_date ? ` (event: ${campaign.event_date})` : ''}\n` : ''}${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}${taskLine}`
     : `RAW MATERIAL (anchor every specific to this; don't invent details not present here):
 ${answers.map((a) => `- (${a.input_type}) ${a.answer}`).join('\n')}
 
-${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Generate the structured JSON brief now. Exactly ${frameCount} beats (${beatList}). Strict JSON. No voiceover field. Respect word budgets. Proofread before output.`
+${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}${campaign.event_date ? ` (event: ${campaign.event_date})` : ''}\n` : ''}${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}${taskLine}`
 
   try {
     const { content } = await generateScript({
       system,
       user,
       temperature: 0.6,
-      maxTokens: 1200,
+      maxTokens: 1400,
       jsonObject: true,
       quality: 'cheap',
       route: 'planner.story_brief',
       clientId: opts.clientId,
-      usageMeta: { format_slug: opts.format.slug, has_seed: !!opts.seedText },
+      usageMeta: { format_slug: opts.format.slug, has_seed: !!opts.seedText, intent },
     })
     const parsed = safeParseJson(content)
     if (!parsed) return null
@@ -884,76 +1187,85 @@ ${opts.seedText ? `SEED IDEA from the team: ${opts.seedText}\n` : ''}TASK: Gener
     const whoRaw = typeof parsed.who_films === 'string' ? parsed.who_films.toLowerCase() : ''
     const who_films: WhoFilmsOut = whoRaw === 'client' ? 'client' : 'agency'
 
-    const rawBeats = Array.isArray(parsed.beats) ? parsed.beats : []
-    const beats: StoryBeatOut[] = []
-    for (const b of rawBeats) {
-      if (!b || typeof b !== 'object') continue
-      const raw = b as Record<string, unknown>
-      const labelStr = typeof raw.label === 'string' ? raw.label.toUpperCase() : ''
-      const label: StoryBeatLabel | null =
-        labelStr === 'HOOK' || labelStr === 'VALUE' || labelStr === 'REHOOK' || labelStr === 'CTA'
-          ? labelStr
-          : null
-      if (!label) continue
-      const capture = typeof raw.capture === 'string' ? raw.capture.trim() : ''
-      let on_screen_text = typeof raw.on_screen_text === 'string' ? raw.on_screen_text.trim() : ''
-      // Word budget enforcement.
-      on_screen_text = truncateToWordBudget(on_screen_text, WORD_BUDGETS[label])
-      if (!capture && !on_screen_text) continue
-      beats.push({ label, capture, on_screen_text, voiceover: '' })
+    const expectedRoles = new Set<FrameRole>(roleSpecs.map((s) => s.role))
+    const rawFrames = Array.isArray(parsed.frames)
+      ? parsed.frames
+      : Array.isArray(parsed.beats)
+        ? parsed.beats
+        : []
+    const frames: StoryFrameV2[] = []
+    for (const f of rawFrames) {
+      if (!f || typeof f !== 'object') continue
+      const raw = f as Record<string, unknown>
+      const roleStr =
+        typeof raw.role === 'string'
+          ? raw.role.toUpperCase()
+          : typeof raw.label === 'string'
+            ? raw.label.toUpperCase()
+            : ''
+      const role = roleStr as FrameRole
+      if (!expectedRoles.has(role)) continue
+
+      let blocks: TextBlock[] = []
+      if (Array.isArray(raw.text_blocks)) {
+        blocks = raw.text_blocks
+          .map((b) => (b && typeof b === 'object' ? (b as Record<string, unknown>) : null))
+          .filter((b): b is Record<string, unknown> => !!b && typeof b.text === 'string' && (b.text as string).trim().length > 0)
+          .map((b) => ({ text: (b.text as string).trim(), emphasis: normalizeEmphasis(b.emphasis) }))
+      } else if (typeof raw.on_screen_text === 'string' && raw.on_screen_text.trim()) {
+        // Resilience: model fell back to the old single-string shape.
+        blocks = [{ text: raw.on_screen_text.trim(), emphasis: 'normal' }]
+      }
+
+      const visual =
+        typeof raw.visual === 'string'
+          ? raw.visual.trim()
+          : typeof raw.capture === 'string'
+            ? raw.capture.trim()
+            : ''
+      const sticker = parseStickerOut(raw.sticker)
+      if (blocks.length === 0 && !visual) continue
+      frames.push({ role, text_blocks: blocks, visual, ...(sticker ? { sticker } : {}) })
     }
 
-    if (beats.length === 0) return null
-    beats.sort((a, b) => beatOrder(a.label) - beatOrder(b.label))
+    if (frames.length === 0) return null
+    frames.sort((a, b) => roleOrder(roleSpecs, a.role) - roleOrder(roleSpecs, b.role))
 
-    // Pro polish for narrative coherence. Reads all 4 frames in context
-    // and rewrites HOOK + REHOOK to make the story flow as ONE narrative.
-    // VALUE stays as-is (it's the meat); CTA stays as-is (we own keyword
-    // enforcement below). Polish is a no-op when frames already cohere.
+    // Pro polish for narrative coherence (teach/prove only - it's built around
+    // the HOOK/VALUE/REHOOK/CTA arc). launch/bts degrade gracefully (skipped).
     await polishStoryCoherence({
-      beats,
+      frames,
+      intent,
       format: opts.format,
       bucket: opts.format.bucket,
       brandName: opts.brandName,
       clientId: opts.clientId,
     })
 
-    // Apply word budget AFTER polish (Pro might rewrite slightly over budget).
-    for (const beat of beats) {
-      const budget = WORD_BUDGETS[beat.label]
-      if (beat.on_screen_text && budget) {
-        beat.on_screen_text = truncateToWordBudget(beat.on_screen_text, budget)
-      }
-    }
+    // Apply word budgets AFTER polish (Pro might rewrite slightly over budget).
+    applyFrameBudgets(frames)
 
-    // No-CTA formats have no CTA beat to inject a keyword into.
-    if (!noCta && opts.dmKeywords.length > 0) {
-      enforceDmKeyword(beats, opts.dmKeywords)
+    // Lock the CTA keyword (mechanic-agnostic - rewrites the keyword token only).
+    if (opts.dmKeywords.length > 0 || campaign?.keyword) {
+      const allowed = campaign?.keyword ? [campaign.keyword] : opts.dmKeywords
+      enforceDmKeyword(frames, allowed)
     }
 
     return {
-      prompt_text: deriveBriefSummary(beats),
-      visual_direction: deriveBriefVisual(beats),
-      beats,
+      prompt_text: deriveBriefSummary(frames),
+      visual_direction: deriveBriefVisual(frames),
+      frames,
       who_films,
       refs: material.refs,
       topic_group_id: material.topic_group_id,
+      intent,
+      campaign,
+      mechanic,
     }
   } catch (err) {
     console.error('story brief generation failed:', err)
     return null
   }
-}
-
-function beatOrder(label: StoryBeatLabel): number {
-  const order: Record<StoryBeatLabel, number> = {
-    HOOK: 0,
-    VALUE: 1,
-    REHOOK: 2,
-    CTA: 3,
-    POLL: 4,
-  }
-  return order[label]
 }
 
 function truncateToWordBudget(text: string, budget: number): string {
@@ -984,18 +1296,28 @@ function truncateToWordBudget(text: string, budget: number): string {
  * a slow Pro response can't kill story generation.
  */
 async function polishStoryCoherence(opts: {
-  beats: StoryBeatOut[]
+  frames: StoryFrameV2[]
+  intent: StoryIntent
   format: ContentFormat
   bucket: string
   brandName: string | null
   clientId?: string
 }): Promise<void> {
-  const hook = opts.beats.find((b) => b.label === 'HOOK')
-  const value = opts.beats.find((b) => b.label === 'VALUE')
-  const rehook = opts.beats.find((b) => b.label === 'REHOOK')
-  const cta = opts.beats.find((b) => b.label === 'CTA')
-  // Polish only when all 4 are present - degrades gracefully on partial drafts.
+  // Polish targets the HOOK/VALUE/REHOOK/CTA arc; only teach/prove have it.
+  // launch/bts degrade gracefully (skipped) so their multi-block frames aren't
+  // flattened by the Pro pass.
+  if (opts.intent !== 'teach' && opts.intent !== 'prove') return
+  const hook = opts.frames.find((f) => f.role === 'HOOK')
+  const value = opts.frames.find((f) => f.role === 'VALUE' || f.role === 'PROOF')
+  const rehook = opts.frames.find((f) => f.role === 'REHOOK')
+  const cta = opts.frames.find((f) => f.role === 'CTA')
   if (!hook || !value || !rehook || !cta) return
+
+  const hookText = firstText(hook)
+  const valueText = firstText(value)
+  const rehookText = firstText(rehook)
+  const ctaText = firstText(cta)
+  if (!hookText || !rehookText) return
 
   const arc = NARRATIVE_ARCS[opts.bucket as FormatBucket] ?? NARRATIVE_ARCS.storytelling
 
@@ -1049,10 +1371,10 @@ FORMAT: ${opts.format.name} - ${opts.format.secret_sauce}`
 
   const user = `DRAFT FRAMES:
 
-HOOK   (current, candidate for rewrite): ${hook.on_screen_text}
-VALUE  (DO NOT TOUCH, but use to anchor HOOK rewrite): ${value.on_screen_text}
-REHOOK (current, candidate for rewrite): ${rehook.on_screen_text}
-CTA    (DO NOT TOUCH, but use to anchor REHOOK rewrite): ${cta.on_screen_text}
+HOOK   (current, candidate for rewrite): ${hookText}
+VALUE  (DO NOT TOUCH, but use to anchor HOOK rewrite): ${valueText}
+REHOOK (current, candidate for rewrite): ${rehookText}
+CTA    (DO NOT TOUCH, but use to anchor REHOOK rewrite): ${ctaText}
 
 TASK: Read all 4 frames. Identify the ONE specific situation VALUE describes. Rewrite HOOK so it drops the viewer into that exact situation. Rewrite REHOOK so it bridges VALUE to CTA in the same scene. Default to rewriting both. Strict JSON only.`
 
@@ -1082,12 +1404,12 @@ TASK: Read all 4 frames. Identify the ONE specific situation VALUE describes. Re
     const rehookRewritten = !!parsed.rehook_rewritten && !!newRehook
 
     if (hookRewritten) {
-      console.log(`[story_brief] polish rewrote HOOK: "${hook.on_screen_text}" -> "${newHook}"`)
-      hook.on_screen_text = newHook
+      console.log(`[story_brief] polish rewrote HOOK: "${hookText}" -> "${newHook}"`)
+      hook.text_blocks[0] = { ...hook.text_blocks[0], text: newHook }
     }
     if (rehookRewritten) {
-      console.log(`[story_brief] polish rewrote REHOOK: "${rehook.on_screen_text}" -> "${newRehook}"`)
-      rehook.on_screen_text = newRehook
+      console.log(`[story_brief] polish rewrote REHOOK: "${rehookText}" -> "${newRehook}"`)
+      rehook.text_blocks[0] = { ...rehook.text_blocks[0], text: newRehook }
     }
     if (!hookRewritten && !rehookRewritten) {
       console.log(`[story_brief] polish kept frames unchanged for ${opts.format.slug}`)
@@ -1099,7 +1421,8 @@ TASK: Read all 4 frames. Identify the ONE specific situation VALUE describes. Re
 
 const DM_PATTERN = /\b((?:DM|Reply)(?:\s+(?:me|us|with))?\s+)(['"`]?)([A-Z][A-Z0-9_]{2,})\2/g
 
-function enforceDmKeyword(beats: StoryBeatOut[], allowed: string[]): void {
+function enforceDmKeyword(frames: StoryFrameV2[], allowed: string[]): void {
+  if (allowed.length === 0) return
   const allowedSet = new Set(allowed.map((k) => k.toUpperCase()))
   const replacement = allowed[0].toUpperCase()
   const rewrites: string[] = []
@@ -1109,12 +1432,12 @@ function enforceDmKeyword(beats: StoryBeatOut[], allowed: string[]): void {
       rewrites.push(`${kw} -> ${replacement}`)
       return `${lead}${quote}${replacement}${quote}`
     })
-  for (const beat of beats) {
-    if (beat.label !== 'CTA') continue
-    if (beat.on_screen_text) beat.on_screen_text = rewrite(beat.on_screen_text)
+  for (const frame of frames) {
+    if (frame.role !== 'CTA') continue
+    frame.text_blocks = frame.text_blocks.map((b) => ({ ...b, text: rewrite(b.text) }))
   }
   if (rewrites.length > 0) {
-    console.log(`[story_brief] enforceDmKeyword rewrote ${rewrites.length} CTA(s):`, rewrites.join(', '))
+    console.log(`[story_brief] enforceDmKeyword rewrote ${rewrites.length} CTA block(s):`, rewrites.join(', '))
   }
 }
 
@@ -1186,29 +1509,41 @@ TASK: Output the JSON now.`
         : 'question'
     if (!question) return null
 
-    const beats: StoryBeatOut[] = [
+    const stickerType = stickerKind as StickerKind
+    const frames: StoryFrameV2[] = [
       {
-        label: 'HOOK',
-        capture: 'text card',
-        on_screen_text: question,
-        voiceover: '',
+        role: 'HOOK',
+        text_blocks: [{ text: question, emphasis: 'normal' }],
+        visual: 'text card',
+        sticker: { type: stickerType },
       },
       {
-        label: 'CTA',
-        capture: 'text card',
-        on_screen_text:
-          stickerKind === 'poll' ? 'Vote.' : stickerKind === 'slider' ? 'Slide it.' : 'Tap the sticker. Reply.',
-        voiceover: '',
+        role: 'CTA',
+        text_blocks: [
+          {
+            text:
+              stickerKind === 'poll'
+                ? 'Vote.'
+                : stickerKind === 'slider'
+                  ? 'Slide it.'
+                  : 'Tap the sticker. Reply.',
+            emphasis: 'normal',
+          },
+        ],
+        visual: 'text card',
       },
     ]
 
     return {
       prompt_text: question,
       visual_direction: `Sticker story (${stickerKind})`,
-      beats,
+      frames,
       who_films: 'agency',
       refs: material.refs,
       topic_group_id: material.topic_group_id,
+      intent: 'engage',
+      campaign: null,
+      mechanic: 'reply',
     }
   } catch (err) {
     console.error('sticker brief generation failed:', err)

@@ -1497,10 +1497,10 @@ export default function ApprovalDetailPage() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-150">
           <div
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border ${
+            className={`glass-pop flex items-center gap-2 px-4 py-2.5 rounded-lg border ${
               toast.kind === 'success'
-                ? 'bg-[var(--bg-card)] border-green-200 text-green-700'
-                : 'bg-[var(--bg-card)] border-red-200 text-red-700'
+                ? 'border-green-200 text-green-700'
+                : 'border-red-200 text-red-700'
             }`}
           >
             {toast.kind === 'success' ? (
@@ -1573,7 +1573,7 @@ export default function ApprovalDetailPage() {
                       full width and aren't squeezed by the button cluster. */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${
                         isApproved
                           ? 'bg-green-100 text-green-700'
                           : 'bg-yellow-100 text-yellow-700'
@@ -1647,7 +1647,7 @@ export default function ApprovalDetailPage() {
                   {/* Video/Image embed */}
                   <div className="w-full rounded-lg overflow-hidden border border-[var(--border-primary)] bg-black">
                     {editingItemId === item.id ? (
-                      <div className="space-y-3 p-3 bg-[var(--bg-card)]">
+                      <div className="space-y-3 p-3 glass-inset">
                         <Input
                           label="Title"
                           value={editItemTitle}
@@ -1783,7 +1783,7 @@ export default function ApprovalDetailPage() {
                         <div>
                           <label
                             htmlFor={`edit-add-${item.id}`}
-                            className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
+                            className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--glass-border)] rounded-lg text-xs text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[#E8F1FF]/30 cursor-pointer transition-colors"
                           >
                             <UploadIcon className="h-4 w-4" />
                             <span>
@@ -1828,7 +1828,7 @@ export default function ApprovalDetailPage() {
                                   </span>
                                 </div>
                                 {!u.error && (
-                                  <div className="h-1 bg-[var(--bg-card-hover)] rounded overflow-hidden mt-0.5">
+                                  <div className="h-1 glass-rail rounded overflow-hidden mt-0.5">
                                     <div
                                       className="h-full bg-[#2B79F7] transition-all duration-150"
                                       style={{ width: `${u.pct}%` }}
@@ -1863,7 +1863,7 @@ export default function ApprovalDetailPage() {
                   </div>
 
                   {/* Comments */}
-                  <div className="border-t border-[var(--border-primary)] pt-3 space-y-3">
+                  <div className="border-t border-[var(--glass-border)] pt-3 space-y-3">
                     <div className="flex items-center gap-2">
                       <MessageCircle className="h-4 w-4 text-[var(--text-tertiary)]" />
                       <span className="text-xs font-semibold text-[var(--text-secondary)]">
@@ -1888,15 +1888,15 @@ export default function ApprovalDetailPage() {
                           return (
                             <div
                               key={c.id}
-                              className={`flex items-start gap-2 text-xs border border-[var(--border-primary)] rounded-lg p-2 ${
+                              className={`flex items-start gap-2 text-xs rounded-lg p-2 ${
                                 c.resolved
                                   ? // bg-green-50 alone becomes a
                                     // near-white wash in dark mode and
                                     // hides the comment text. The dark
                                     // variant uses a subtle 10% green
                                     // tint so text stays legible.
-                                    'bg-green-50 dark:bg-emerald-500/10'
-                                  : 'bg-[var(--bg-tertiary)]'
+                                    'border border-green-200 bg-green-50 dark:bg-emerald-500/10 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
+                                  : 'glass-inset'
                               }`}
                             >
                               <div className="mt-0.5">
@@ -1975,7 +1975,7 @@ export default function ApprovalDetailPage() {
         : parent.content
 
             return (
-        <div className="mb-1 px-2 py-1 bg-[var(--bg-tertiary)] rounded text-[10px] text-[var(--text-tertiary)]">
+        <div className="mb-1 px-2 py-1 glass-inset rounded text-[10px] text-[var(--text-tertiary)]">
           Replying to <span className="font-semibold">{parentAuthor}</span>:
           {' '}
           <span className="italic">&quot;{snippet}&quot;</span>
@@ -1997,7 +1997,7 @@ export default function ApprovalDetailPage() {
               )
             }
             title="Jump to this moment"
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]"
           >
             <ClockIcon className="h-3 w-3" />
             {formatTimestamp(c.timestamp_seconds)}
@@ -2015,7 +2015,7 @@ export default function ApprovalDetailPage() {
               )
             }
             title="Show the highlighted region"
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] text-[10px] font-medium hover:bg-[#D6E5FF] transition-colors shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]"
           >
             <PenIcon className="h-3 w-3" />
             View highlight
@@ -2080,7 +2080,7 @@ export default function ApprovalDetailPage() {
           <span>Uploading…</span>
           <span>{uploadProgress[c.id]}%</span>
         </div>
-        <div className="h-1 bg-[var(--bg-card-hover)] rounded overflow-hidden">
+        <div className="h-1 glass-rail rounded overflow-hidden">
           <div
             className="h-full bg-[#2B79F7] transition-all duration-150"
             style={{ width: `${uploadProgress[c.id]}%` }}
@@ -2120,7 +2120,7 @@ export default function ApprovalDetailPage() {
               href={att.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--border-primary)] text-[11px] text-[#2B79F7] hover:border-[#2B79F7]"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--glass-border)] text-[11px] text-[#2B79F7] hover:border-[#2B79F7]"
             >
               <Paperclip className="h-3 w-3 shrink-0" />
               <span className="truncate">{att.name || 'Attachment'}</span>
@@ -2133,10 +2133,10 @@ export default function ApprovalDetailPage() {
   <button
     type="button"
     onClick={() => toggleResolveComment(c)}
-    className={`px-2 py-0.5 rounded-full border transition-colors ${
+    className={`px-2 py-0.5 rounded-full transition-colors ${
       c.resolved
-        ? 'border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10 hover:bg-green-500/20'
-        : 'border-[var(--border-primary)] text-[var(--text-tertiary)] hover:border-[#2B79F7] hover:bg-[var(--bg-card-hover)]'
+        ? 'border border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10 hover:bg-green-500/20 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]'
+        : 'glass-chip text-[var(--text-tertiary)] hover:border-[#2B79F7]'
     }`}
     disabled={resolvingCommentId === c.id}
   >
@@ -2196,7 +2196,7 @@ export default function ApprovalDetailPage() {
                           setUnreadPreview((prev) => ({ ...prev, [item.id]: null }))
                         }}
                         aria-label={`Jump to new comment from ${unreadPreview[item.id]!.name}`}
-                        className="group flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-md text-[11px] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
+                        className="group glass-pop flex items-center gap-2 mt-1 pl-1 pr-3 py-1 rounded-full text-[11px] text-[var(--text-secondary)] hover:border-[#2B79F7] hover:shadow-lg transition-all animate-in fade-in slide-in-from-bottom-1 duration-200"
                       >
                         {unreadPreview[item.id]!.avatar ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
@@ -2220,7 +2220,7 @@ export default function ApprovalDetailPage() {
                     )}
 
                     {/* New comment input */}
-                    <div className="border border-[var(--border-primary)] rounded-lg p-2 space-y-2">
+                    <div className="glass-inset rounded-lg p-2 space-y-2">
   {replyTarget && replyTarget.itemId === item.id && (
     <p className="text-[10px] text-[var(--text-tertiary)]">
       Replying to <span className="font-semibold">{replyTarget.userName}</span>
@@ -2282,7 +2282,7 @@ export default function ApprovalDetailPage() {
         : mentionUsers
       const visible = filtered.slice(0, mentionQuery ? 5 : 3)
       return (
-        <div className="absolute bottom-full left-0 right-0 mb-1 z-20 border border-[var(--border-primary)] rounded-lg bg-[var(--bg-card)] shadow-lg text-[11px] max-h-40 overflow-y-auto">
+        <div className="glass-pop absolute bottom-full left-0 right-0 mb-1 z-20 rounded-lg text-[11px] max-h-40 overflow-y-auto">
         {visible.map((u) => (
           <button
             key={u.id}
@@ -2299,7 +2299,7 @@ export default function ApprovalDetailPage() {
               setMentionTargetItemId(null)
               setMentionQuery('')
             }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--bg-tertiary)] text-left"
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 text-left"
           >
             {u.profile_picture_url ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -2335,7 +2335,7 @@ export default function ApprovalDetailPage() {
         {draft.map((u) => (
           <span
             key={u.id}
-            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium"
+            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-full bg-[#E8F0FE] text-[#1E54B7] font-medium shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]"
           >
             {u.profile_picture_url ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -2375,7 +2375,7 @@ export default function ApprovalDetailPage() {
           type="button"
           onClick={() => handleClearPendingField(item.id, 'timestampSeconds')}
           title="Remove timestamp"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]"
         >
           <ClockIcon className="h-3 w-3" />
           {formatTimestamp(pendingAnnotation[item.id].timestampSeconds!)}
@@ -2387,7 +2387,7 @@ export default function ApprovalDetailPage() {
           type="button"
           onClick={() => handleClearPendingField(item.id, 'region')}
           title="Remove highlight"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E8F1FF] text-[#1E54B7] font-medium hover:bg-[#D6E5FF] transition-colors shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]"
         >
           <PenIcon className="h-3 w-3" />
           {pendingAnnotation[item.id].region!.shape === 'circle' ? 'Circle' : 'Highlight'}

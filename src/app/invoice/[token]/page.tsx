@@ -105,7 +105,7 @@ export default function InvoicePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4]">
+      <div className="min-h-screen flex items-center justify-center form-canvas">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     )
@@ -113,7 +113,7 @@ export default function InvoicePage() {
 
   if (error || !inv) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f6f5f4] p-6">
+      <div className="min-h-screen flex items-center justify-center form-canvas p-6">
         <div className="bg-white rounded-2xl shadow-sm border border-[#e5e3df] px-8 py-10 text-center max-w-sm">
           <p className="text-slate-800 font-semibold">Invoice unavailable</p>
           <p className="text-slate-500 text-sm mt-1">{error || 'This invoice could not be found.'}</p>
@@ -129,7 +129,7 @@ export default function InvoicePage() {
   )
 
   return (
-    <div className="min-h-screen bg-[#f6f5f4]">
+    <div className="min-h-screen form-canvas">
       {/* Slim document header bar */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#e5e3df]">
         <div className="max-w-[880px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">

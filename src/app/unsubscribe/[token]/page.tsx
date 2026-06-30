@@ -59,7 +59,7 @@ export default function UnsubscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F5F4] flex items-start justify-center px-4 py-16">
+    <div className="min-h-screen form-canvas flex items-start justify-center px-4 py-16">
       <div className="w-full max-w-md bg-white border border-[#E7E5E0] rounded-xl p-8">
         <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-gray-400">
           {senderName || 'Email preferences'}

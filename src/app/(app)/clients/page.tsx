@@ -14,7 +14,7 @@ import {
   MoreVertical,
   Building2,
   Calendar,
-  Sparkles,
+  PenLine,
   Eye,
   Trash2,
   Copy,
@@ -30,6 +30,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 interface Client {
   id: string
@@ -379,7 +380,7 @@ export default function ClientsPage() {
     <div
       ref={menuRef}
       style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
-      className="bg-theme-card rounded-xl shadow-lg border border-theme-primary z-[100] py-1 animate-in zoom-in fade-in duration-150"
+      className="glass-pop rounded-xl z-[100] py-1 animate-in zoom-in fade-in duration-150"
     >
       <button
         onClick={() => handleViewProfile(client.id)}
@@ -411,7 +412,7 @@ export default function ClientsPage() {
             onClick={() => handleCreateContent(client.id)}
             className="w-full px-4 py-2.5 text-left text-sm text-theme-primary hover:bg-theme-tertiary flex items-center gap-3 transition-colors"
           >
-            <Sparkles className="h-4 w-4 text-theme-tertiary" />
+            <PenLine className="h-4 w-4 text-theme-tertiary" />
             Create Content
           </button>
         </>
@@ -468,6 +469,7 @@ export default function ClientsPage() {
 
   return (
     <>
+      <div className="min-h-screen">
       <Header title="Clients" subtitle="Manage your client accounts" />
       <div className="p-4 md:p-8 animate-in fade-in">
         {/* Notification toast - bottom-right so the top nav doesn't
@@ -500,7 +502,7 @@ export default function ClientsPage() {
                 placeholder="Search clients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 input-premium"
+                className="w-full pl-11 pr-4 py-2.5"
               />
             </div>
           </div>
@@ -593,7 +595,6 @@ export default function ClientsPage() {
                           className="flex-1 btn-premium"
                           onClick={() => handleCreateContent(client.id)}
                         >
-                          <Sparkles className="h-4 w-4 mr-1" />
                           Create
                         </Button>
                       </>
@@ -655,21 +656,23 @@ export default function ClientsPage() {
                   </div>
 
                   <div className="hidden md:flex items-center gap-2 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewProfile(client.id)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Profile
-                    </Button>
+                    <Tooltip content="View profile" position="top">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="p-2"
+                        aria-label="View profile"
+                        onClick={() => handleViewProfile(client.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Tooltip>
                     {!showArchived ? (
                       <Button
                         size="sm"
                         className="btn-premium"
                         onClick={() => handleCreateContent(client.id)}
                       >
-                        <Sparkles className="h-4 w-4 mr-1" />
                         Create
                       </Button>
                     ) : (
@@ -696,6 +699,7 @@ export default function ClientsPage() {
             </ul>
           </Card>
         )}
+      </div>
       </div>
 
       <ConfirmModal
@@ -788,9 +792,9 @@ function SegmentedToggle({
   archivedCount: number
 }) {
   return (
-    <div className="relative inline-flex items-center bg-theme-tertiary rounded-full p-1 border border-theme-primary">
+    <div className="glass-rail relative inline-flex items-center rounded-full p-1">
       <span
-        className="absolute top-1 bottom-1 rounded-full bg-theme-card shadow-sm transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+        className="absolute top-1 bottom-1 rounded-full glass-thumb transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         style={{
           left: showArchived ? '50%' : '4px',
           right: showArchived ? '4px' : '50%',
@@ -800,13 +804,13 @@ function SegmentedToggle({
         type="button"
         onClick={() => onChange(false)}
         className={`relative z-10 px-4 py-1.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1.5 ${
-          !showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+          !showArchived ? 'text-white' : 'text-theme-secondary hover:text-theme-primary'
         }`}
       >
         Active
         <span
           className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none ${
-            !showArchived ? 'bg-[#E8F1FF] text-[#2B79F7]' : 'bg-theme-primary/10 text-theme-secondary'
+            !showArchived ? 'bg-white/25 text-white' : 'bg-theme-primary/10 text-theme-secondary'
           }`}
         >
           {activeCount}
@@ -816,13 +820,13 @@ function SegmentedToggle({
         type="button"
         onClick={() => onChange(true)}
         className={`relative z-10 px-4 py-1.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1.5 ${
-          showArchived ? 'text-[#2B79F7]' : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
+          showArchived ? 'text-white' : 'text-theme-secondary hover:text-theme-primary'
         }`}
       >
         Archived
         <span
           className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none ${
-            showArchived ? 'bg-[#E8F1FF] text-[#2B79F7]' : 'bg-theme-primary/10 text-theme-secondary'
+            showArchived ? 'bg-white/25 text-white' : 'bg-theme-primary/10 text-theme-secondary'
           }`}
         >
           {archivedCount}
@@ -834,13 +838,13 @@ function SegmentedToggle({
 
 function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   return (
-    <div className="inline-flex items-center bg-theme-tertiary rounded-xl p-1 border border-theme-primary">
+    <div className="glass-rail inline-flex items-center rounded-xl p-1">
       <button
         type="button"
         onClick={() => onChange('grid')}
         className={`p-1.5 rounded-lg transition-colors ${
           mode === 'grid'
-            ? 'bg-theme-card text-[#2B79F7] shadow-sm'
+            ? 'glass-thumb text-white'
             : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
         aria-label="Grid view"
@@ -853,7 +857,7 @@ function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: View
         onClick={() => onChange('list')}
         className={`p-1.5 rounded-lg transition-colors ${
           mode === 'list'
-            ? 'bg-theme-card text-[#2B79F7] shadow-sm'
+            ? 'glass-thumb text-white'
             : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-card-hover'
         }`}
         aria-label="List view"

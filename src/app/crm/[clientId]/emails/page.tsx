@@ -41,7 +41,6 @@ import {
   Users,
   BellOff,
   Settings as SettingsIcon,
-  Sparkles,
   Send,
   Trash2,
   Pause,
@@ -560,7 +559,7 @@ export default function EmailsPage() {
                 {showPlanInfo && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowPlanInfo(false)} />
-                    <div className="absolute left-0 top-7 z-40 w-80 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl p-4">
+                    <div className="absolute left-0 top-7 z-40 w-80 glass-pop rounded-xl p-4">
                       <div className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                         Sending on the free Google plan
                       </div>
@@ -706,7 +705,7 @@ export default function EmailsPage() {
             return (
               <div
                 key={c.id}
-                className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] overflow-hidden"
+                className="glass-card rounded-xl overflow-hidden"
               >
                 <button
                   className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[var(--bg-card-hover)]"
@@ -798,7 +797,7 @@ export default function EmailsPage() {
                               }
                             }}
                           >
-                            <Sparkles className="h-3.5 w-3.5 mr-1" /> Generate now
+                            Generate now
                           </Button>
                         )}
                         {c.kind === 'broadcast' && campaignEmails.length === 0 && !emailsLoading && (
@@ -815,7 +814,7 @@ export default function EmailsPage() {
                                 }
                               }}
                             >
-                              <Sparkles className="h-3.5 w-3.5 mr-1" /> AI draft
+                              AI draft
                             </Button>
                             <Button
                               size="sm"
@@ -968,7 +967,7 @@ export default function EmailsPage() {
           {groups.map((g) => (
             <div
               key={g.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 glass-card rounded-xl px-4 py-3"
             >
               <div>
                 <div className="font-medium text-[var(--text-primary)]">{g.name}</div>
@@ -1236,7 +1235,7 @@ function SettingsView({
     }
   }
 
-  const sectionCls = 'rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4'
+  const sectionCls = 'glass-card rounded-xl p-4'
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
@@ -2189,7 +2188,7 @@ function ComposerModal({
   const insertMenuEl = () => (
     <>
       <div className="fixed inset-0 z-10" onClick={() => setInsertMenu(null)} />
-      <div className="absolute left-0 top-7 z-20 w-60 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card)] shadow-xl py-1">
+      <div className="absolute left-0 top-7 z-20 w-60 glass-pop rounded-lg py-1">
         <div className="px-3 py-1 text-[10px] uppercase tracking-wide font-semibold text-[var(--text-tertiary)]">
           {insertMenu?.split && htmlHasText(insertMenu.split.selected)
             ? 'Turn selection into / insert here'
@@ -2750,7 +2749,7 @@ function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto p-4">
       <div
-        className={`w-full ${wide ? 'max-w-4xl mt-16' : 'max-w-lg mt-28'} mb-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-xl`}
+        className={`w-full ${wide ? 'max-w-4xl mt-16' : 'max-w-lg mt-28'} mb-8 glass-pop rounded-xl`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-primary)]">
           <h2 className="font-semibold text-[var(--text-primary)]">{title}</h2>

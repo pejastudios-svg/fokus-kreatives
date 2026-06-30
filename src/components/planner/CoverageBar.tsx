@@ -44,7 +44,7 @@ export function CoverageBar({ coverage, target }: CoverageBarProps) {
   ]
 
   return (
-    <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] px-4 py-3">
+    <div className="glass-card rounded-xl px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
           Coverage
@@ -56,7 +56,7 @@ export function CoverageBar({ coverage, target }: CoverageBarProps) {
         )}
       </div>
 
-      <div className="relative h-3 rounded-full overflow-hidden bg-[var(--bg-tertiary)]">
+      <div className="glass-rail relative h-3 rounded-full overflow-hidden">
         {!empty &&
           (() => {
             let acc = 0
@@ -111,7 +111,7 @@ export function CoverageBar({ coverage, target }: CoverageBarProps) {
         })}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-[var(--border-primary)] flex items-center justify-between gap-3 flex-wrap">
+      <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex items-center justify-between gap-3 flex-wrap">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
           Streams
         </span>

@@ -1138,7 +1138,7 @@ function RevenueSkeleton() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-3 sm:p-4">
+          <div key={i} className="glass-card rounded-2xl p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-2">
               <Skeleton className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-[var(--bg-card-hover)]" />
               <Skeleton className="h-3 w-16 sm:w-20 bg-[var(--bg-card-hover)]" />
@@ -1154,7 +1154,7 @@ function RevenueSkeleton() {
         ))}
       </div>
 
-      <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden">
+      <div className="glass-card rounded-2xl overflow-hidden">
         <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 flex gap-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-3 w-20 sm:w-24 bg-[var(--bg-card-hover)] shrink-0" />
@@ -1224,7 +1224,7 @@ function RevenueSkeleton() {
 
       {/* Hero: revenue trend chart + status mix donut */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="lg:col-span-2 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 sm:p-5">
+        <div className="lg:col-span-2 glass-card rounded-2xl p-4 sm:p-5">
           <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
             <div className="flex items-start gap-6 sm:gap-8 flex-wrap">
               <div>
@@ -1299,7 +1299,7 @@ function RevenueSkeleton() {
           />
         </div>
 
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-4 sm:p-5 flex flex-col">
+        <div className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col">
           <p className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-3">
             Invoice mix
           </p>
@@ -1413,7 +1413,7 @@ function RevenueSkeleton() {
       {/* Payments list - one card with row dividers, no horizontal scroll
           on mobile, full table-like layout on desktop. */}
       {filteredPayments.length === 0 ? (
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-8 text-center text-[var(--text-tertiary)]">
+        <div className="glass-card rounded-2xl p-8 text-center text-[var(--text-tertiary)]">
           <DollarSign className="h-10 w-10 mx-auto mb-3" />
           <p className="text-sm">No payments found.</p>
           <div className="mt-4 flex justify-center">
@@ -1424,7 +1424,7 @@ function RevenueSkeleton() {
           </div>
         </div>
       ) : (
-        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] overflow-hidden divide-y divide-[var(--border-primary)]">
+        <div className="glass-card rounded-2xl overflow-hidden divide-y divide-[var(--border-primary)]">
           {filteredPayments.map((payment) => {
             const config = statusConfig[payment.status]
             const StatusIcon = config.icon
@@ -2137,7 +2137,7 @@ function Modal(props: { children: React.ReactNode; onClose: () => void; title: s
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] shadow-2xl flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl glass-pop rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -2182,7 +2182,7 @@ function RevenueKpi({
 }) {
   const symbol = symbolCurrency ? getCurrencySymbol(symbolCurrency) : null
   return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-primary)] p-3 sm:p-4">
+    <div className="glass-card rounded-2xl p-3 sm:p-4">
       <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
         <div
           className={`p-1.5 sm:p-2 ${iconBg} rounded-lg flex items-center justify-center min-w-[28px] sm:min-w-[32px]`}

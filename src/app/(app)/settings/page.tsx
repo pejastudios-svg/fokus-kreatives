@@ -185,7 +185,7 @@ function SettingsSkeleton() {
       />
       <div className="p-4 md:p-8 max-w-4xl mx-auto">
         {notification && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] ${
             notification.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
           }`}>
             {notification.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}

@@ -125,7 +125,7 @@ export function TimePicker({
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 bg-theme-input border border-theme-primary rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-[#2B79F7] transition-all"
+        className="w-full flex items-center gap-3 px-4 py-2.5 glass-field text-left transition-all"
       >
         <Clock className="h-4 w-4 text-theme-tertiary" />
         <span className={value ? 'text-theme-primary' : 'text-theme-tertiary'}>
@@ -135,7 +135,7 @@ export function TimePicker({
 
       {isOpen && (
         <div
-          className={`absolute z-50 w-64 max-w-[calc(100vw-1rem)] bg-theme-card border border-theme-primary rounded-2xl shadow-lg p-3 animate-in fade-in zoom-in duration-150 ${
+          className={`absolute z-50 w-64 max-w-[calc(100vw-1rem)] glass-pop rounded-2xl p-3 animate-in fade-in zoom-in duration-150 ${
             dropDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
           }`}
         >

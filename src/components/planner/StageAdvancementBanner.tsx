@@ -38,7 +38,7 @@ export function StageAdvancementBanner({ clientId, currentStage, proposedStage, 
   const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : '')
 
   return (
-    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 flex items-center justify-between gap-3">
+    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.14)] px-4 py-3 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
         <div>
@@ -55,7 +55,7 @@ export function StageAdvancementBanner({ clientId, currentStage, proposedStage, 
         <button
           onClick={() => handle('dismiss')}
           disabled={busy !== null}
-          className="px-2.5 py-1 text-xs rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+          className="px-2.5 py-1 text-xs rounded-md text-[var(--text-secondary)] glass-chip disabled:opacity-50"
         >
           {busy === 'dismiss' ? 'Dismissing...' : 'Dismiss'}
         </button>
