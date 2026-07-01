@@ -71,9 +71,9 @@ function factRows(rows: Array<[string, string]>): string {
 
 // brandName is optional - outward (white-labeled) emails pass
 // payload.fromName so the header shows the client's brand instead
-// of Fokus Kreatives. Internal emails keep the default.
+// of Fokus Kreativez. Internal emails keep the default.
 function baseTemplate(title: string, bodyHtml: string, brandName?: string): string {
-  const brand = escapeHtml(brandName || 'Fokus Kreatives')
+  const brand = escapeHtml(brandName || 'Fokus Kreativez')
   return (
     `<div style="margin:0;padding:32px 16px;background:#F6F5F4;">` +
     `<div style="max-width:560px;margin:0 auto;font-family:${FONT};">` +
@@ -156,7 +156,7 @@ function invoiceSent(payload: Payload): RenderedEmail {
 
   const subject =
     str(payload, 'subject') ||
-    'Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (fromName || 'Fokus Kreatives')
+    'Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (fromName || 'Fokus Kreativez')
 
   const html = baseTemplate(
     'Your invoice is ready',
@@ -243,20 +243,20 @@ function agreementSent(payload: Payload): RenderedEmail {
   const isCc = payload.cc === true
 
   const subject =
-    str(payload, 'subject') || title + ' from ' + (fromName || 'Fokus Kreatives')
+    str(payload, 'subject') || title + ' from ' + (fromName || 'Fokus Kreativez')
 
   const html = baseTemplate(
     isCc ? 'An agreement was shared with you' : 'You have an agreement to sign',
     para('Hi ' + escapeHtml(recipientName) + ',') +
       (isCc
         ? para(
-            '<b>' + escapeHtml(fromName || 'Fokus Kreatives') + '</b> has shared <b>' +
+            '<b>' + escapeHtml(fromName || 'Fokus Kreativez') + '</b> has shared <b>' +
               escapeHtml(title) + '</b> with you for your records.',
           ) +
           (link ? buttonHtml(link, 'View agreement') : '') +
           muted('No action is needed from you.')
         : para(
-            '<b>' + escapeHtml(fromName || 'Fokus Kreatives') + '</b> has sent you <b>' +
+            '<b>' + escapeHtml(fromName || 'Fokus Kreativez') + '</b> has sent you <b>' +
               escapeHtml(title) + '</b> to review and sign online.',
           ) +
           (link ? buttonHtml(link, 'Review and sign') : '') +

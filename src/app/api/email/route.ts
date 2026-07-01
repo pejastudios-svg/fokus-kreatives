@@ -15,12 +15,12 @@ export async function POST(request: NextRequest) {
       html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #2B79F7 0%, #1E54B7 50%, #143A80 100%); padding: 40px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Fokus Kreatives</h1>
+            <h1 style="color: white; margin: 0;">Fokus Kreativez</h1>
           </div>
           <div style="padding: 40px; background: #f9fafb;">
             <h2 style="color: #1f2937;">You're Invited!</h2>
             <p style="color: #6b7280;">Hi ${data.name},</p>
-            <p style="color: #6b7280;">${data.invitedBy} has invited you to join Fokus Kreatives as a <strong>${data.role}</strong>.</p>
+            <p style="color: #6b7280;">${data.invitedBy} has invited you to join Fokus Kreativez as a <strong>${data.role}</strong>.</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${process.env.NEXT_PUBLIC_APP_URL}/invite/${data.token}" 
                  style="background: linear-gradient(135deg, #2B79F7 0%, #1E54B7 100%); 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #2B79F7 0%, #1E54B7 50%, #143A80 100%); padding: 40px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Fokus Kreatives</h1>
+            <h1 style="color: white; margin: 0;">Fokus Kreativez</h1>
           </div>
           <div style="padding: 40px; background: #f9fafb;">
             <h2 style="color: #1f2937;">Welcome to Your Client Portal!</h2>
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // For free tier, Resend only allows sending to verified emails
     // You can only send to yourself until you verify a domain
     const { data: emailData, error } = await resend.emails.send({
-      from: 'Fokus Kreatives <onboarding@resend.dev>',
+      from: 'Fokus Kreativez <onboarding@resend.dev>',
       to: [to],
       subject: subject,
       html: html,

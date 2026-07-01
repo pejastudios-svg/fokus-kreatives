@@ -251,7 +251,7 @@ export async function pumpQueuedSends(email: CampaignEmailRow): Promise<{
     (client.email_from_name as string | null)?.trim() ||
     (client.business_name as string | null)?.trim() ||
     (client.name as string | null)?.trim() ||
-    'Fokus Kreatives'
+    'Fokus Kreativez'
 
   // Clamp the configured cap DOWN to what the client's actual sending
   // account can safely handle, so a high setting never pushes a free Gmail

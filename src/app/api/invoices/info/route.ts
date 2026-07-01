@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         client?.email_from_name ||
         client?.business_name ||
         client?.name ||
-        'Fokus Kreatives',
+        'Fokus Kreativez',
       logo: client?.profile_picture_url || null,
     },
   })

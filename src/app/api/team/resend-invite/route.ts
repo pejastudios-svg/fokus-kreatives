@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
             inviterName: me?.name || 'Someone',
             inviterAvatarUrl,
             role: target.role,
-            workspaceName: 'Fokus Kreatives workspace',
+            workspaceName: 'Fokus Kreativez workspace',
             acceptUrl: inviteLink,
           },
         }),

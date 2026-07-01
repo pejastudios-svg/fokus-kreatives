@@ -198,7 +198,7 @@ export function CombinedReport({
   const order: CombinedSectionKey[] = ['revenue', 'leads', 'meetings', 'capture', 'team']
   const included = order.filter((k) => sections[k] != null)
   const docProps: DocumentProps = { title: `${workspaceName} - Workspace Report` }
-  const agency = 'Fokus Kreatives'
+  const agency = 'Fokus Kreativez'
 
   return (
     <Document {...docProps}>

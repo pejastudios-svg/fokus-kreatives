@@ -251,7 +251,7 @@ export default function NewClientPage() {
       const { error: supportChannelError } = await supabase.from('channels').insert({
         client_id: clientData.id,
         name: 'fokus-kreatives-support',
-        description: 'Direct communication with Fokus Kreatives team',
+        description: 'Direct communication with Fokus Kreativez team',
         is_private: false,
         is_dm: false,
       })

@@ -138,7 +138,7 @@ export function ReportPage({
   reportTitle,
   period,
   filters = [],
-  agency = 'Fokus Kreatives',
+  agency = 'Fokus Kreativez',
   generatedAtIso,
   children,
 }: ReportPageProps) {

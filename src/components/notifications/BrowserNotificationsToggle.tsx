@@ -77,7 +77,7 @@ export function BrowserNotificationsToggle() {
             Browser notifications aren&apos;t supported on this device
           </p>
           <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-snug">
-            On iOS, add Fokus Kreatives to your Home Screen first (Share &rarr;
+            On iOS, add Fokus Kreativez to your Home Screen first (Share &rarr;
             Add to Home Screen). Then come back here to enable.
           </p>
         </div>
@@ -137,7 +137,7 @@ export function BrowserNotificationsToggle() {
       {active && (
         <>
           <p className="text-[11px] text-emerald-500 mt-3">
-            Active on this device. Add Fokus Kreatives to your Home Screen
+            Active on this device. Add Fokus Kreativez to your Home Screen
             (iOS) or Install button (desktop) for the best experience.
           </p>
           <div className="mt-3 flex items-center gap-2 flex-wrap">

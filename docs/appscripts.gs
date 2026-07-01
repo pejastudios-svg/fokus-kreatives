@@ -205,13 +205,13 @@ function buttonHtml(url, text) {
 
 // brandName is optional - outward (white-labeled) emails pass
 // payload.fromName so the header shows the client's brand instead
-// of Fokus Kreatives. Internal emails keep the default.
+// of Fokus Kreativez. Internal emails keep the default.
 function baseTemplate(title, bodyHtml, brandName) {
   return `
   <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
     <div style="background:linear-gradient(135deg,#2B79F7 0%,#1E54B7 60%,#143A80 100%);
                 padding:22px 24px;border-radius:14px 14px 0 0;">
-      <div style="color:#fff;font-size:18px;font-weight:800;">${escapeHtml(brandName || 'Fokus Kreatives')}</div>
+      <div style="color:#fff;font-size:18px;font-weight:800;">${escapeHtml(brandName || 'Fokus Kreativez')}</div>
       <div style="color:#E8F1FF;margin-top:6px;font-size:14px;">${title}</div>
     </div>
     <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 14px 14px;
@@ -465,7 +465,7 @@ function handleInvoiceSent(payload) {
   const link = payload.link || ''
 
   const subject = payload.subject ||
-    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreatives'))
+    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreativez'))
 
   const html = baseTemplate(
     'You have a new invoice',
@@ -495,7 +495,7 @@ function handleAgreementSent(payload) {
   const recipientName = payload.recipientName || 'there'
   const title = payload.title || 'Agreement'
   const link = payload.link || ''
-  const fromName = payload.fromName || 'Fokus Kreatives'
+  const fromName = payload.fromName || 'Fokus Kreativez'
 
   const subject = payload.subject || (title + ' from ' + fromName)
 
@@ -578,7 +578,7 @@ function handlePaymentCreated(payload) {
         '<p style="margin:0 0 4px;"><strong>Amount:</strong> ' + escapeHtml(currency) + ' ' + amount + '</p>' +
         '<p style="margin:0 0 4px;">' + dueText + '</p>' +
       '</div>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreatives</p>' +
+      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreativez</p>' +
     '</div>'
 
   MailApp.sendEmail({
@@ -607,7 +607,7 @@ function handlePaymentDue(payload) {
         '<li><strong>Amount:</strong> ' + currency + ' ' + amount + '</li>' +
         '<li><strong>Due date:</strong> ' + dueDate + '</li>' +
       '</ul>' +
-      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreatives</p>' +
+      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p>' +
     '</div>';
 
   MailApp.sendEmail({
@@ -778,7 +778,7 @@ function handleMeetingRescheduled(payload) {
       '<p><strong>' + escapeHtml(title) + '</strong> with ' + escapeHtml(clientName) + ' has a new time:</p>' +
       '<div style="background:#F9FAFB;border-radius:12px;padding:14px 18px;margin:12px 0;"><strong>' + escapeHtml(when) + '</strong></div>' +
       linkHtml +
-      '<p style="font-size:12px;color:#6b7280;">Sent by ' + escapeHtml(payload.fromName || 'Fokus Kreatives') + '</p>' +
+      '<p style="font-size:12px;color:#6b7280;">Sent by ' + escapeHtml(payload.fromName || 'Fokus Kreativez') + '</p>' +
     '</div>';
 
   const msg = { to: recipients, subject: 'Rescheduled: ' + title, htmlBody: html }
@@ -813,7 +813,7 @@ function handleMeetingReminder(payload) {
         (when ? '<li><strong>When:</strong> ' + escapeHtml(when) + '</li>' : '') +
       '</ul>' +
       linkHtml +
-      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreatives</p>' +
+      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p>' +
     '</div>';
 
   MailApp.sendEmail({
@@ -880,7 +880,7 @@ function handleCaptureSubmission(payload) {
       '<table style="border-collapse:collapse;width:100%;margin-top:8px;">' +
         rowsHtml +
       '</table>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:20px;">Sent by Fokus Kreatives</p>' +
+      '<p style="color:#6B7280; font-size:12px; margin-top:20px;">Sent by Fokus Kreativez</p>' +
     '</div>'
 
   MailApp.sendEmail({
@@ -933,7 +933,7 @@ function handleLeadCreated(payload) {
         '<p style="margin:0 0 4px;"><strong>Name:</strong> ' + escapeHtml(leadName) + '</p>' +
         '<p style="margin:0 0 4px;"><strong>Source:</strong> ' + escapeHtml(source) + '</p>' +
       '</div>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreatives</p>' +
+      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreativez</p>' +
     '</div>'
 
   MailApp.sendEmail({
@@ -966,7 +966,7 @@ function handleInviteEmail(payload, context) {
 
   var subtitle = ''
   if (context === 'workspace') {
-    subtitle = inviterName + ' invited you to join the Fokus Kreatives workspace.'
+    subtitle = inviterName + ' invited you to join the Fokus Kreativez workspace.'
   } else if (context === 'crm') {
     subtitle = inviterName + ' invited you to join the client workspace: ' + workspaceName + '.'
   }
@@ -1016,7 +1016,7 @@ function handleInviteEmail(payload, context) {
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
               '<tr>' +
                 '<td align="left" valign="middle">' +
-                  '<img src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png" alt="Fokus Kreatives" ' +
+                  '<img src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png" alt="Fokus Kreativez" ' +
                     'width="32" height="32" style="display:block;height:32px;width:auto;border:0;" />' +
                 '</td>' +
                 '<td align="right" valign="middle" style="color:#E5E7EB;font-size:13px;font-weight:500;">' +
@@ -1375,7 +1375,7 @@ function sendDailyMeetingSummary() {
         html += '</li>'
       })
 
-      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreatives</p></div>'
+      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p></div>'
 
       var subject = 'Today\'s meetings for ' + targets.clientDisplayName
 
@@ -1459,7 +1459,7 @@ function sendDailyPaymentSummary() {
         html += '</li>'
       })
 
-      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreatives</p></div>'
+      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p></div>'
 
       var subject = 'Payments due/overdue for ' + targets.clientDisplayName
 

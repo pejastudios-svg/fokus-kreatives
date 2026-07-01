@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
         (lockClient?.email_from_name as string | null)?.trim() ||
         (lockClient?.business_name as string | null)?.trim() ||
         (lockClient?.name as string | null)?.trim() ||
-        'Fokus Kreatives'
+        'Fokus Kreativez'
       return NextResponse.json({
         success: true,
         agreement: {
@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
     (client?.email_from_name as string | null)?.trim() ||
     (client?.business_name as string | null)?.trim() ||
     (client?.name as string | null)?.trim() ||
-    'Fokus Kreatives'
+    'Fokus Kreativez'
 
   return NextResponse.json({
     success: true,

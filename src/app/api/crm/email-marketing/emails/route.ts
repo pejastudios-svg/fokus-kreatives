@@ -37,7 +37,7 @@ async function loadClientRenderBits(clientId: string) {
     (client?.email_from_name as string | null)?.trim() ||
     (client?.business_name as string | null)?.trim() ||
     (client?.name as string | null)?.trim() ||
-    'Fokus Kreatives'
+    'Fokus Kreativez'
   return { settings, fromName }
 }
 

@@ -41,7 +41,7 @@
 
 ## 1. Quick orientation
 
-**App:** Fokus Kreatives - Next.js 16 (App Router) + Supabase + Tailwind v4 agency CRM and content-generation platform. The agency creates social-media content packages for clients across multiple tiers.
+**App:** Fokus Kreativez - Next.js 16 (App Router) + Supabase + Tailwind v4 agency CRM and content-generation platform. The agency creates social-media content packages for clients across multiple tiers.
 
 **What we're building:** A *content planner* - a calendar-based system that generates a month's worth of content slots across multiple streams (long-form video, short-form/Reels, engagement reels, carousels, IG/FB stories), drives format selection from a per-brand format library with cooldown + coverage logic, and produces scripts on demand from typed raw material extracted via 5-question topic forms.
 

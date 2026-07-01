@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
           case 'series_form_submitted':
             return 'Series form submitted'
           default:
-            return 'Fokus Kreatives'
+            return 'Fokus Kreativez'
         }
       })()
       const body = formatNotificationText(stub)

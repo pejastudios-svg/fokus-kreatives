@@ -213,7 +213,7 @@ export default function InvitePage() {
           <div className="flex justify-center mb-6">
             <Image
               src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-              alt="Fokus Kreatives"
+              alt="Fokus Kreativez"
               width={160}
               height={48}
               className="object-contain w-auto h-auto max-h-12"

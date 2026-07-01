@@ -156,7 +156,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, mobile = false }:
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={LOGO_URL}
-            alt="Fokus Kreatives"
+            alt="Fokus Kreativez"
             className="max-w-full max-h-full object-contain"
           />
         </div>

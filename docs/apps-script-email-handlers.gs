@@ -271,10 +271,10 @@ function factRowsHtml(rows) {
 
 // brandName is optional - outward (white-labeled) emails pass
 // payload.fromName so the header shows the client's brand instead
-// of Fokus Kreatives. Internal emails keep the default.
+// of Fokus Kreativez. Internal emails keep the default.
 
 function baseTemplate(title, bodyHtml, brandName) {
-  var brand = escapeHtml(brandName || 'Fokus Kreatives');
+  var brand = escapeHtml(brandName || 'Fokus Kreativez');
   return '<div style="margin:0;padding:32px 16px;background:#F6F5F4;">' +
     '<div style="max-width:560px;margin:0 auto;font-family:' + EMAIL_FONT + ';">' +
     '<div style="background:#FFFFFF;border:1px solid #E7E5E0;border-radius:12px;padding:30px 34px;">' +
@@ -373,7 +373,7 @@ function handleInvoiceSent(payload) {
   const link = payload.link || ''
 
   const subject = payload.subject ||
-    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreatives'))
+    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreativez'))
 
   const html = baseTemplate(
     'Your invoice is ready',
@@ -408,7 +408,7 @@ function handleLeadMagnet(payload) {
 
   var leadName = payload.leadName || 'there'
   var url = payload.magnetUrl || ''
-  var brand = payload.clientName || 'Fokus Kreatives'
+  var brand = payload.clientName || 'Fokus Kreativez'
   var buttonText = payload.buttonText || 'Access your resource'
   var intro = payload.message
     ? escapeHtml(payload.message)
@@ -460,7 +460,7 @@ function handleAgreementSent(payload) {
   const recipientName = payload.recipientName || 'there'
   const title = payload.title || 'Agreement'
   const link = payload.link || ''
-  const fromName = payload.fromName || 'Fokus Kreatives'
+  const fromName = payload.fromName || 'Fokus Kreativez'
   // CC copies carry cc:true - same email, "view" wording, no signing ask.
   const isCc = payload.cc === true
 
@@ -1072,7 +1072,7 @@ function handleInviteEmail(payload, context) {
 
   var subtitle = ''
   if (context === 'workspace') {
-    subtitle = inviterName + ' invited you to join the Fokus Kreatives workspace.'
+    subtitle = inviterName + ' invited you to join the Fokus Kreativez workspace.'
   } else if (context === 'crm') {
     subtitle = inviterName + ' invited you to join the client workspace: ' + workspaceName + '.'
   }
@@ -1129,7 +1129,7 @@ function handleInviteEmail(payload, context) {
       '</tr>' +
     '</table>'
 
-  const brand = context === 'crm' ? workspaceName : 'Fokus Kreatives'
+  const brand = context === 'crm' ? workspaceName : 'Fokus Kreativez'
 
   const html = baseTemplate(
     'You have been invited',

@@ -292,7 +292,7 @@ export default function TeamPage() {
             inviterName: currentUserName || 'Someone',
             inviterAvatarUrl: currentUserAvatar || '',
             role: finalRole,
-            workspaceName: 'Fokus Kreatives workspace',
+            workspaceName: 'Fokus Kreativez workspace',
             acceptUrl: inviteLink,
           },
         }),

@@ -143,7 +143,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <BurgerButton open={mobileOpen} onClick={() => setMobileOpen((o) => !o)} />
             <Image
               src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png"
-              alt="Fokus Kreatives"
+              alt="Fokus Kreativez"
               width={100}
               height={30}
               className="object-contain w-auto h-7"

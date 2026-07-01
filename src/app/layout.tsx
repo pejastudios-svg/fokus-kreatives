@@ -40,7 +40,7 @@ const LOGO_URL =
   'https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png'
 
 export const metadata: Metadata = {
-  title: 'Fokus Kreatives',
+  title: 'Fokus Kreativez',
   description: 'Content Creation & Lead Generation Platform',
   // manifest -> Install-as-PWA on desktop browsers + Android.
   // appleWebApp -> iOS Add-to-Home-Screen flow, which is the

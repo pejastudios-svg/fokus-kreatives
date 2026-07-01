@@ -332,7 +332,7 @@ export default function AdminPage() {
 
       const doc = (
         <AdminActivityReport
-          workspaceName="Fokus Kreatives · Admin"
+          workspaceName="Fokus Kreativez · Admin"
           rangeLabel={TIME_RANGE_LABEL[range]}
           filtersLabel={filters}
           totalCount={activity.counts.total}
