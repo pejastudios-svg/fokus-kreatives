@@ -45,7 +45,8 @@ interface FormOption {
   id: string
   label: string
   submitted: boolean
-  topicIds: string[]
+  /** The form's topics ({id, title}) - a magnet can be scoped to one of them. */
+  topics: { id: string; title: string }[]
 }
 
 interface ClientData {
@@ -80,6 +81,9 @@ export default function PromptsPage() {
   // legacy behaviour). A form id scopes the magnet's material to just that
   // question form's answers.
   const [selectedFormId, setSelectedFormId] = useState('')
+  // '' = all topics in the selected form; a topic id narrows the magnet to that
+  // single topic's braindump (per-topic mode).
+  const [selectedTopicId, setSelectedTopicId] = useState('')
   const [scopedAnswers, setScopedAnswers] = useState<FormAnswer[] | null>(null)
   const [loadingScoped, setLoadingScoped] = useState(false)
 
@@ -162,9 +166,11 @@ export default function PromptsPage() {
             topics?: unknown
           }
           if (!f.id) continue
-          const topicList = Array.isArray(f.topics) ? (f.topics as { id?: string }[]) : []
-          const topicIds = topicList.map((t) => t?.id).filter((id): id is string => !!id)
-          if (topicIds.length === 0) continue
+          const topicList = Array.isArray(f.topics) ? (f.topics as { id?: string; title?: string }[]) : []
+          const topics = topicList
+            .filter((t): t is { id: string; title?: string } => !!t?.id)
+            .map((t, i) => ({ id: t.id, title: t.title?.trim() || `Topic ${i + 1}` }))
+          if (topics.length === 0) continue
           const dateLabel = f.created_at
             ? new Date(f.created_at).toLocaleDateString(undefined, {
                 month: 'short',
@@ -177,7 +183,7 @@ export default function PromptsPage() {
             id: f.id,
             label: f.submitted_at ? base : `${base} (not answered yet)`,
             submitted: !!f.submitted_at,
-            topicIds,
+            topics,
           })
         }
 
@@ -255,12 +261,18 @@ export default function PromptsPage() {
   )
 
   useEffect(() => {
-    // Reset the per-form choice whenever the client changes.
+    // Reset the per-form + per-topic choice whenever the client changes.
     setSelectedFormId('')
+    setSelectedTopicId('')
     setScopedAnswers(null)
     if (selectedClientId) loadClientData(selectedClientId)
     else setClientData(null)
   }, [selectedClientId, loadClientData])
+
+  // Reset the topic choice whenever the form changes (topics are form-specific).
+  useEffect(() => {
+    setSelectedTopicId('')
+  }, [selectedFormId])
 
   // Load the chosen form's answers (scoped by topic_group_id) when a specific
   // form is picked. '' falls back to the all-forms material already loaded.
@@ -278,8 +290,13 @@ export default function PromptsPage() {
     setLoadingScoped(true)
     ;(async () => {
       try {
+        // Per-topic mode: scope to just the selected topic's group id.
+        // Otherwise scope to every topic in the form.
+        const topicIds = selectedTopicId
+          ? [selectedTopicId]
+          : form.topics.map((t) => t.id)
         const groupIds = await Promise.all(
-          form.topicIds.map((tid) => topicGroupIdFor(selectedFormId, tid)),
+          topicIds.map((tid) => topicGroupIdFor(selectedFormId, tid)),
         )
         const { data } = await supabase
           .from('topics')
@@ -317,7 +334,7 @@ export default function PromptsPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedClientId, selectedFormId, clientData, supabase])
+  }, [selectedClientId, selectedFormId, selectedTopicId, clientData, supabase])
 
   const handleGenerate = (card: PromptCardMeta) => {
     if (!clientData || !selectedClient) return
@@ -336,6 +353,9 @@ export default function PromptsPage() {
         existingAnswers: clientData.existingAnswers,
         formAnswers: leadMagnetAnswers,
         competitorInsights: clientData.competitorInsights,
+        // Per-topic mode when a single topic is picked - narrows the prompt to
+        // build one qualified magnet (+ a keyword) from that topic's braindump.
+        leadMagnetScope: selectedTopicId ? 'topic' : selectedFormId ? 'form' : 'all',
       })
       const label = selectedClient.name || selectedClient.business_name || 'this client'
       const suffix = card.type === 'seed-topics' ? ` (${effectiveSeedCount})` : ''
@@ -359,6 +379,7 @@ export default function PromptsPage() {
   }
 
   const ready = !!clientData && !loadingData
+  const selectedForm = clientData?.forms.find((f) => f.id === selectedFormId) ?? null
 
   return (
     <>
@@ -425,6 +446,33 @@ export default function PromptsPage() {
                     </option>
                   ))}
                 </select>
+
+                {/* Per-topic scope. Once a form is picked, narrow the magnet to
+                    a single topic (build one focused, qualified magnet + its own
+                    keyword) or keep the whole form. */}
+                {selectedForm && selectedForm.topics.length > 0 && (
+                  <div className="mt-2.5">
+                    <label className="text-xs font-medium text-[var(--text-secondary)]">
+                      Topic (optional)
+                    </label>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5 mb-1.5">
+                      Pick one topic to build a single focused magnet from it, or use the whole form.
+                    </p>
+                    <select
+                      value={selectedTopicId}
+                      onChange={(e) => setSelectedTopicId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B79F7]"
+                    >
+                      <option value="">All topics in this form</option>
+                      {selectedForm.topics.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {selectedFormId && (
                   <p className="text-xs pt-1 flex items-center gap-1.5">
                     {loadingScoped ? (
@@ -441,8 +489,8 @@ export default function PromptsPage() {
                       >
                         <Check className="h-3.5 w-3.5" />
                         {(scopedAnswers?.length ?? 0) > 0
-                          ? `${scopedAnswers?.length} answers from this form`
-                          : 'No answers on this form yet'}
+                          ? `${scopedAnswers?.length} answers from this ${selectedTopicId ? 'topic' : 'form'}`
+                          : `No answers on this ${selectedTopicId ? 'topic' : 'form'} yet`}
                       </span>
                     )}
                   </p>

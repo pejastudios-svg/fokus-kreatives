@@ -145,6 +145,19 @@ STEP 7 - Save the finished magnet to a Google Doc titled "[Client business name]
 
 ${HOUSE_RULES}`
 
+// Appended to the lead-magnet prompt when scoped to a SINGLE topic. Narrows the
+// whole-business framing above into "build ONE magnet from this topic's method",
+// with a qualification gate (skip topics that only describe an outcome/service)
+// and a topical DM keyword so multiple magnets don't all share one keyword.
+const LEAD_MAGNET_PER_TOPIC = `
+## PER-TOPIC MODE (read this AFTER the steps above - it narrows them)
+The DOCUMENTED ANSWERS below are ONE topic's braindump, not the whole business. Work from THIS topic only:
+- The magnet's substance comes from THIS topic's [framework] and [proof] answers. Do NOT pull in other topics or invent a method the answers don't contain.
+- QUALIFY FIRST. A magnet needs a complete-but-narrow, teachable method. If this topic's answers only give an outcome, a mindset, or a description of your service ("we do X for you", "30 days of content in a day") with no real step-by-step the audience could follow, do NOT force a magnet. Say plainly that this topic isn't magnet-ready, name the ONE missing piece (a concrete method/steps) that would make it one, and stop.
+- If it qualifies, produce ONE magnet from this topic. Produce a SECOND only if the topic clearly splits into two genuinely distinct deliverables (different asset, different narrow problem) - otherwise one is correct.
+- Still bridge to the client's signature offer: this magnet is top-of-funnel for the same paid offer.
+- End with a suggested DM KEYWORD: one short, uppercase, on-topic word (e.g. BATCH, CAMERA, GEAR) the audience comments/DMs to get it - never a generic word like FRAMEWORK.`
+
 const RESEARCH_BODY = `You are a research analyst at Fokus Kreativez, a content agency. Produce a research brief on one client so the team can position them sharply and generate content that wins. Do LIVE web research - real competitor content, real market signals, real audience language - not opinions. Every non-obvious claim cites a source (link or where you found it). Treat the brand profile below as the starting hypothesis, not gospel: confirm, sharpen, or challenge it with what you find online.
 
 Run the research in three lenses.
@@ -192,6 +205,10 @@ interface BuildInput {
   /** lead-magnet: the owner's real answers from the question form (typed),
    *  used as the asset's source material. */
   formAnswers?: FormAnswer[]
+  /** lead-magnet scope. 'topic' narrows the prompt to build ONE magnet from a
+   *  single topic's braindump (qualify-first, suggest a keyword); 'form'/'all'
+   *  keep the whole-business framing. Default 'all'. */
+  leadMagnetScope?: 'topic' | 'form' | 'all'
   /** Saved competitor analyzer notes (clients.competitor_insights). Injected
    *  into all three prompts so Claude builds on real research, not a blank. */
   competitorInsights?: string
@@ -236,6 +253,7 @@ export function buildPrompt({
   existingAnswers = [],
   formAnswers = [],
   competitorInsights = '',
+  leadMagnetScope = 'all',
 }: BuildInput): string {
   if (type === 'seed-topics') {
     let out = seedTopicsBody(count)
@@ -259,6 +277,7 @@ export function buildPrompt({
   out += competitorBlock(competitorInsights)
   if (type === 'lead-magnet') {
     out += formAnswersBlock(formAnswers)
+    if (leadMagnetScope === 'topic') out += LEAD_MAGNET_PER_TOPIC
   }
   return out
 }
