@@ -61,13 +61,39 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to load slot stats' }, { status: 500 })
     }
 
+    // Stories live in their own table (dated via pinned_to_date) but occupy the
+    // calendar too, so the date-pinned ones count toward the client's total -
+    // otherwise the card under-counts by ~a month of stories. Stories have no
+    // 'approved' state, so `approved` stays slot-only.
+    const { data: storyRows, error: storyErr } = await admin
+      .from('story_queue_items')
+      .select('client_id, created_at')
+      .in('client_id', clientIds)
+      .not('pinned_to_date', 'is', null)
+    if (storyErr) {
+      // Non-fatal - fall back to slot-only totals rather than failing the page.
+      console.warn('slot-stats: story count failed (non-fatal):', storyErr.message)
+    }
+
     const acc = new Map<string, SlotStats>()
+    const ensure = (clientId: string) =>
+      acc.get(clientId) ?? { client_id: clientId, total: 0, approved: 0, last_activity: null }
+
     for (const r of (rows ?? []) as Array<{ client_id: string; status: string; updated_at: string | null }>) {
-      const cur = acc.get(r.client_id) ?? { client_id: r.client_id, total: 0, approved: 0, last_activity: null }
+      const cur = ensure(r.client_id)
       cur.total += 1
       if (r.status === 'approved') cur.approved += 1
       if (r.updated_at && (!cur.last_activity || r.updated_at > cur.last_activity)) {
         cur.last_activity = r.updated_at
+      }
+      acc.set(r.client_id, cur)
+    }
+
+    for (const r of (storyRows ?? []) as Array<{ client_id: string; created_at: string | null }>) {
+      const cur = ensure(r.client_id)
+      cur.total += 1
+      if (r.created_at && (!cur.last_activity || r.created_at > cur.last_activity)) {
+        cur.last_activity = r.created_at
       }
       acc.set(r.client_id, cur)
     }

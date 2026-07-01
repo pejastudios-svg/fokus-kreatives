@@ -5,7 +5,7 @@
 // swap format, delete) + the M4 script editor and QA checklist panel.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Lock, Unlock, RefreshCw, Trash2, X, ArrowRightLeft, CheckCircle2 } from 'lucide-react'
+import { Loader2, Lock, Unlock, RefreshCw, Trash2, X, ArrowRightLeft, CheckCircle2, Undo2 } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -27,6 +27,18 @@ interface Props {
    *  Resolves on success, rejects with an Error (whose `.message` may
    *  contain the unresolved-checklist-items detail) on failure. */
   onApprove: (slotId: string) => Promise<void>
+  /** Withdraw a slot's approval: flips it from 'approved' back to 'drafted'
+   *  so it can be edited / regenerated again. Parent flips local status and
+   *  rolls back on failure. */
+  onWithdrawApproval: (slotId: string) => Promise<void>
+  /** Fires script generation for this slot. Tracked in the parent so the
+   *  spinner survives closing + reopening the drawer. Returns the new
+   *  script + checklist so the drawer can update its local mirror. */
+  onGenerateScript: (slotId: string) => Promise<{ script: string; checklist: ChecklistItem[] }>
+  /** True while THIS slot's script generation is in flight (parent-tracked). */
+  slotGenerating?: boolean
+  /** True while THIS slot's regenerate is in flight (parent-tracked). */
+  slotRegenerating?: boolean
   /** Bulk-generate every slot in the campaign (same topic_group_id) that
    *  doesn't yet have a script. Parent dispatches N parallel
    *  /generate-script calls and tracks progress in its own state. */
@@ -53,6 +65,10 @@ export function SlotDetailDrawer({
   onAction,
   onSwapFormat,
   onApprove,
+  onWithdrawApproval,
+  onGenerateScript,
+  slotGenerating,
+  slotRegenerating,
   onGenerateCampaign,
   campaignSlotsRemaining,
   campaignBulkInFlight,
@@ -63,6 +79,7 @@ export function SlotDetailDrawer({
   const [showSwap, setShowSwap] = useState(false)
   const [confirmApprove, setConfirmApprove] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [approveError, setApproveError] = useState<string | null>(null)
 
   // Local mirror of script + checklist so user actions update the UI without
@@ -75,8 +92,13 @@ export function SlotDetailDrawer({
     : []
   const [script, setScript] = useState(initialScript)
   const [checklist, setChecklist] = useState<ChecklistItem[]>(initialChecklist)
-  const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+
+  // In-flight state is owned by the parent (survives close/reopen). Local
+  // `busy` still drives lock/unlock/swap/delete while the drawer is mounted.
+  const genInFlight = !!slotGenerating
+  const regenInFlight = !!slotRegenerating
+  const mutating = busy || genInFlight || regenInFlight
 
   // Keep local state in sync if the slot prop changes (e.g. after parent
   // re-fetch following a regenerate of the SLOT itself, not the script).
@@ -112,25 +134,14 @@ export function SlotDetailDrawer({
 
   const handleGenerateScript = async () => {
     setGenerateError(null)
-    setGenerating(true)
     try {
-      const res = await fetch(`/api/planner/slot/${slot.id}/generate-script`, {
-        method: 'POST',
-      })
-      const data = await res.json()
-      if (!data.success) throw new Error(data.error || 'Generation failed')
-      setScript(typeof data.script === 'string' ? data.script : '')
-      setChecklist(
-        Array.isArray(data.checklist) ? (data.checklist as ChecklistItem[]) : [],
-      )
-      // Sync parent so the slot prop reflects the new generation_meta on
-      // any re-render. Without this, closing + reopening the drawer would
-      // re-seed from stale parent state.
-      if (onRefresh) await onRefresh()
+      // The parent owns the fetch + in-flight tracking (so the spinner
+      // survives close/reopen) and returns the fresh script + checklist.
+      const data = await onGenerateScript(slot.id)
+      setScript(data.script)
+      setChecklist(data.checklist)
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setGenerating(false)
     }
   }
 
@@ -157,6 +168,18 @@ export function SlotDetailDrawer({
       setApproveError(err instanceof Error ? err.message : String(err))
     } finally {
       setApproving(false)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    setApproveError(null)
+    setWithdrawing(true)
+    try {
+      await onWithdrawApproval(slot.id)
+    } catch (err) {
+      setApproveError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -243,8 +266,8 @@ export function SlotDetailDrawer({
               slotId={slot.id}
               initialScript={script}
               hasScript={hasScript}
-              isGenerating={generating}
-              disabled={isApproved}
+              isGenerating={genInFlight}
+              disabled={isApproved || mutating}
               onGenerate={handleGenerateScript}
               onSaved={(s) => {
                 setScript(s)
@@ -281,7 +304,7 @@ export function SlotDetailDrawer({
           {hasScript && (
             <div className="border-t border-[var(--glass-border)] pt-4 space-y-2">
               <button
-                disabled={!canApprove || busy}
+                disabled={!canApprove || mutating}
                 onClick={() => setConfirmApprove(true)}
                 title={
                   isApproved
@@ -302,6 +325,17 @@ export function SlotDetailDrawer({
                 <CheckCircle2 className="h-4 w-4" />
                 {isApproved ? 'Approved' : 'Approve slot'}
               </button>
+              {isApproved && (
+                <button
+                  disabled={withdrawing}
+                  onClick={handleWithdraw}
+                  title="Withdraw approval - reverts this slot to drafted so it can be edited or regenerated"
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-[var(--glass-border)] text-[var(--text-secondary)] hover:bg-[var(--glass-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {withdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+                  Withdraw approval
+                </button>
+              )}
               {!isApproved && !checklistResolved && checklist.length > 0 && (
                 <p className="text-[11px] text-[var(--text-tertiary)] text-center">
                   Resolve every checklist item to enable approval
@@ -323,7 +357,7 @@ export function SlotDetailDrawer({
             */}
             {slot.topic_group_id && campaignSlotsRemaining > 0 && (
               <button
-                disabled={busy || campaignBulkInFlight}
+                disabled={mutating || campaignBulkInFlight}
                 onClick={() => {
                   if (slot.topic_group_id) {
                     void onGenerateCampaign(slot.topic_group_id)
@@ -338,16 +372,16 @@ export function SlotDetailDrawer({
             )}
 
             <button
-              disabled={busy || slot.status === 'approved'}
+              disabled={mutating || slot.status === 'approved'}
               onClick={() => handleAction('regenerate')}
               className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {busy || regenInFlight ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Regenerate
             </button>
 
             <button
-              disabled={busy || slot.status === 'approved'}
+              disabled={mutating || slot.status === 'approved'}
               onClick={() => handleAction(slot.locked ? 'unlock' : 'lock')}
               className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
             >
@@ -357,7 +391,7 @@ export function SlotDetailDrawer({
 
             {slot.stream !== 'long_form' && (
               <button
-                disabled={busy || slot.status === 'approved'}
+                disabled={mutating || slot.status === 'approved'}
                 onClick={() => setShowSwap((v) => !v)}
                 className="glass-chip w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md disabled:opacity-50"
               >
@@ -380,7 +414,7 @@ export function SlotDetailDrawer({
                         setBusy(false)
                       }
                     }}
-                    disabled={busy || f.id === slot.format_id}
+                    disabled={mutating || f.id === slot.format_id}
                     className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-white/5 disabled:opacity-50"
                   >
                     <div className="font-semibold text-[var(--text-primary)]">{f.name}</div>
@@ -391,7 +425,7 @@ export function SlotDetailDrawer({
             )}
 
             <button
-              disabled={busy || slot.status === 'approved'}
+              disabled={mutating || slot.status === 'approved'}
               onClick={() => setConfirmDelete(true)}
               className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md border border-red-500/40 text-red-500 hover:bg-red-500/10 disabled:opacity-50"
             >

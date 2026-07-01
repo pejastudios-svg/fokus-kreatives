@@ -270,6 +270,60 @@ ENGAGEMENT REEL DO NOT:
 - Write paragraphs. Every overlay is one short readable line.`
 
 // =============================================================================
+// ENGAGEMENT_REEL_CAPTION_BUILDOUT - caption-carry reel (List Bait / Caption)
+// =============================================================================
+// A DIFFERENT engagement reel: the ONE where teaching does NOT go on screen.
+// The on-screen text is a pure curiosity hook + a "read the caption" nudge;
+// the full value lives in the caption as a numbered list. Used only for
+// engagement_reel.caption_list - the generic ENGAGEMENT_REEL_BUILDOUT (which
+// puts the teaching core across scenes 2-3) forces value onto the screen and
+// breaks this format.
+export const ENGAGEMENT_REEL_CAPTION_BUILDOUT = `ENGAGEMENT REEL STRUCTURE - CAPTION-CARRY (silent, text-on-screen, 8-25 seconds).
+
+This is a SILENT REEL where the ON-SCREEN text ONLY sells the click and the CAPTION carries 100% of the value. NO voiceover, NO narration. This is the ONE engagement reel where the teaching does NOT go on screen - it lives entirely in the caption as a numbered list.
+
+OUTPUT SECTIONS (in this exact order, using these exact bracket labels):
+
+[TITLE]
+Internal title. Single line. Not shown to viewer.
+
+[ANGLE]
+One line naming the list / framework moment from raw material this reel anchors on. Internal.
+
+[PACING]
+One word: slow-build | fast-cut | reflective | punchy. Usually punchy or slow-build.
+
+[LENGTH]
+Approximate seconds (8-25s - two on-screen scenes is short).
+
+[SCENES]
+EXACTLY 2 scenes. On-screen overlay text only. NO teaching, NO value, NO list items on screen.
+Write the overlay as PLAIN TEXT - do NOT wrap it in square brackets. Format each as:
+  Scene N (X-Y sec): the overlay line
+
+Scene 1 (CURIOSITY HOOK): a broad statement OR "N things / ways / mistakes / signs in [niche]" that promises a list WITHOUT revealing it. 5-12 words. Pure curiosity - it must NOT teach.
+Scene 2 (READ-CAPTION DIRECTIVE): the fixed line "Check the caption 👇". Use exactly this short nudge with the down-arrow emoji - do NOT restate the list, add value, or reword it longer.
+
+HARD RULE: the list itself NEVER appears on screen. If a reason, step, tip, or numbered point shows up in a scene, you have FAILED this format. The screen sells the click; the caption delivers.
+
+[CAPTION]
+100-220 words. This carries 100% of the value as a skimmable NUMBERED list. Structure:
+- OPEN: 1-2 lines that raise the stakes and promise the list. Never "this reel covers...".
+- LIST: N numbered points (the count MUST match the number named on screen). Each point = a sharp claim, then one line on why it matters, then an optional one-line fix. Every item earns its place - no filler between items, no restating the hook.
+- CLOSE: the takeaway + ONE soft CTA (save it, follow for more, or "comment KEYWORD" when a brand DM keyword is locked).
+Numbered bullets are REQUIRED here - this is the one format that uses them.
+
+[HASHTAGS]
+8-14 unique hashtags, space-separated.
+
+CAPTION-CARRY HARD RULES:
+- ZERO voiceover, ZERO narration. Every on-screen word is overlay text.
+- EXACTLY 2 on-screen scenes. The value lives ONLY in the caption.
+- The number named on screen (e.g. "3 reasons") MUST equal the count of numbered points in the caption.
+- Do NOT put a poll / debate / opinion-split on screen - this format's engagement is a caption comment / save, not an on-screen question.
+- Do NOT spread the list across scenes. Do NOT add a third scene.`
+
+// =============================================================================
 // CAROUSEL_BUILDOUT - 10-slide teaching deck
 // =============================================================================
 // Carousels are NOT spoken scripts and NOT silent reels. They are 10-slide
@@ -288,9 +342,6 @@ Internal title for the carousel. Single line. Not shown to viewer.
 
 [ANGLE]
 One line naming which specific concept from raw material this carousel teaches. Internal note for the team.
-
-[CAPTION]
-90-160 words. The caption TEACHES the takeaway, not "this carousel covers...". 3 short paragraphs separated by line breaks. Ends with a question OR a "comment KEYWORD" prompt that drives comments. The caption stands alone - someone who didn't swipe should still get value from it.
 
 [SLIDES]
 EXACTLY 10 slides. Format each slide as:
@@ -327,9 +378,14 @@ For a 3-part method: slides 4-6 = one part per slide + slides 7-8 show the parts
 
 DO NOT write 5 generic teaching slides - each slide adds a distinct component.
 
+TEACH THE VIEWER HOW TO DO IT THEMSELVES. Every teaching slide gives the reader something they can act on - a step, a rule, a concrete example, a specific how. NEVER use a teaching slide to describe what YOU or your service does for them. Lines like "I handle the editing for you", "you focus on your business", "I'll do X so you don't have to" are SALES/SERVICE lines, not teaching - they leave the reader with nothing to apply and make the carousel feel empty. If the raw material only describes your service (the outcome) and not the method (the how), teach the method the outcome implies and give a concrete example; do NOT pad the teaching slots with benefits. The ONLY sell is slide 10.
+
 Slide 9 (SUMMARY): The screenshot-worthy distillation. Max 14 words. This is the "save this" slide - it should fit on its own as a standalone share.
 
 Slide 10 (CTA): The comment-driven CTA. Max 12 words. Use "Comment KEYWORD for [thing]" form when a brand DM keyword is locked. Otherwise drive a save / share / follow.
+
+[CAPTION]
+90-160 words, written AFTER the slides so it complements the deck. The caption TEACHES the takeaway, not "this carousel covers...". 3 short paragraphs separated by line breaks. Ends with a question OR a "comment KEYWORD" prompt that drives comments. The caption stands alone - someone who didn't swipe should still get value from it.
 
 [HASHTAGS]
 12-18 unique hashtags, space-separated.
@@ -699,12 +755,19 @@ export function frameworkBlock(): string {
  */
 export function frameworkBlockForStream(
   stream: 'long_form' | 'short_form' | 'engagement_reel' | 'carousel' | 'story',
+  formatSlug?: string,
 ): string {
   switch (stream) {
     case 'long_form':
       console.log('[framework] using LONGFORM_BUILDOUT')
       return `${FRAMEWORK_BASE}\n\n${LONGFORM_BUILDOUT}`
     case 'engagement_reel':
+      // Caption-carry formats (List Bait) keep the value in the caption, so
+      // they need a different scene structure than the value-on-screen default.
+      if (formatSlug === 'engagement_reel.caption_list') {
+        console.log('[framework] using ENGAGEMENT_REEL_CAPTION_BUILDOUT')
+        return `${FRAMEWORK_BASE}\n\n${ENGAGEMENT_REEL_CAPTION_BUILDOUT}`
+      }
       console.log('[framework] using ENGAGEMENT_REEL_BUILDOUT')
       return `${FRAMEWORK_BASE}\n\n${ENGAGEMENT_REEL_BUILDOUT}`
     case 'carousel':

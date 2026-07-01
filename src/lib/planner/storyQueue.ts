@@ -35,6 +35,9 @@
 //      injected into the CTA section.
 
 import { generateScript } from '@/lib/ai/provider'
+import { sanitizeStoryText, findHardBanHit } from '@/lib/prompt/engine'
+import { evaluateStoryChecklist } from '@/lib/checklist/storyChecklist'
+import type { ChecklistItem } from '@/lib/checklist/items'
 import { listFormats } from '@/lib/contentFormats'
 import type { ContentFormat } from '@/lib/contentFormats/types'
 import type {
@@ -122,12 +125,39 @@ const NARRATIVE_ARCS: Record<FormatBucket, { hook: string; value: string; rehook
 // generateOneStoryBrief's prompt builder.
 // ---------------------------------------------------------------------------
 
+/**
+ * CTA shape for a story. We rotate this across a story set so a month of
+ * stories doesn't collapse into "Reply KEYWORD" on every card:
+ *   - keyword:    the lead-capture ask ("Reply 'FRAMEWORK' for X") - keyword-locked
+ *   - engagement: a genuine reply, no keyword ("Reply with your take")
+ *   - share:      "Send this to someone who..."
+ *   - follow:     "Follow for [specific next thing]"
+ * launch/bts use their own CTA specs and ignore this.
+ */
+type CtaShape = 'keyword' | 'engagement' | 'share' | 'follow'
+const CTA_SHAPES: CtaShape[] = ['keyword', 'engagement', 'share', 'follow']
+
+/** Rotate CTA shape for teach stories; prove always asks for the breakdown. */
+function pickCtaShape(intent: StoryIntent, rotation: number): CtaShape {
+  if (intent !== 'teach') return 'keyword'
+  return CTA_SHAPES[Math.abs(rotation) % CTA_SHAPES.length]
+}
+
+/** Small stable string hash (djb2) - deterministic CTA rotation for one-offs. */
+function stableHash(s: string): number {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i)
+  return h >>> 0
+}
+
 interface ArcCtx {
   bucket: FormatBucket
   arc: { hook: string; value: string; rehook: string; cta: string }
   KW: string
   mechanic: StoryMechanic
   campaign: StoryCampaign | null
+  /** Which CTA shape this story uses (keyword/engagement/share/follow). */
+  ctaShape: CtaShape
 }
 
 interface RoleSpec {
@@ -151,7 +181,19 @@ const CTA_SPEC: RoleSpec = {
   role: 'CTA',
   wordBudget: 14,
   maxBlocks: 1,
-  guidance: (c) => `${c.arc.cta} Phrase as the ${c.mechanic === 'dm' ? 'DM' : 'reply-to-story'} CTA: "${replyOrDm(c)} for [the thing]."`,
+  guidance: (c) => {
+    switch (c.ctaShape) {
+      case 'engagement':
+        return `an ENGAGEMENT reply CTA - NO keyword. Invite a genuine reply tied to this story's value beat. Shape: "Reply to this story with [your take / your answer]." Do NOT use a keyword word. Do NOT say "Save this".`
+      case 'share':
+        return `a SHARE CTA - NO keyword. Shape: "Send this to someone who [specific person this story is for]." Make the "someone who" specific to the value beat, not generic.`
+      case 'follow':
+        return `a FOLLOW CTA - NO keyword. Shape: "Follow for [the specific next thing this account delivers]." Tie it to the value beat, never generic "more content".`
+      case 'keyword':
+      default:
+        return `${c.arc.cta} Phrase as the ${c.mechanic === 'dm' ? 'DM' : 'reply-to-story'} CTA: "${replyOrDm(c)} for [the thing]."`
+    }
+  },
 }
 
 const PROOF_SPEC: RoleSpec = {
@@ -404,6 +446,7 @@ export async function refillStoryQueue(
       visual_direction: generated.visual_direction,
       frames: generated.frames,
       raw_material_refs: generated.refs,
+      checklist: generated.checklist,
     })
     if (error) {
       skipped.push(`${format.slug}: ${error.message}`)
@@ -497,6 +540,7 @@ export async function generateStoryPrompt(input: GenerateStoryPromptInput): Prom
       frames: generated.frames,
       raw_material_refs: generated.refs,
       seed_text: input.seedText ?? null,
+      checklist: generated.checklist,
     })
     .select('id')
     .single()
@@ -616,6 +660,7 @@ export async function generateStoriesForPlan(input: {
     intent: StoryIntent
     campaign: StoryCampaign | null
     mechanic: StoryMechanic
+    checklist: ChecklistItem[]
   }
   const inserts: PendingInsert[] = []
   const BATCH = 6
@@ -663,7 +708,10 @@ export async function generateStoriesForPlan(input: {
   for (let i = 0; i < queue.length; i += BATCH) {
     const batchSlice = queue.slice(i, i + BATCH)
     const batchResults = await Promise.all(
-      batchSlice.map(async (unit) => {
+      batchSlice.map(async (unit, sliceIdx) => {
+        // Calendar position across the whole (date-sorted) queue - drives the
+        // CTA-shape rotation so consecutive stories don't repeat a CTA type.
+        const calendarIdx = i + sliceIdx
         // Pick the best format for this anchor in the story pool. We
         // prefer formats whose required input_types include the anchor's
         // input_type, falling back to whatever scores highest. Cooldown
@@ -696,6 +744,7 @@ export async function generateStoriesForPlan(input: {
                 recentHooks: [],
                 intent,
                 campaign: intent === 'launch' ? campaign : null,
+                ctaRotation: calendarIdx,
               })
         if (!generated) return null
         return {
@@ -708,6 +757,7 @@ export async function generateStoriesForPlan(input: {
           intent: generated.intent,
           campaign: generated.campaign,
           mechanic: generated.mechanic,
+          checklist: generated.checklist,
         }
       }),
     )
@@ -734,6 +784,7 @@ export async function generateStoriesForPlan(input: {
         frames: r.frames,
         raw_material_refs: r.refs,
         pinned_to_date: r.date,
+        checklist: r.checklist,
       })),
       { count: 'exact' },
     )
@@ -827,6 +878,7 @@ export async function regenerateStoryPrompt(itemId: string): Promise<{ id: strin
       intent: generated.intent,
       campaign: generated.campaign,
       mechanic: generated.mechanic,
+      checklist: generated.checklist,
     })
     .eq('id', itemId)
   if (error) return null
@@ -867,6 +919,8 @@ interface GeneratedBrief {
   intent: StoryIntent
   campaign: StoryCampaign | null
   mechanic: StoryMechanic
+  /** Per-story QA checklist (AI tells / fabrication / CTA). Read-only in UI. */
+  checklist: ChecklistItem[]
 }
 
 const ASSET_SLOT_SET = new Set<AssetSlot>(['screenshot-proof', 'dm-testimonial', 'result-graphic'])
@@ -1004,6 +1058,9 @@ async function generateOneStoryBrief(opts: {
   intent?: StoryIntent
   /** Launch campaign (offer / event / keyword). Only meaningful for launch. */
   campaign?: StoryCampaign | null
+  /** Calendar position in the story set - rotates the CTA shape so a set
+   *  varies. Falls back to a stable hash of the anchor when omitted. */
+  ctaRotation?: number
 }): Promise<GeneratedBrief | null> {
   const intent: StoryIntent = opts.intent ?? 'teach'
   const roleSpecs = INTENT_ROLES[intent] ?? INTENT_ROLES.teach
@@ -1048,12 +1105,20 @@ async function generateOneStoryBrief(opts: {
     ? `\nANCHOR IS RECYCLED. This topic doesn't have enough fresh answers to fill the campaign quota, so this anchor moment is being used a SECOND time across the brand's content. Your frames MUST take a totally different angle than any prior piece using this same anchor: different opener, different value, different CTA wording. Treat this as a separate post about the same situation, not a paraphrase.\n`
     : ''
 
+  // Rotate the CTA shape. In a batch the caller passes the calendar index;
+  // for a one-off (Redo / preview) fall back to a stable hash of the anchor
+  // so the same story deterministically gets the same shape.
+  const ctaRotation =
+    opts.ctaRotation ?? stableHash(anchor?.id ?? material.topic_group_id ?? opts.format.slug)
+  const ctaShape = pickCtaShape(intent, ctaRotation)
+
   const arcCtx: ArcCtx = {
     bucket: (opts.format.bucket as FormatBucket) ?? 'storytelling',
     arc: NARRATIVE_ARCS[opts.format.bucket as FormatBucket] ?? NARRATIVE_ARCS.storytelling,
     KW,
     mechanic,
     campaign,
+    ctaShape,
   }
 
   const frameCount = roleSpecs.length
@@ -1102,10 +1167,12 @@ CONTINUOUS-MONOLOGUE RULE:
 - RIGHT (linked): "Creator's block hit hard." / "So I started A/B testing the format." / "That's when I knew it actually worked."
 - The opener does not need a connective. Every later frame should.
 
-BANNED LANGUAGE PATTERNS (these are AI tells - do NOT use them):
-- Rhetorical question + fragment answer: "That one story? It's 8 posts." / "The real difference? Not features." / "The fix? Real stories." Rewrite as ONE statement.
+BANNED LANGUAGE PATTERNS (these are AI tells - do NOT use them. An automated scrubber runs after you and will mangle these, so write clean the first time):
+- Rhetorical question + fragment answer. THIS IS THE #1 STORY TELL. Banned openers include "The real shift? ...", "The real problem? ...", "The real reason ...? ...", "What changed? ...", "What really matters? ...", "The catch? ...", "The kicker? ...", "It's not what you think." Write the answer as ONE plain statement instead. WRONG: "The real shift? Stopping the habit." RIGHT: "The shift was giving up the habit."
+- Negation pivot: "X isn't Y, it's Z" / "you're not X, you're Y" / "it's not about A, it's about B". This is the single biggest AI tell. State the positive claim directly. WRONG: "The real problem isn't burnout, it's creator chaos." RIGHT: "The real problem is creator chaos."
 - Sentence opening with "Now, ..." or "And here's the thing,". Just say the thing.
 - Em-dash for dramatic reframe ("--it's the one that fits YOUR brain").
+- Caps-for-emphasis on a whole word ("your camera is NOT the reason"). Use normal case; use the "emphasis" field for stress, not capitals.
 - Formulaic three-item lists with Oxford "and": "We analyze, craft, and handle." Drop the formula or pick ONE specific verb.
 - "good news / better news / best news" or numbered-tier escalation - that reads as a template.
 - "Game-changer", "level up", "unlock the secret", "the truth about", "this changes everything".
@@ -1160,9 +1227,11 @@ ${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}$
       system,
       user,
       temperature: 0.6,
-      maxTokens: 1400,
+      // Pro reserves ~1k tokens for internal reasoning out of maxOutputTokens,
+      // so give the JSON payload real headroom on top of the ~600-token frames.
+      maxTokens: 3000,
       jsonObject: true,
-      quality: 'cheap',
+      quality: 'high', // Pro - stories draft here now follow the ban/tell rules far better than Flash-Lite
       route: 'planner.story_brief',
       clientId: opts.clientId,
       usageMeta: { format_slug: opts.format.slug, has_seed: !!opts.seedText, intent },
@@ -1225,14 +1294,46 @@ ${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}$
       clientId: opts.clientId,
     })
 
-    // Apply word budgets AFTER polish (Pro might rewrite slightly over budget).
+    // Deterministic AI-tell scrub on every overlay line. Stories never ran
+    // through the sanitizer before, so em-dashes, "isn't X, it's Y" pivots,
+    // caps-for-emphasis, and rhetorical-question openers all slipped through.
+    for (const frame of frames) {
+      const cleaned = frame.text_blocks
+        .map((b) => ({ ...b, text: sanitizeStoryText(b.text) }))
+        .filter((b) => b.text.length > 0)
+      // Keep the scrubbed blocks unless the scrub emptied the whole frame.
+      if (cleaned.length > 0) frame.text_blocks = cleaned
+      for (const b of frame.text_blocks) {
+        const ban = findHardBanHit(b.text)
+        if (ban) {
+          console.warn(
+            `[story_brief] hard-ban survived sanitize (${opts.format.slug} ${frame.role}): "${ban}" in "${b.text}"`,
+          )
+        }
+      }
+    }
+
+    // Apply word budgets AFTER polish + sanitize (either can change length).
     applyFrameBudgets(frames)
 
-    // Lock the CTA keyword (mechanic-agnostic - rewrites the keyword token only).
-    if (opts.dmKeywords.length > 0 || campaign?.keyword) {
+    // Lock the CTA keyword ONLY when this story actually uses a keyword CTA.
+    // Engagement/share/follow CTAs (rotated in for teach stories) have no
+    // keyword to lock, so enforcing here would wrongly inject one.
+    if (ctaShape === 'keyword' && (opts.dmKeywords.length > 0 || campaign?.keyword)) {
       const allowed = campaign?.keyword ? [campaign.keyword] : opts.dmKeywords
       enforceDmKeyword(frames, allowed)
     }
+
+    // QA checklist (Pro grade + deterministic hard-ban override). Never throws.
+    const checklist = await evaluateStoryChecklist({
+      frames,
+      rawMaterial: answers.map((a) => `- (${a.input_type}) ${a.answer}`).join('\n'),
+      campaignContext: campaign?.offer
+        ? `${campaign.offer}${campaign.event_date ? ` (event: ${campaign.event_date})` : ''}`
+        : undefined,
+      clientId: opts.clientId,
+      formatSlug: opts.format.slug,
+    })
 
     return {
       prompt_text: deriveBriefSummary(frames),
@@ -1243,6 +1344,7 @@ ${campaign?.offer ? `CAMPAIGN OFFER (what the CTA drives to): ${campaign.offer}$
       intent,
       campaign,
       mechanic,
+      checklist,
     }
   } catch (err) {
     console.error('story brief generation failed:', err)
@@ -1474,9 +1576,10 @@ TASK: Output the JSON now.`
       system,
       user,
       temperature: 0.6,
-      maxTokens: 200,
+      // Pro needs room for its reasoning budget on top of the tiny JSON output.
+      maxTokens: 1200,
       jsonObject: true,
-      quality: 'cheap',
+      quality: 'high', // Pro - keep the sticker question on the same tier as the rest
       route: 'planner.story_sticker',
       clientId: opts.clientId,
       usageMeta: { format_slug: opts.format.slug },
@@ -1525,6 +1628,8 @@ TASK: Output the JSON now.`
       intent: 'engage',
       campaign: null,
       mechanic: 'reply',
+      // A sticker is one poll question + "Vote." - no narrative frames to grade.
+      checklist: [],
     }
   } catch (err) {
     console.error('sticker brief generation failed:', err)

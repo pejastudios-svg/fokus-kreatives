@@ -17,6 +17,7 @@ import { PlanGenerationProgress, type PlanGenStatus } from '@/components/planner
 import { TopicBatchPickerModal, type TopicBatch } from '@/components/planner/TopicBatchPickerModal'
 import { StoryQueuePanel } from '@/components/planner/StoryQueuePanel'
 import { SlotDetailDrawer } from '@/components/planner/SlotDetailDrawer'
+import type { ChecklistItem } from '@/lib/checklist/items'
 import { StageAdvancementBanner } from '@/components/planner/StageAdvancementBanner'
 import { ReadinessPanel } from '@/components/planner/ReadinessPanel'
 import type { PlannerData, StoryIntent } from '@/components/planner/types'
@@ -264,6 +265,49 @@ export default function ClientPlannerPage() {
     }
   }, [clientId, fromDate, toDate, refresh])
 
+  // Slots with a generate/regenerate request in flight, keyed by slot id.
+  // Tracked HERE (not in the drawer) so the spinner survives closing and
+  // reopening the slot drawer while the request is still running - the drawer
+  // unmounts on close, which would otherwise reset its local busy state.
+  const [slotInFlight, setSlotInFlight] = useState<Record<string, 'generating' | 'regenerating'>>({})
+  const markSlotInFlight = useCallback(
+    (id: string, value: 'generating' | 'regenerating' | null) => {
+      setSlotInFlight((prev) => {
+        if (value === null) {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        }
+        return { ...prev, [id]: value }
+      })
+    },
+    [],
+  )
+
+  // Fires the script generation for one slot and tracks it in slotInFlight so
+  // the drawer's spinner reflects the true state even after close/reopen.
+  const handleGenerateScript = useCallback(
+    async (slotId: string): Promise<{ script: string; checklist: ChecklistItem[] }> => {
+      markSlotInFlight(slotId, 'generating')
+      try {
+        const res = await fetch(`/api/planner/slot/${slotId}/generate-script`, { method: 'POST' })
+        const data = await res.json()
+        if (!data.success) throw new Error(data.error || 'Generation failed')
+        // Sync generation_meta into parent state so a drawer reopen re-seeds
+        // from fresh data rather than stale.
+        void refresh()
+        return {
+          script: typeof data.script === 'string' ? data.script : '',
+          checklist: Array.isArray(data.checklist) ? (data.checklist as ChecklistItem[]) : [],
+        }
+      } finally {
+        markSlotInFlight(slotId, null)
+      }
+    },
+    [markSlotInFlight, refresh],
+  )
+
   const handleSlotAction = useCallback(
     async (slotId: string, action: 'regenerate' | 'lock' | 'unlock' | 'delete') => {
       // Lock and delete are fully optimistic - the UI updates instantly and
@@ -329,6 +373,7 @@ export default function ClientPlannerPage() {
           }
         : null
 
+      markSlotInFlight(slotId, 'regenerating')
       setData((prevData) => {
         if (!prevData) return prevData
         return {
@@ -374,9 +419,11 @@ export default function ClientPlannerPage() {
             }
           })
         }
+      } finally {
+        markSlotInFlight(slotId, null)
       }
     },
-    [data, refresh],
+    [data, refresh, markSlotInFlight],
   )
 
   // Generate-button click. Pre-fetches available batches; if there's only
@@ -686,6 +733,45 @@ export default function ClientPlannerPage() {
           }
         })
         throw e instanceof Error ? e : new Error('Approval failed')
+      }
+    },
+    [data, refresh],
+  )
+
+  const handleWithdrawApproval = useCallback(
+    async (slotId: string) => {
+      // Optimistic - flip 'approved' back to 'drafted' immediately, then fire
+      // the API. Roll back + rethrow on failure so the drawer surfaces it.
+      const slotBefore = data?.slots.find((s) => s.id === slotId)
+      const prevStatus = slotBefore?.status ?? 'approved'
+      const prevApprovedAt = slotBefore?.approved_at ?? null
+
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          slots: prev.slots.map((s) =>
+            s.id === slotId ? { ...s, status: 'drafted' as const, approved_at: null } : s,
+          ),
+        }
+      })
+
+      try {
+        const res = await fetch(`/api/planner/slot/${slotId}/withdraw-approval`, { method: 'POST' })
+        const j = await res.json()
+        if (!j.success) throw new Error(j.error || 'Withdraw failed')
+        void refresh()
+      } catch (e) {
+        setData((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            slots: prev.slots.map((s) =>
+              s.id === slotId ? { ...s, status: prevStatus, approved_at: prevApprovedAt } : s,
+            ),
+          }
+        })
+        throw e instanceof Error ? e : new Error('Withdraw failed')
       }
     },
     [data, refresh],
@@ -1468,6 +1554,10 @@ export default function ClientPlannerPage() {
           onAction={handleSlotAction}
           onSwapFormat={handleSwapFormat}
           onApprove={handleApproveSlot}
+          onWithdrawApproval={handleWithdrawApproval}
+          onGenerateScript={handleGenerateScript}
+          slotGenerating={slotInFlight[openSlot.id] === 'generating'}
+          slotRegenerating={slotInFlight[openSlot.id] === 'regenerating'}
           onGenerateCampaign={handleGenerateCampaign}
           campaignSlotsRemaining={
             openSlot.topic_group_id

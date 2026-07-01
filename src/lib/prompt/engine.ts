@@ -194,6 +194,11 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   // "lead-generating" → "lead, generating"). Plain hyphens are NEVER touched
   // by sanitize anymore.
   { re: /\s+—\s+(?=(?:that['’]s|it['’]s|this\s+is|those\s+are|they['’]re)\s+)/g, replace: ', ' },
+  // General em-dash fallback: any remaining em-dash (parenthetical asides like
+  // "your content—scripting and recording—stays consistent") becomes a comma.
+  // Targets ONLY the em-dash char (U+2014), never the hyphen-minus, so
+  // compound modifiers ("5-part intro", "lead-generating") are untouched.
+  { re: /\s*—\s*/g, replace: ', ' },
   // "X is not Y. It's Z." / "X isn't Y. It's Z." → drop the negation clause, keep the positive claim
   { re: /\b(\w[\w\s]{0,30})\s+is\s+not\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
   { re: /\b(\w[\w\s]{0,30})\s+isn['’]t\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
@@ -614,6 +619,35 @@ const PREAMBLE_STRIPPERS: RegExp[] = [
   /^\s*here['’]s (?:the|your) (?:improved|revised|rewritten|updated) [^:]*:?\s*/i,
   /^\s*i['’]?ve (?:rewritten|improved|updated)[^:]*:?\s*/i,
   /^\s*sure[,!]?\s+here['’]s[^:]*:?\s*/i,
+]
+
+/**
+ * Story-frame-only repairs. These target AI tells that show up in short IG
+ * story overlays (rhetorical-question openers, "you're not X; you're Y"
+ * pivots, "not what you think") and are NOT worth adding to the long-form
+ * REPAIR_REGEX. Applied by sanitizeStoryText(), which also runs the shared
+ * REPAIR_REGEX (em-dash, "isn't X, it's Y" pivots, caps-for-emphasis).
+ */
+const STORY_REPAIRS: Array<{ re: RegExp; replace: RepairReplacer }> = [
+  // "It's not what you think" / "Not what you think" - a pure tell with no
+  // content of its own. Strip it wherever it appears.
+  { re: /\b(?:it['’]s\s+)?not what you think[.,!?]*\s*/gi, replace: '' },
+  // Rhetorical-question opener + fragment answer. Drop the question, keep the
+  // answer: "The real shift? Stopping the habit..." -> "Stopping the habit...";
+  // "What changed? I decided to..." -> "I decided to...". Only fires at the
+  // start of a block, only for a known rhetorical lead-in, and only when a
+  // real answer follows the "?" - so genuine standalone questions (sticker
+  // polls) are never touched.
+  {
+    re: /^\s*(?:the\s+real\s+[\w-]+(?:\s+[\w-]+){0,4}|the\s+(?:catch|kicker|secret|trick|truth|fix|difference|problem|point|reason(?:\s+[\w-]+){0,4})|what\s+(?:changed|really\s+matters|most\s+people\s+miss|nobody\s+tells\s+you|happened(?:\s+next)?))\s*\?\s+(?=[A-Za-z0-9])/gi,
+    replace: '',
+  },
+  // "You're/We're/They're not X; you're/we're/they're Y" -> keep the positive
+  // clause. Complements the REPAIR_REGEX pivots (which cover "it's/that's not").
+  {
+    re: /\b(you|we|they)(['’]re)\s+not(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,50}[,;.]\s*\1\2\s+/gi,
+    replace: "$1$2 ",
+  },
 ]
 
 export function allowedPillarsForTier(tier: Tier): Pillar[] {
@@ -1077,6 +1111,38 @@ export function sanitize(text: string): string {
   t = t.replace(/\n{3,}/g, '\n\n')
 
   return t.trim()
+}
+
+/**
+ * Lean sanitizer for a SHORT story overlay line. Applies the mechanical
+ * AI-tell repairs (em-dash reframes, "isn't X, it's Y" pivots,
+ * caps-for-emphasis, rhetorical-question fragments) WITHOUT the long-form
+ * section/hashtag/publishing-pack normalization in sanitize() - that logic
+ * would mangle a 12-word frame. Caller runs this per text_block.
+ */
+export function sanitizeStoryText(text: string): string {
+  let t = (text || '').trim()
+  if (!t) return t
+
+  // Shared mechanical repairs (em-dash, negation pivots, caps, question marks).
+  for (const { re, replace } of REPAIR_REGEX) {
+    t = typeof replace === 'string' ? t.replace(re, replace) : t.replace(re, replace)
+  }
+  // Story-only tells (rhetorical-question openers, you're-not-X pivots, etc.).
+  for (const { re, replace } of STORY_REPAIRS) {
+    t = typeof replace === 'string' ? t.replace(re, replace) : t.replace(re, replace)
+  }
+
+  // Repairs can lowercase a word at a sentence boundary - restore it.
+  t = t.replace(/(^|[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
+  // Lowercase a capitalized pronoun left mid-sentence after a connector.
+  t = t.replace(
+    /\b(But|And|So|Yet|Or)\s+(It|That|They|This|These|Those|He|She|We|You|I)\b/g,
+    (_m, conj: string, pronoun: string) => `${conj} ${pronoun === 'I' ? 'I' : pronoun.toLowerCase()}`,
+  )
+
+  // Collapse any double spaces the strips left behind.
+  return t.replace(/\s{2,}/g, ' ').trim()
 }
 
 function capHashtags(text: string, max: number): string {

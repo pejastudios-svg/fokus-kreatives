@@ -71,9 +71,11 @@ export default function BrandIntakePage() {
   const token = (params?.token as string) || ''
 
   const [client, setClient] = useState<IntakeClient | null>(null)
+  // localStorage so intake answers survive closing the tab, not just a refresh.
   const [form, setForm, clearForm, draftRestored] = useFormPersistence<IntakeFormData>(
     `intake-form:${token}`,
     emptyForm,
+    { storage: 'local' },
   )
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)

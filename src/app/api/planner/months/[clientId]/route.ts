@@ -29,7 +29,8 @@ interface MonthInfo {
   firstDate: string
   /** Latest scheduled date that month, YYYY-MM-DD. */
   lastDate: string
-  /** Number of slots in the month (across all streams). */
+  /** Number of items in the month: content_plan_slots (all streams) plus
+   *  date-pinned stories. */
   slotCount: number
 }
 
@@ -64,7 +65,23 @@ export async function GET(
       )
     }
 
-    const dates = (rows ?? []).map((r) => r.scheduled_date as string).filter(Boolean)
+    // Stories live in their own table (dated via pinned_to_date) but still
+    // occupy the calendar, so they count toward the month totals too. Without
+    // this the populated-slots strip under-counts by ~a month of stories.
+    const { data: storyRows, error: storyErr } = await admin
+      .from('story_queue_items')
+      .select('pinned_to_date')
+      .eq('client_id', clientId)
+      .not('pinned_to_date', 'is', null)
+    if (storyErr) {
+      // Non-fatal - fall back to slot-only counts rather than failing the strip.
+      console.warn('months load: story count failed (non-fatal):', storyErr.message)
+    }
+
+    const dates = [
+      ...(rows ?? []).map((r) => r.scheduled_date as string),
+      ...(storyRows ?? []).map((r) => r.pinned_to_date as string),
+    ].filter(Boolean)
 
     // Bucket dates by YYYY-MM.
     const byMonth = new Map<string, MonthInfo>()

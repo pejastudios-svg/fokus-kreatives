@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -109,13 +110,21 @@ export function QuestionsFormEngine() {
   const [selectedClientId, setSelectedClientId] = useState(readStashedClientId)
   useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
 
+  // topicCount stays plain useState - it's auto-synced from the client's tier
+  // by an effect below, so persisting it would just get clobbered on load.
   const [topicCount, setTopicCount] = useState(2)
-  const [title, setTitle] = useState('')
+  // Typed fields persisted to localStorage (survives refresh + tab close) so a
+  // half-filled form builder isn't lost.
+  const [title, setTitle] = useFormPersistence('qform-builder:title', '', { storage: 'local' })
   // Manual seed topic titles. Each non-empty string becomes a topic with
   // its title pre-set; the AI just generates the 6 questions for it. Lets
   // staff drop in topics the brand profile doesn't capture (e.g. a recent
   // client win or pivot the AI couldn't have known about).
-  const [seedTopics, setSeedTopics] = useState<string[]>([])
+  const [seedTopics, setSeedTopics] = useFormPersistence<string[]>(
+    'qform-builder:seedTopics',
+    [],
+    { storage: 'local' },
+  )
   // Saturation report from the last generation. Surfaces a warning when
   // newly-generated titles are largely recycled vs the brand's history.
   const [saturation, setSaturation] = useState<{

@@ -3,14 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * Persist form state to sessionStorage so accidental refreshes don't blow it away.
- * Cleared automatically when the tab closes (sessionStorage scope), or manually via clear().
+ * Persist form state to web storage so a refresh / tab close doesn't blow it away.
+ * Cleared manually via clear() (e.g. on successful submit).
+ *
+ * `storage` (default 'session'):
+ *   - 'session' → sessionStorage: survives refresh, cleared when the tab closes.
+ *   - 'local'   → localStorage: survives refresh AND tab close (draft is still
+ *     there when the user comes back later). Use for forms where losing typed
+ *     work is costly (long answer forms, builders).
  *
  * Returns [state, setState, clear, wasRestored].
- * `wasRestored` is true when state was hydrated from sessionStorage on mount -
+ * `wasRestored` is true when state was hydrated from storage on mount -
  * use it to skip server-side prefill so a draft isn't overwritten.
  *
- *   const [form, setForm, clearForm, wasRestored] = useFormPersistence('intake:'+id, empty)
+ *   const [form, setForm, clearForm, wasRestored] =
+ *     useFormPersistence('intake:'+id, empty, { storage: 'local' })
  *   useEffect(() => {
  *     if (wasRestored) return
  *     fetch(...).then(setForm)
@@ -20,7 +27,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export function useFormPersistence<T>(
   key: string,
   initial: T,
+  options?: { storage?: 'local' | 'session' },
 ): [T, React.Dispatch<React.SetStateAction<T>>, () => void, boolean] {
+  const storageType = options?.storage ?? 'session'
+  const getStore = (): Storage | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      return storageType === 'local' ? window.localStorage : window.sessionStorage
+    } catch {
+      return null
+    }
+  }
   const restoredRef = useRef(false)
   // Only persist after the consumer has actually mutated state. Without this,
   // the very first render would write the empty initial state to sessionStorage,
@@ -29,9 +46,10 @@ export function useFormPersistence<T>(
   const userTouchedRef = useRef(false)
 
   const [state, setStateInner] = useState<T>(() => {
-    if (typeof window === 'undefined') return initial
+    const store = getStore()
+    if (!store) return initial
     try {
-      const raw = window.sessionStorage.getItem(key)
+      const raw = store.getItem(key)
       if (raw !== null) {
         restoredRef.current = true
         return JSON.parse(raw) as T
@@ -48,21 +66,24 @@ export function useFormPersistence<T>(
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
     if (!userTouchedRef.current) return
+    const store = getStore()
+    if (!store) return
     try {
-      window.sessionStorage.setItem(key, JSON.stringify(state))
+      store.setItem(key, JSON.stringify(state))
     } catch {
       // storage full or disabled - ignore
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, state])
 
   const clear = useCallback(() => {
     setStateInner(initial)
     userTouchedRef.current = false
-    if (typeof window !== 'undefined') {
+    const store = getStore()
+    if (store) {
       try {
-        window.sessionStorage.removeItem(key)
+        store.removeItem(key)
       } catch {
         // ignore
       }

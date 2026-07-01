@@ -44,7 +44,15 @@ export function buildFormatPromptBlock(
   // Streams whose format library beats are spoken-script shaped. For
   // these, we DROP strategy_beats and mad_libs to avoid conflicting with
   // the framework block's silent / static structure.
-  const dropSpokenBeats = stream === 'engagement_reel' || stream === 'carousel'
+  //
+  // EXCEPTION: caption-carry formats (List Bait) already have silent-shaped
+  // beats (ON-SCREEN HOOK / DIRECTIVE + CAPTION OPEN / LIST / CLOSE) that
+  // define the correct structure. Dropping them leaves only the generic
+  // value-on-screen framework, which is exactly the bug - so keep them.
+  const CAPTION_CARRY_SLUGS = new Set(['engagement_reel.caption_list'])
+  const dropSpokenBeats =
+    (stream === 'engagement_reel' || stream === 'carousel') &&
+    !CAPTION_CARRY_SLUGS.has(format.slug)
 
   const beats = format.strategy_beats
     .map((b) => `- ${b.label} - ${b.description}`)

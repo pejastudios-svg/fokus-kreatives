@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     // Active queue (unused prompts the team can still act on).
     const { data: storyRows } = await supabase
       .from('story_queue_items')
-      .select('id, format_id, source_format_id, carrier, intent, campaign, mechanic, prompt_text, visual_direction, frames, raw_material_refs, pinned_to_date, seed_text, created_at, consumed_at')
+      .select('id, format_id, source_format_id, carrier, intent, campaign, mechanic, prompt_text, visual_direction, frames, raw_material_refs, pinned_to_date, seed_text, created_at, consumed_at, checklist')
       .eq('client_id', clientId)
       .is('consumed_at', null)
       .order('created_at', { ascending: false })
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
     // payload bounded - older history is in the DB but not returned here.
     const { data: storyHistoryRows } = await supabase
       .from('story_queue_items')
-      .select('id, format_id, source_format_id, carrier, intent, campaign, mechanic, prompt_text, visual_direction, frames, raw_material_refs, pinned_to_date, seed_text, created_at, consumed_at')
+      .select('id, format_id, source_format_id, carrier, intent, campaign, mechanic, prompt_text, visual_direction, frames, raw_material_refs, pinned_to_date, seed_text, created_at, consumed_at, checklist')
       .eq('client_id', clientId)
       .not('consumed_at', 'is', null)
       .order('consumed_at', { ascending: false })

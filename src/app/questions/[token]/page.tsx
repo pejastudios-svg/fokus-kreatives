@@ -81,17 +81,21 @@ export default function QuestionFormPage() {
 
   // Persisted draft state. We keep two maps so we can drive both legacy
   // and topic forms from the same persistence hook.
+  // localStorage so a client's typed answers survive closing the tab, not just
+  // a refresh (sessionStorage). Cleared on successful submit.
   const [answers, setAnswers, clearAnswers] = useFormPersistence<Record<string, string>>(
     `question-form:${token}`,
     {},
+    { storage: 'local' },
   )
   const [topicAnswers, setTopicAnswers, clearTopicAnswers] = useFormPersistence<
     Record<string, Record<string, string>>
-  >(`question-form-topics:${token}`, {})
+  >(`question-form-topics:${token}`, {}, { storage: 'local' })
   // Voice-note URLs keyed by question id (unique across legacy + topic forms).
   const [audioUrls, setAudioUrls, clearAudioUrls] = useFormPersistence<Record<string, string>>(
     `question-form-audio:${token}`,
     {},
+    { storage: 'local' },
   )
 
   const [prefilled, setPrefilled] = useState(false)

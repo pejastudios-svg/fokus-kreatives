@@ -58,14 +58,17 @@ export default function SeriesFormPage() {
 
   const [form, setForm] = useState<PublicSeriesForm | null>(null)
   const [client, setClient] = useState<PublicClient | null>(null)
+  // localStorage so typed answers survive closing the tab, not just a refresh.
   const [answers, setAnswers, clearAnswers] = useFormPersistence<Record<string, string>>(
     `series-form:${token}`,
     {},
+    { storage: 'local' },
   )
   // Voice-note URLs keyed by question id, persisted alongside the text answers.
   const [audioUrls, setAudioUrls, clearAudioUrls] = useFormPersistence<Record<string, string>>(
     `series-form-audio:${token}`,
     {},
+    { storage: 'local' },
   )
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)

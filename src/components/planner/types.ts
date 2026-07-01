@@ -2,6 +2,7 @@
 // API shape so the page can hand the response object straight through.
 
 import type { ContentFormat } from '@/lib/contentFormats/types'
+import type { ChecklistItem } from '@/lib/checklist/items'
 
 export type SlotStream = 'long_form' | 'short_form' | 'engagement_reel' | 'carousel'
 export type SlotStatus = 'planned' | 'drafted' | 'approved'
@@ -231,6 +232,9 @@ export interface StoryQueueItem {
   created_at: string
   /** Set when the item has been marked as used. Null when still active. */
   consumed_at?: string | null
+  /** Per-story QA checklist (AI tells / fabrication / CTA). Read-only in UI;
+   *  empty on legacy rows + stickers. */
+  checklist?: ChecklistItem[] | null
 }
 
 export interface CoverageSnapshot {

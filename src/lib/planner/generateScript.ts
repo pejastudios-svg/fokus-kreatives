@@ -40,6 +40,7 @@ import {
 import {
   countSpokenWords,
   enforceLengthChecklistItem,
+  enforceCarouselValueChecklistItem,
   getChecklistForFormat,
   lengthTargetWindow,
   reconcileChecklist,
@@ -351,7 +352,7 @@ async function generateScriptForSlotInner(
     dmKeywords,
     ctaPlatform,
     siblingHooks,
-    checklistDefs: getChecklistForFormat(format.slug),
+    checklistDefs: getChecklistForFormat(format.slug, stream),
   })
 
   // 10. Run generation. Long-form takes a different path because its
@@ -419,7 +420,7 @@ async function generateScriptForSlotInner(
   // deterministic flags (length, fabrication) can override the AI grade.
   // Long-form's checklist is built later after sanitize via a separate
   // Pro evaluation call, so we just hold a reference to fill in below.
-  let checklist = reconcileChecklist(format.slug, rawChecklist)
+  let checklist = reconcileChecklist(format.slug, rawChecklist, stream)
 
   // 11. The hook+close polish step is no longer needed. Pro now drafts
   //     the entire script in step 10, so there's no Flash output to clean
@@ -565,7 +566,9 @@ async function generateScriptForSlotInner(
         brandName: brandName ?? null,
         clientId: slotData.client_id as string,
       })
-      if (caption) cleanScript = spliceCaption(cleanScript, caption)
+      // Sanitize the repaired caption - it's spliced AFTER the main sanitize
+      // pass, so without this an em-dash / AI tell in the repair would ship.
+      if (caption) cleanScript = spliceCaption(cleanScript, sanitize(caption))
     }
     // Same safety net for [HASHTAGS] - the last section, so the most likely
     // to be dropped or truncated.
@@ -601,6 +604,10 @@ async function generateScriptForSlotInner(
     target_length_min: format.target_length_min,
     target_length_max: format.target_length_max,
   })
+
+  // 18b. Carousel "teaching, not selling" check - force-flag any teaching
+  //      slide that describes the service instead of teaching the viewer.
+  enforceCarouselValueChecklistItem(checklist, cleanScript, stream)
 
   // 19. Number-fabrication check against the sanitized script. Flags the
   //     no-fabrication checklist item rather than silently rewriting.
@@ -792,7 +799,7 @@ function buildSystemPrompt(input: BuildSystemPromptInput): string {
   // Stream-aware framework. Long-form gets BASE + 5-step LONGFORM_BUILDOUT.
   // Everything else (short-form / engagement-reel / carousel / story) gets
   // BASE + 8-beat SHORTFORM_BUILDOUT.
-  sections.push(frameworkBlockForStream(stream))
+  sections.push(frameworkBlockForStream(stream, format.slug))
 
   // Long-form ALSO gets the detailed output schema (LONGFORM_FRAMEWORK).
   // Short-form's output schema is baked into SHORTFORM_BUILDOUT itself.

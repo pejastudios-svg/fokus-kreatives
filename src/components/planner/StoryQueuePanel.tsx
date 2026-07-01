@@ -29,6 +29,7 @@ import type {
   TextEmphasis,
 } from './types'
 import { normalizeFrame } from './types'
+import { StoryChecklist } from './StoryChecklist'
 import { DatePopover } from '@/components/ui/DatePopover'
 
 interface Props {
@@ -170,6 +171,8 @@ export function StoryQueuePanel({
                 </div>
 
                 <StoryBriefView item={item} />
+
+                <StoryChecklist items={item.checklist} />
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <button

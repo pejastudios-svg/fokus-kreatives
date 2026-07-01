@@ -243,11 +243,24 @@ const FORMAT_ITEMS: Record<string, ChecklistItemDef[]> = {
   ],
 }
 
-/** Returns the full checklist definition list for a given format slug:
- *  universal items prepended to the format-specific items. */
-export function getChecklistForFormat(formatSlug: string): ChecklistItemDef[] {
+// =============================================================================
+// STREAM ITEMS - applied by output stream, not format slug. Carousels run
+// from many format slugs, so a per-slug FORMAT_ITEMS entry can't cover them.
+// =============================================================================
+export const CAROUSEL_ITEMS: ChecklistItemDef[] = [
+  {
+    id: 'carousel.slides_actionable',
+    label: 'Every teaching slide teaches (no service/sales filler)',
+    rule: 'Each teaching slide (4-8) gives the viewer something they can ACT ON - a step, a rule, or a concrete example. NONE of them describe what you or your service does for them ("I handle the editing", "you focus on your business", "I\'ll do X for you", "while I handle the rest") - those are sales/service lines, not teaching, and leave the reader with nothing to apply. The only sell is slide 10 (the CTA).',
+  },
+]
+
+/** Returns the full checklist definition list for a format slug + stream:
+ *  universal items, then format-specific items, then stream items. */
+export function getChecklistForFormat(formatSlug: string, stream?: string): ChecklistItemDef[] {
   const formatItems = FORMAT_ITEMS[formatSlug] ?? []
-  return [...UNIVERSAL_ITEMS, ...formatItems]
+  const streamItems = stream === 'carousel' ? CAROUSEL_ITEMS : []
+  return [...UNIVERSAL_ITEMS, ...formatItems, ...streamItems]
 }
 
 /** Validates a checklist returned by the AI: drops items not in the registry,
@@ -256,8 +269,9 @@ export function getChecklistForFormat(formatSlug: string): ChecklistItemDef[] {
 export function reconcileChecklist(
   formatSlug: string,
   raw: unknown,
+  stream?: string,
 ): ChecklistItem[] {
-  const defs = getChecklistForFormat(formatSlug)
+  const defs = getChecklistForFormat(formatSlug, stream)
   const defById = new Map(defs.map((d) => [d.id, d]))
   const incoming = Array.isArray(raw) ? raw : []
 
@@ -373,6 +387,56 @@ export function lengthTargetWindow(
  *   - status='manual_check' when no target is defined
  *
  *  Mutates and returns the items array for caller convenience. */
+// Service/sales lines that describe what the brand DOES for the viewer instead
+// of teaching them. These killed the value in real carousels ("I handle all
+// the editing", "you focus on your business"). Deterministic - a teaching
+// slide containing one of these is a hard flag regardless of the AI's grade.
+const CAROUSEL_SERVICE_PATTERNS: RegExp[] = [
+  /\b(i|we)(?:'?ll| will)?\s+(?:handle|manage|do|edit|record|schedule|write|create|post|run|take care of)\b[^.!?]{0,50}\bfor you\b/i,
+  /\bi\s+handle\s+(?:all\s+)?(?:the\s+)?(?:editing|scheduling|posting|rest|work)\b/i,
+  /\bwhile\s+(?:i|we)\s+(?:handle|do|manage|take care of)\b/i,
+  /\byou\s+(?:just\s+)?focus on\s+(?:your\s+)?(?:business|company|brand|clients?)\b/i,
+  /\bso you (?:can focus|don'?t have to)\b/i,
+  /\b(?:i|we)(?:'?ll)?\s+take care of (?:it|everything|the rest)\b/i,
+]
+
+/** Returns the [SLIDES] section body, or the whole script if unlabeled. */
+function extractSlidesSection(script: string): string {
+  const m = script.match(/\[SLIDES\]([\s\S]*?)(?=\n\[[A-Z]|$)/i)
+  return m ? m[1] : script
+}
+
+/**
+ * Deterministic override for the carousel "teaching, not selling" item. Scans
+ * the slides for service/sales lines and force-flags when found - so even if
+ * the AI rubber-stamps, "I handle the editing for you" style slides get caught
+ * before the deck reaches staff. No-op for non-carousel streams. When no
+ * service line is found, the AI's grade stands (it may still flag genericness).
+ */
+export function enforceCarouselValueChecklistItem(
+  items: ChecklistItem[],
+  script: string,
+  stream: 'long_form' | 'short_form' | 'engagement_reel' | 'carousel' | 'story',
+): ChecklistItem[] {
+  if (stream !== 'carousel') return items
+  const idx = items.findIndex((i) => i.id === 'carousel.slides_actionable')
+  if (idx === -1) return items
+
+  const slides = extractSlidesSection(script)
+  const lines = slides.split('\n').filter((l) => /\bslide\s*\d+\s*:/i.test(l))
+  for (const line of lines) {
+    if (CAROUSEL_SERVICE_PATTERNS.some((re) => re.test(line))) {
+      items[idx] = {
+        ...items[idx],
+        status: 'flag',
+        ai_note: `A teaching slide sells the service instead of teaching: "${line.trim()}". Teaching slides must give the viewer something to act on; the only sell is slide 10.`,
+      }
+      break
+    }
+  }
+  return items
+}
+
 export function enforceLengthChecklistItem(
   items: ChecklistItem[],
   script: string,

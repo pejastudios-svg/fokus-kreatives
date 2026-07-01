@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -105,13 +106,19 @@ export function SeriesFormEngine() {
   useApplyClientPreselect(selectedClientId, setSelectedClientId, clients)
 
   // Series setup
-  const [title, setTitle] = useState('')
+  // Free-text config persisted to localStorage (survives refresh + tab close)
+  // so a half-built series form isn't lost.
+  const [title, setTitle] = useFormPersistence('series-builder:title', '', { storage: 'local' })
   const [framing, setFraming] = useState<SeriesFraming>('lessons')
   const [seriesLabel, setSeriesLabel] = useState<SeriesLabel>('Day')
   const [seriesLength, setSeriesLength] = useState(30)
   const [format, setFormat] = useState<SeriesFormat>('short')
-  const [brandLine, setBrandLine] = useState('')
-  const [ctaText, setCtaText] = useState('')
+  const [brandLine, setBrandLine] = useFormPersistence('series-builder:brandLine', '', {
+    storage: 'local',
+  })
+  const [ctaText, setCtaText] = useFormPersistence('series-builder:ctaText', '', {
+    storage: 'local',
+  })
 
   // Drafted questions before save
   const [draft, setDraft] = useState<SeriesQuestion[]>([])
