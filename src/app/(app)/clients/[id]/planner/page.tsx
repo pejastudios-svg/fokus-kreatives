@@ -219,13 +219,20 @@ export default function ClientPlannerPage() {
     return () => clearTimeout(t)
   }, [refresh])
 
-  const handleGenerate = useCallback(async () => {
+  // topicGroupIdsArg is passed EXPLICITLY by the confirm modal. Reading
+  // scopedTopicGroupIds from the closure here is what silently dropped the
+  // user's batch selection: this callback's dependency array didn't include
+  // it, so useCallback kept serving a stale closure with the empty initial
+  // value and the generate request went out unscoped - the plan then pulled
+  // whatever material ranked freshest, including last month's form.
+  const handleGenerate = useCallback(async (topicGroupIdsArg?: string[]) => {
     // Close the confirm modal immediately - the floating progress card takes
     // over so the user can keep navigating the planner during generation.
     setConfirmGenerate(false)
     setGenStatus('running')
     setGenError(undefined)
     setGenWarnings([])
+    const scope = topicGroupIdsArg ?? scopedTopicGroupIds
 
     // Past-from auto-extend: if the user picked a from-date in the past
     // (e.g. May 1 when today is May 6), snap from to today and extend the
@@ -258,7 +265,7 @@ export default function ClientPlannerPage() {
           endDate: effectiveTo,
           // Empty array = no scope (use all unused). Non-empty = restrict to
           // the picker's selection.
-          topicGroupIds: scopedTopicGroupIds.length > 0 ? scopedTopicGroupIds : undefined,
+          topicGroupIds: scope.length > 0 ? scope : undefined,
         }),
       })
       const j = await res.json()
@@ -273,7 +280,7 @@ export default function ClientPlannerPage() {
       setGenError(e instanceof Error ? e.message : 'Generation failed')
       setGenStatus('error')
     }
-  }, [clientId, fromDate, toDate, refresh])
+  }, [clientId, fromDate, toDate, refresh, scopedTopicGroupIds, loadMonthsWithSlots])
 
   // Slots with a generate/regenerate request in flight, keyed by slot id.
   // Tracked HERE (not in the drawer) so the spinner survives closing and
@@ -1647,7 +1654,10 @@ export default function ClientPlannerPage() {
               : `All ${rangePlan.total} slot${rangePlan.total === 1 ? '' : 's'} in ${fromDate} to ${toDate} ${rangePlan.total === 1 ? 'is' : 'are'} drafted, approved, or locked and will be kept. New slots will be planned around them using unused material.`
         }
         confirmLabel="Generate"
-        onConfirm={handleGenerate}
+        // Pass the scope explicitly - the modal re-renders after the picker
+        // sets scopedTopicGroupIds, so this arrow always reads the fresh
+        // selection regardless of handleGenerate's memoization.
+        onConfirm={() => handleGenerate(scopedTopicGroupIds)}
         onClose={() => setConfirmGenerate(false)}
       />
 

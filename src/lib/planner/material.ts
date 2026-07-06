@@ -55,8 +55,12 @@ export async function loadAvailableTopicGroups(
   const excludeSet = new Set(excludeTopicGroupIds)
   const filtered = rows.filter((r) => {
     if (!r.topic_group_id) return false
+    // Explicit scope WINS over consumption excludes. Scoping a batch in the
+    // picker is the deliberate "plan from this topic" action - e.g.
+    // extending last month's campaigns into a new month - so a group being
+    // consumed elsewhere must not silently drop it from a scoped run.
+    if (includeSet) return includeSet.has(r.topic_group_id)
     if (excludeSet.has(r.topic_group_id)) return false
-    if (includeSet && !includeSet.has(r.topic_group_id)) return false
     return true
   })
 

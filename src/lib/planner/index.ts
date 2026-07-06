@@ -273,10 +273,28 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
     (r) => r.locked || r.status === 'approved' || r.status === 'drafted',
   )
 
-  // Approved/drafted slots have already consumed their topic_group_id.
-  const consumedGroupIds = survivors
-    .map((r) => r.topic_group_id)
-    .filter((x): x is string => !!x)
+  // A topic group is CONSUMED once any drafted/approved/locked slot ANYWHERE
+  // on the calendar was built from it - not just slots inside this run's
+  // horizon. Horizon-only consumption let a fresh-month plan re-pick LAST
+  // month's topics: their slots sat outside the new horizon, and the
+  // freshness sort put them first, so an unscoped August re-plan re-told
+  // July's campaigns and the user read it as hallucination. The single-slot
+  // regenerate path (regeneratePlanSlot below) already uses all-time
+  // consumption; this aligns plan generation with it. Explicitly scoping a
+  // batch in the picker still overrides via includeOnlyTopicGroupIds.
+  const { data: consumedRows } = await supabase
+    .from('content_plan_slots')
+    .select('topic_group_id, status, locked')
+    .eq('client_id', input.clientId)
+    .not('topic_group_id', 'is', null)
+  const consumedGroupIds = Array.from(
+    new Set(
+      ((consumedRows ?? []) as Array<{ topic_group_id: string | null; status: string; locked: boolean }>)
+        .filter((r) => r.locked || r.status === 'approved' || r.status === 'drafted')
+        .map((r) => r.topic_group_id)
+        .filter((x): x is string => !!x),
+    ),
+  )
 
   const allTopicGroups = await loadAvailableTopicGroups(
     supabase,
