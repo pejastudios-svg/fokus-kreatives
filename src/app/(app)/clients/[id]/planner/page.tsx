@@ -1088,6 +1088,17 @@ export default function ClientPlannerPage() {
       })
   }, [data, fromDate, toDate])
 
+  // Range-aware framing for the Generate/Regenerate button + confirm modal.
+  // MUST key off visibleSlots (the selected from/to range), not data.slots -
+  // data.slots merges every range viewed this session, so after loading a
+  // populated month the button would read "Regenerate plan" on a month
+  // that has nothing in it yet. `replace` counts what regeneration would
+  // actually wipe (unlocked planned slots); everything else survives.
+  const rangePlan = useMemo(() => {
+    const replace = visibleSlots.filter((s) => s.status === 'planned' && !s.locked).length
+    return { total: visibleSlots.length, replace, keep: visibleSlots.length - replace }
+  }, [visibleSlots])
+
   // Derive openSlot from data + openSlotId. Auto-closes when the slot is
   // gone (e.g. after optimistic delete) and auto-syncs when fields change
   // (e.g. after lock toggle, format swap, regenerate).
@@ -1276,7 +1287,7 @@ export default function ClientPlannerPage() {
             </div>
 
             <Button size="sm" onClick={handleGenerateClick} disabled={genStatus === 'running' || pickerLoading}>
-              {data.slots.length > 0 ? 'Regenerate plan' : 'Generate plan'}
+              {rangePlan.total > 0 ? 'Regenerate plan' : 'Generate plan'}
             </Button>
 
             <KebabMenu
@@ -1593,11 +1604,13 @@ export default function ClientPlannerPage() {
 
       <ConfirmModal
         open={confirmGenerate}
-        title={data.slots.length > 0 ? 'Regenerate plan?' : 'Generate plan'}
+        title={rangePlan.total > 0 ? 'Regenerate plan?' : 'Generate plan'}
         message={
-          data.slots.length > 0
-            ? `Regenerating wipes the current planned slots that aren't locked or approved between ${fromDate} and ${toDate}. Locked and approved slots are preserved.`
-            : `This will create a content plan from ${fromDate} to ${toDate}.`
+          rangePlan.total === 0
+            ? `This will create a content plan from ${fromDate} to ${toDate} using unused material.`
+            : rangePlan.replace > 0
+              ? `This range (${fromDate} to ${toDate}) has ${rangePlan.total} slot${rangePlan.total === 1 ? '' : 's'}. Regenerating replaces the ${rangePlan.replace} planned unlocked one${rangePlan.replace === 1 ? '' : 's'} with a fresh plan${rangePlan.keep > 0 ? ` and keeps the ${rangePlan.keep} drafted, approved, or locked one${rangePlan.keep === 1 ? '' : 's'}` : ''}.`
+              : `All ${rangePlan.total} slot${rangePlan.total === 1 ? '' : 's'} in ${fromDate} to ${toDate} ${rangePlan.total === 1 ? 'is' : 'are'} drafted, approved, or locked and will be kept. New slots will be planned around them using unused material.`
         }
         confirmLabel="Generate"
         onConfirm={handleGenerate}
