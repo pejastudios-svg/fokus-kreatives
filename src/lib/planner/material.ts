@@ -1,7 +1,18 @@
 // Pull the client's available raw material into TopicGroups for the planner.
 // "Available" = source='form' answers grouped by topic_group_id, excluding
-// answers used in already-approved slots (those are consumed) and excluding
 // topic_groups marked in-use earlier in the same plan run.
+//
+// CONSUMPTION IS GROUP-LEVEL, NOT ANSWER-LEVEL. Answers referenced by an
+// approved slot get used_at stamped, but they are still returned here.
+// The campaign model anchors pieces on answer positions and gates formats
+// on input types (scoring.ts FORMAT_CRITICAL_INPUTS), so hiding consumed
+// answers starves a re-planned campaign: approving 2 slots in July stamped
+// 4 of 6 answers, and the August run then saw a topic with only opinion +
+// failed_attempt left - every carousel format scored fit=0 and the whole
+// carousel stream silently dropped. A group only becomes unavailable when
+// EVERY answer is consumed (nothing new to say) - and even then an explicit
+// scope via the batch picker (includeOnlyTopicGroupIds) overrides, because
+// scoping a group IS the "re-plan this campaign topic" intent.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TopicInputType } from '@/lib/types/questionForm'
@@ -36,7 +47,6 @@ export async function loadAvailableTopicGroups(
     .from('topics')
     .select('id, client_id, question, answer, pillar, source, input_type, thin_flag, topic_group_id, group_position, used_at, created_at')
     .eq('client_id', clientId)
-    .is('used_at', null)
     .not('topic_group_id', 'is', null)
   if (error) throw error
 
@@ -73,6 +83,10 @@ export async function loadAvailableTopicGroups(
   const out: TopicGroup[] = []
   for (const [topic_group_id, answers] of groups) {
     if (answers.length === 0) continue
+    // Fully-consumed group: every answer already anchors approved content,
+    // so there's nothing new to plan from. Skip - unless the caller
+    // explicitly scoped to this group (deliberate re-plan).
+    if (!includeSet?.has(topic_group_id) && answers.every((a) => a.used_at)) continue
     answers.sort((a, b) => (a.group_position ?? 99) - (b.group_position ?? 99))
     const freshness = answers
       .map((a) => a.created_at)

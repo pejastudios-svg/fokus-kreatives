@@ -18,6 +18,10 @@ interface Props {
   status: PlanGenStatus
   errorMessage?: string
   onDismiss: () => void
+  /** Warnings from the generate response (skipped slots, dropped streams).
+   *  When present, the success banner does NOT auto-dismiss - a silently
+   *  vanishing banner is how dropped carousels went unnoticed. */
+  warnings?: string[]
   /** Expected duration in ms (used for the fake-progress fill speed). Default 30s. */
   expectedDurationMs?: number
   /** Auto-dismiss delay after success. Default 2.5s. */
@@ -25,11 +29,13 @@ interface Props {
 }
 
 const FAKE_CAP = 95 // never go past 95% until the API actually returns
+const MAX_WARNINGS_SHOWN = 6
 
 export function PlanGenerationProgress({
   status,
   errorMessage,
   onDismiss,
+  warnings = [],
   expectedDurationMs = 30_000,
   successHoldMs = 2500,
 }: Props) {
@@ -61,7 +67,11 @@ export function PlanGenerationProgress({
     if (status === 'success') {
       setProgress(100)
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => onDismiss(), successHoldMs)
+      // With warnings, hold the banner until the user dismisses it -
+      // auto-dismissing would hide the only signal that slots dropped.
+      if (warnings.length === 0) {
+        timeoutRef.current = setTimeout(() => onDismiss(), successHoldMs)
+      }
       return () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
         timeoutRef.current = null
@@ -72,7 +82,7 @@ export function PlanGenerationProgress({
       // most of the way" vs "it failed at start." No auto-dismiss.
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [status, expectedDurationMs, successHoldMs, onDismiss])
+  }, [status, expectedDurationMs, successHoldMs, onDismiss, warnings.length])
 
   if (status === 'idle') return null
 
@@ -80,6 +90,7 @@ export function PlanGenerationProgress({
   const isSuccess = status === 'success'
   const isError = status === 'error'
   const isRunning = status === 'running'
+  const hasWarnings = isSuccess && warnings.length > 0
 
   return (
     <div
@@ -89,24 +100,27 @@ export function PlanGenerationProgress({
         'fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)]',
         'glass-pop rounded-xl shadow-premium-lg p-4',
         'transition-opacity duration-300',
-        isSuccess
-          ? 'border-emerald-500/40'
-          : isError
-            ? 'border-red-500/40'
-            : '',
+        hasWarnings
+          ? 'border-amber-500/40'
+          : isSuccess
+            ? 'border-emerald-500/40'
+            : isError
+              ? 'border-red-500/40'
+              : '',
       ].join(' ')}
     >
       <div className="flex items-start gap-3">
         <div className="shrink-0 mt-0.5">
           {isRunning && <Loader2 className="h-4 w-4 animate-spin text-[#2B79F7]" />}
-          {isSuccess && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+          {isSuccess && !hasWarnings && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+          {hasWarnings && <AlertTriangle className="h-4 w-4 text-amber-500" />}
           {isError && <AlertTriangle className="h-4 w-4 text-red-500" />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-[var(--text-primary)]">
               {isRunning && 'Generating plan'}
-              {isSuccess && 'Plan generated'}
+              {isSuccess && (hasWarnings ? 'Plan generated with warnings' : 'Plan generated')}
               {isError && 'Generation failed'}
             </p>
             {!isRunning && (
@@ -127,6 +141,20 @@ export function PlanGenerationProgress({
           )}
           {isError && errorMessage && (
             <p className="mt-0.5 text-xs text-red-500 break-words">{errorMessage}</p>
+          )}
+          {hasWarnings && (
+            <div className="mt-1 space-y-0.5">
+              {warnings.slice(0, MAX_WARNINGS_SHOWN).map((w, i) => (
+                <p key={i} className="text-[11px] text-amber-500 break-words">
+                  {w}
+                </p>
+              ))}
+              {warnings.length > MAX_WARNINGS_SHOWN && (
+                <p className="text-[11px] text-[var(--text-tertiary)]">
+                  +{warnings.length - MAX_WARNINGS_SHOWN} more
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

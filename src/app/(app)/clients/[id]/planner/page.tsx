@@ -36,6 +36,10 @@ export default function ClientPlannerPage() {
   const abortRef = useRef<AbortController | null>(null)
   const [genStatus, setGenStatus] = useState<PlanGenStatus>('idle')
   const [genError, setGenError] = useState<string | undefined>(undefined)
+  // Warnings from the last generate run (skipped slots, dropped streams).
+  // Shown in the progress banner - a plan that silently drops carousels
+  // must say so.
+  const [genWarnings, setGenWarnings] = useState<string[]>([])
   const [error, setError] = useState('')
   // Date range for the plan. fromDate / toDate are YYYY-MM-DD strings; both
   // editable via real date pickers in the top bar. Defaults: today through
@@ -221,6 +225,7 @@ export default function ClientPlannerPage() {
     setConfirmGenerate(false)
     setGenStatus('running')
     setGenError(undefined)
+    setGenWarnings([])
 
     // Past-from auto-extend: if the user picked a from-date in the past
     // (e.g. May 1 when today is May 6), snap from to today and extend the
@@ -262,6 +267,7 @@ export default function ClientPlannerPage() {
       // Plan generation can extend slots into new months - refresh the
       // months-with-slots strip so the new month anchors appear.
       void loadMonthsWithSlots()
+      setGenWarnings(Array.isArray(j.warnings) ? (j.warnings as string[]) : [])
       setGenStatus('success')
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Generation failed')
@@ -1691,9 +1697,11 @@ export default function ClientPlannerPage() {
       <PlanGenerationProgress
         status={genStatus}
         errorMessage={genError}
+        warnings={genWarnings}
         onDismiss={() => {
           setGenStatus('idle')
           setGenError(undefined)
+          setGenWarnings([])
         }}
       />
     </>
