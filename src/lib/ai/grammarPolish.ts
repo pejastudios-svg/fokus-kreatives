@@ -50,6 +50,7 @@ ALLOWED EDITS (use the minimum change):
 - Missing or wrong articles: "I built system" -> "I built a system"; "the result was a positive" -> "the result was positive".
 - Comma splices that are clearly two independent clauses: "I tried Facebook ads, I spent $500" -> "I tried Facebook ads. I spent $500." (only when the second clause has its own subject + verb and would obviously be a separate sentence).
 - Punctuation drops: "post will flop guaranteed" -> "post will flop, guaranteed".
+- Label-colon fragments in prose: a short noun-phrase label + colon + payoff reads as an AI tell and must become a full sentence with the SAME words. "The real issue: your content has no anchor" -> "The real issue is that your content has no anchor". "The fix: Build a system" -> "The fix is to build a system". "My mistake: Using ChatGPT for scripts" -> "My mistake was using ChatGPT for scripts". ONLY rewrite the label into a verb phrase - do not touch the payoff wording. Do NOT apply this to: bracket section labels ([HOOK], [SCENES]...), "Scene N (X-Y sec):" / "Slide N:" prefixes, numbered list items, colons that introduce a list of items, or colons that introduce a quote.
 - Capitalization within bracket section headers if the brand template requires all-caps (e.g. "WHO this IS FOR" -> "WHO THIS IS FOR" inside "📌 WHO THIS IS FOR:").
 
 FORBIDDEN:

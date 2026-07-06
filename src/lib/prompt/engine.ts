@@ -284,12 +284,15 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   { re: /\ba\s+curiosity\s+loop\b/gi, replace: 'an open question' },
   { re: /\ban\s+curiosity\s+loop\b/gi, replace: 'an open question' },
   { re: /\bcuriosity\s+loop\b/gi, replace: 'open question' },
-  // Filler starters - strip, keep rest of sentence
-  { re: /\band the result\??/gi, replace: "here's what happened." },
+  // Filler starters - strip, keep rest of sentence. Every phrase needs a
+  // trailing \b before the optional "?" or it matches INSIDE longer words:
+  // "and the result" without \b ate the front of "and the resulting
+  // burnout", leaving "here's what happened.ing burnout" in a live script.
+  { re: /\band the result\b\??/gi, replace: "here's what happened." },
   { re: /^\s*the result\??$/gim, replace: "here's what happened." },
-  { re: /\band you know what\??\s*/gi, replace: '' },
-  { re: /\b(?:and|but)\s+(?:here['’]s\s+)?the best part\??\s*/gi, replace: '' },
-  { re: /\bhere['’]s the best part\??\s*/gi, replace: '' },
+  { re: /\band you know what\b\??\s*/gi, replace: '' },
+  { re: /\b(?:and|but)\s+(?:here['’]s\s+)?the best part\b\??\s*/gi, replace: '' },
+  { re: /\bhere['’]s the best part\b\??\s*/gi, replace: '' },
   { re: /\bwhat if i told you\b[,.]?\s*/gi, replace: '' },
   { re: /\bhere['’]s what i['’]ve learned\b[,.]?\s*/gi, replace: "what I figured out was" },
   { re: /\byeah,?\s*you read that right\b[,.]?\s*/gi, replace: '' },

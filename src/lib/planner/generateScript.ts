@@ -234,6 +234,16 @@ async function generateScriptForSlotInner(
   }>
   if (answers.length === 0) throw new Error('No topic answers resolved from refs')
 
+  // Re-order to match raw_material_refs. The plan's answer-indexed campaign
+  // model puts the slot's ANCHOR answer at refs[0] (each sibling slot in the
+  // campaign anchors a DIFFERENT answer) - but .in() returns rows in
+  // arbitrary order, so without this sort every slot fed the model the same
+  // undifferentiated blob and six short-forms came back telling one story.
+  const refOrder = new Map(refs.map((r, i) => [r, i]))
+  answers.sort((a, b) => (refOrder.get(a.id) ?? 99) - (refOrder.get(b.id) ?? 99))
+  // Long-form has no anchor - it deliberately uses the whole answer set.
+  const anchor = stream !== 'long_form' ? answers[0] ?? null : null
+
   // 4. Load brand profile + content settings for prompt context + cache key.
   const { data: clientData } = await supabase
     .from('clients')
@@ -344,6 +354,7 @@ async function generateScriptForSlotInner(
     stream,
     format,
     answers,
+    anchor,
     brandName,
     creatorName,
     brandWebsite,
@@ -837,6 +848,18 @@ interface BuildUserPromptInput {
     input_type: string
     thin_flag: boolean
   }>
+  /** The single answer this slot is anchored to (refs[0] from the plan's
+   *  answer-indexed campaign model). Null for long-form, which uses the
+   *  whole answer set. When set, the prompt centers the piece on this
+   *  answer and demotes the rest to supporting context - sibling slots
+   *  anchor different answers, which is where campaign variety comes from. */
+  anchor: {
+    id: string
+    question: string | null
+    answer: string
+    input_type: string
+    thin_flag: boolean
+  } | null
   brandName: string | null
   /** Creator's personal name (clients.name). Used by the long-form
    *  description for the hook line and "In this video, [Creator]..."
@@ -871,16 +894,40 @@ interface BuildUserPromptInput {
 }
 
 function buildUserPrompt(input: BuildUserPromptInput): string {
-  const { stream, format, answers, brandName, creatorName, brandWebsite, midrollCta, descriptionSettings, dmKeywords, ctaPlatform, siblingHooks, checklistDefs } = input
+  const { stream, format, answers, anchor, brandName, creatorName, brandWebsite, midrollCta, descriptionSettings, dmKeywords, ctaPlatform, siblingHooks, checklistDefs } = input
   const sections: string[] = []
 
   if (brandName) sections.push(`BRAND: ${brandName}`)
 
-  sections.push(
-    `RAW MATERIAL (anchor every specific to this; do NOT invent details):\n${answers
-      .map((a) => `- (${a.input_type}) ${a.answer}`)
-      .join('\n')}`,
-  )
+  if (anchor) {
+    // Anchor-centered raw material. Feeding every answer as one flat list
+    // made the model gravitate to the most vivid answer in ALL of a
+    // campaign's slots - six short-forms retelling the same story. The
+    // anchor rotates per slot at plan time; the prompt has to enforce it.
+    const supporting = answers.filter((a) => a.id !== anchor.id)
+    const parts = [
+      `ANCHOR ANSWER (${anchor.input_type}) - THE CORE OF THIS PIECE:`,
+      anchor.answer,
+      '',
+      'ANCHOR RULE (STRICT): This piece exists to deliver the ANCHOR answer. The [TITLE], the hook, and the main narrative or teaching of the body all come from the ANCHOR - its specific moment, claim, story, or method is the star of this piece. Every other slot in this campaign anchors on a DIFFERENT answer from the same topic; if you build this script around the supporting material instead, two posts in the same week end up telling the same story.',
+    ]
+    if (supporting.length > 0) {
+      parts.push(
+        '',
+        `SUPPORTING MATERIAL (context only - a passing detail, a credibility beat, or connective tissue. Never the main story of this piece):\n${supporting
+          .map((a) => `- (${a.input_type}) ${a.answer}`)
+          .join('\n')}`,
+      )
+    }
+    parts.push('', 'Do NOT invent details beyond this material.')
+    sections.push(parts.join('\n'))
+  } else {
+    sections.push(
+      `RAW MATERIAL (anchor every specific to this; do NOT invent details):\n${answers
+        .map((a) => `- (${a.input_type}) ${a.answer}`)
+        .join('\n')}`,
+    )
+  }
 
   // CTA keyword rule (when set on brand_content_settings.dm_keywords).
   // Stories use "DM me [keyword]" form; short-form / engagement-reel /

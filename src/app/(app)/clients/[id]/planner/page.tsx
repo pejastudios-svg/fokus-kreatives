@@ -608,7 +608,7 @@ export default function ClientPlannerPage() {
       // today, so campaign slots scheduled in the past would be silently
       // skipped if we filtered locally (that's how exports ended up with
       // "no script generated yet" placeholders on generated campaigns).
-      let needGeneration: { id: string }[] = []
+      let needGeneration: { id: string; stream?: string }[] = []
       try {
         const res = await fetch(
           `/api/planner/campaign-pending?clientId=${clientId}&topicGroupId=${topicGroupId}`,
@@ -627,6 +627,34 @@ export default function ClientPlannerPage() {
       if (needGeneration.length === 0) {
         setError('No slots in this campaign need a script - all are already drafted.')
         return
+      }
+
+      // Interleave streams before batching into waves. The server's
+      // cross-slot hook dedup only sees hooks that are ALREADY SAVED, and
+      // the pending list is date-ordered which clusters same-stream slots
+      // together - a wave of 4 short-forms generates in parallel with none
+      // seeing the others' hooks. Round-robin by stream spreads same-stream
+      // slots across waves so later ones dedupe against earlier ones.
+      {
+        const byStream = new Map<string, typeof needGeneration>()
+        for (const s of needGeneration) {
+          const key = s.stream ?? 'unknown'
+          const arr = byStream.get(key) ?? []
+          arr.push(s)
+          byStream.set(key, arr)
+        }
+        const interleaved: typeof needGeneration = []
+        for (let added = true; added; ) {
+          added = false
+          for (const arr of byStream.values()) {
+            const next = arr.shift()
+            if (next) {
+              interleaved.push(next)
+              added = true
+            }
+          }
+        }
+        needGeneration = interleaved
       }
 
       // Initialize progress.
