@@ -288,7 +288,12 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   // trailing \b before the optional "?" or it matches INSIDE longer words:
   // "and the result" without \b ate the front of "and the resulting
   // burnout", leaving "here's what happened.ing burnout" in a live script.
-  { re: /\band the result\b\??/gi, replace: "here's what happened." },
+  //
+  // "and the result" additionally REQUIRES the "?" - the target is only the
+  // dramatic-question tic ("...and the result?"). Without that anchor it
+  // matched the ordinary continuation "and the result was better retention"
+  // and produced "here's what happened. was better retention".
+  { re: /\band the result\?/gi, replace: "here's what happened." },
   { re: /^\s*the result\??$/gim, replace: "here's what happened." },
   { re: /\band you know what\b\??\s*/gi, replace: '' },
   { re: /\b(?:and|but)\s+(?:here['’]s\s+)?the best part\b\??\s*/gi, replace: '' },

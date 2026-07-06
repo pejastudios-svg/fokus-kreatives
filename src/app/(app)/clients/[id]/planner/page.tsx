@@ -697,15 +697,26 @@ export default function ClientPlannerPage() {
         return slot.id
       }
 
-      const results: PromiseSettledResult<string>[] = []
+      const failedSlots: typeof needGeneration = []
       for (let i = 0; i < needGeneration.length; i += WAVE_SIZE) {
         const wave = needGeneration.slice(i, i + WAVE_SIZE)
         const waveResults = await Promise.allSettled(wave.map(fireOne))
-        results.push(...waveResults)
+        waveResults.forEach((r, j) => {
+          if (r.status === 'rejected') failedSlots.push(wave[j])
+        })
       }
 
-      // Tally failures.
-      const failed = results.filter((r) => r.status === 'rejected').length
+      // Retry pass: failures here are usually one-off bad generation rolls
+      // (truncated JSON), so give each failed slot one more sequential shot
+      // before reporting it. Sequential on purpose - no wave pressure.
+      let failed = 0
+      for (const slot of failedSlots) {
+        try {
+          await fireOne(slot)
+        } catch {
+          failed += 1
+        }
+      }
       if (failed > 0) {
         setCampaignBulkProgress((prev) => {
           const next = new Map(prev)

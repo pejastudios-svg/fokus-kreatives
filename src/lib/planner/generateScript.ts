@@ -405,6 +405,9 @@ async function generateScriptForSlotInner(
   } else {
     // Short-form / engagement-reel / carousel: combined JSON+checklist
     // generation works fine because the output is small enough.
+    // maxAttempts 3 (default is 2): the failure mode here is a truncated /
+    // misshapen JSON roll, and in bulk runs the default meant ~3 slots per
+    // campaign died on two bad rolls in a row and surfaced as "N failed".
     const parsed = await withContentRetry(
       `planner.script.${stream}`,
       async () => {
@@ -422,6 +425,7 @@ async function generateScriptForSlotInner(
         })
         return parseScriptOutput(result.content)
       },
+      { maxAttempts: 3 },
     )
     rawScript = parsed.script
     rawChecklist = parsed.checklist
@@ -753,12 +757,19 @@ function maxTokensForStream(stream: SlotStream, quality: 'high' | 'standard' | '
       // Going higher invites the AI to pad sections beyond their target
       // word counts.
       return 8000
+    // JSON streams get generous ceilings. maxOutputTokens is a CAP, not a
+    // spend - unused headroom costs nothing, and the JSON structure (exact
+    // scene/slide counts, fixed section labels) constrains padding. Tight
+    // caps were the main source of bulk-generation failures: script + full
+    // checklist + JSON escaping + Pro's thinking share would truncate
+    // mid-string, fail the parse, and after two bad rolls the slot
+    // surfaced as "failed" in the campaign banner.
     case 'short_form':
-      return 1200 + proReserve
+      return 2000 + proReserve
     case 'engagement_reel':
-      return 800 + proReserve
+      return 1600 + proReserve
     case 'carousel':
-      return 1500 + proReserve
+      return 2600 + proReserve
   }
 }
 
@@ -910,6 +921,8 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
       anchor.answer,
       '',
       'ANCHOR RULE (STRICT): This piece exists to deliver the ANCHOR answer. The [TITLE], the hook, and the main narrative or teaching of the body all come from the ANCHOR - its specific moment, claim, story, or method is the star of this piece. Every other slot in this campaign anchors on a DIFFERENT answer from the same topic; if you build this script around the supporting material instead, two posts in the same week end up telling the same story.',
+      '',
+      'DO NOT RETELL THE WHOLE JOURNEY. The answers in this topic are facets of one story, and the audience sees several pieces from it in the same week. A piece that walks the full arc (the struggle, then the realization, then the system, then the results) is a duplicate of every other piece that does the same. Enter the story AT the anchor\'s moment and stay there: zoom in, add its specific details, and go deeper instead of wider. Supporting material earns at most one passing clause - never its own beat.',
     ]
     if (supporting.length > 0) {
       parts.push(
