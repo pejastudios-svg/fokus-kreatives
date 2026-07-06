@@ -361,10 +361,15 @@ export async function POST(
       // ---- Long-form body of the main tab ----
       const longFormSegments: DocSegment[] = []
       if (!longFormSlot) {
-        longFormSegments.push({
-          text: killDashes('WARNING: No long-form slot in this campaign. Generate before exporting.'),
-          style: 'plain',
-        })
+        // Only warn when the tier actually expects a long-form. Tiers like
+        // 'top' run 0 long-form per campaign - a warning there is noise
+        // that reads like something went wrong.
+        if (expected.long_form > 0) {
+          longFormSegments.push({
+            text: killDashes('WARNING: No long-form slot in this campaign. Generate before exporting.'),
+            style: 'plain',
+          })
+        }
       } else {
         const meta = (longFormSlot.generation_meta ?? {}) as Record<string, unknown>
         const script = typeof meta.script === 'string' ? meta.script.trim() : ''
@@ -459,6 +464,16 @@ export async function POST(
       }
     })
 
+    // Count exported slots that have no script - these render as
+    // "no script generated yet" placeholders in the doc. Returned to the
+    // UI so the export banner can flag the gap instead of the user
+    // discovering it inside the doc.
+    const missingScriptCount = slots.filter((s) => {
+      const meta = (s.generation_meta ?? {}) as Record<string, unknown>
+      const script = typeof meta.script === 'string' ? meta.script.trim() : ''
+      return !script
+    }).length
+
     const globalShareList = getGlobalShareList()
     const shareWith = globalShareList ?? (clickerEmail ? [clickerEmail] : [])
 
@@ -478,6 +493,7 @@ export async function POST(
         mode: 'gdoc',
         docs: result.docs,
         campaignCount: campaigns.length,
+        missingScriptCount,
         appsScriptDiagnostics: result.appsScriptDiagnostics,
       })
     }
@@ -489,6 +505,7 @@ export async function POST(
       filename: result.filename,
       fallbackReason: result.fallbackReason,
       campaignCount: campaigns.length,
+      missingScriptCount,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

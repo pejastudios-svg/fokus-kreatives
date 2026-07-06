@@ -61,6 +61,10 @@ export default function ClientPlannerPage() {
     name: string
   }
   const [lastExportDocs, setLastExportDocs] = useState<ExportedDoc[]>([])
+  // How many exported slots had no script (they render as "no script
+  // generated yet" placeholders in the doc). Shown as a warning line in
+  // the export banner so gaps surface here, not inside the doc.
+  const [lastExportMissing, setLastExportMissing] = useState(0)
   const [copiedDocId, setCopiedDocId] = useState<string | null>(null)
   // Campaign-picker state for the export dropdown.
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
@@ -592,16 +596,27 @@ export default function ClientPlannerPage() {
 
   const handleGenerateCampaign = useCallback(
     async (topicGroupId: string) => {
-      // Identify the slots that need scripts in this campaign. A "needs
-      // script" slot is one that has no generation_meta.script saved.
-      const campaignSlots = data?.slots.filter(
-        (s) => s.topic_group_id === topicGroupId,
-      ) ?? []
-      const needGeneration = campaignSlots.filter((s) => {
-        const meta = (s.generation_meta as Record<string, unknown>) ?? {}
-        const script = typeof meta.script === 'string' ? meta.script.trim() : ''
-        return !script
-      })
+      // Identify the slots that need scripts in this campaign - fetched
+      // server-side so the list covers the WHOLE campaign, not just the
+      // slots inside the visible calendar window. data.slots starts at
+      // today, so campaign slots scheduled in the past would be silently
+      // skipped if we filtered locally (that's how exports ended up with
+      // "no script generated yet" placeholders on generated campaigns).
+      let needGeneration: { id: string }[] = []
+      try {
+        const res = await fetch(
+          `/api/planner/campaign-pending?clientId=${clientId}&topicGroupId=${topicGroupId}`,
+          { cache: 'no-store' },
+        )
+        const j = await res.json()
+        if (!j.success || !Array.isArray(j.slots)) {
+          throw new Error(j.error || 'Failed to load campaign slots')
+        }
+        needGeneration = j.slots
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load campaign slots')
+        return
+      }
 
       if (needGeneration.length === 0) {
         setError('No slots in this campaign need a script - all are already drafted.')
@@ -665,15 +680,20 @@ export default function ClientPlannerPage() {
 
       // Clear progress after a short delay so the banner stays up long
       // enough for the user to see the final count before disappearing.
-      setTimeout(() => {
-        setCampaignBulkProgress((prev) => {
-          const next = new Map(prev)
-          next.delete(topicGroupId)
-          return next
-        })
-      }, 5000)
+      // When ANY slot failed, the banner stays until dismissed - a 5s
+      // flash is how failed slots went unnoticed and exported without
+      // scripts.
+      if (failed === 0) {
+        setTimeout(() => {
+          setCampaignBulkProgress((prev) => {
+            const next = new Map(prev)
+            next.delete(topicGroupId)
+            return next
+          })
+        }, 5000)
+      }
     },
-    [data, refresh],
+    [clientId, refresh],
   )
 
   const handleApproveSlot = useCallback(
@@ -953,6 +973,7 @@ export default function ClientPlannerPage() {
   const handleExportToGoogleDoc = useCallback(async (campaignId?: string | null) => {
     setExportError(null)
     setLastExportDocs([])
+    setLastExportMissing(0)
     setCopiedDocId(null)
     setExporting(true)
     setExportMenuOpen(false)
@@ -965,6 +986,9 @@ export default function ClientPlannerPage() {
       const j = await res.json()
       if (!j.success) {
         throw new Error(j.error || 'Export failed')
+      }
+      if (typeof j.missingScriptCount === 'number') {
+        setLastExportMissing(j.missingScriptCount)
       }
 
       if (j.mode === 'gdoc' && Array.isArray(j.docs) && j.docs.length > 0) {
@@ -1071,6 +1095,39 @@ export default function ClientPlannerPage() {
     if (!openSlotId || !data) return null
     return data.slots.find((s) => s.id === openSlotId) ?? null
   }, [data, openSlotId])
+
+  // Campaign-wide "needs script" count for the open slot's campaign,
+  // fetched server-side. data.slots is scoped to the visible calendar
+  // window (starts at today), so counting locally misses campaign slots
+  // scheduled in the past - the drawer's bulk-generate button would hide
+  // itself while ungenerated slots still existed. Null while loading or
+  // on fetch failure; the drawer falls back to the local count then.
+  const [campaignPendingCount, setCampaignPendingCount] = useState<number | null>(null)
+  const openSlotGroupId = openSlot?.topic_group_id ?? null
+  useEffect(() => {
+    setCampaignPendingCount(null)
+    if (!openSlotGroupId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/planner/campaign-pending?clientId=${clientId}&topicGroupId=${openSlotGroupId}`,
+          { cache: 'no-store' },
+        )
+        const j = await res.json()
+        if (!cancelled && j.success && Array.isArray(j.slots)) {
+          setCampaignPendingCount(j.slots.length)
+        }
+      } catch {
+        // Non-fatal - the drawer falls back to the locally-computed count.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // `data` is a dep so the count refetches after any refresh() - e.g.
+    // when a bulk generation finishes and slots flip to drafted.
+  }, [openSlotGroupId, clientId, data])
 
   const visiblePinnedStories = useMemo(
     () =>
@@ -1278,13 +1335,23 @@ export default function ClientPlannerPage() {
                   Last export - {lastExportDocs.length} {lastExportDocs.length === 1 ? 'doc' : 'docs'} created
                 </div>
                 <button
-                  onClick={() => setLastExportDocs([])}
+                  onClick={() => {
+                    setLastExportDocs([])
+                    setLastExportMissing(0)
+                  }}
                   className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-white/5"
                   title="Dismiss"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
+              {lastExportMissing > 0 && (
+                <div className="mb-2 text-[11px] text-amber-500">
+                  {lastExportMissing} slot{lastExportMissing === 1 ? '' : 's'} had no script
+                  and exported as placeholders. Open a slot in that campaign and run
+                  campaign generation to fill them, then export again.
+                </div>
+              )}
               <div className="space-y-1.5">
                 {lastExportDocs.map((doc) => (
                   <div
@@ -1348,8 +1415,10 @@ export default function ClientPlannerPage() {
         )}
 
         {/* Bulk-generate progress banner. One row per active or recently-
-            completed campaign-bulk-generate. Auto-dismisses 5s after the
-            last slot finishes (handled in handleGenerateCampaign). */}
+            completed campaign-bulk-generate. Clean runs auto-dismiss 5s
+            after the last slot finishes (handled in handleGenerateCampaign);
+            runs with failures stay until dismissed so failed slots can't
+            slip by unnoticed and export without scripts. */}
         {campaignBulkProgress.size > 0 && (
           <Card>
             <CardContent className="text-sm text-[var(--text-primary)] space-y-2">
@@ -1363,9 +1432,26 @@ export default function ClientPlannerPage() {
                       <span className="font-semibold">
                         {isDone ? 'Campaign generation complete' : 'Generating campaign'}
                       </span>
-                      <span className="tabular-nums text-[var(--text-tertiary)]">
-                        {progress.done} / {progress.total}
-                        {progress.failed > 0 ? ` (${progress.failed} failed)` : ''}
+                      <span className="flex items-center gap-1.5">
+                        <span className="tabular-nums text-[var(--text-tertiary)]">
+                          {progress.done} / {progress.total}
+                          {progress.failed > 0 ? ` (${progress.failed} failed)` : ''}
+                        </span>
+                        {isDone && (
+                          <button
+                            onClick={() =>
+                              setCampaignBulkProgress((prev) => {
+                                const next = new Map(prev)
+                                next.delete(topicGroupId)
+                                return next
+                              })
+                            }
+                            className="p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                            title="Dismiss"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full glass-rail overflow-hidden">
@@ -1377,6 +1463,13 @@ export default function ClientPlannerPage() {
                         style={{ width: `${pct}%` }}
                       />
                     </div>
+                    {isDone && progress.failed > 0 && (
+                      <div className="text-[11px] text-amber-500">
+                        {progress.failed} slot{progress.failed === 1 ? '' : 's'} failed to
+                        generate. Open a slot in this campaign and run campaign generation
+                        again to retry the missing ones.
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1561,7 +1654,11 @@ export default function ClientPlannerPage() {
           onGenerateCampaign={handleGenerateCampaign}
           campaignSlotsRemaining={
             openSlot.topic_group_id
-              ? data.slots.filter((s) => {
+              ? // Server-fetched campaign-wide count when available; the
+                // local count only covers slots in the visible calendar
+                // window and misses past-dated ones.
+                campaignPendingCount ??
+                data.slots.filter((s) => {
                   if (s.topic_group_id !== openSlot.topic_group_id) return false
                   const meta = (s.generation_meta as Record<string, unknown>) ?? {}
                   const script = typeof meta.script === 'string' ? meta.script.trim() : ''
