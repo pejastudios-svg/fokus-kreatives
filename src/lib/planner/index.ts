@@ -48,7 +48,7 @@ import { plannerAdmin } from './db'
 import { loadAvailableTopicGroups } from './material'
 import { buildUsageHistory, isOnCooldown, type FormatUsageEntry } from './cooldowns'
 import { effectiveTargets, tallyCoverage } from './coverage'
-import { generateHookPreview } from './hookPreview'
+import { generateHookPreview, hookPreviewFallback } from './hookPreview'
 import { scoreFormat } from './scoring'
 import { generateStoriesForPlan } from './storyQueue'
 import {
@@ -255,18 +255,14 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
     .lt('scheduled_date', horizonEnd)
   const existingRows = ((existing ?? []) as SlotRow[]).map((r) => rowToSlot(r, formatById))
 
-  // Wipe non-locked, non-approved horizon rows so we can repopulate. Approved
-  // and locked slots stay (and their material is treated as consumed).
+  // Non-locked planned rows get REPLACED by this run. The actual delete is
+  // deferred to Phase C (right before the insert) so a run that dies mid-way
+  // - AI outage, function timeout - leaves the existing plan intact instead
+  // of wiping it and creating nothing. Nothing between here and Phase C
+  // reads planned slots from the DB; all picks work off in-memory state.
   const wipeIds = existingRows
     .filter((r) => !r.locked && r.status === 'planned')
     .map((r) => r.id)
-  if (wipeIds.length) {
-    const { error: deleteErr } = await supabase
-      .from('content_plan_slots')
-      .delete()
-      .in('id', wipeIds)
-    if (deleteErr) console.error('plan slot wipe error:', deleteErr)
-  }
 
   // Survivors = locked + approved + drafted slots that anchor cooldowns / coverage.
   const survivors = existingRows.filter(
@@ -554,6 +550,16 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
       }
     })
 
+  // Deferred wipe (see comment where wipeIds is computed): only now that the
+  // new plan is fully built do we remove the planned rows it replaces.
+  if (wipeIds.length) {
+    const { error: deleteErr } = await supabase
+      .from('content_plan_slots')
+      .delete()
+      .in('id', wipeIds)
+    if (deleteErr) console.error('plan slot wipe error:', deleteErr)
+  }
+
   if (insertRows.length) {
     const { error: insertErr, count } = await supabase
       .from('content_plan_slots')
@@ -794,6 +800,15 @@ async function pickSlot(input: PickSlotInput): Promise<PickResult | null> {
 
 const HOOK_PREVIEW_BATCH_SIZE = 8
 
+/** Hard time budget for the whole hook-preview phase. Previews are
+ *  cosmetic (calendar card text) and every one has a deterministic
+ *  fallback - they must NEVER be the reason a plan run dies. Without this
+ *  budget, a provider outage made each preview call burn through the
+ *  provider's full retry/backoff cycle, 64 slots of that blew past the
+ *  serverless function's duration cap, and the run was killed before the
+ *  slots were ever inserted. Normal runs finish this phase in ~30-40s. */
+const HOOK_PREVIEW_TIME_BUDGET_MS = 90_000
+
 /** Run hook-preview generation in parallel batches. Mutates each pick's
  *  hook_preview in place. Each preview is anchored to the pick's anchor
  *  answer (set during Phase A from the campaign queue), which structurally
@@ -803,8 +818,24 @@ const HOOK_PREVIEW_BATCH_SIZE = 8
 async function generateHookBatch(
   picks: Array<{ pick: PickResult; clientId: string; brandName: string | null }>,
 ): Promise<void> {
+  const deadline = Date.now() + HOOK_PREVIEW_TIME_BUDGET_MS
   for (let i = 0; i < picks.length; i += HOOK_PREVIEW_BATCH_SIZE) {
     const batch = picks.slice(i, i + HOOK_PREVIEW_BATCH_SIZE)
+    if (Date.now() > deadline) {
+      // Out of time - fill the rest with deterministic fallbacks so the
+      // plan still creates. The user can regenerate individual slots later
+      // to get AI previews.
+      console.warn(
+        `[generateHookBatch] time budget exhausted - falling back for ${picks.length - i} remaining previews`,
+      )
+      for (const entry of picks.slice(i)) {
+        entry.pick.hook_preview = hookPreviewFallback(
+          entry.pick.format,
+          entry.pick.anchor ?? entry.pick.answers[0] ?? null,
+        )
+      }
+      return
+    }
     await Promise.all(
       batch.map(async (entry) => {
         entry.pick.hook_preview = await generateHookPreview({

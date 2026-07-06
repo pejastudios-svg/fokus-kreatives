@@ -4,6 +4,10 @@ import { proposeStageAdvancement } from '@/lib/contentStage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// Plan generation is the longest request in the app (format picks + hook
+// previews + story generation for a full month). Pin the function duration
+// so the platform default can't kill a legitimate run mid-way.
+export const maxDuration = 300
 
 interface Body {
   clientId?: string

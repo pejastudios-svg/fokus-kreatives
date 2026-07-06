@@ -108,6 +108,14 @@ ${brandName ? `BRAND: ${brandName}\n` : ''}${siblingBlock}${recycledBlock}TASK: 
   }
 }
 
+/** Exported for the plan generator's Phase B time budget: when hook-preview
+ *  generation runs out of time (e.g. the AI provider is down and every call
+ *  burns through retries), remaining picks get this fallback directly
+ *  instead of another doomed API call. */
+export function hookPreviewFallback(format: ContentFormat, anchor: RawTopicAnswer | null): string {
+  return deterministicFallback(format, anchor)
+}
+
 function deterministicFallback(format: ContentFormat, anchor: RawTopicAnswer | null): string {
   if (!anchor) return format.name
   const trimmed = anchor.answer.replace(/\s+/g, ' ').trim()

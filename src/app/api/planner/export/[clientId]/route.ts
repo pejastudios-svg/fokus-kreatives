@@ -22,6 +22,9 @@ import { normalizeFrame, type NormalizedFrame } from '@/components/planner/types
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// Multi-campaign exports create one Google Doc per campaign via Apps
+// Script - slow enough on big plans to outlive the platform default.
+export const maxDuration = 300
 
 const admin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

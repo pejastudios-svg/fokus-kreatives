@@ -111,7 +111,7 @@ export default function ClientPlannerPage() {
   const loadMonthsWithSlots = useCallback(async () => {
     try {
       const r = await fetch(`/api/planner/months/${clientId}`, { cache: 'no-store' })
-      const j = await r.json()
+      const j = await readJsonSafe(r)
       if (j.success && Array.isArray(j.months)) {
         setMonthsWithSlots(j.months as MonthWithSlots[])
       }
@@ -149,7 +149,7 @@ export default function ClientPlannerPage() {
         `/api/planner/data?clientId=${clientId}&from=${fetchFrom}&to=${fetchTo}`,
         { cache: 'no-store', signal: ctrl.signal },
       )
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Load failed')
       // Merge strategy: keep previously-fetched slots that fall OUTSIDE
       // the current fetch range; replace slots INSIDE the range with the
@@ -268,7 +268,7 @@ export default function ClientPlannerPage() {
           topicGroupIds: scope.length > 0 ? scope : undefined,
         }),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Generation failed')
       await refresh()
       // Plan generation can extend slots into new months - refresh the
@@ -309,7 +309,7 @@ export default function ClientPlannerPage() {
       markSlotInFlight(slotId, 'generating')
       try {
         const res = await fetch(`/api/planner/slot/${slotId}/generate-script`, { method: 'POST' })
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) throw new Error(data.error || 'Generation failed')
         // Sync generation_meta into parent state so a drawer reopen re-seeds
         // from fresh data rather than stale.
@@ -345,7 +345,7 @@ export default function ClientPlannerPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ locked: newLocked }),
           })
-          const j = await res.json()
+          const j = await readJsonSafe(res)
           if (!j.success) throw new Error(j.error || 'Update failed')
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Lock update failed')
@@ -365,7 +365,7 @@ export default function ClientPlannerPage() {
         setOpenSlotId(null)
         try {
           const res = await fetch(`/api/planner/slot/${slotId}`, { method: 'DELETE' })
-          const j = await res.json()
+          const j = await readJsonSafe(res)
           if (!j.success) throw new Error(j.error || 'Delete failed')
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Delete failed')
@@ -410,7 +410,7 @@ export default function ClientPlannerPage() {
 
       try {
         const res = await fetch(`/api/planner/slot/${slotId}/regenerate`, { method: 'POST' })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Regenerate failed')
         // Refresh in the background to pull the new format / hook.
         void refresh()
@@ -453,7 +453,7 @@ export default function ClientPlannerPage() {
       const res = await fetch(`/api/planner/topic-batches?clientId=${clientId}`, {
         cache: 'no-store',
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       const batches = (j.success ? (j.batches as TopicBatch[]) : []) ?? []
       const usableBatches = batches.filter((b) => b.usableTopicCount > 0)
       setPickerBatches(batches)
@@ -499,7 +499,7 @@ export default function ClientPlannerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientId, date, slotIds }),
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Reorder failed')
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Reorder failed')
@@ -530,7 +530,7 @@ export default function ClientPlannerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scheduledDate: newDate }),
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Reschedule failed')
         return { warnings: (j.warnings as string[]) || [] }
       } catch (e) {
@@ -567,7 +567,7 @@ export default function ClientPlannerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ formatId }),
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Swap failed')
         // Fire-and-forget refresh in the background so any server-side
         // derived fields (hook_preview, generation_meta) come in sync.
@@ -621,7 +621,7 @@ export default function ClientPlannerPage() {
           `/api/planner/campaign-pending?clientId=${clientId}&topicGroupId=${topicGroupId}`,
           { cache: 'no-store' },
         )
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success || !Array.isArray(j.slots)) {
           throw new Error(j.error || 'Failed to load campaign slots')
         }
@@ -682,7 +682,7 @@ export default function ClientPlannerPage() {
         const res = await fetch(`/api/planner/slot/${slot.id}/generate-script`, {
           method: 'POST',
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Generation failed')
 
         // Update progress incrementally as each slot lands. The bulk
@@ -779,7 +779,7 @@ export default function ClientPlannerPage() {
 
       try {
         const res = await fetch(`/api/planner/slot/${slotId}/approve`, { method: 'POST' })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) {
           const unresolved = Array.isArray(j.unresolved) ? j.unresolved : []
           const detail =
@@ -830,7 +830,7 @@ export default function ClientPlannerPage() {
 
       try {
         const res = await fetch(`/api/planner/slot/${slotId}/withdraw-approval`, { method: 'POST' })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Withdraw failed')
         void refresh()
       } catch (e) {
@@ -881,7 +881,7 @@ export default function ClientPlannerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ used }),
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || (used ? 'Mark as used failed' : 'Unmark failed'))
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Action failed')
@@ -898,7 +898,7 @@ export default function ClientPlannerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, seedText: seedText || null, intent: intent ?? null }),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Generate failed')
       await refresh()
     },
@@ -918,7 +918,7 @@ export default function ClientPlannerPage() {
     })
     try {
       const res = await fetch(`/api/planner/story-queue/${id}`, { method: 'DELETE' })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Delete failed')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
@@ -932,7 +932,7 @@ export default function ClientPlannerPage() {
         const res = await fetch(`/api/planner/story-queue/${id}/regenerate`, {
           method: 'POST',
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Regenerate failed')
         await refresh()
       } catch (e) {
@@ -948,7 +948,7 @@ export default function ClientPlannerPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId }),
     })
-    const j = await res.json()
+    const j = await readJsonSafe(res)
     if (j.success) await refresh()
   }, [clientId, refresh])
 
@@ -971,7 +971,7 @@ export default function ClientPlannerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scheduledDate: date }),
         })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Pin failed')
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Pin failed')
@@ -989,7 +989,7 @@ export default function ClientPlannerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, ttlDays: 90 }),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success || !j.link) throw new Error(j.error || 'Failed')
       const url = `${window.location.origin}/plan/${j.link.token}`
       await navigator.clipboard.writeText(url)
@@ -1009,7 +1009,7 @@ export default function ClientPlannerPage() {
       const res = await fetch(`/api/planner/export/${clientId}/campaigns`, {
         cache: 'no-store',
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (j.success && Array.isArray(j.campaigns)) {
         setExportCampaigns(j.campaigns)
       }
@@ -1035,7 +1035,7 @@ export default function ClientPlannerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(campaignId ? { campaignId } : {}),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) {
         throw new Error(j.error || 'Export failed')
       }
@@ -1094,7 +1094,7 @@ export default function ClientPlannerPage() {
           purge: mode === 'purge',
         }),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Delete failed')
       await refresh()
       // Months may have emptied out entirely - refresh the strip so
@@ -1177,7 +1177,7 @@ export default function ClientPlannerPage() {
           `/api/planner/campaign-pending?clientId=${clientId}&topicGroupId=${openSlotGroupId}`,
           { cache: 'no-store' },
         )
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!cancelled && j.success && Array.isArray(j.slots)) {
           setCampaignPendingCount(j.slots.length)
         }
@@ -1760,6 +1760,25 @@ export default function ClientPlannerPage() {
 function capitalize(s: string): string {
   if (!s) return ''
   return s[0].toUpperCase() + s.slice(1)
+}
+
+// Parse a fetch Response as JSON, translating platform-level failures into
+// a readable message. When a serverless function times out or crashes, the
+// platform returns a plain-text/HTML error page - calling res.json() on it
+// throws "Unexpected token 'A', \"An error o\"... is not valid JSON", which
+// is what users were seeing raw in the error banner.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJsonSafe(res: Response): Promise<any> {
+  try {
+    const parsed = res.json()
+    return await parsed
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'The server returned an unreadable response. Try again.'
+        : `The server did not complete the request (status ${res.status}). It likely timed out or hit an upstream outage - try again in a minute.`,
+    )
+  }
 }
 
 // Date helpers - YYYY-MM-DD strings (UTC) so they line up with the rest of

@@ -27,6 +27,10 @@ import { plannerAdmin } from '@/lib/planner/db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// Script generation chains several model calls (draft + person check +
+// polish + grammar + caption/hashtag repairs + retries). Pin the duration
+// so a slow-but-recoverable run isn't killed by the platform default.
+export const maxDuration = 300
 
 export async function POST(
   _req: NextRequest,
