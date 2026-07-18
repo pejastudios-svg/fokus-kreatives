@@ -343,16 +343,18 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
     datesPerCampaign.push(dates.slice(start, end))
   }
 
-  // Per-stream slot counts. Survivors reduce the count for their stream
-  // within the campaign that owns them (best-effort - we just decrement
-  // globally since survivors are pre-existing approved/locked work).
-  const survivorCount: Record<SlotStream, number> = {
-    long_form: 0,
-    short_form: 0,
-    engagement_reel: 0,
-    carousel: 0,
+  // Surviving drafted/approved/locked slots already occupy part of their
+  // campaign's quota. Count them per (topic group, stream) and SUBTRACT
+  // when building the queue below - otherwise re-planning a campaign whose
+  // scripts were already generated stacks a second full-size set on top of
+  // the survivors (a live campaign ended up with 31 slots instead of 16:
+  // 15 drafted survivors from run 1 + a fresh full 16 from run 2).
+  const survivorByGroupStream = new Map<string, number>()
+  for (const s of survivors) {
+    if (!s.topic_group_id) continue
+    const key = `${s.topic_group_id}:${s.stream}`
+    survivorByGroupStream.set(key, (survivorByGroupStream.get(key) ?? 0) + 1)
   }
-  for (const s of survivors) survivorCount[s.stream] += 1
 
   interface CampaignQueueItem {
     stream: SlotStream
@@ -386,19 +388,29 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
     }
     const pieces: CampaignPiece[] = []
 
+    // Quota per stream = tier target minus what this campaign's surviving
+    // drafted/approved/locked slots already cover. Re-planning tops the
+    // campaign UP to its quota instead of duplicating it.
+    const survived = (stream: SlotStream) =>
+      survivorByGroupStream.get(`${topic.topic_group_id}:${stream}`) ?? 0
+
     // Long-form: uses all answers, no specific anchor.
-    const lfCount = Math.max(0, tierCfg.perCampaign.longForm * monthsAhead - 0)
+    const lfCount = Math.max(0, tierCfg.perCampaign.longForm * monthsAhead - survived('long_form'))
     for (let i = 0; i < lfCount; i++) {
       pieces.push({ stream: 'long_form', slotIndex: i, anchor: null, recycled: false })
     }
 
     const streamCounts: Array<[SlotStream, number]> = [
-      ['short_form', tierCfg.perCampaign.shortForm * monthsAhead],
-      ['engagement_reel', tierCfg.perCampaign.engagementReels * monthsAhead],
-      ['carousel', tierCfg.perCampaign.carousels * monthsAhead],
+      ['short_form', Math.max(0, tierCfg.perCampaign.shortForm * monthsAhead - survived('short_form'))],
+      ['engagement_reel', Math.max(0, tierCfg.perCampaign.engagementReels * monthsAhead - survived('engagement_reel'))],
+      ['carousel', Math.max(0, tierCfg.perCampaign.carousels * monthsAhead - survived('carousel'))],
     ]
     for (const [stream, count] of streamCounts) {
-      for (let slotIndex = 0; slotIndex < count; slotIndex++) {
+      // slotIndex starts AFTER the survivors so topped-up pieces anchor on
+      // answers the surviving pieces haven't used yet.
+      const offset = survived(stream)
+      for (let i = 0; i < count; i++) {
+        const slotIndex = offset + i
         const answerCount = topic.answers.length
         if (answerCount === 0) continue
         const anchor = topic.answers[slotIndex % answerCount]
@@ -434,9 +446,6 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
     return a.slotIndex - b.slotIndex
   })
 
-  // Subtract survivors from the global tally just for telemetry; the queue
-  // build above already excluded them via `numCampaigns` derivation.
-  void survivorCount
 
   // Build the running history. Survivors anchor it.
   const runningHistory: FormatUsageEntry[] = buildUsageHistory(survivors)

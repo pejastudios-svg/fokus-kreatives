@@ -136,7 +136,11 @@ ${itemsBlock}`
       system,
       user,
       temperature: 0.2,
-      maxTokens: 1200,
+      // Pro's thinking (capped at 1024) counts against maxOutputTokens. At
+      // 1200 the thinking left ~200-300 tokens for a 10-item checklist JSON
+      // and every response truncated mid-string (finish=MAX_TOKENS) - the
+      // eval permanently fell back to manual_check. Size for thinking + JSON.
+      maxTokens: 2800,
       jsonObject: true,
       quality: 'high', // Pro - strict honest grading, not a rubber stamp
       route: 'planner.story_checklist',

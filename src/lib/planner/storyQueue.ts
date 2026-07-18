@@ -1468,7 +1468,11 @@ TASK: Read all 4 frames. Identify the ONE specific situation VALUE describes. Re
       system,
       user,
       temperature: 0.5,
-      maxTokens: 500,
+      // Pro reserves up to 1024 tokens for thinking INSIDE maxOutputTokens.
+      // At 500 the thinking consumed the whole budget and the response text
+      // came back EMPTY (finish=MAX_TOKENS, text_len=0) - every polish call
+      // silently no-oped. Budget = thinking cap + room for the small JSON.
+      maxTokens: 2000,
       jsonObject: true,
       quality: 'high', // Pro - the whole point is narrative craft
       route: 'planner.story_polish',
@@ -1576,8 +1580,10 @@ TASK: Output the JSON now.`
       system,
       user,
       temperature: 0.6,
-      // Pro needs room for its reasoning budget on top of the tiny JSON output.
-      maxTokens: 1200,
+      // Pro needs room for its reasoning budget on top of the tiny JSON
+      // output. Thinking is capped at 1024 and counts against this number -
+      // 1200 left it ~200 tokens of real output on a thoughtful roll.
+      maxTokens: 1800,
       jsonObject: true,
       quality: 'high', // Pro - keep the sticker question on the same tier as the rest
       route: 'planner.story_sticker',

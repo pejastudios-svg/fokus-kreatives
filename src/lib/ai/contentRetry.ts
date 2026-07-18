@@ -63,6 +63,17 @@ export async function withContentRetry<T>(
     } catch (err) {
       lastErr = err
       const msg = err instanceof Error ? err.message : String(err)
+      // PROVIDER-transient failures (503/UNAVAILABLE/quota/network) have
+      // already been retried with ~80s of backoff inside provider.ts.
+      // Re-rolling them at the content layer multiplies worst-case latency:
+      // during a Gemini outage, 3 content attempts x 80s of provider backoff
+      // held generation locks and concurrency slots for 5-8 MINUTES per
+      // slot. Fail fast instead - the caller or user retries after the
+      // provider recovers. Content retries are for bad token rolls only.
+      if (/503|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|429|fetch failed|ENOTFOUND|ETIMEDOUT|ECONNRESET/i.test(msg)) {
+        console.warn(`[content-retry] ${route} attempt ${attempt}/${maxAttempts} hit a provider outage - failing fast (no content retry): ${msg}`)
+        throw err
+      }
       const willRetry = attempt < maxAttempts
       console.warn(
         `[content-retry] ${route} attempt ${attempt}/${maxAttempts} failed: ${msg}${willRetry ? ' - retrying' : ' - giving up'}`,

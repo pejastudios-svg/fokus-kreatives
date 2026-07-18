@@ -37,8 +37,10 @@ export const HARD_BANS = [
   // survive the repair pass we want them surgically stripped. NOTE: this
   // entry MUST NOT be a plain hyphen ("-"), or surgicalBanRemoval will
   // delete every sentence that uses a compound modifier ("5-part intro",
-  // "lead-generating machine", etc.).
-  '-',
+  // "lead-generating machine", etc.) and findHardBanHit will flag every
+  // hyphenated word. (That exact regression shipped once: the em dash
+  // below was typo'd to a plain hyphen.)
+  '—',
   '–',
   // Rhetorical-fragment-question transitions. These read as conversational
   // but every AI uses them now - they're the new "Here's the thing".
@@ -222,11 +224,16 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:wasn['’]t|weren['’]t|was\s+not|were\s+not)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,60}[,;]\s+but\s+(?:rather\s+|instead\s+)?(?:just\s+|simply\s+|merely\s+|only\s+)?/gi, replace: '$1 was ' },
   // Auxiliary-verb negation: "<pronoun> don't/doesn't (just) X; <pronoun> Y" → "<pronoun> Y".
   // Drops the negation clause and the repeated subject, keeping only the positive Y clause.
-  { re: /\b(I|we|you|they|he|she|it)\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:I|we|you|they|he|she|it)\s+/gi, replace: '$1 ' },
+  // The just/simply/merely qualifier is REQUIRED. Without it this rule ate
+  // plain negation + new sentence ("it doesn't go in. This approach...")
+  // and left mangled prose in live captions. The AI-tell reframe always
+  // carries the qualifier ("doesn't just X; it Y") - match only that.
+  { re: /\b(I|we|you|they|he|she|it)\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)\s+(?:just|simply|merely|only)\s+[^.,;!?]{1,80}[,;.]\s*(?:I|we|you|they|he|she|it)\s+/gi, replace: '$1 ' },
   // Noun-subject auxiliary-verb negation: "<determiner + noun> doesn't (just) X; it Y" → "<subj> Y".
   // Catches "This intro doesn't just tell them what's coming; it makes them feel understood."
   // Pivot clause accepts bare pronoun + verb (not only "it's" / "that's").
-  { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)(?:\s+(?:just|simply|merely|only))?\s+[^.,;!?]{1,80}[,;.]\s*(?:it|that|they|this|these|those)\s+/gi, replace: '$1 ' },
+  // Qualifier required here too - same false-positive class as above.
+  { re: /\b((?:this|that|it|these|those|my|your|our|their|his|her|the|a|an)(?:\s+\*{0,2}[\w-]+\*{0,2}){0,4})\s+(?:do\s+not|don['’]t|does\s+not|doesn['’]t|didn['’]t)\s+(?:just|simply|merely|only)\s+[^.,;!?]{1,80}[,;.]\s*(?:it|that|they|this|these|those)\s+/gi, replace: '$1 ' },
   // Broadest subject-agnostic pivot: "<anything> isn't (just) Y; it's Z" - catches adjective-led
   // subjects like "consistent, engaging content isn't magic; it's a pattern" that slip past the
   // determiner-anchored rule. Runs AFTER the specific rules so those take priority.
@@ -322,7 +329,17 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   // could legitimately start a question, including imperative-style verbs
   // ("want", "need", "got", "ready", "tell", "let", "try", "think", "ever",
   // "feel"). If the sentence opens with one of those, leave the '?' alone.
-  { re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so|want|need|got|ready|tell|let|try|think|ever|feel|been|fancy|wanna|gonna|sure|guess|wonder|see|know|remember|notice|imagine)\b)([A-Z][^?.!]{8,200}?)\?/gi, replace: '$1$2.' },
+  {
+    re: /(^|[.!?]\s+)(?!(?:how|what|why|when|where|who|which|can|could|do|does|did|is|are|am|was|were|will|would|should|may|might|must|have|has|had|so|want|need|got|ready|tell|let|try|think|ever|feel|been|fancy|wanna|gonna|sure|guess|wonder|see|know|remember|notice|imagine)\b)([A-Z][^?.!]{8,200}?)\?/gi,
+    // Function replacer: a sentence can open with a statement-y word and
+    // still be a real question via a mid-sentence pivot ("Value or Volume,
+    // which side are you on?"). If a question indicator appears after a
+    // comma inside the span, keep the '?'.
+    replace: ((m: string, pre: string, body: string) =>
+      /,\s*(?:which|what|why|how|who|where|when|are|is|am|do|does|did|can|could|will|would|should|or)\b/i.test(body)
+        ? m
+        : `${pre}${body}.`) as (substring: string, ...args: string[]) => string,
+  },
 
   // Common paired-adjective AI stacks - strip the redundant adjective.
   // Conservative: only the highest-frequency offenders so we don't eat
@@ -619,6 +636,12 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   { re: /\b(hey|hi)\s+friends?\s*[,.]?\s*/gi, replace: '' },
   { re: /\blet me (tell|share)(\s+you)?\s*[,.]?\s*/gi, replace: '' },
   { re: /\blisten up\s*[,.]?\s*/gi, replace: '' },
+
+  // LAST: orphaned-conjunction cleanup. Earlier phrase strips can eat the
+  // rest of a line and leave a bare "But" / "And" as an entire section
+  // (a live REHOOK 2 shipped as just "But"). A line that is only a
+  // conjunction plus punctuation carries no content - drop it.
+  { re: /^\s*(?:but|and|so|yet|because)[\s.,!]*$/gim, replace: '' },
 ]
 
 const PREAMBLE_STRIPPERS: RegExp[] = [
@@ -1080,7 +1103,9 @@ export function sanitize(text: string): string {
   // `!` and `?` are excluded because quoted interjections like "Click me!" And "aha!" Moment
   // are mid-sentence - treating them as terminators wrongly capitalizes the next word.
   // Also handle closing quote/paren between terminator and space: `.' it's` / `.) it's`.
-  t = t.replace(/(^|[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
+  // Lookbehinds exempt mid-sentence abbreviations (vs. / e.g. / i.e. / etc.)
+  // - without them "quality vs. quantity" became "quality vs. Quantity".
+  t = t.replace(/(^|(?<!\bvs)(?<!\be\.g)(?<!\bi\.e)(?<!\betc)[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
 
   // Post-strip artifact: stripping phrases like "here's the real deal: " leaves the
   // following word mid-sentence but still capitalized. Lowercase a capitalized pronoun
@@ -1142,7 +1167,9 @@ export function sanitizeStoryText(text: string): string {
   }
 
   // Repairs can lowercase a word at a sentence boundary - restore it.
-  t = t.replace(/(^|[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
+  // Lookbehinds exempt mid-sentence abbreviations (vs. / e.g. / i.e. / etc.)
+  // - without them "quality vs. quantity" became "quality vs. Quantity".
+  t = t.replace(/(^|(?<!\bvs)(?<!\be\.g)(?<!\bi\.e)(?<!\betc)[.:]['"’”)\]]*\s+|\n\s*)([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
   // Lowercase a capitalized pronoun left mid-sentence after a connector.
   t = t.replace(
     /\b(But|And|So|Yet|Or)\s+(It|That|They|This|These|Those|He|She|We|You|I)\b/g,

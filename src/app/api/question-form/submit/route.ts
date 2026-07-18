@@ -32,19 +32,6 @@ interface Body {
   audioUrls?: Record<string, string>
 }
 
-const INPUT_TYPE_TO_POSITION: Record<TopicInputType, number> = {
-  scene: 1,
-  failed_attempt: 2,
-  turning_point: 3,
-  framework: 4,
-  proof: 5,
-  // Optional types - position is informational only, the planner cares about
-  // input_type. Place after the locked 5 so a topic with extras stays sortable.
-  opinion: 6,
-  named_mentor: 7,
-  win_moment: 8,
-}
-
 interface AnswerRow {
   client_id: string
   question: string
@@ -162,7 +149,8 @@ export async function POST(req: NextRequest) {
         const groupId = topicGroupIdFor(form.id, topic.id)
         let topicHasAnswers = false
 
-        for (const q of topic.questions) {
+        for (let qi = 0; qi < topic.questions.length; qi++) {
+          const q = topic.questions[qi]
           const raw = topicAns[q.id]
           const answer = typeof raw === 'string' ? raw.trim() : ''
           const audio = audioUrls[q.id] ?? null
@@ -179,7 +167,12 @@ export async function POST(req: NextRequest) {
             input_type: q.input_type,
             thin_flag: !!thinFlags[q.id],
             topic_group_id: groupId,
-            group_position: INPUT_TYPE_TO_POSITION[q.input_type] ?? null,
+            // Position = the question's ORDER in the topic, not a lookup by
+            // input_type. Topics can now carry second-pass questions (two
+            // scenes, two proofs...) and a type-keyed position map would
+            // collide them at the same slot - the planner anchors script N
+            // on answer N, so ordering has to stay unique and stable.
+            group_position: qi + 1,
             audio_url: audio,
           })
         }

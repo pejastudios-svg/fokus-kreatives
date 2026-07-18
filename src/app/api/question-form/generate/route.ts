@@ -9,6 +9,7 @@ import {
   type TopicAxis,
   type TopicInputType,
 } from '@/lib/types/questionForm'
+import { resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
 import { generateScript } from '@/lib/ai/provider'
 
 export const runtime = 'nodejs'
@@ -22,9 +23,13 @@ interface Body {
   topicCount?: number
   clientId?: string
   /** Pre-seeded topic titles. The AI keeps these titles verbatim and just
-   *  generates the 6 questions per seed. Any remaining quota
+   *  generates the questions per seed. Any remaining quota
    *  (topicCount - seeds.length) gets fully AI-generated topics. */
   seedTopics?: string[]
+  /** Optional override for how many questions each topic gets. Defaults to
+   *  the client's tier: the largest per-campaign stream quota, so every
+   *  script in a campaign can anchor on its own answer. Clamped 6-12. */
+  questionsPerTopic?: number
 }
 
 const VALID_PILLARS: TopicPillar[] = [
@@ -49,6 +54,60 @@ const INPUT_TYPE_ORDER: TopicInputType[] = [
   'proof',
   'opinion',
 ]
+
+// Questions-per-topic bounds. 6 = the locked arc (back-compat default).
+// Above 6, the arc repeats as a "second pass" (question 7 = a second scene,
+// 8 = another failed attempt, ...) so every planner slot gets a FRESH anchor
+// answer instead of recycling one - the planner anchors script N on answer N.
+// Capped at 12 to keep the client-facing form answerable.
+const QUESTIONS_PER_TOPIC_MIN = 6
+const QUESTIONS_PER_TOPIC_MAX = 12
+
+/** The input_type at each question position: the locked arc, cycled. */
+function questionTypeSequence(n: number): TopicInputType[] {
+  const out: TopicInputType[] = []
+  for (let i = 0; i < n; i++) out.push(INPUT_TYPE_ORDER[i % INPUT_TYPE_ORDER.length])
+  return out
+}
+
+/** Questions per topic = the client's largest per-campaign stream quota
+ *  (short-form / reels / carousels / stories), so a tier or custom config
+ *  that generates 10 scripts from one topic gets 10 distinct anchors.
+ *  Explicit override wins; no client or tier falls back to the locked 6. */
+async function deriveQuestionsPerTopic(
+  clientId: string | undefined,
+  override: number | undefined,
+): Promise<number> {
+  const clamp = (n: number) =>
+    Math.min(QUESTIONS_PER_TOPIC_MAX, Math.max(QUESTIONS_PER_TOPIC_MIN, Math.round(n)))
+  if (typeof override === 'number' && Number.isFinite(override)) return clamp(override)
+  if (!clientId) return QUESTIONS_PER_TOPIC_MIN
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+    const { data } = await supabase
+      .from('clients')
+      .select('package_tier, custom_config')
+      .eq('id', clientId)
+      .maybeSingle()
+    if (!data?.package_tier) return QUESTIONS_PER_TOPIC_MIN
+    const cfg = resolveTierConfig({
+      package_tier: data.package_tier as TierKey,
+      custom_config: (data.custom_config as CustomConfig | null) ?? null,
+    })
+    const largest = Math.max(
+      cfg.perCampaign.shortForm,
+      cfg.perCampaign.engagementReels,
+      cfg.perCampaign.carousels,
+      cfg.perCampaign.stories,
+    )
+    return clamp(largest)
+  } catch {
+    return QUESTIONS_PER_TOPIC_MIN
+  }
+}
 
 function clientContext(
   profile: BrandProfile | null,
@@ -92,28 +151,44 @@ function normalizePillar(raw: unknown): TopicPillar {
 
 // Build a topic from one parsed JSON entry. Returns null when the entry is
 // too malformed to use - we drop it rather than fall back to a synthetic
-// shape, since a well-tagged 5-question arc is the whole point.
-function normalizeTopic(raw: unknown): FormTopic | null {
+// shape, since a well-tagged question arc is the whole point.
+//
+// expectedTypes is the full position -> input_type sequence (the locked arc,
+// cycled for second-pass questions). Questions are consumed FIRST-UNUSED per
+// expected type so a topic with two `scene` questions assigns the first to
+// position 1 and the second to the second-pass slot, preserving order. The
+// locked first 6 are required; second-pass questions are best-effort (a
+// topic that came back with only the arc still passes).
+function normalizeTopic(raw: unknown, expectedTypes: TopicInputType[]): FormTopic | null {
   if (!isRecord(raw)) return null
   const title = asString(raw.title)
   if (!title) return null
   const rawQs = Array.isArray(raw.questions) ? raw.questions : []
 
-  // Index incoming questions by input_type so we can iterate the locked order.
-  const byType = new Map<TopicInputType, Record<string, unknown>>()
+  const pool: Array<{ q: Record<string, unknown>; used: boolean }> = []
   for (const q of rawQs) {
-    if (!isRecord(q)) continue
-    const it = asString(q.input_type) as TopicInputType
-    if ((INPUT_TYPE_ORDER as string[]).includes(it)) byType.set(it, q)
+    if (isRecord(q)) pool.push({ q, used: false })
   }
 
   const questions: FormTopicQuestion[] = []
-  for (const inputType of INPUT_TYPE_ORDER) {
-    const q = byType.get(inputType)
-    if (!q) return null // require all 5 - drop the topic if any is missing
-    const text = asString(q.text) || asString(q.question)
-    if (!text) return null
-    const placeholder = asString(q.placeholder) || asString(q.hint) || undefined
+  for (let pos = 0; pos < expectedTypes.length; pos++) {
+    const inputType = expectedTypes[pos]
+    const entry = pool.find(
+      (e) => !e.used && (asString(e.q.input_type) as TopicInputType) === inputType,
+    )
+    if (!entry) {
+      // Missing a locked-arc question = drop the topic. Missing a
+      // second-pass extra = accept what we have.
+      if (pos < INPUT_TYPE_ORDER.length) return null
+      break
+    }
+    const text = asString(entry.q.text) || asString(entry.q.question)
+    if (!text) {
+      if (pos < INPUT_TYPE_ORDER.length) return null
+      break
+    }
+    entry.used = true
+    const placeholder = asString(entry.q.placeholder) || asString(entry.q.hint) || undefined
     questions.push({
       id: crypto.randomUUID(),
       input_type: inputType,
@@ -375,6 +450,13 @@ export async function POST(req: NextRequest) {
     const requestedCount = Math.min(20, Math.max(1, body.topicCount ?? 4))
     const topicCount = Math.max(requestedCount, seedTopics.length)
 
+    // Questions per topic scales with the client's tier / custom config so
+    // every script in a campaign anchors on its own answer (see
+    // deriveQuestionsPerTopic). 6 = the locked arc; extras are second-pass
+    // variants of the arc.
+    const questionsPerTopic = await deriveQuestionsPerTopic(body.clientId, body.questionsPerTopic)
+    const expectedTypes = questionTypeSequence(questionsPerTopic)
+
     const ctx = clientContext(body.clientProfile ?? null, body.clientName, body.businessName, body.industry)
 
     const recent = body.clientId
@@ -395,7 +477,7 @@ export async function POST(req: NextRequest) {
       else axisAssignments.push(aiAxes[i - seedTopics.length] ?? null)
     }
 
-    const system = `You design braindump forms for content creators. Your output is a JSON list of TOPICS, each with exactly 6 questions in a locked input-type order.
+    const system = `You design braindump forms for content creators. Your output is a JSON list of TOPICS, each with exactly ${questionsPerTopic} questions in a locked input-type order.
 
 WHO IS ANSWERING: the brand's OWNER / FOUNDER / OPERATOR is filling out this form about their OWN journey, expertise, and business. They are NOT a customer of the brand. The brand belongs to them. They are the one with the stories, the failed attempts, the frameworks, and the proof.
 
@@ -426,7 +508,16 @@ Each topic's 6 questions surface TYPED raw material. The first 5 form a Hero's J
   4. input_type=framework      - the method or pattern the OWNER landed on that actually worked. Specific steps, named if possible.
   5. input_type=proof          - the outcome, the result, the evidence it worked - either for the owner directly or for clients they served.
   6. input_type=opinion        - a contrarian or sharp take adjacent to this topic. What does the OWNER believe about this that most people in the space disagree with? What would they argue with a peer about? This is the raw material for hot takes, debates, and engagement reels.
-
+${
+  questionsPerTopic > 6
+    ? `
+SECOND-PASS QUESTIONS (${7} through ${questionsPerTopic}): after the locked 6, the arc repeats from the top (question 7 = a second scene, 8 = another failed_attempt, and so on). Every answer becomes the anchor of its OWN script, so each second-pass question MUST surface a DIFFERENT specific story than its first-pass counterpart:
+- A different moment in time, a different client, a different mistake, a different flavor of proof (client result vs personal result), a second sharper or adjacent opinion.
+- NEVER rephrase an earlier question in the same topic. If question 2 asked about the mistake in their process, question 8 asks about a completely different failed attempt from a different chapter of the same topic.
+- If two questions would pull the same answer out of the client, one of them is wrong - rewrite it until it extracts something new.
+`
+    : ''
+}
 Question writing rules:
 - Anchor every question to the topic's title. Don't ask generic "tell me about your business" questions.
 - Pull from the CLIENT CONTEXT below: name pain points, desires, evergreen topics, and the audience role when it sharpens the question.
@@ -455,13 +546,13 @@ Tag each topic with pillar_hint - the best-fit pillar for the topic as a whole. 
     const dedupeBlock = titleBlock + answerBlock
 
     // Pre-seeded titles get reused VERBATIM as topic titles. The AI just
-    // writes the 6 questions for each. The remaining (topicCount - seeds)
+    // writes the questions for each. The remaining (topicCount - seeds)
     // topics are fully AI-generated. The seeded topics MUST come first in
     // the output array so the caller can rely on the order.
     const seedBlock = seedTopics.length
-      ? `\nPRE-SEEDED TOPIC TITLES (the first ${seedTopics.length} topic(s) in your output MUST use these exact titles - do NOT rewrite or paraphrase them, just generate the 6 questions for each):\n${seedTopics.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n${
+      ? `\nPRE-SEEDED TOPIC TITLES (the first ${seedTopics.length} topic(s) in your output MUST use these exact titles - do NOT rewrite or paraphrase them, just generate the ${questionsPerTopic} questions for each):\n${seedTopics.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n${
           topicCount > seedTopics.length
-            ? `\nTopics ${seedTopics.length + 1} through ${topicCount} are AI-generated as usual - fresh angles, full title + 6 questions per topic.\n`
+            ? `\nTopics ${seedTopics.length + 1} through ${topicCount} are AI-generated as usual - fresh angles, full title + ${questionsPerTopic} questions per topic.\n`
             : '\nAll topics in this batch are seeded; no AI-generated titles.\n'
         }`
       : ''
@@ -492,30 +583,27 @@ Return ONLY a JSON object with this exact shape (no prose, no markdown, no comme
       "pillar_hint": "one of: ${VALID_PILLARS.join(' | ')}",
       "topic_axis": "the axis assigned for this slot (or omit on seeded slots)",
       "questions": [
-        { "input_type": "scene",          "text": "...", "placeholder": "..." },
-        { "input_type": "failed_attempt", "text": "...", "placeholder": "..." },
-        { "input_type": "turning_point",  "text": "...", "placeholder": "..." },
-        { "input_type": "framework",      "text": "...", "placeholder": "..." },
-        { "input_type": "proof",          "text": "...", "placeholder": "..." },
-        { "input_type": "opinion",        "text": "...", "placeholder": "..." }
+${expectedTypes.map((t) => `        { "input_type": "${t}", "text": "...", "placeholder": "..." }`).join(',\n')}
       ]
     }
   ]
 }
 
-Generate exactly ${topicCount} topics. Each topic MUST have all 6 input_types present.`
+Generate exactly ${topicCount} topics. Each topic MUST have exactly ${questionsPerTopic} questions in exactly this input_type order.`
 
     const { content: raw } = await generateScript({
       system,
       user,
       temperature: 0.7,
-      maxTokens: 4000,
+      // Sized to the batch: ~80 tokens per question + headroom. The old
+      // fixed 4000 truncated once topics carried second-pass questions.
+      maxTokens: Math.min(8000, Math.max(4000, topicCount * questionsPerTopic * 80 + 800)),
       jsonObject: true,
       // Mechanical structured-JSON - Flash-Lite is plenty.
       quality: 'cheap',
       route: 'question_form.generate',
       clientId: body.clientId,
-      usageMeta: { topic_count: topicCount },
+      usageMeta: { topic_count: topicCount, questions_per_topic: questionsPerTopic },
     })
 
     let parsed: unknown
@@ -531,7 +619,7 @@ Generate exactly ${topicCount} topics. Each topic MUST have all 6 input_types pr
     const rawTopics = isRecord(parsed) && Array.isArray(parsed.topics) ? parsed.topics : []
     const topics: FormTopic[] = []
     for (const t of rawTopics) {
-      const normalized = normalizeTopic(t)
+      const normalized = normalizeTopic(t, expectedTypes)
       if (normalized) topics.push(normalized)
     }
 

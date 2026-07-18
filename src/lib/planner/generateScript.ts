@@ -927,7 +927,7 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
     if (supporting.length > 0) {
       parts.push(
         '',
-        `SUPPORTING MATERIAL (context only - a passing detail, a credibility beat, or connective tissue. Never the main story of this piece):\n${supporting
+        `SUPPORTING MATERIAL - IDEAS ONLY, WORDING OFF-LIMITS: each answer below is the ANCHOR of a different script in this campaign, and its wording belongs to that script. You may use a supporting answer's idea as context (one clause, restated in completely fresh words), but do NOT quote it, closely paraphrase it, or reuse its distinctive phrases. When several scripts each lean on the same vivid lines, the whole week reads like one post copy-pasted.\n${supporting
           .map((a) => `- (${a.input_type}) ${a.answer}`)
           .join('\n')}`,
       )
@@ -1029,7 +1029,7 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
   if (siblingHooks.length > 0) {
     const trimmed = siblingHooks.slice(-12) // cap to keep prompt size sane
     sections.push(
-      `HOOKS ALREADY USED IN THIS PLAN (do NOT paraphrase any of these - your hook must come at a clearly different moment, with a different opening angle, even if the underlying answer is thematically similar):\n${trimmed
+      `TITLES + HOOKS ALREADY USED IN THIS PLAN (same stream). Do NOT paraphrase any of these, and do NOT reuse their distinctive phrases ANYWHERE in your script - not the hook, the body, the caption, or the title. If a vivid phrase below already carried another post, find different words for this one. Your piece must enter at a clearly different moment with a different opening angle:\n${trimmed
         .map((h) => `- "${h}"`)
         .join('\n')}`,
     )
@@ -1128,6 +1128,59 @@ function parseScriptOutput(content: string): {
     }
   }
 
+  // Double-wrap salvage: the model sometimes nests a SECOND JSON envelope
+  // inside the script string ('{"script": "{\"script\": \"[TITLE]...\"}"}').
+  // A live carousel saved the whole inner envelope - braces, escaped \n's,
+  // checklist and all - as its script. If the extracted script looks like
+  // another envelope, unwrap it (best-effort; a parse failure keeps the
+  // string as-is and the [CHECKLIST] strip below still cleans the tail).
+  if (script.startsWith('{') && script.includes('"script"')) {
+    try {
+      const inner = JSON.parse(script) as Record<string, unknown>
+      if (inner && typeof inner.script === 'string' && inner.script.trim()) {
+        console.warn('[generateScript] script field contained a nested JSON envelope - unwrapped.')
+        script = inner.script.trim()
+      }
+    } catch {
+      // Not valid JSON - fall through with the raw string.
+    }
+  }
+
+  // Salvage: the model sometimes returns `script` as a STRUCTURED OBJECT
+  // ({ title, angle, slides: [...] }) instead of the bracket-labeled string
+  // the schema demands. The content is all there - flatten keys into
+  // bracket sections rather than burning a retry (or failing the slot).
+  if (!script && obj.script && typeof obj.script === 'object' && !Array.isArray(obj.script)) {
+    const parts: string[] = []
+    for (const [k, v] of Object.entries(obj.script as Record<string, unknown>)) {
+      const label = k.replace(/[_\-\s]+/g, ' ').trim().toUpperCase()
+      let text = ''
+      if (typeof v === 'string') {
+        text = v
+      } else if (Array.isArray(v)) {
+        text = v
+          .map((item) =>
+            typeof item === 'string'
+              ? item
+              : item && typeof item === 'object'
+                ? Object.values(item as Record<string, unknown>)
+                    .filter((x): x is string | number => typeof x === 'string' || typeof x === 'number')
+                    .join(': ')
+                : '',
+          )
+          .filter(Boolean)
+          .join('\n')
+      } else if (typeof v === 'number') {
+        text = String(v)
+      }
+      if (label && text.trim()) parts.push(`[${label}]\n${text.trim()}`)
+    }
+    if (parts.length > 0) {
+      console.warn('[generateScript] script field was an object - flattened to bracket sections.')
+      script = parts.join('\n\n')
+    }
+  }
+
   if (!script) {
     const keys = Object.keys(obj).slice(0, 10).join(', ')
     const snippet = content.length > 300 ? `${content.slice(0, 200)}...${content.slice(-100)}` : content
@@ -1136,6 +1189,16 @@ function parseScriptOutput(content: string): {
       snippet,
     )
     throw new Error(`Script output had no script field (keys: ${keys})`)
+  }
+
+  // The model occasionally embeds its checklist INSIDE the script string as
+  // a trailing "[CHECKLIST] {...}" section (one shipped to a live carousel
+  // and would have printed raw JSON into the export doc). The checklist is
+  // parsed from its own JSON field - anything after a [CHECKLIST] label in
+  // the script body is garbage. Cut it.
+  script = script.replace(/\n?\s*\[CHECKLIST\][\s\S]*$/i, '').trim()
+  if (!script) {
+    throw new Error('Script output was only a checklist - no script content')
   }
 
   // Checklist might also live under a couple of variants.
@@ -1279,9 +1342,21 @@ async function loadSiblingHooks(opts: {
     if (!meta) continue
     const script = typeof meta.script === 'string' ? meta.script : ''
     const hook = extractHookLine(script)
-    if (hook) hooks.push(hook)
+    const title = extractTitleLine(script)
+    // Title + hook together define the sibling's angle AND its vocabulary -
+    // both feed the avoid-list so later scripts dodge the phrasing, not
+    // just the opening line.
+    const combined = [title, hook].filter(Boolean).join(' / ')
+    if (combined) hooks.push(combined)
   }
   return hooks
+}
+
+/** Pull the [TITLE] line out of a bracket-formatted script. */
+function extractTitleLine(script: string): string | null {
+  if (!script) return null
+  const m = script.match(/\[TITLE\]\s*\n+([^\n\[]+)/i)
+  return m && m[1].trim() ? m[1].trim() : null
 }
 
 /** Pull the [HOOK] line out of a bracket-formatted script. Falls back to

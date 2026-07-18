@@ -698,23 +698,54 @@ export default function ClientPlannerPage() {
       }
 
       const failedSlots: typeof needGeneration = []
-      for (let i = 0; i < needGeneration.length; i += WAVE_SIZE) {
+      let stormAborted = false
+      for (let i = 0; i < needGeneration.length && !stormAborted; i += WAVE_SIZE) {
         const wave = needGeneration.slice(i, i + WAVE_SIZE)
         const waveResults = await Promise.allSettled(wave.map(fireOne))
+        const waveFailures: typeof needGeneration = []
         waveResults.forEach((r, j) => {
-          if (r.status === 'rejected') failedSlots.push(wave[j])
+          if (r.status === 'rejected') waveFailures.push(wave[j])
         })
+        failedSlots.push(...waveFailures)
+
+        // Circuit breaker: an ENTIRE wave failing means the provider is down
+        // or the server is still draining earlier work (429s) - not a batch
+        // of unlucky rolls. Continuing just machine-guns every remaining
+        // slot into instant failure. Stop; the pending endpoint keeps the
+        // un-attempted slots available for a later run.
+        if (waveFailures.length === wave.length && wave.length > 1) {
+          stormAborted = true
+          const unattempted = needGeneration.length - (i + wave.length)
+          setError(
+            `Generation paused - the AI provider or server is busy right now. ` +
+              `${unattempted > 0 ? `${unattempted} slot${unattempted === 1 ? '' : 's'} not attempted. ` : ''}` +
+              `Run campaign generation again in a few minutes to continue.`,
+          )
+          // Shrink the banner's total to what was actually attempted so the
+          // progress row completes instead of hanging mid-bar forever.
+          setCampaignBulkProgress((prev) => {
+            const next = new Map(prev)
+            const cur = next.get(topicGroupId)
+            if (cur) next.set(topicGroupId, { ...cur, total: i + wave.length })
+            return next
+          })
+        }
       }
 
       // Retry pass: failures here are usually one-off bad generation rolls
       // (truncated JSON), so give each failed slot one more sequential shot
       // before reporting it. Sequential on purpose - no wave pressure.
-      let failed = 0
-      for (const slot of failedSlots) {
-        try {
-          await fireOne(slot)
-        } catch {
-          failed += 1
+      // Skipped when the run aborted on an outage - retrying into a dead
+      // provider just doubles the wait.
+      let failed = failedSlots.length
+      if (!stormAborted) {
+        failed = 0
+        for (const slot of failedSlots) {
+          try {
+            await fireOne(slot)
+          } catch {
+            failed += 1
+          }
         }
       }
       if (failed > 0) {
