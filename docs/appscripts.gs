@@ -84,6 +84,14 @@ function doPost(e) {
         handleLeadCreated(payload);
         break;
 
+      case 'lead_magnet':
+        handleLeadMagnet(payload);
+        break;
+
+      case 'thank_you':
+        handleThankYou(payload);
+        break;
+
       case 'workspace_invite':
         handleInviteEmail(payload, 'workspace');
         break;
@@ -94,6 +102,18 @@ function doPost(e) {
 
       case 'invoice_sent':
         handleInvoiceSent(payload);
+        break;
+
+      case 'marketing_email':
+        handleMarketingEmail(payload);
+        break;
+
+      case 'email_material_low':
+        handleEmailMaterialLow(payload);
+        break;
+
+      case 'email_upgrade_nudge':
+        handleEmailUpgradeNudge(payload);
         break;
 
       case 'agreement_sent':
@@ -167,6 +187,19 @@ function manualMailTest() {
   Logger.log('Daily quota remaining: ' + MailApp.getRemainingDailyQuota())
 }
 
+function quotaProbe() {
+  Logger.log('before: ' + MailApp.getRemainingDailyQuota());
+  MailApp.sendEmail({
+    to: 'fokuskreatives@gmail.com',
+    subject: 'quota probe',
+    htmlBody: '<p>probe</p>'
+  });
+  Logger.log('after: ' + MailApp.getRemainingDailyQuota());
+}
+
+
+
+
 // ========== SHARED HELPERS ==========
 
 function safeToCsv(to) {
@@ -190,44 +223,6 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
-function buttonHtml(url, text) {
-  if (!url) return '';
-  return `
-    <div style="margin: 18px 0;">
-      <a href="${url}" target="_blank"
-         style="display:inline-block;background:#2B79F7;color:#fff;text-decoration:none;
-                padding:12px 18px;border-radius:10px;font-weight:700;">
-        ${text}
-      </a>
-    </div>
-  `;
-}
-
-// brandName is optional - outward (white-labeled) emails pass
-// payload.fromName so the header shows the client's brand instead
-// of Fokus Kreativez. Internal emails keep the default.
-function baseTemplate(title, bodyHtml, brandName) {
-  return `
-  <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
-    <div style="background:linear-gradient(135deg,#2B79F7 0%,#1E54B7 60%,#143A80 100%);
-                padding:22px 24px;border-radius:14px 14px 0 0;">
-      <div style="color:#fff;font-size:18px;font-weight:800;">${escapeHtml(brandName || 'Fokus Kreativez')}</div>
-      <div style="color:#E8F1FF;margin-top:6px;font-size:14px;">${title}</div>
-    </div>
-    <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 14px 14px;
-                padding:22px 24px;background:#ffffff;">
-      ${bodyHtml}
-      <div style="margin-top:18px;color:#9ca3af;font-size:12px;">
-        If you didn’t expect this email, you can ignore it.
-      </div>
-    </div>
-  </div>
-  `;
-}
-
-// White-label aware sender: when the payload carries fromName/replyTo
-// (attached server-side for outward emails only), the email displays the
-// client's name as the sender and replies go to the client.
 function sendHtmlEmail(payload, subject, html) {
   const toCsv = safeToCsv(payload.to)
   if (!toCsv) { Logger.log('Missing payload.to'); return }
@@ -237,218 +232,131 @@ function sendHtmlEmail(payload, subject, html) {
   MailApp.sendEmail(msg)
 }
 
-// ========== APPROVALS ==========
+// ========== EMAIL DESIGN SYSTEM ==========
 
-function handleApprovalComment(payload) {
-  const clientName = payload.clientName || 'Someone'
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval'
+var EMAIL_FONT = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+function buttonHtml(url, text) {
+  if (!url) return '';
+  return '<div style="margin:24px 0 4px;">' +
+    '<a href="' + url + '" target="_blank" ' +
+    'style="display:inline-block;background:#2B79F7;color:#ffffff;text-decoration:none;' +
+    'padding:10px 22px;border-radius:9999px;font-size:14px;font-weight:600;">' + text + '</a>' +
+    '</div>';
+}
+
+function paraHtml(text) {
+  return '<p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.65;">' + text + '</p>';
+}
+
+function mutedHtml(text) {
+  return '<p style="margin:14px 0 0;font-size:13px;color:#9CA3AF;line-height:1.6;">' + text + '</p>';
+}
+
+// Label/value rows separated by hairlines. rows = [['Amount', 'USD 100'], ...]
+// Rows with an empty value are skipped.
+
+function factRowsHtml(rows) {
+  var filled = (rows || []).filter(function (r) { return r && r[1]; });
+  if (filled.length === 0) return '';
+  var tr = filled.map(function (r) {
+    return '<tr>' +
+      '<td style="padding:9px 0;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;">' + r[0] + '</td>' +
+      '<td align="right" style="padding:9px 0;border-bottom:1px solid #F3F4F6;font-size:13px;color:#111827;font-weight:600;">' + r[1] + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<table width="100%" cellpadding="0" cellspacing="0" border="0" ' +
+    'style="margin:18px 0 6px;border-collapse:collapse;">' + tr + '</table>';
+}
+
+// brandName is optional - outward (white-labeled) emails pass
+// payload.fromName so the header shows the client's brand instead
+// of Fokus Kreatives. Internal emails keep the default.
+
+function baseTemplate(title, bodyHtml, brandName) {
+  var brand = escapeHtml(brandName || 'Fokus Kreatives');
+  return '<div style="margin:0;padding:32px 16px;background:#F6F5F4;">' +
+    '<div style="max-width:560px;margin:0 auto;font-family:' + EMAIL_FONT + ';">' +
+    '<div style="background:#FFFFFF;border:1px solid #E7E5E0;border-radius:12px;padding:30px 34px;">' +
+    '<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;">' + brand + '</div>' +
+    '<div style="margin:14px 0 16px;font-size:18px;font-weight:600;color:#111827;">' + title + '</div>' +
+    bodyHtml +
+    '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6;font-size:12px;color:#9CA3AF;line-height:1.6;">' +
+    'If you did not expect this email, you can ignore it.' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '</div>';
+}
+
+// ========== MARKETING (CAMPAIGN) EMAILS ==========
+
+// Campaign value emails arrive PRE-RENDERED: the app builds the final html
+// per recipient (links wrapped with that recipient's tracking token, the
+// unsubscribe footer baked in) so this handler just delivers it. fromName
+// and replyTo carry the client's white-label branding as usual.
+
+function handleMarketingEmail(payload) {
+  const recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleMarketingEmail: no recipients'); return }
+  if (!payload.html) { Logger.log('handleMarketingEmail: no html'); return }
+
+  const msg = {
+    to: recipients,
+    subject: payload.subject || '(no subject)',
+    htmlBody: payload.html,
+  }
+  if (payload.fromName) msg.name = payload.fromName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  MailApp.sendEmail(msg)
+}
+
+// Internal alert: a client's unused form answers are nearly exhausted, so
+// AI value emails are about to run out of fresh material. Sent to everyone
+// assigned to the client.
+
+function handleEmailMaterialLow(payload) {
+  const recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleEmailMaterialLow: no recipients'); return }
+
+  const clientName = payload.clientName || 'A client'
+  const remaining = (payload.remaining != null) ? payload.remaining : 0
   const url = payload.url || ''
-  const commentSnippet = payload.commentSnippet || ''
 
-  const subject = `New comment on: ${approvalTitle}`
+  const subject = 'Form answers running low for ' + clientName
+
   const html = baseTemplate(
-    'New comment on an approval',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div><b>${escapeHtml(clientName)}</b> commented on <b>${escapeHtml(approvalTitle)}</b>.</div>
-        ${commentSnippet ? `<div style="margin-top:10px;color:#374151;"><b>Comment:</b><br/>"${escapeHtml(commentSnippet)}"</div>` : ''}
-        ${buttonHtml(url, 'Open approval')}
-      </div>
-    `
+    'Email material is running low',
+    paraHtml('<b>' + escapeHtml(clientName) + '</b> has only <b>' + remaining +
+      '</b> unused form answer' + (remaining === 1 ? '' : 's') + ' left for email campaigns.') +
+    paraHtml('Once the answers run out, new value emails cannot be generated without repeating old material. Send them a new questions form to keep the emails fresh.') +
+    (url ? buttonHtml(url, 'Open client profile') : '')
   )
 
-  sendHtmlEmail(payload, subject, html)
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html })
 }
 
-function quotaProbe() {
-  Logger.log('before: ' + MailApp.getRemainingDailyQuota());
-  MailApp.sendEmail({
-    to: 'fokuskreatives@gmail.com',
-    subject: 'quota probe',
-    htmlBody: '<p>probe</p>'
-  });
-  Logger.log('after: ' + MailApp.getRemainingDailyQuota());
-}
+// Internal alert: a client's list has outgrown free Google sending, so
+// campaigns are spreading across multiple days. Nudge the team to move the
+// client to Google Workspace (lifts the daily limit to ~2,000).
 
+function handleEmailUpgradeNudge(payload) {
+  const recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleEmailUpgradeNudge: no recipients'); return }
 
-function handleApprovalCommentResolved(payload) {
-  const clientName = payload.clientName || 'Client'
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval'
-  const url = payload.url || ''
-  const commentSnippet = payload.commentSnippet || ''
+  const clientName = payload.clientName || 'A client'
+  const dailyMax = (payload.dailyMax != null) ? payload.dailyMax : 120
+  const url = payload.url || 'https://workspace.google.com/'
 
-  const subject = `Resolved: comment on ${approvalTitle}`
   const html = baseTemplate(
-    'A comment you wrote was marked resolved',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div>Your comment on <b>${escapeHtml(approvalTitle)}</b> was marked resolved.</div>
-        ${commentSnippet ? `<div style="margin-top:10px;color:#374151;"><b>Your comment:</b><br/>"${escapeHtml(commentSnippet)}"</div>` : ''}
-        ${buttonHtml(url, 'Open approval')}
-      </div>
-    `
+    'Time to upgrade email sending',
+    paraHtml('<b>' + escapeHtml(clientName) + '</b> is sending more emails than the free Google plan safely allows (about ' +
+      dailyMax + ' a day), so their campaigns are now spreading across several days to avoid being flagged.') +
+    paraHtml('Moving them to Google Workspace lifts the limit to roughly 2,000 a day and sends from their own professional email address. Setup takes a few minutes, then reconnect their email under Settings.') +
+    (url ? buttonHtml(url, 'See Google Workspace') : '')
   )
 
-  sendHtmlEmail(payload, subject, html)
-}
-
-function handleApprovalCreated(payload) {
-  const clientName = payload.clientName || 'Client';
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
-  const url = payload.url || '';
-
-  const subject = `Approval created: ${approvalTitle}`;
-  const html = baseTemplate(
-    'New approval created',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div><b>Client:</b> ${clientName}</div>
-        <div style="margin-top:6px;"><b>Approval:</b> ${approvalTitle}</div>
-        ${buttonHtml(url, 'Open approval')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-function handleApprovalApproved(payload) {
-  const clientName = payload.clientName || 'Client';
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
-  const url = payload.url || '';
-
-  const subject = `Approved: ${approvalTitle}`;
-  const html = baseTemplate(
-    'Approval approved',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div><b>Client:</b> ${clientName}</div>
-        <div style="margin-top:6px;"><b>Approval:</b> ${approvalTitle}</div>
-        ${buttonHtml(url, 'View approval')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-function handleApprovalMention(payload) {
-  const clientName = payload.clientName || 'Client';
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
-  const url = payload.url || '';
-  const commentSnippet = payload.commentSnippet || '';
-
-  const subject = `You were mentioned: ${approvalTitle}`;
-  const html = baseTemplate(
-    'You were mentioned in an approval comment',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div><b>Client:</b> ${clientName}</div>
-        <div style="margin-top:6px;"><b>Approval:</b> ${approvalTitle}</div>
-        ${commentSnippet ? `<div style="margin-top:10px;color:#374151;"><b>Comment:</b><br/>"${commentSnippet}"</div>` : ''}
-        ${buttonHtml(url, 'Open approval')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-function handleApprovalReminder(payload) {
-  const clientName = payload.clientName || 'Client';
-  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
-  const url = payload.url || '';
-  const reminderLabel = payload.reminderLabel || 'Reminder';
-
-  const subject = `Reminder: ${approvalTitle}`;
-  const html = baseTemplate(
-    'Approval reminder',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <div><b>Client:</b> ${clientName}</div>
-        <div style="margin-top:6px;"><b>Approval:</b> ${approvalTitle}</div>
-        <div style="margin-top:10px;color:#374151;"><b>Reminder:</b> ${reminderLabel}</div>
-        ${buttonHtml(url, 'Open approval')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-// ========== FORMS / INTAKE ==========
-
-function handleBrandIntakeSubmitted(payload) {
-  const clientName = payload.clientName || 'A client';
-  const businessName = payload.businessName || '';
-  const url = payload.url || '';
-
-  const who = businessName ? `${clientName} (${businessName})` : clientName;
-  const subject = `Brand intake submitted: ${who}`;
-
-  const html = baseTemplate(
-    'Brand intake submitted',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <p style="margin:0 0 10px;"><b>${escapeHtml(who)}</b> just submitted their brand intake form.</p>
-        <p style="margin:0;color:#4B5563;">Review their profile and kick off content creation.</p>
-        ${buttonHtml(url, 'View client profile')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-function handleQuestionFormSubmitted(payload) {
-  const clientName = payload.clientName || 'A client';
-  const businessName = payload.businessName || '';
-  const count = typeof payload.count === 'number' ? payload.count : 0;
-  const url = payload.url || '';
-
-  const who = businessName ? `${clientName} (${businessName})` : clientName;
-  const subject = count
-    ? `${who} answered ${count} braindump question${count === 1 ? '' : 's'}`
-    : `${who} submitted a braindump`;
-
-  const html = baseTemplate(
-    'Question form submitted',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <p style="margin:0 0 10px;"><b>${escapeHtml(who)}</b> just filled out their braindump form${count ? ` and dropped <b>${count}</b> answer${count === 1 ? '' : 's'} into their topic bank` : ''}.</p>
-        <p style="margin:0;color:#4B5563;">Their topics are ready to turn into scripts.</p>
-        ${buttonHtml(url, 'Open client profile')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
-}
-
-function handleSeriesFormSubmitted(payload) {
-  const clientName = payload.clientName || 'A client';
-  const businessName = payload.businessName || '';
-  const seriesTitle = payload.seriesTitle || 'a series';
-  const count = typeof payload.count === 'number' ? payload.count : 0;
-  const url = payload.url || '';
-
-  const who = businessName ? `${clientName} (${businessName})` : clientName;
-  const subject = count
-    ? `${who} filled out ${count} answer${count === 1 ? '' : 's'} for "${seriesTitle}"`
-    : `${who} submitted "${seriesTitle}"`;
-
-  const html = baseTemplate(
-    'Series form submitted',
-    `
-      <div style="font-size:14px;color:#111827;">
-        <p style="margin:0 0 10px;"><b>${escapeHtml(who)}</b> just submitted the series form for <b>${escapeHtml(seriesTitle)}</b>${count ? `, with <b>${count}</b> per-entry answer${count === 1 ? '' : 's'}` : ''}.</p>
-        <p style="margin:0;color:#4B5563;">Open the Series Form tab on the dashboard and click <b>Build prompt</b> on the form to assemble the external prompt from their answers.</p>
-        ${buttonHtml(url, 'Open client profile')}
-      </div>
-    `
-  );
-
-  sendHtmlEmail(payload, subject, html);
+  MailApp.sendEmail({ to: recipients, subject: 'Upgrade email sending for ' + clientName, htmlBody: html })
 }
 
 // ========== INVOICES ==========
@@ -465,21 +373,19 @@ function handleInvoiceSent(payload) {
   const link = payload.link || ''
 
   const subject = payload.subject ||
-    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreativez'))
+    ('Invoice' + (invoiceNumber ? ' #' + invoiceNumber : '') + ' from ' + (payload.fromName || 'Fokus Kreatives'))
 
   const html = baseTemplate(
-    'You have a new invoice',
-    '<div style="font-size:14px;color:#111827;">' +
-      '<p style="margin:0 0 10px;">Hi ' + escapeHtml(billToName) + ',</p>' +
-      '<p style="margin:0 0 12px;">Your invoice' +
-        (invoiceNumber ? ' <b>#' + escapeHtml(invoiceNumber) + '</b>' : '') +
-        ' is ready to view and pay online.</p>' +
-      '<div style="background:#F9FAFB;border-radius:12px;padding:12px 16px;margin-bottom:12px;">' +
-        '<p style="margin:0 0 4px;"><b>Amount due:</b> ' + escapeHtml(currency) + ' ' + amount + '</p>' +
-        (dueDate ? '<p style="margin:0;"><b>Due date:</b> ' + escapeHtml(dueDate) + '</p>' : '') +
-      '</div>' +
-      (link ? buttonHtml(link, 'View invoice') : '') +
-    '</div>',
+    'Your invoice is ready',
+    paraHtml('Hi ' + escapeHtml(billToName) + ',') +
+    paraHtml('Your invoice' +
+      (invoiceNumber ? ' <b>#' + escapeHtml(invoiceNumber) + '</b>' : '') +
+      ' is ready to view and pay online.') +
+    factRowsHtml([
+      ['Amount due', escapeHtml(currency) + ' ' + amount],
+      ['Due date', dueDate ? escapeHtml(dueDate) : ''],
+    ]) +
+    (link ? buttonHtml(link, 'View invoice') : ''),
     payload.fromName
   )
 
@@ -488,6 +394,65 @@ function handleInvoiceSent(payload) {
 
 // ========== AGREEMENTS ==========
 
+// Delivers a capture page's lead magnet to the person who submitted the form.
+// Two flavours, set by the app via payload.magnetType:
+//   - 'url':  a button linking to an external resource (link only).
+//   - 'file': same button (pointing at the uploaded file's public URL) PLUS
+//             the file attached to the email, fetched from payload.attachUrl.
+// White-labeled with the client's brand name. Attachment failures degrade
+// gracefully to a link-only email so the lead always gets something.
+
+function handleLeadMagnet(payload) {
+  var recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleLeadMagnet: no recipients'); return }
+
+  var leadName = payload.leadName || 'there'
+  var url = payload.magnetUrl || ''
+  var brand = payload.clientName || 'Fokus Kreatives'
+  var buttonText = payload.buttonText || 'Access your resource'
+  var intro = payload.message
+    ? escapeHtml(payload.message)
+    : 'Thanks for signing up. Here is the resource you requested.'
+
+  var body =
+    paraHtml('Hi ' + escapeHtml(leadName) + ',') +
+    paraHtml(intro) +
+    (url ? buttonHtml(url, escapeHtml(buttonText)) : '')
+
+  var html = baseTemplate('Your resource from ' + escapeHtml(brand), body, payload.clientName)
+
+  // Attach the uploaded file when one was provided. Capped to keep under
+  // Gmail's ~25MB attachment limit; oversize or failed fetches fall back to
+  // the link in the email body.
+  var attachments = []
+  if (payload.attachUrl) {
+    try {
+      var resp = UrlFetchApp.fetch(payload.attachUrl, { muteHttpExceptions: true, followRedirects: true })
+      if (resp.getResponseCode() === 200) {
+        var blob = resp.getBlob()
+        if (blob.getBytes().length <= 20 * 1024 * 1024) {
+          var fname = (payload.fileName || 'resource').replace(/[^\w.\- ]+/g, '').slice(0, 120)
+          blob.setName(fname)
+          attachments.push(blob)
+        } else {
+          Logger.log('handleLeadMagnet: file too large to attach, sending link only')
+        }
+      }
+    } catch (e) {
+      Logger.log('handleLeadMagnet: attach failed, sending link only: ' + e)
+    }
+  }
+
+  var subject = payload.subject || ('Your resource from ' + brand)
+  var msg = { to: recipients, subject: subject, htmlBody: html }
+  // No fromName from the capture route, so brand the sender with the client.
+  if (payload.fromName) msg.name = payload.fromName
+  else if (payload.clientName) msg.name = payload.clientName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  if (attachments.length) msg.attachments = attachments
+  MailApp.sendEmail(msg)
+}
+
 function handleAgreementSent(payload) {
   const recipients = normalizeRecipients(payload.to)
   if (!recipients) { Logger.log('handleAgreementSent: no recipients'); return }
@@ -495,20 +460,27 @@ function handleAgreementSent(payload) {
   const recipientName = payload.recipientName || 'there'
   const title = payload.title || 'Agreement'
   const link = payload.link || ''
-  const fromName = payload.fromName || 'Fokus Kreativez'
+  const fromName = payload.fromName || 'Fokus Kreatives'
+  // CC copies carry cc:true - same email, "view" wording, no signing ask.
+  const isCc = payload.cc === true
 
   const subject = payload.subject || (title + ' from ' + fromName)
 
+  const body = isCc
+    ? paraHtml('Hi ' + escapeHtml(recipientName) + ',') +
+      paraHtml('<b>' + escapeHtml(fromName) + '</b> has shared <b>' +
+        escapeHtml(title) + '</b> with you for your records.') +
+      (link ? buttonHtml(link, 'View agreement') : '') +
+      mutedHtml('No action is needed from you.')
+    : paraHtml('Hi ' + escapeHtml(recipientName) + ',') +
+      paraHtml('<b>' + escapeHtml(fromName) + '</b> has sent you <b>' +
+        escapeHtml(title) + '</b> to review and sign online.') +
+      (link ? buttonHtml(link, 'Review and sign') : '') +
+      mutedHtml('Signing takes less than a minute. Once signed, a copy is emailed to you automatically.')
+
   const html = baseTemplate(
-    'You have an agreement to review and sign',
-    '<div style="font-size:14px;color:#111827;">' +
-      '<p style="margin:0 0 10px;">Hi ' + escapeHtml(recipientName) + ',</p>' +
-      '<p style="margin:0 0 12px;"><b>' + escapeHtml(fromName) + '</b> has sent you <b>' +
-        escapeHtml(title) + '</b> to review and sign online.</p>' +
-      buttonHtml(link, 'Review and sign') +
-      '<p style="margin:12px 0 0;color:#6B7280;font-size:13px;">Signing takes less than a minute. ' +
-        'Once signed, a copy is emailed to you automatically.</p>' +
-    '</div>',
+    isCc ? 'An agreement was shared with you' : 'You have an agreement to sign',
+    body,
     payload.fromName
   )
 
@@ -524,68 +496,76 @@ function handleAgreementSigned(payload) {
   const signerName = payload.signerName || ''
   const signedAt = payload.signedAt || ''
   const link = payload.link || ''
+  const invoiceUrl = payload.invoiceUrl || ''
 
   const subject = payload.subject || ('Signed: ' + title)
 
   const html = baseTemplate(
     'Agreement signed',
-    '<div style="font-size:14px;color:#111827;">' +
-      '<p style="margin:0 0 10px;">Hi ' + escapeHtml(recipientName) + ',</p>' +
-      '<p style="margin:0 0 12px;"><b>' + escapeHtml(title) + '</b> has been signed' +
-        (signerName ? ' by <b>' + escapeHtml(signerName) + '</b>' : '') +
-        (signedAt ? ' on ' + escapeHtml(signedAt) : '') + '.</p>' +
-      buttonHtml(link, 'View signed agreement') +
-      '<p style="margin:12px 0 0;color:#6B7280;font-size:13px;">Keep this email for your records. ' +
-        'The link above always shows the signed document.</p>' +
-    '</div>',
+    paraHtml('Hi ' + escapeHtml(recipientName) + ',') +
+    paraHtml('<b>' + escapeHtml(title) + '</b> has been signed' +
+      (signerName ? ' by <b>' + escapeHtml(signerName) + '</b>' : '') +
+      (signedAt ? ' on ' + escapeHtml(signedAt) : '') + '.') +
+    (link ? buttonHtml(link, 'View signed agreement') : '') +
+    (invoiceUrl
+      ? paraHtml('An invoice for this agreement is ready.') + buttonHtml(invoiceUrl, 'View invoice')
+      : '') +
+    mutedHtml(payload.pdfHtml
+      ? 'A PDF copy of the signed agreement is attached for your records.'
+      : 'Keep this email for your records. The link above always shows the signed document.'),
     payload.fromName
   )
 
-  sendHtmlEmail(payload, subject, html)
+  // Attach a PDF of the signed agreement when the app provided its HTML.
+  // Apps Script renders HTML -> PDF natively (no library needed). Password
+  // protected agreements omit pdfHtml on purpose and stay link-only.
+  var attachments = []
+  if (payload.pdfHtml) {
+    try {
+      var name = (payload.pdfName || (title + '.pdf')).replace(/[^\w.\- ]+/g, '').slice(0, 120)
+      if (name.slice(-4).toLowerCase() !== '.pdf') name += '.pdf'
+      var pdf = Utilities.newBlob(payload.pdfHtml, 'text/html', 'agreement.html')
+        .getAs('application/pdf')
+        .setName(name)
+      attachments.push(pdf)
+    } catch (e) {
+      Logger.log('handleAgreementSigned: PDF build failed, sending without attachment: ' + e)
+    }
+  }
+
+  var msg = { to: normalizeRecipients(payload.to), subject: subject, htmlBody: html }
+  if (payload.fromName) msg.name = payload.fromName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  if (attachments.length) msg.attachments = attachments
+  MailApp.sendEmail(msg)
 }
 
 // ========== PAYMENTS ==========
 
 function handlePaymentCreated(payload) {
-  if (!payload) {
-    Logger.log('handlePaymentCreated: no payload')
-    return
-  }
+  if (!payload) { Logger.log('handlePaymentCreated: no payload'); return }
 
   const recipients = normalizeRecipients(payload.to)
-  if (!recipients) {
-    Logger.log('handlePaymentCreated: no recipients')
-    return
-  }
+  if (!recipients) { Logger.log('handlePaymentCreated: no recipients'); return }
 
   const amount = payload.amount || 0
   const currency = payload.currency || 'USD'
   const dueDate = payload.dueDate || null
   const clientName = payload.clientName || 'there'
 
-  const subject =
-    payload.subject || `New payment just got logged for your account`
+  const subject = payload.subject || 'New payment just got logged for your account'
 
-  const dueText = dueDate
-    ? 'Due date: <strong>' + escapeHtml(dueDate) + '</strong>'
-    : 'No due date set yet.'
+  const html = baseTemplate(
+    'A payment was added to your account',
+    paraHtml('Hi ' + escapeHtml(clientName) + ',') +
+    paraHtml('A new payment was just added to your CRM.') +
+    factRowsHtml([
+      ['Amount', escapeHtml(currency) + ' ' + amount],
+      ['Due date', dueDate ? escapeHtml(dueDate) : ''],
+    ])
+  )
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827; margin-bottom:8px;">Hey ' + escapeHtml(clientName) + ',</h2>' +
-      '<p style="color:#111827; margin:0 0 12px;">A new payment was just added to your CRM.</p>' +
-      '<div style="background:#F9FAFB; border-radius:12px; padding:12px 16px; margin-bottom:12px;">' +
-        '<p style="margin:0 0 4px;"><strong>Amount:</strong> ' + escapeHtml(currency) + ' ' + amount + '</p>' +
-        '<p style="margin:0 0 4px;">' + dueText + '</p>' +
-      '</div>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreativez</p>' +
-    '</div>'
-
-  MailApp.sendEmail({
-    to: recipients,
-    subject: subject,
-    htmlBody: html,
-  })
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html })
 }
 
 function handlePaymentDue(payload) {
@@ -598,29 +578,24 @@ function handlePaymentDue(payload) {
   const clientName = payload.clientName || 'Client';
 
   const subject = payload.subject || ('Payment due for ' + clientName);
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#b91c1c;">Payment Due Reminder</h2>' +
-      '<p>A payment is now due.</p>' +
-      '<ul>' +
-        '<li><strong>Client:</strong> ' + escapeHtml(clientName) + '</li>' +
-        '<li><strong>Amount:</strong> ' + currency + ' ' + amount + '</li>' +
-        '<li><strong>Due date:</strong> ' + dueDate + '</li>' +
-      '</ul>' +
-      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p>' +
-    '</div>';
 
-  MailApp.sendEmail({
-    to: recipients,
-    subject: subject,
-    htmlBody: html
-  });
+  const html = baseTemplate(
+    'Payment due',
+    paraHtml('A payment is now due.') +
+    factRowsHtml([
+      ['Client', escapeHtml(clientName)],
+      ['Amount', escapeHtml(currency) + ' ' + amount],
+      ['Due date', dueDate ? escapeHtml(dueDate) : ''],
+    ])
+  )
+
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html });
 }
 
 // ========== MEETINGS ==========
 
-// Helper: turn payload.calendar into HTML button row + ics attachment.
-// Returns { buttonsHtml, attachments } — caller appends buttons into
+// Helper: turn payload.calendar into HTML links + ics attachment.
+// Returns { buttonsHtml, attachments } - caller appends buttons into
 // its template and passes attachments to MailApp.sendEmail.
 function buildCalendarBlock(payload) {
   const cal = payload.calendar
@@ -629,33 +604,29 @@ function buildCalendarBlock(payload) {
   }
 
   const btn = (href, label) =>
-    '<a href="' + href + '" target="_blank" ' +
-      'style="display:inline-block;margin:4px 6px 4px 0;padding:8px 14px;' +
-      'background:#F3F4F6;color:#111827;text-decoration:none;font-size:12px;' +
-      'font-weight:600;border-radius:8px;border:1px solid #E5E7EB;">' +
-      label +
-    '</a>'
+    href
+      ? '<a href="' + href + '" target="_blank" ' +
+        'style="display:inline-block;margin:4px 6px 4px 0;padding:7px 14px;' +
+        'background:#FFFFFF;color:#374151;text-decoration:none;font-size:12px;' +
+        'font-weight:600;border-radius:9999px;border:1px solid #E5E7EB;">' +
+        label +
+        '</a>'
+      : ''
 
   const buttonsHtml =
-    '<div style="margin:18px 0;padding:14px 16px;background:#F9FAFB;' +
-      'border:1px solid #E5E7EB;border-radius:12px;">' +
-      '<div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:8px;">' +
-        '📅 Add to your calendar' +
-      '</div>' +
-      '<div style="font-size:12px;color:#4B5563;margin-bottom:10px;">' +
-        'One-click add. Your calendar will handle reminders for you.' +
+    '<div style="margin:20px 0 4px;padding:16px 18px;border:1px solid #F3F4F6;border-radius:10px;">' +
+      '<div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:10px;">' +
+        'Add to your calendar' +
       '</div>' +
       btn(cal.googleUrl, 'Google Calendar') +
       btn(cal.outlookUrl, 'Outlook') +
       btn(cal.office365Url, 'Office 365') +
       btn(cal.yahooUrl, 'Yahoo') +
-      '<div style="margin-top:8px;font-size:11px;color:#6B7280;">' +
+      '<div style="margin-top:10px;font-size:12px;color:#9CA3AF;">' +
         'Apple Calendar users: open the attached .ics file.' +
       '</div>' +
     '</div>'
 
-  // ICS as a downloadable / clickable attachment. Apple Calendar +
-  // Outlook desktop open it natively.
   const icsBlob = Utilities.newBlob(cal.ics, 'text/calendar', 'invite.ics')
   return { buttonsHtml: buttonsHtml, attachments: [icsBlob] }
 }
@@ -675,41 +646,28 @@ function handleMeetingCreated(payload) {
   const platformLabel = platform || 'Manual booking'
   const subject = payload.subject || ('New ' + platformLabel + ' meeting: ' + title)
 
-  var linkHtml = ''
-  if (link) {
-    linkHtml = '<p><a href="' + link + '" target="_blank" ' +
-      'style="display:inline-block;background:#2B79F7;color:#fff;text-decoration:none;' +
-      'padding:10px 16px;border-radius:10px;font-weight:700;">Open meeting link</a></p>'
-  }
-
-  var attendeeHtml = ''
+  var bookedBy = ''
   if (attendeeName || attendeeEmail) {
-    attendeeHtml =
-      '<li><strong>Booked by:</strong> ' +
-        escapeHtml(attendeeName || attendeeEmail) +
-        (attendeeName && attendeeEmail
-          ? ' (<a href="mailto:' + attendeeEmail + '">' + escapeHtml(attendeeEmail) + '</a>)'
-          : '') +
-      '</li>'
+    bookedBy = escapeHtml(attendeeName || attendeeEmail) +
+      (attendeeName && attendeeEmail ? ' (' + escapeHtml(attendeeEmail) + ')' : '')
   }
 
   const cal = buildCalendarBlock(payload)
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827;">New Meeting Scheduled</h2>' +
-      '<p>A new meeting has been scheduled' + (platform ? ' via <strong>' + escapeHtml(platform) + '</strong>' : '') + '.</p>' +
-      '<ul>' +
-        '<li><strong>Title:</strong> ' + escapeHtml(title) + '</li>' +
-        '<li><strong>Client:</strong> ' + escapeHtml(clientName) + '</li>' +
-        (when ? '<li><strong>When:</strong> ' + escapeHtml(when) + '</li>' : '') +
-        (platform ? '<li><strong>Platform:</strong> ' + escapeHtml(platform) + '</li>' : '') +
-        attendeeHtml +
-      '</ul>' +
-      linkHtml +
-      cal.buttonsHtml +
-      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p>' +
-    '</div>'
+  const html = baseTemplate(
+    'New meeting scheduled',
+    paraHtml('A new meeting has been scheduled' +
+      (platform ? ' via <b>' + escapeHtml(platform) + '</b>' : '') + '.') +
+    factRowsHtml([
+      ['Meeting', escapeHtml(title)],
+      ['Client', escapeHtml(clientName)],
+      ['When', when ? escapeHtml(when) : ''],
+      ['Platform', platform ? escapeHtml(platform) : ''],
+      ['Booked by', bookedBy],
+    ]) +
+    (link ? buttonHtml(link, 'Open meeting link') : '') +
+    cal.buttonsHtml
+  )
 
   MailApp.sendEmail({
     to: recipients,
@@ -732,31 +690,22 @@ function handleMeetingInviteeConfirmation(payload) {
 
   const subject = payload.subject || ('Your meeting with ' + clientName + ' is confirmed')
 
-  var linkHtml = ''
-  if (link) {
-    linkHtml =
-      '<p style="margin:20px 0;"><a href="' + link + '" target="_blank" ' +
-        'style="display:inline-block;background:#2B79F7;color:#fff;text-decoration:none;' +
-        'padding:12px 22px;border-radius:10px;font-weight:700;">Join meeting</a></p>'
-  }
-
   const cal = buildCalendarBlock(payload)
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827;">You\'re booked in</h2>' +
-      '<p>Hey ' + escapeHtml(attendeeName) + ',</p>' +
-      '<p>Your meeting with <strong>' + escapeHtml(clientName) + '</strong> is confirmed' +
-      (platform ? ' on <strong>' + escapeHtml(platform) + '</strong>' : '') + '.</p>' +
-      '<div style="background:#F9FAFB;border-radius:12px;padding:14px 18px;margin:12px 0;">' +
-        '<p style="margin:0 0 6px;"><strong>Title:</strong> ' + escapeHtml(title) + '</p>' +
-        (when ? '<p style="margin:0 0 6px;"><strong>When:</strong> ' + escapeHtml(when) + '</p>' : '') +
-        (platform ? '<p style="margin:0;"><strong>Platform:</strong> ' + escapeHtml(platform) + '</p>' : '') +
-      '</div>' +
-      linkHtml +
-      cal.buttonsHtml +
-      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">See you then.</p>' +
-    '</div>'
+  const html = baseTemplate(
+    'Your meeting is confirmed',
+    paraHtml('Hi ' + escapeHtml(attendeeName) + ',') +
+    paraHtml('Your meeting with <b>' + escapeHtml(clientName) + '</b> is confirmed.') +
+    factRowsHtml([
+      ['Meeting', escapeHtml(title)],
+      ['When', when ? escapeHtml(when) : ''],
+      ['Platform', platform ? escapeHtml(platform) : ''],
+    ]) +
+    (link ? buttonHtml(link, 'Join meeting') : '') +
+    cal.buttonsHtml +
+    mutedHtml('See you then.'),
+    payload.fromName || (clientName !== 'them' ? clientName : '')
+  )
 
   const msg = { to: recipients, subject: subject, htmlBody: html, attachments: cal.attachments }
   if (payload.fromName) msg.name = payload.fromName
@@ -767,19 +716,19 @@ function handleMeetingInviteeConfirmation(payload) {
 function handleMeetingRescheduled(payload) {
   const recipients = normalizeRecipients(payload.to);
   if (!recipients) return;
+
   const title = payload.title || 'Your meeting';
   const when = payload.when || '';
   const link = payload.link || '';
   const clientName = payload.clientName || 'the team';
-  var linkHtml = link ? '<p><a href="' + link + '" target="_blank" style="display:inline-block;background:#2B79F7;color:#fff;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:700;">Join link</a></p>' : '';
-  var html =
-    '<div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827;">Your meeting has been rescheduled</h2>' +
-      '<p><strong>' + escapeHtml(title) + '</strong> with ' + escapeHtml(clientName) + ' has a new time:</p>' +
-      '<div style="background:#F9FAFB;border-radius:12px;padding:14px 18px;margin:12px 0;"><strong>' + escapeHtml(when) + '</strong></div>' +
-      linkHtml +
-      '<p style="font-size:12px;color:#6b7280;">Sent by ' + escapeHtml(payload.fromName || 'Fokus Kreativez') + '</p>' +
-    '</div>';
+
+  const html = baseTemplate(
+    'Your meeting was rescheduled',
+    paraHtml('<b>' + escapeHtml(title) + '</b> with ' + escapeHtml(clientName) + ' has a new time.') +
+    factRowsHtml([['New time', when ? escapeHtml(when) : '']]) +
+    (link ? buttonHtml(link, 'Join meeting') : ''),
+    payload.fromName
+  )
 
   const msg = { to: recipients, subject: 'Rescheduled: ' + title, htmlBody: html }
   if (payload.fromName) msg.name = payload.fromName
@@ -798,96 +747,64 @@ function handleMeetingReminder(payload) {
   const timing = payload.timing || 'upcoming';
 
   const subject = payload.subject || ('Reminder: ' + title + ' (' + timing + ')');
-  var linkHtml = '';
-  if (link) {
-    linkHtml = '<p><a href="' + link + '">Join meeting</a></p>';
-  }
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827;">Meeting Reminder</h2>' +
-      '<p>You have a meeting ' + escapeHtml(timing) + '.</p>' +
-      '<ul>' +
-        '<li><strong>Title:</strong> ' + escapeHtml(title) + '</li>' +
-        '<li><strong>Client:</strong> ' + escapeHtml(clientName) + '</li>' +
-        (when ? '<li><strong>When:</strong> ' + escapeHtml(when) + '</li>' : '') +
-      '</ul>' +
-      linkHtml +
-      '<p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p>' +
-    '</div>';
+  const html = baseTemplate(
+    'Meeting reminder',
+    paraHtml('You have a meeting ' + escapeHtml(timing) + '.') +
+    factRowsHtml([
+      ['Meeting', escapeHtml(title)],
+      ['Client', escapeHtml(clientName)],
+      ['When', when ? escapeHtml(when) : ''],
+    ]) +
+    (link ? buttonHtml(link, 'Join meeting') : '')
+  )
 
-  MailApp.sendEmail({
-    to: recipients,
-    subject: subject,
-    htmlBody: html
-  });
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html });
 }
 
 // ========== CAPTURE / LEADS ==========
 
 function handleCaptureSubmission(payload) {
-  if (!payload) {
-    Logger.log('handleCaptureSubmission: no payload')
-    return
-  }
+  if (!payload) { Logger.log('handleCaptureSubmission: no payload'); return }
 
   const recipients = normalizeRecipients(payload.to)
-  if (!recipients) {
-    Logger.log('handleCaptureSubmission: no recipients')
-    return
-  }
+  if (!recipients) { Logger.log('handleCaptureSubmission: no recipients'); return }
 
   const pageName = payload.pageName || 'Capture page'
-  const slug = payload.slug || ''
   const formData = payload.formData || {}
   const fieldLabels = payload.fieldLabels || {}
   const clientName = payload.clientName || 'there'
 
-  // Build label-aware bullet list. Falls back to a friendly version
-  // of the raw key (e.g. "Meeting date" instead of "meeting_date") so
-  // submission keys that aren't in fieldLabels still look readable.
+  // Build label-aware rows. Falls back to a friendly version of the raw
+  // key (e.g. "Meeting date" instead of "meeting_date") so submission
+  // keys that aren't in fieldLabels still look readable.
   const skipKeys = ['meeting_date', 'meeting_time']
-  const keys = Object.keys(formData).filter(k => !skipKeys.includes(k))
+  const keys = Object.keys(formData).filter(k => skipKeys.indexOf(k) === -1)
   keys.sort()
 
   function prettyKey(k) {
     return String(k).replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
-  var rowsHtml = ''
-  keys.forEach(function (k) {
+  const rows = keys.map(function (k) {
     const label = fieldLabels[k] || prettyKey(k)
     const raw = formData[k]
     const val = (raw === null || raw === undefined || String(raw) === '')
-      ? '—'
+      ? '-'
       : escapeHtml(String(raw))
-    rowsHtml +=
-      '<tr>' +
-        '<td style="padding:8px 12px;border:1px solid #e5e7eb;background:#F9FAFB;width:40%;"><b>' + escapeHtml(label) + '</b></td>' +
-        '<td style="padding:8px 12px;border:1px solid #e5e7eb;">' + val + '</td>' +
-      '</tr>'
+    return [escapeHtml(label), val]
   })
 
   const subject = payload.subject || ('New lead from "' + pageName + '"')
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 620px; margin: 0 auto;">' +
-      '<h2 style="color:#111827; margin-bottom:8px;">Hey ' + escapeHtml(clientName) + ',</h2>' +
-      '<p style="margin:0 0 12px; color:#111827;">Good news - someone just filled out your capture page <strong>' +
-        escapeHtml(pageName) +
-      '</strong>.</p>' +
-      (slug ? '<p style="margin:0 0 12px; color:#6B7280; font-size:13px;">Slug: ' + escapeHtml(slug) + '</p>' : '') +
-      '<table style="border-collapse:collapse;width:100%;margin-top:8px;">' +
-        rowsHtml +
-      '</table>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:20px;">Sent by Fokus Kreativez</p>' +
-    '</div>'
+  const html = baseTemplate(
+    'New capture page submission',
+    paraHtml('Hi ' + escapeHtml(clientName) + ',') +
+    paraHtml('Someone just filled out your capture page <b>' + escapeHtml(pageName) + '</b>.') +
+    factRowsHtml(rows)
+  )
 
-  MailApp.sendEmail({
-    to: recipients,
-    subject: subject,
-    htmlBody: html
-  })
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html })
 }
 
 function renderFormTable(formData, fieldLabels) {
@@ -898,7 +815,7 @@ function renderFormTable(formData, fieldLabels) {
   return keys.map((k) => {
     const label = labels[k] || k
     const v = formData[k]
-    const val = (v === null || v === undefined || String(v) === '') ? '—' : String(v)
+    const val = (v === null || v === undefined || String(v) === '') ? '-' : String(v)
     return `<tr>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;"><b>${label}</b></td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;">${val}</td>
@@ -907,55 +824,244 @@ function renderFormTable(formData, fieldLabels) {
 }
 
 function handleLeadCreated(payload) {
-  if (!payload) {
-    Logger.log('handleLeadCreated: no payload')
-    return
-  }
+  if (!payload) { Logger.log('handleLeadCreated: no payload'); return }
 
   const recipients = normalizeRecipients(payload.to)
-  if (!recipients) {
-    Logger.log('handleLeadCreated: no recipients')
-    return
-  }
+  if (!recipients) { Logger.log('handleLeadCreated: no recipients'); return }
 
   const leadName = payload.leadName || 'New Lead'
   const source = payload.source || 'Unknown source'
   const clientName = payload.clientName || 'there'
 
-  const subject =
-    payload.subject || `You just got a new lead in your CRM`
+  const subject = payload.subject || 'You just got a new lead in your CRM'
 
-  const html =
-    '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-      '<h2 style="color:#111827; margin-bottom:8px;">Hey ' + escapeHtml(clientName) + ',</h2>' +
-      '<p style="margin:0 0 12px; color:#111827;">You just got a new lead added to your CRM.</p>' +
-      '<div style="background:#F9FAFB; border-radius:12px; padding:12px 16px; margin-bottom:12px;">' +
-        '<p style="margin:0 0 4px;"><strong>Name:</strong> ' + escapeHtml(leadName) + '</p>' +
-        '<p style="margin:0 0 4px;"><strong>Source:</strong> ' + escapeHtml(source) + '</p>' +
-      '</div>' +
-      '<p style="color:#6B7280; font-size:12px; margin-top:16px;">Sent by Fokus Kreativez</p>' +
-    '</div>'
+  const html = baseTemplate(
+    'New lead in your CRM',
+    paraHtml('Hi ' + escapeHtml(clientName) + ',') +
+    paraHtml('You just got a new lead added to your CRM.') +
+    factRowsHtml([
+      ['Name', escapeHtml(leadName)],
+      ['Source', escapeHtml(source)],
+    ])
+  )
 
-  MailApp.sendEmail({
-    to: recipients,
-    subject: subject,
-    htmlBody: html,
-  })
+  MailApp.sendEmail({ to: recipients, subject: subject, htmlBody: html })
+}
+
+// Custom "thanks for filling out the form" email sent to the person who
+// submitted a capture page (only when the page has it toggled on). The app
+// fills {{Field}} merge tokens from the submitter's answers and passes the
+// finished subject + body html, so this handler just wraps the body in the
+// white-labeled shell and sends it. MailApp sends from the script owner's
+// connected Google account, so it goes out as the connected email.
+function handleThankYou(payload) {
+  var recipients = normalizeRecipients(payload.to)
+  if (!recipients) { Logger.log('handleThankYou: no recipients'); return }
+
+  var bodyHtml = payload.html || ''
+  if (!bodyHtml) { Logger.log('handleThankYou: no body'); return }
+
+  var subject = payload.subject || 'Thank you'
+  // Empty title - the agency's own copy carries the greeting/message, so we
+  // don't stack a heading on top of it. Brand = the client (white-label).
+  var html = baseTemplate('', bodyHtml, payload.clientName)
+
+  var msg = { to: recipients, subject: subject, htmlBody: html }
+  if (payload.fromName) msg.name = payload.fromName
+  else if (payload.clientName) msg.name = payload.clientName
+  if (payload.replyTo) msg.replyTo = payload.replyTo
+  MailApp.sendEmail(msg)
+}
+
+// ========== APPROVALS ==========
+
+function handleApprovalCreated(payload) {
+  const clientName = payload.clientName || 'Client';
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
+  const url = payload.url || '';
+
+  const subject = 'Approval created: ' + approvalTitle;
+  const html = baseTemplate(
+    'New approval created',
+    factRowsHtml([
+      ['Client', escapeHtml(clientName)],
+      ['Approval', escapeHtml(approvalTitle)],
+    ]) +
+    buttonHtml(url, 'Open approval')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleApprovalApproved(payload) {
+  const clientName = payload.clientName || 'Client';
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
+  const url = payload.url || '';
+
+  const subject = 'Approved: ' + approvalTitle;
+  const html = baseTemplate(
+    'Approval approved',
+    factRowsHtml([
+      ['Client', escapeHtml(clientName)],
+      ['Approval', escapeHtml(approvalTitle)],
+    ]) +
+    buttonHtml(url, 'View approval')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleApprovalMention(payload) {
+  const clientName = payload.clientName || 'Client';
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
+  const url = payload.url || '';
+  const commentSnippet = payload.commentSnippet || '';
+
+  const subject = 'You were mentioned: ' + approvalTitle;
+  const html = baseTemplate(
+    'You were mentioned in a comment',
+    paraHtml('You were mentioned in a comment on <b>' + escapeHtml(approvalTitle) +
+      '</b> for <b>' + escapeHtml(clientName) + '</b>.') +
+    (commentSnippet
+      ? paraHtml('<span style="color:#6B7280;">&quot;' + escapeHtml(commentSnippet) + '&quot;</span>')
+      : '') +
+    buttonHtml(url, 'Open approval')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleApprovalReminder(payload) {
+  const clientName = payload.clientName || 'Client';
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval';
+  const url = payload.url || '';
+  const reminderLabel = payload.reminderLabel || 'Reminder';
+
+  const subject = 'Reminder: ' + approvalTitle;
+  const html = baseTemplate(
+    'Approval reminder',
+    factRowsHtml([
+      ['Client', escapeHtml(clientName)],
+      ['Approval', escapeHtml(approvalTitle)],
+      ['Reminder', escapeHtml(reminderLabel)],
+    ]) +
+    buttonHtml(url, 'Open approval')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleApprovalComment(payload) {
+  const clientName = payload.clientName || 'Someone'
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval'
+  const url = payload.url || ''
+  const commentSnippet = payload.commentSnippet || ''
+
+  const subject = 'New comment on: ' + approvalTitle
+  const html = baseTemplate(
+    'New comment on an approval',
+    paraHtml('<b>' + escapeHtml(clientName) + '</b> commented on <b>' +
+      escapeHtml(approvalTitle) + '</b>.') +
+    (commentSnippet
+      ? paraHtml('<span style="color:#6B7280;">&quot;' + escapeHtml(commentSnippet) + '&quot;</span>')
+      : '') +
+    buttonHtml(url, 'Open approval')
+  )
+
+  sendHtmlEmail(payload, subject, html)
+}
+
+function handleApprovalCommentResolved(payload) {
+  const approvalTitle = payload.approvalTitle || payload.title || 'Approval'
+  const url = payload.url || ''
+  const commentSnippet = payload.commentSnippet || ''
+
+  const subject = 'Resolved: comment on ' + approvalTitle
+  const html = baseTemplate(
+    'Your comment was resolved',
+    paraHtml('Your comment on <b>' + escapeHtml(approvalTitle) + '</b> was marked resolved.') +
+    (commentSnippet
+      ? paraHtml('<span style="color:#6B7280;">&quot;' + escapeHtml(commentSnippet) + '&quot;</span>')
+      : '') +
+    buttonHtml(url, 'Open approval')
+  )
+
+  sendHtmlEmail(payload, subject, html)
+}
+
+// ========== FORMS / INTAKE ==========
+
+function handleBrandIntakeSubmitted(payload) {
+  const clientName = payload.clientName || 'A client';
+  const businessName = payload.businessName || '';
+  const url = payload.url || '';
+
+  const who = businessName ? clientName + ' (' + businessName + ')' : clientName;
+  const subject = 'Brand intake submitted: ' + who;
+
+  const html = baseTemplate(
+    'Brand intake submitted',
+    paraHtml('<b>' + escapeHtml(who) + '</b> just submitted their brand intake form.') +
+    paraHtml('Review their profile and kick off content creation.') +
+    buttonHtml(url, 'View client profile')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleQuestionFormSubmitted(payload) {
+  const clientName = payload.clientName || 'A client';
+  const businessName = payload.businessName || '';
+  const count = typeof payload.count === 'number' ? payload.count : 0;
+  const url = payload.url || '';
+
+  const who = businessName ? clientName + ' (' + businessName + ')' : clientName;
+  const subject = count
+    ? who + ' answered ' + count + ' braindump question' + (count === 1 ? '' : 's')
+    : who + ' submitted a braindump';
+
+  const html = baseTemplate(
+    'Question form submitted',
+    paraHtml('<b>' + escapeHtml(who) + '</b> just filled out their braindump form' +
+      (count ? ' and dropped <b>' + count + '</b> answer' + (count === 1 ? '' : 's') + ' into their topic bank' : '') + '.') +
+    paraHtml('Their topics are ready to turn into scripts.') +
+    buttonHtml(url, 'Open client profile')
+  );
+
+  sendHtmlEmail(payload, subject, html);
+}
+
+function handleSeriesFormSubmitted(payload) {
+  const clientName = payload.clientName || 'A client';
+  const businessName = payload.businessName || '';
+  const seriesTitle = payload.seriesTitle || 'a series';
+  const count = typeof payload.count === 'number' ? payload.count : 0;
+  const url = payload.url || '';
+
+  const who = businessName ? clientName + ' (' + businessName + ')' : clientName;
+  const subject = count
+    ? who + ' filled out ' + count + ' answer' + (count === 1 ? '' : 's') + ' for "' + seriesTitle + '"'
+    : who + ' submitted "' + seriesTitle + '"';
+
+  const html = baseTemplate(
+    'Series form submitted',
+    paraHtml('<b>' + escapeHtml(who) + '</b> just submitted the series form for <b>' +
+      escapeHtml(seriesTitle) + '</b>' +
+      (count ? ', with <b>' + count + '</b> per-entry answer' + (count === 1 ? '' : 's') : '') + '.') +
+    paraHtml('Open the Series Form tab on the dashboard and click <b>Build prompt</b> on the form to assemble the external prompt from their answers.') +
+    buttonHtml(url, 'Open client profile')
+  );
+
+  sendHtmlEmail(payload, subject, html);
 }
 
 // ========== INVITES ==========
 
 function handleInviteEmail(payload, context) {
-  if (!payload) {
-    Logger.log('handleInviteEmail: no payload')
-    return
-  }
+  if (!payload) { Logger.log('handleInviteEmail: no payload'); return }
 
   const recipients = normalizeRecipients(payload.to)
-  if (!recipients) {
-    Logger.log('handleInviteEmail: no recipients')
-    return
-  }
+  if (!recipients) { Logger.log('handleInviteEmail: no recipients'); return }
 
   const inviteeName = payload.inviteeName || 'there'
   const inviterName = payload.inviterName || 'Someone'
@@ -966,7 +1072,7 @@ function handleInviteEmail(payload, context) {
 
   var subtitle = ''
   if (context === 'workspace') {
-    subtitle = inviterName + ' invited you to join the Fokus Kreativez workspace.'
+    subtitle = inviterName + ' invited you to join the Fokus Kreatives workspace.'
   } else if (context === 'crm') {
     subtitle = inviterName + ' invited you to join the client workspace: ' + workspaceName + '.'
   }
@@ -979,129 +1085,60 @@ function handleInviteEmail(payload, context) {
   const initial = escapeHtml((inviterName || '?').charAt(0).toUpperCase())
 
   // Avatar - email-safe (table-based, no flex). Either a real image or a
-  // letter fallback rendered in a 48x48 cell that actually centers in Gmail.
+  // letter fallback rendered in a 44x44 cell that actually centers in Gmail.
   var avatarCell
   if (inviterAvatar) {
     avatarCell =
       '<img src="' + inviterAvatar + '" alt="' + escapeHtml(inviterName) + '" ' +
-      'width="48" height="48" ' +
-      'style="display:block;width:48px;height:48px;border-radius:48px;object-fit:cover;border:2px solid #2B79F7;" />'
+      'width="44" height="44" ' +
+      'style="display:block;width:44px;height:44px;border-radius:44px;object-fit:cover;" />'
   } else {
     avatarCell =
-      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="48" ' +
-        'style="border-collapse:collapse;width:48px;height:48px;">' +
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="44" ' +
+        'style="border-collapse:collapse;width:44px;height:44px;">' +
         '<tr>' +
-          '<td align="center" valign="middle" width="48" height="48" ' +
-            'style="width:48px;height:48px;border-radius:48px;' +
-            'background:linear-gradient(135deg,#2B79F7 0%,#1E54B7 100%);' +
+          '<td align="center" valign="middle" width="44" height="44" ' +
+            'style="width:44px;height:44px;border-radius:44px;' +
             'background-color:#2B79F7;color:#FFFFFF;' +
-            'font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;' +
-            'line-height:48px;text-align:center;mso-line-height-rule:exactly;">' +
+            'font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;' +
+            'line-height:44px;text-align:center;mso-line-height-rule:exactly;">' +
             initial +
           '</td>' +
         '</tr>' +
       '</table>'
   }
 
-  const html =
-'<!doctype html><html><body style="margin:0;padding:0;background:#F4F6FA;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;">' +
-  '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F6FA;padding:32px 12px;">' +
-    '<tr><td align="center">' +
-      '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" ' +
-        'style="max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E5E7EB;">' +
+  const inviterCard =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ' +
+      'style="margin:18px 0 6px;border:1px solid #F3F4F6;border-radius:10px;">' +
+      '<tr>' +
+        '<td valign="middle" width="60" style="padding:14px 0 14px 16px;">' +
+          avatarCell +
+        '</td>' +
+        '<td valign="middle" style="padding:14px 16px;">' +
+          '<div style="color:#111827;font-size:14px;font-weight:600;line-height:1.3;">' +
+            escapeHtml(inviterName) +
+          '</div>' +
+          (roleText
+            ? '<div style="margin-top:3px;color:#6B7280;font-size:13px;line-height:1.4;">' +
+                'Inviting you as <b style="color:#374151;">' + escapeHtml(roleText) + '</b>' +
+              '</div>'
+            : ''
+          ) +
+        '</td>' +
+      '</tr>' +
+    '</table>'
 
-        // Header
-        '<tr>' +
-          '<td style="background:linear-gradient(135deg,#2B79F7 0%,#1E54B7 50%,#143A80 100%);background-color:#2B79F7;padding:22px 28px;">' +
-            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
-              '<tr>' +
-                '<td align="left" valign="middle">' +
-                  '<img src="https://silly-blue-r3z2xucguf.edgeone.app/FOKUS%20CREATIVES%20logo.png" alt="Fokus Kreativez" ' +
-                    'width="32" height="32" style="display:block;height:32px;width:auto;border:0;" />' +
-                '</td>' +
-                '<td align="right" valign="middle" style="color:#E5E7EB;font-size:13px;font-weight:500;">' +
-                  'Workspace Invitation' +
-                '</td>' +
-              '</tr>' +
-            '</table>' +
-          '</td>' +
-        '</tr>' +
+  const brand = context === 'crm' ? workspaceName : 'Fokus Kreatives'
 
-        // Greeting
-        '<tr>' +
-          '<td style="padding:36px 32px 16px;">' +
-            '<h1 style="margin:0 0 12px;color:#0F172A;font-size:22px;font-weight:700;line-height:1.3;">' +
-              'Hey ' + escapeHtml(inviteeName) + ',' +
-            '</h1>' +
-            '<p style="margin:0;color:#475569;font-size:15px;line-height:1.65;">' +
-              escapeHtml(subtitle) +
-            '</p>' +
-          '</td>' +
-        '</tr>' +
-
-        // Inviter card (sits in its own subtle panel for breathing room)
-        '<tr>' +
-          '<td style="padding:8px 32px 28px;">' +
-            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ' +
-              'style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:12px;">' +
-              '<tr>' +
-                '<td valign="middle" width="64" style="padding:14px 0 14px 16px;">' +
-                  avatarCell +
-                '</td>' +
-                '<td valign="middle" style="padding:14px 16px;">' +
-                  '<div style="color:#0F172A;font-size:15px;font-weight:600;line-height:1.3;">' +
-                    escapeHtml(inviterName) +
-                  '</div>' +
-                  (roleText
-                    ? '<div style="margin-top:3px;color:#64748B;font-size:13px;line-height:1.4;">' +
-                        'Inviting you as <strong style="color:#334155;font-weight:600;">' + escapeHtml(roleText) + '</strong>' +
-                      '</div>'
-                    : ''
-                  ) +
-                '</td>' +
-              '</tr>' +
-            '</table>' +
-          '</td>' +
-        '</tr>' +
-
-        // CTA
-        '<tr>' +
-          '<td style="padding:0 32px 36px;">' +
-            '<p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.65;">' +
-              'Click the button below to accept and get access to your workspace.' +
-            '</p>' +
-            '<table role="presentation" cellpadding="0" cellspacing="0" border="0">' +
-              '<tr>' +
-                '<td style="border-radius:9999px;background:linear-gradient(135deg,#2B79F7 0%,#1E54B7 100%);background-color:#2B79F7;">' +
-                  '<a href="' + acceptUrl + '" target="_blank" ' +
-                    'style="display:inline-block;padding:13px 28px;color:#FFFFFF;text-decoration:none;' +
-                    'font-size:15px;font-weight:600;line-height:1;border-radius:9999px;">' +
-                    'Accept Invitation' +
-                  '</a>' +
-                '</td>' +
-              '</tr>' +
-            '</table>' +
-          '</td>' +
-        '</tr>' +
-
-        // Footer
-        '<tr>' +
-          '<td style="padding:0 32px;">' +
-            '<div style="height:1px;background:#E5E7EB;line-height:1px;font-size:1px;">&nbsp;</div>' +
-          '</td>' +
-        '</tr>' +
-        '<tr>' +
-          '<td style="padding:18px 32px 28px;">' +
-            '<p style="margin:0;color:#94A3B8;font-size:12px;line-height:1.55;">' +
-              'If you weren\'t expecting this, you can safely ignore this email.' +
-            '</p>' +
-          '</td>' +
-        '</tr>' +
-
-      '</table>' +
-    '</td></tr>' +
-  '</table>' +
-'</body></html>'
+  const html = baseTemplate(
+    'You have been invited',
+    paraHtml('Hi ' + escapeHtml(inviteeName) + ',') +
+    paraHtml(escapeHtml(subtitle)) +
+    inviterCard +
+    buttonHtml(acceptUrl, 'Accept invitation'),
+    brand
+  )
 
   MailApp.sendEmail({
     to: recipients,
@@ -1120,11 +1157,11 @@ function handleTestEmail(payload) {
   MailApp.sendEmail({
     to: to,
     subject: subject,
-    htmlBody: '<p>' + body + '</p>'
+    htmlBody: baseTemplate('Test email', paraHtml(escapeHtml(body)))
   });
 }
 
-// ===== SUPABASE HELPERS =====
+// ========== SUPABASE HELPERS ==========
 
 function getSupabaseConfig() {
   const url = PropertiesService.getScriptProperties().getProperty('SUPABASE_URL')
@@ -1238,7 +1275,7 @@ function getNotificationTargetsFromSupabase(clientId) {
   return { clientDisplayName, notificationSettings, emails }
 }
 
-// ===== CRON RUNNERS =====
+// ========== CRON RUNNERS ==========
 
 function drainEmailOutbox() {
   const props = PropertiesService.getScriptProperties()
@@ -1256,6 +1293,44 @@ function drainEmailOutbox() {
     Logger.log('drainEmailOutbox: ' + res.getResponseCode() + ' ' + res.getContentText())
   } catch (e) {
     Logger.log('drainEmailOutbox failed: ' + e)
+  }
+}
+
+// Email campaigns worker (Emails tab): generates upcoming drafts and
+// dispatches due campaign emails. Add a time trigger every 5-10 minutes.
+function runEmailCampaignsCron() {
+  const props = PropertiesService.getScriptProperties()
+  const appUrl = props.getProperty('APP_URL')
+  const cronSecret = props.getProperty('CRON_SECRET')
+  if (!appUrl || !cronSecret) {
+    Logger.log('Missing APP_URL or CRON_SECRET in Script Properties')
+    return
+  }
+  const url = appUrl + '/api/cron/email-campaigns?secret=' + encodeURIComponent(cronSecret)
+  try {
+    const res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true })
+    Logger.log('runEmailCampaignsCron: ' + res.getResponseCode() + ' ' + res.getContentText())
+  } catch (e) {
+    Logger.log('runEmailCampaignsCron failed: ' + e)
+  }
+}
+
+// Recently Deleted purge (Agreements): hard-deletes agreements soft-deleted
+// 30+ days ago. Add a daily time trigger.
+function runAgreementsPurge() {
+  const props = PropertiesService.getScriptProperties()
+  const appUrl = props.getProperty('APP_URL')
+  const cronSecret = props.getProperty('CRON_SECRET')
+  if (!appUrl || !cronSecret) {
+    Logger.log('Missing APP_URL or CRON_SECRET in Script Properties')
+    return
+  }
+  const url = appUrl + '/api/cron/purge-agreements?secret=' + encodeURIComponent(cronSecret)
+  try {
+    const res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true })
+    Logger.log('runAgreementsPurge: ' + res.getResponseCode() + ' ' + res.getContentText())
+  } catch (e) {
+    Logger.log('runAgreementsPurge failed: ' + e)
   }
 }
 
@@ -1303,7 +1378,7 @@ function runApprovalsCron() {
   }
 }
 
-// ===== DAILY MEETING SUMMARY (for TODAY) =====
+// ========== DAILY SUMMARIES ==========
 
 function sendDailyMeetingSummary() {
   try {
@@ -1359,25 +1434,23 @@ function sendDailyMeetingSummary() {
         continue
       }
 
-      // Build HTML list
-      var html = '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-        '<h2 style="color:#111827;">Today\'s Meetings</h2>' +
-        '<p>Here\'s a summary of your meetings for today (' + todayStart.toDateString() + '):</p>' +
-        '<ul>'
-
-      clientMeetings.forEach(function (m) {
+      var rows = clientMeetings.map(function (m) {
         var dt = new Date(m.date_time)
         var when = dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-        html += '<li><strong>' + escapeHtml(m.title || 'Untitled') + '</strong> at ' + when
-        if (m.location_url) {
-          html += ' – <a href="' + m.location_url + '">Join link</a>'
-        }
-        html += '</li>'
+        var label = escapeHtml(m.title || 'Untitled') +
+          (m.location_url
+            ? ' &middot; <a href="' + m.location_url + '" style="color:#2B79F7;text-decoration:none;">Join link</a>'
+            : '')
+        return [when, label]
       })
 
-      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p></div>'
+      var html = baseTemplate(
+        "Today's meetings",
+        paraHtml("Here's your meeting schedule for today (" + escapeHtml(todayStart.toDateString()) + ').') +
+        factRowsHtml(rows)
+      )
 
-      var subject = 'Today\'s meetings for ' + targets.clientDisplayName
+      var subject = "Today's meetings for " + targets.clientDisplayName
 
       MailApp.sendEmail({
         to: emails.join(','),
@@ -1390,8 +1463,6 @@ function sendDailyMeetingSummary() {
     Logger.log('sendDailyMeetingSummary error: ' + err)
   }
 }
-
-// ===== DAILY PAYMENT (REVENUE) SUMMARY =====
 
 function sendDailyPaymentSummary() {
   try {
@@ -1445,21 +1516,17 @@ function sendDailyPaymentSummary() {
         continue
       }
 
-      // Build HTML
-      var html = '<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto;">' +
-        '<h2 style="color:#111827;">Payments Due / Overdue</h2>' +
-        '<p>Here are payments that are due or overdue as of ' + todayYmd + ':</p>' +
-        '<ul>'
-
-      clientPayments.forEach(function (p) {
-        html += '<li>'
-        html += '<strong>' + (p.currency || 'USD') + ' ' + p.amount + '</strong>'
-        html += ' – status: ' + escapeHtml(p.status || '')
-        html += ' – due date: ' + escapeHtml(p.due_date || '')
-        html += '</li>'
+      var rows = clientPayments.map(function (p) {
+        var label = escapeHtml(p.status || 'pending') +
+          (p.due_date ? ' &middot; due ' + escapeHtml(p.due_date) : '')
+        return [label, escapeHtml(p.currency || 'USD') + ' ' + p.amount]
       })
 
-      html += '</ul><p style="font-size:12px;color:#6b7280;">Sent by Fokus Kreativez</p></div>'
+      var html = baseTemplate(
+        'Payments due or overdue',
+        paraHtml('Here are the payments that are due or overdue as of ' + escapeHtml(todayYmd) + '.') +
+        factRowsHtml(rows)
+      )
 
       var subject = 'Payments due/overdue for ' + targets.clientDisplayName
 
@@ -1474,6 +1541,7 @@ function sendDailyPaymentSummary() {
     Logger.log('sendDailyPaymentSummary error: ' + err)
   }
 }
+
 
 // ========== MISC UTILITIES ==========
 
