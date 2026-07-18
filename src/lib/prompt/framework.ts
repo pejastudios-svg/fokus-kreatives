@@ -201,17 +201,23 @@ SHORT-FORM DO NOT:
 - Output ANY beat without its bracket label - all 8 beats labelled, in order.`
 
 // =============================================================================
-// ENGAGEMENT_REEL_BUILDOUT - silent text-on-screen reel (15-45s)
+// ENGAGEMENT_REEL_BUILDOUT - silent story-progression reel (15-45s)
 // =============================================================================
 // Engagement reels are NOT spoken scripts. They are silent reels with
 // background visuals (b-roll, brand graphics) and on-screen overlay text
-// the viewer reads. The format's job is comment generation - the final
-// scene drives a poll, opinion-split question, or "comment KEYWORD".
-export const ENGAGEMENT_REEL_BUILDOUT = `ENGAGEMENT REEL STRUCTURE (silent, text-on-screen only, 15-45 seconds).
+// the viewer reads. The reel's job is RESONANCE through a story
+// progression - a timeline the viewer feels - not comment-begging. The
+// reference for this shape: "19 year old me: praying my dad lives long
+// enough to repay him" -> "25 year old me: bought him his dream car" ->
+// "gave him a home he can finally own" -> "reunited him with family".
+// Escalating frames, no CTA anywhere; the caption aims the emotion at an
+// audience. The ONLY engagement reel with a CTA is caption_list (the
+// caption-carry buildout below).
+export const ENGAGEMENT_REEL_BUILDOUT = `ENGAGEMENT REEL STRUCTURE - STORY PROGRESSION (silent, text-on-screen only, 15-45 seconds).
 
 This is a SILENT REEL. The viewer sees background visuals (b-roll, brand graphics) while READING on-screen overlay text. There is NO voiceover, NO narration, NO spoken script. Every word in the output is overlay text the viewer reads.
 
-The format's PURPOSE is comment generation. The final scene MUST drive a comment via opinion-splitting question, poll, or "comment KEYWORD" CTA.
+The reel's PURPOSE is resonance. It tells ONE story as a PROGRESSION across frames - a before state that escalates through real beats to an after state. The viewer comments and shares because the story hit them, not because they were asked to. There is NO CTA in this reel. Not on screen, not in the caption. No "comment KEYWORD", no polls, no "which side are you on".
 
 OUTPUT SECTIONS (in this exact order, using these exact bracket labels):
 
@@ -222,36 +228,56 @@ Internal title for the reel. Single line. Not shown to viewer.
 One line naming which specific moment from raw material this reel anchors on. Internal note for the team.
 
 [PACING]
-One word: slow-build | fast-cut | reflective | punchy. Pick based on the emotional shape of the angle. Polls / debates use punchy. Hero's Journey Text uses reflective.
+One word: slow-build | fast-cut | reflective | punchy. Progressions usually run slow-build or reflective.
 
 [LENGTH]
-Approximate seconds (15-45s based on scene count).
+Approximate seconds (15-60s based on scene count).
 
 [SCENES]
-1-4 scenes. Each scene is on-screen overlay text only. NO voiceover, NO narration, NO "Say this:" annotation. Format each scene as:
+At least 4 scenes - the arc below needs them. NO upper limit: use exactly as many beats as the story needs (strong progressions often run 6-8). Never pad with filler beats to seem longer, never compress two real beats into one to seem shorter. Each scene is on-screen overlay text only. NO voiceover, NO narration, NO "Say this:" annotation. Format each scene as:
 
   Scene N (X-Y sec): [overlay text]
 
-5-14 words per overlay. No paragraphs. No voiceover-length sentences. Each scene moves the idea forward - no scene restates the previous.
+5-14 words per overlay. No paragraphs. Each scene ADVANCES the timeline - no scene restates the previous.
 
-Scene 1 (HOOK): The opening overlay that names the problem or payoff. Specific, anchored.
-Scenes 2-3 (TEACH): The teaching core. ONE concept per scene. For polls / debates, the question/take + one piece of context.
-Final scene (ENGAGEMENT DRIVER - MOST-FAILED RULE):
-  This scene IS the format's purpose. It MUST be one of:
-  - "Comment KEYWORD for [thing]" (when a brand DM keyword is locked) - the keyword goes in the OVERLAY, not just the caption
-  - "A or B?" / "X or Y?" poll text
-  - A short opinion-split question that splits the audience ("Is X overrated?", "Should creators do Y?")
-  Do NOT use the final scene for a closing statement, summary line, or wrap-up like "So I built a system" or "Now I do X". Those are short-form CLOSE/RELOOP shapes - they don't drive comments. The caption holds the framing; the final scene drives the action.
+THE ARC IS MANDATORY: down, then TURN, then up. A progression that stays in the pit is a complaint, not a story. A progression that skips the pit is a brag. Every reel crosses the turn.
 
-  WRONG (closes the story instead of driving comments):
-    "So I built a system to turn my real stories into a month of content."
-  RIGHT (drives a comment):
+Scene 1 (BEFORE): the raw starting state, time-anchored and specific. The reader should feel the weight or the want. ("Two years ago: begging AI for scripts I hated filming.")
+Next 1-2 scenes (STRUGGLE - the buildup): the descent deepens with real beats - what it cost, what failed, how far down it went. Each beat is worse or heavier than the last.
+TURN scene (REQUIRED): the moment it changed - a realization, a decision, a person. One scene. This is the story's hinge; without it there is no story.
+CLIMB scenes (REQUIRED - 1-2 scenes, the most-skipped stage): what the narrator actually DID after the turn - actions and events in time order, each one concrete. ("I scripted a month in one sitting." "Filmed all of it in an afternoon." "Month 2: the first inbound lead.") The turn is a decision; the climb is the doing. A reel that jumps from realization straight to the happy ending has no process - it is a before/after ad, not a story.
+Final scene (RESOLUTION - REQUIRED): the after state, concrete and lived, and it completes THE SAME PERSON'S story that scene 1 opened. If scene 1 is "I", the final scene is what's true for "I" now - client results can be a climb beat, but they cannot replace the narrator's own landing. The final line ends the story - it does not summarize it, moralize it, or ask anything. The reel must end ABOVE where it started.
+
+Use a repeating frame pattern when it fits ("Back then: ..." / "Now: ...", "Month 1: ..." / "Month 6: ...") - repetition is the rhythm that makes progressions land.
+
+EVERY SCENE IS A FILMABLE MOMENT (the test that separates story from essay): each beat is something that HAPPENED at a point in time - a camera could have caught it, or a screenshot could prove it. Beliefs, quotes, slogans, claims, and morals are NOT beats. Filling the arc stages with claims produces an argument wearing a story costume - structurally correct and completely flat.
+  WRONG (claims dressed as scenes):
+    "I used to believe volume negates luck."   (a belief - nothing happened)
+    "Value negates luck."   (a slogan - nothing happened)
+    "So I built a system around that one idea."   (an abstraction - what did you DO?)
+    "Then I realized, for business owners..."   (cliffhanger ellipsis - an empty scene)
+  RIGHT (moments a camera could catch):
+    "Last spring: posting three videos a day, every single day."
+    "Then one 90-second story got more replies than a month of daily posts."
+    "So I sat down and scripted thirty days of real stories in one night."
+
+WHEN THE ANCHOR IS AN OPINION: do not argue the opinion on screen - tell the story of the moment that FORGED it, using the events in the supporting answers. The opinion is the reel's subtext; the viewer should reach it themselves by the final scene. It may be stated at most once, and never as its own scene.
+
+NO split-thought scenes: every scene is a complete line. Never end a scene with "..." to be continued by the next.
+
+  WRONG (ends in the pit - complaint, not story):
+    "It made me hate creating content."
+  WRONG (moralizes instead of landing):
+    "The lesson: stop using AI prompts."
+  WRONG (asks instead of landing):
     "Comment CONTENT for the framework."
-    "Is AI scriptwriting the death of personal branding?"
-    "Real stories or polished frameworks - which works for you?"
+    "Volume or value - which side are you on?"
+  RIGHT (lands above the opening):
+    "Now clients film once a month and their content runs itself."
+    "Same person. Different system."
 
 [CAPTION]
-60-120 words. The caption TEACHES the takeaway, not "this reel covers...". Ends with a question that prompts comments. Plain text - no bullet points unless the format calls for them.
+30-90 words. The caption AIMS the story at the audience the way a dedication does ("for every business owner still filming at midnight..."), or adds the one line of context the frames couldn't hold. It may end with a soft open question. It must NOT contain "comment KEYWORD", link pushes, or any sell. It must NOT moralize the story into a lesson ("It's not about how often you post, but...", "The real key is...") - the frames carry the meaning; the caption points at who it's for.
 
 [HASHTAGS]
 8-14 unique hashtags, space-separated.
@@ -260,14 +286,16 @@ ENGAGEMENT REEL HARD RULES:
 - ZERO voiceover, ZERO spoken script, ZERO narration. Every word the viewer encounters is overlay text.
 - NEVER include lines like "Voiceover:", "Narration:", "Say this:", or any (spoken) annotation.
 - 5-14 words per overlay scene. Anything longer doesn't read in time.
-- Final scene drives engagement. The format's purpose IS the comment count.
-- 1-4 scenes total. Most engagement reels are 2-3 scenes.
-- Pacing matches the emotional shape of the angle.
+- EVERY scene is a beat of the SAME story, in time order. If the scenes could be shuffled without breaking anything, it is not a progression - rewrite.
+- The arc MUST cross the turn and resolve. Ending on the low point ("It made me hate creating content", "So I just stopped") fails the format - the turn and the after-state are not optional scenes.
+- Every beat is REAL and from raw material. Numbers, moments, and names from the answers - never invented. The TURN and RESOLUTION beats may draw their FACTS from the supporting answers (the turning point, the proof) even when the piece is anchored on the struggle - state them in fresh words, never in the supporting answers' own phrasing.
+- NO CTA anywhere. No comment keyword, no poll, no question finale, no "save this". The story is the engagement.
+- If the format module below suggests ending on a poll, debate question, or comment CTA, IGNORE that ending - use the format module only for the ANGLE of the story. The progression structure above always wins.
 
 ENGAGEMENT REEL DO NOT:
 - Output anything resembling a spoken short-form script (no [HOOK], [REHOOK 1], [BODY], [REHOOK 2], [CLOSE], [RELOOP] sections - those are short-form labels, not reel labels).
-- Add a CTA mid-script the way short-form does. Engagement reels have ONE CTA at the end (the engagement driver).
-- Write paragraphs. Every overlay is one short readable line.`
+- Write paragraphs. Every overlay is one short readable line.
+- Turn the final scene into a lesson ("The lesson: build systems"). Land the story; let the viewer draw the lesson.`
 
 // =============================================================================
 // ENGAGEMENT_REEL_CAPTION_BUILDOUT - caption-carry reel (List Bait / Caption)
@@ -372,9 +400,15 @@ Slides 4-8 (TEACHING BODY): EXACTLY five teaching slides. Each one teaches a dis
 
 Slide 4 is the FIRST teaching slide, NOT a meta intro / "Start by answering these 5 questions" bridge / "Here's how it works" preamble. That kind of meta slide wastes a slot and forces the remaining 4 to compress two components into one (this is a real failure mode - DO NOT do it).
 
-For a 5-question / 5-step framework: slides 4-8 = one question or step per slide. Use the actual question or verb-led action verbatim from raw material. NEVER combine two questions into one slide ("4 & 5. Framework & Proof: ..." is broken - that's a slot allocation failure).
+EVERY TEACHING SLIDE CARRIES ONE CONCRETE SPECIFIC from raw material - a number, a name, a real moment, a real act, or a sharp why. The reference decks that do this right read like "I gave $25K to my best friend when we hit our record month" and "I helped a stranger for free; his case study closed me $48K in clients" - every slide is its own payload a reader could screenshot. A slide that is only an abstract instruction ("Ask yourself: what clicked?", "Turn that story into a campaign") is FILLER unless the same slide grounds it with the brand's own example.
+
+DO NOT build the middle slides as a generic planning-question checklist ("What were you stuck on? / What finally clicked? / What was the result?"). Those questions are the AGENCY'S internal planning tool, not deck content - and decks built on them all read identical. Teach through the anchor's actual story: what the brand did, what it cost, what changed, what the numbers were.
+
+For a 5-question / 5-step framework: slides 4-8 = one question or step per slide. Use the actual question or verb-led action verbatim from raw material, and pair each with the brand's real example where the material has one. NEVER combine two questions into one slide ("4 & 5. Framework & Proof: ..." is broken - that's a slot allocation failure).
 
 For a 3-part method: slides 4-6 = one part per slide + slides 7-8 show the parts working together with a specific example.
+
+For a story deck (the anchor is a journey, not a method): slides 4-8 = one real beat per slide, in time order, each with its concrete detail - and the beats MUST cross a TURN. Descent beats first (what it cost, what failed), then the turn (what changed it), then payoff beats (what is true now, with a number or moment). A deck that stays in the pit, or jumps from pain straight to advice with no lived turn and resolution, is a failed story deck. A story deck with no numbers, names, or moments is a failed story deck.
 
 DO NOT write 5 generic teaching slides - each slide adds a distinct component.
 
@@ -396,6 +430,7 @@ CAROUSEL HARD RULES:
 - The caption TEACHES the takeaway. It doesn't describe the carousel.
 - Every slide stands alone - no "and the next thing" / "as I mentioned" transitional crutches.
 - Slides 4-8 each name ONE distinct component. Generic "consistency matters" / "be specific" slides fail the test.
+- Every teaching slide carries one concrete specific (number, name, moment, act, or sharp why) from raw material. Abstract-instruction slides without a grounding example fail the test.
 
 CAROUSEL DO NOT:
 - Output any spoken-script structure (no [HOOK], [REHOOK 1], [BODY], [REHOOK 2], [CLOSE], [RELOOP] sections - those are short-form labels).

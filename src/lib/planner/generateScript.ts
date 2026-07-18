@@ -242,7 +242,42 @@ async function generateScriptForSlotInner(
   const refOrder = new Map(refs.map((r, i) => [r, i]))
   answers.sort((a, b) => (refOrder.get(a.id) ?? 99) - (refOrder.get(b.id) ?? 99))
   // Long-form has no anchor - it deliberately uses the whole answer set.
-  const anchor = stream !== 'long_form' ? answers[0] ?? null : null
+  let anchor = stream !== 'long_form' ? answers[0] ?? null : null
+
+  // Progression reels cannot anchor on an opinion - opinions contain no
+  // events, and reels anchored on one fake the arc with slogans regardless
+  // of prompt rules. Slots planned before this rule may still carry an
+  // opinion anchor; remap to the first story-typed answer so regeneration
+  // fixes them without a re-plan. The opinion stays in supporting material.
+  if (
+    stream === 'engagement_reel' &&
+    format.slug !== 'engagement_reel.caption_list' &&
+    anchor?.input_type === 'opinion'
+  ) {
+    let storyAnchor = answers.find((a) => a.input_type !== 'opinion') ?? null
+    if (!storyAnchor && slotData.topic_group_id) {
+      // The slot's refs are opinion-only (opinion-critical formats ref just
+      // the opinion). Pull the topic's story answers in so the reel has
+      // events to build from.
+      const { data: extraRows } = await supabase
+        .from('topics')
+        .select('id, question, answer, input_type, thin_flag')
+        .eq('topic_group_id', slotData.topic_group_id)
+        .neq('input_type', 'opinion')
+        .order('group_position', { ascending: true })
+      const extras = (extraRows ?? []) as typeof answers
+      if (extras.length > 0) {
+        storyAnchor = extras[0]
+        answers.unshift(...extras)
+      }
+    }
+    if (storyAnchor) {
+      console.log(
+        `[generateScript] reel anchored on opinion - remapping anchor to (${storyAnchor.input_type}) for slot ${slotId}`,
+      )
+      anchor = storyAnchor
+    }
+  }
 
   // 4. Load brand profile + content settings for prompt context + cache key.
   const { data: clientData } = await supabase
@@ -504,11 +539,17 @@ async function generateScriptForSlotInner(
   }
 
   // 14. CTA keyword enforcement. Stories use "DM me X" form; short-form /
-  //     engagement-reel / carousel feed posts use "comment X" form.
+  //     carousel feed posts use "comment X" form.
   //     LONG-FORM IS DIFFERENT - YouTube uses a website-link CTA and never
   //     a comment-keyword. Skip enforcement entirely for long_form so we
   //     don't rewrite the website-link CTA into a "comment KEYWORD" form.
-  if (dmKeywords.length > 0 && stream !== 'long_form') {
+  //     ENGAGEMENT REELS (except caption_list) are CTA-free story
+  //     progressions - enforcement would inject the very "comment KEYWORD"
+  //     line the format bans.
+  const skipCtaEnforcement =
+    stream === 'long_form' ||
+    (stream === 'engagement_reel' && format.slug !== 'engagement_reel.caption_list')
+  if (dmKeywords.length > 0 && !skipCtaEnforcement) {
     const enforced = enforceCtaKeyword(finalScript, dmKeywords, ctaPlatform)
     if (enforced.rewrites.length > 0) {
       console.log(
@@ -767,7 +808,9 @@ function maxTokensForStream(stream: SlotStream, quality: 'high' | 'standard' | '
     case 'short_form':
       return 2000 + proReserve
     case 'engagement_reel':
-      return 1600 + proReserve
+      // Progression reels have no scene ceiling - budget for 8+ scenes +
+      // caption + checklist without truncation.
+      return 2400 + proReserve
     case 'carousel':
       return 2600 + proReserve
   }
@@ -778,8 +821,19 @@ function maxTokensForStream(stream: SlotStream, quality: 'high' | 'standard' | '
  *  follows whichever instruction is more concrete (usually the output
  *  schema) and ignores the framework. The most common failure mode this
  *  prevents: engagement reels coming out as short-form spoken scripts. */
-function expectedSchemaForStream(stream: SlotStream): string {
+function expectedSchemaForStream(stream: SlotStream, formatSlug?: string): string {
   console.log(`[generateScript] expectedSchemaForStream called with stream="${stream}"`)
+  // Engagement reels split by format: caption_list is the ONLY reel with a
+  // CTA (it lives in the caption). Every other reel is a story progression
+  // with NO CTA - the schema text must match the buildout or the model
+  // follows whichever is more concrete.
+  if (stream === 'engagement_reel' && formatSlug !== 'engagement_reel.caption_list') {
+    return `Shape:
+{
+  "script": "Engagement reel as one string. SILENT TEXT-ON-SCREEN STORY PROGRESSION - NO spoken script, NO voiceover, NO narration. Use these EXACT bracket section labels in this order: [TITLE], [ANGLE], [PACING], [LENGTH], [SCENES], [CAPTION], [HASHTAGS]. Inside [SCENES], format each scene as 'Scene N (X-Y sec): [overlay text]' on its own line - at least 4 scenes, no upper limit, as many beats as the story needs. The scenes are ONE story in time order with a MANDATORY arc: BEFORE (the low point), STRUGGLE (the buildup), TURN (the moment it changed - required), CLIMB (1-2 scenes of what the narrator actually DID after the turn - required; jumping from realization straight to the outcome fails the format), RESOLUTION (the concrete after-state for the SAME person who opened scene 1 - required). Every scene is a FILMABLE MOMENT - an event at a point in time a camera could catch; beliefs, slogans, quotes, and abstract claims are not scenes. The reel must end ABOVE where it started; ending on the low point or a moral fails the format. NO CTA anywhere - no comment keyword, no poll, no question finale, no 'save this'. Do NOT use [HOOK]/[REHOOK 1]/[BODY]/[REHOOK 2]/[CLOSE]/[RELOOP] - those are short-form labels and produce the wrong format.",
+  "checklist": [ { "id": "...", "status": "pass" | "flag" | "manual_check", "ai_note": "..." } ]
+}`
+  }
   switch (stream) {
     case 'long_form':
       return `Shape:
@@ -927,7 +981,11 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
     if (supporting.length > 0) {
       parts.push(
         '',
-        `SUPPORTING MATERIAL - IDEAS ONLY, WORDING OFF-LIMITS: each answer below is the ANCHOR of a different script in this campaign, and its wording belongs to that script. You may use a supporting answer's idea as context (one clause, restated in completely fresh words), but do NOT quote it, closely paraphrase it, or reuse its distinctive phrases. When several scripts each lean on the same vivid lines, the whole week reads like one post copy-pasted.\n${supporting
+        `SUPPORTING MATERIAL - IDEAS ONLY, WORDING OFF-LIMITS: each answer below is the ANCHOR of a different script in this campaign, and its wording belongs to that script. You may use a supporting answer's idea as context (one clause, restated in completely fresh words), but do NOT quote it, closely paraphrase it, or reuse its distinctive phrases. When several scripts each lean on the same vivid lines, the whole week reads like one post copy-pasted.${
+          stream === 'engagement_reel'
+            ? ' EXCEPTION FOR THIS PROGRESSION REEL: the arc must cross a turn and resolve, so the TURN and RESOLUTION beats may take their FACTS (the turning point, the proof, the numbers) from the supporting answers - stated in fresh words, never their phrasing.'
+            : ''
+        }\n${supporting
           .map((a) => `- (${a.input_type}) ${a.answer}`)
           .join('\n')}`,
       )
@@ -943,11 +1001,15 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
   }
 
   // CTA keyword rule (when set on brand_content_settings.dm_keywords).
-  // Stories use "DM me [keyword]" form; short-form / engagement-reel /
-  // carousel feed posts use "comment [keyword]" form. Long-form does NOT
-  // use a comment-keyword CTA - YouTube's CTA is a website link-out
-  // (handled below via MID-ROLL CTA TEXT). Skip this block for long_form.
-  if (stream !== 'long_form') {
+  // Stories use "DM me [keyword]" form; short-form / carousel feed posts
+  // use "comment [keyword]" form. Long-form does NOT use a comment-keyword
+  // CTA - YouTube's CTA is a website link-out (handled below via MID-ROLL
+  // CTA TEXT). Engagement reels are CTA-free story progressions, EXCEPT
+  // caption_list whose caption ends with the keyword CTA.
+  const wantsCtaKeyword =
+    stream !== 'long_form' &&
+    !(stream === 'engagement_reel' && format.slug !== 'engagement_reel.caption_list')
+  if (wantsCtaKeyword) {
     const ctaKeywordBlock = buildCtaKeywordPromptBlock(dmKeywords, ctaPlatform)
     if (ctaKeywordBlock) sections.push(ctaKeywordBlock)
   }
@@ -1068,7 +1130,7 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
       `OUTPUT (STRICT JSON):
 The response must be a single JSON object with EXACTLY these two top-level keys: "script" (string) and "checklist" (array). Use these exact key names - do NOT use "scriptText", "content", "output", "qa", or any other variant. No additional top-level keys.
 
-${expectedSchemaForStream(stream)}
+${expectedSchemaForStream(stream, format.slug)}
 
 No prose outside the JSON. No markdown code fences. No "Here's the JSON:" preamble. The response must START with { and END with }. Nothing else.`,
     )

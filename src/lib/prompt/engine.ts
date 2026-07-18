@@ -360,6 +360,14 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
 
   // Tag-question filler at end of sentence: "...impossible task, right?"
   { re: /,\s*right\?/g, replace: '.' },
+  // Standalone "You know?" / "You know." filler sentence. The ?-stripper
+  // turns the tic "You know?" into the even worse fragment "You know." -
+  // either way the sentence carries nothing. Drop it entirely.
+  { re: /(^|[.!?]\s+)you know[.?!]\s*/gi, replace: '$1' },
+  // Question openers the model writes with a period: "Want my content
+  // system. Comment FRAMEWORK below." The opener is a question - restore
+  // the "?" when it's immediately followed by an imperative CTA verb.
+  { re: /\b(want|need)(\s+(?:my|your|the|this|our|a|an)\s+[^.!?\n]{1,60})\.(\s+(?:comment|dm|save|follow|drop|reply))/gi, replace: '$1$2?$3' },
 
   // ", and honestly," / "and honestly," softener mid-sentence transition.
   { re: /,?\s+and honestly,?\s+/gi, replace: ', ' },

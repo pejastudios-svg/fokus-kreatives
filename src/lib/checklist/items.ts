@@ -434,6 +434,21 @@ export function enforceCarouselValueChecklistItem(
       break
     }
   }
+
+  // The agency's internal planning-question trio ("What was I stuck on? /
+  // What finally clicked? / What was the result?") keeps surfacing as slide
+  // content despite the prompt ban - decks built on it all read identical.
+  // Deterministic flag so it can't slip through as a "pass".
+  const trioHits = lines.filter((l) =>
+    /what\s+(?:was|were)\s+(?:i|you)\s+stuck\s+on|what\s+(?:finally\s+)?clicked|what\s+was\s+the\s+(?:result|outcome)/i.test(l),
+  )
+  if (trioHits.length > 0 && items[idx].status !== 'flag') {
+    items[idx] = {
+      ...items[idx],
+      status: 'flag',
+      ai_note: `Slide uses the internal planning-question trio as content: "${trioHits[0].trim()}". Teach through the anchor's actual story (numbers, moments, acts) instead - regenerate or rewrite the slide.`,
+    }
+  }
   return items
 }
 
@@ -456,7 +471,7 @@ export function enforceLengthChecklistItem(
     items[idx] = {
       ...items[idx],
       status: 'manual_check',
-      ai_note: `Computed ${wordCount} words across overlay scenes + caption + hashtags. Engagement reels are structurally constrained: 1-4 scenes (5-14 words each) + 60-120 word caption + 8-14 hashtags. Eyeball the structure rather than the total word count.`,
+      ai_note: `Computed ${wordCount} words across overlay scenes + caption + hashtags. Engagement reels are structurally constrained: 4+ scenes (5-14 words each, as many as the arc needs) + caption + 8-14 hashtags. Eyeball the structure rather than the total word count.`,
     }
     return items
   }

@@ -409,12 +409,22 @@ export async function generatePlan(input: GeneratePlanInput): Promise<GeneratePl
       // slotIndex starts AFTER the survivors so topped-up pieces anchor on
       // answers the surviving pieces haven't used yet.
       const offset = survived(stream)
+      // Progression reels anchor on EVENTS. An opinion answer has no
+      // events - reels anchored on one fake the arc with slogans no matter
+      // how the prompt is worded (verified across repeated rolls). Rotate
+      // reel anchors over story-typed answers only; opinions stay available
+      // as supporting material and as anchors for opinion-native formats
+      // (short-form hot takes).
+      const anchorPool =
+        stream === 'engagement_reel'
+          ? topic.answers.filter((a) => a.input_type !== 'opinion')
+          : topic.answers
+      const pool = anchorPool.length > 0 ? anchorPool : topic.answers
       for (let i = 0; i < count; i++) {
         const slotIndex = offset + i
-        const answerCount = topic.answers.length
-        if (answerCount === 0) continue
-        const anchor = topic.answers[slotIndex % answerCount]
-        const recycled = slotIndex >= answerCount
+        if (pool.length === 0) continue
+        const anchor = pool[slotIndex % pool.length]
+        const recycled = slotIndex >= pool.length
         pieces.push({ stream, slotIndex, anchor, recycled })
       }
     }
