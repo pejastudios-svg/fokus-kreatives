@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createClient } from '@/lib/supabase/client'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
@@ -220,7 +221,7 @@ export function QuestionsFormEngine() {
           seedTopics: cleanedSeeds.length ? cleanedSeeds : undefined,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Generation failed')
       setDraftTopics(data.topics as FormTopic[])
       setSaturation(data.saturation ?? null)
@@ -299,7 +300,7 @@ export function QuestionsFormEngine() {
           topics: cleaned,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Save failed')
       setDraftTopics([])
       setTitle('')
@@ -340,7 +341,7 @@ export function QuestionsFormEngine() {
       const res = await fetch(
         `/api/question-form/answers?token=${encodeURIComponent(form.token)}`,
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success && data.submitted) {
         setAnswersByForm((prev) => ({
           ...prev,

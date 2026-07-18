@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
@@ -169,7 +170,7 @@ export default function TaskDetailPage() {
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/tasks/${taskId}`)
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) {
       setTask(null)
       return
@@ -207,7 +208,7 @@ export default function TaskDetailPage() {
 
   const loadStatusLog = useCallback(async () => {
     const res = await fetch(`/api/tasks/${taskId}/status-log`)
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (data.success) setStatusLog(data.log)
   }, [taskId])
 
@@ -261,7 +262,7 @@ export default function TaskDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) {
           flash('error', data.error || 'Save failed')
           return false
@@ -329,7 +330,7 @@ export default function TaskDetailPage() {
 
   const handleDelete = async () => {
     const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) throw new Error(data.error || 'Failed to delete task')
     router.push('/tasks')
   }
@@ -338,7 +339,7 @@ export default function TaskDetailPage() {
     setIsDuplicating(true)
     try {
       const res = await fetch(`/api/tasks/${taskId}/duplicate`, { method: 'POST' })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to duplicate task')
         return

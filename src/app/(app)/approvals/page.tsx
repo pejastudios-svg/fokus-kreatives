@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
@@ -227,7 +228,7 @@ export default function ApprovalsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId: trimmed }),
         })
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (cancelled) return
         if (data.success) {
           setClickupTaskName(data.name)
@@ -674,7 +675,7 @@ const searchResults = assigneeSearchOpen
       // instead of a silent close.
       let data: { success?: boolean; error?: string; approvalId?: string } | null = null
       try {
-        data = await res.json()
+        data = await readJsonSafe(res)
       } catch (parseErr) {
         console.error('Create approval: response was not JSON', parseErr, { status: res.status })
         showToast('error', `Couldn't create the approval (server returned ${res.status}).`)
@@ -777,7 +778,7 @@ const searchResults = assigneeSearchOpen
         approved,
       }),
     })
-    const data = await res.json().catch(() => ({ success: false }))
+    const data = await readJsonSafe(res).catch(() => ({ success: false }))
     if (!data.success) {
       console.error('Toggle approve failed:', data.error)
       showToast('error', data.error || "Couldn't update that approval. Please try again.")
@@ -808,7 +809,7 @@ const handleDeleteApproval = async (approvalId: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ approvalId }),
     })
-    const data = await res.json().catch(() => ({ success: false }))
+    const data = await readJsonSafe(res).catch(() => ({ success: false }))
     if (!data.success) {
       console.error('Delete approval failed:', data.error)
       setApprovals(previous)

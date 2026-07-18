@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -215,7 +216,7 @@ export function ScriptPackageEngine() {
           ctaText: ctaText.trim() || null,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Generation failed')
       setLongform({ id: cardId, kind: 'longform', index: 1, total: 1, status: 'ready', content: data.content })
     } catch (e) {
@@ -277,7 +278,7 @@ export function ScriptPackageEngine() {
             ctaText: ctaText.trim() || null,
           }),
         })
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) throw new Error(data.error || 'Failed')
         const angle = extractAngle(data.content)
         if (angle) previousAngles.push(angle)
@@ -323,7 +324,7 @@ export function ScriptPackageEngine() {
           ctaText: ctaText.trim() || null,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Failed')
       setter((prev) =>
         prev.map((c, idx) =>

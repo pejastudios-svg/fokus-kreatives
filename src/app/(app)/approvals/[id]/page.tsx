@@ -2,6 +2,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { readApprovalCache, writeApprovalCache } from '@/lib/approvalCache'
 import { uploadWithProgress } from '@/lib/uploadWithProgress'
 import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
@@ -1221,7 +1222,7 @@ export default function ApprovalDetailPage() {
           }),
         })
 
-        const apiData = await res.json()
+        const apiData = await readJsonSafe(res)
         if (!apiData.success) {
           console.error('Send comment API error:', apiData.error)
           // Roll back the optimistic comment.

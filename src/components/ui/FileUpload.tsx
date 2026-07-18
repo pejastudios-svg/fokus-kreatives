@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Upload, X, Loader2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -56,7 +57,7 @@ export function FileUpload({ onUpload, folder = 'general', accept = '*', label =
         })
         let sign: { success?: boolean; path?: string; token?: string; publicUrl?: string; error?: string }
         try {
-          sign = await signRes.json()
+          sign = await readJsonSafe(signRes)
         } catch {
           throw new Error(`Upload could not start (server error ${signRes.status}). Try again.`)
         }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createPortal } from 'react-dom'
 import { Bell, Trash2, X, CheckCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -190,7 +191,7 @@ export function Header({ title, subtitle }: HeaderProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json().catch(() => ({ success: false }))
+      const data = await readJsonSafe(res).catch(() => ({ success: false }))
       if (!data.success) {
         console.error('Notification mutate failed:', { ...data, sent: body })
         return false

@@ -121,26 +121,52 @@ async function tryAppsScriptExport(
     })
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { error: `Apps Script returned ${res.status}: ${text.slice(0, 200)}` }
+      // Never surface the raw body - Google returns full HTML pages here
+      // and users were seeing "<!DOCTYPE html>..." dumps in the export
+      // banner. Map the status to what it actually means.
+      const hint =
+        res.status === 404
+          ? 'The Google Docs webhook deployment no longer exists - redeploy the Apps Script and update APPS_SCRIPT_EXPORT_WEBHOOK_URL.'
+          : res.status === 401 || res.status === 403
+            ? 'The Google Docs webhook refused the request - check the deployment is a Web app with access set to Anyone.'
+            : 'The Google Docs webhook is not responding normally - try again in a minute.'
+      return { error: `Google Docs export unavailable (${res.status}). ${hint}` }
     }
 
-    const json = (await res.json()) as {
+    let json: {
       ok?: boolean
       docs?: CreatedDoc[]
       error?: string
       diagnostics?: unknown
     }
+    try {
+      json = (await res.json()) as typeof json
+    } catch {
+      return {
+        error:
+          'The Google Docs webhook returned an unreadable response - check the Apps Script deployment, then try again.',
+      }
+    }
     if (!json.ok) {
-      return { error: `Apps Script error: ${json.error || 'unknown'}` }
+      const reason = (json.error || '').slice(0, 160) || 'unknown error'
+      const hint =
+        /invalid secret/i.test(reason)
+          ? ' The EXPECTED_SECRET in the Apps Script does not match APPS_SCRIPT_EXPORT_SECRET.'
+          : ''
+      return { error: `Google Docs export failed: ${reason}.${hint}` }
     }
     if (!Array.isArray(json.docs) || json.docs.length === 0) {
-      return { error: 'Apps Script response missing docs array' }
+      return { error: 'Google Docs export returned no documents - try again.' }
     }
     return { docs: json.docs, diagnostics: json.diagnostics }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    return { error: `Apps Script call failed: ${detail}` }
+    const friendly = /abort|timeout/i.test(detail)
+      ? 'The Google Docs webhook timed out after 90 seconds - large exports can do this; try again or export one campaign at a time.'
+      : /ENOTFOUND|ECONNREFUSED|fetch failed/i.test(detail)
+        ? 'Could not reach Google - check the connection and try again.'
+        : `Google Docs export failed: ${detail.slice(0, 160)}`
+    return { error: friendly }
   }
 }
 

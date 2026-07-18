@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { PortalLayout } from '@/components/portal/PortalLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { createClient } from '@/lib/supabase/client'
@@ -124,7 +125,7 @@ export default function PortalApprovalsPage() {
         }),
       })
 
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         alert(data.error || 'Failed to update approval')
         if (clientId) await loadApprovals(clientId)

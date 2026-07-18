@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { VoiceTextarea } from '@/components/ui/VoiceTextarea'
@@ -80,7 +81,7 @@ export default function SeriesFormPage() {
     const load = async () => {
       try {
         const res = await fetch(`/api/series-form/info?token=${encodeURIComponent(token)}`)
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) {
           setError(data.error || 'Invalid link')
           return
@@ -145,7 +146,7 @@ export default function SeriesFormPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, answers, audioUrls }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {

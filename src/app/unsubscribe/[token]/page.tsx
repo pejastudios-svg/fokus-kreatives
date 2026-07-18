@@ -6,6 +6,7 @@
 // with a resubscribe-friendly success message.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 
 type Stage = 'loading' | 'confirm' | 'done' | 'already' | 'error'
@@ -27,7 +28,7 @@ export default function UnsubscribePage() {
     ;(async () => {
       try {
         const res = await fetch(`/api/e/u/${token}`)
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (cancelled) return
         if (!json.success) {
           setStage('error')
@@ -49,7 +50,7 @@ export default function UnsubscribePage() {
     setBusy(true)
     try {
       const res = await fetch(`/api/e/u/${token}`, { method: 'POST' })
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       setStage(json.success ? 'done' : 'error')
     } catch {
       setStage('error')

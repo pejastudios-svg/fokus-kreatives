@@ -10,6 +10,7 @@
 // current SW + permission state on this specific browser.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Bell, BellOff, AlertCircle } from 'lucide-react'
 import {
   isPushSupported,
@@ -147,7 +148,7 @@ export function BrowserNotificationsToggle() {
                 setTestResult(null)
                 try {
                   const res = await fetch('/api/push/test', { method: 'POST' })
-                  const data = await res.json()
+                  const data = await readJsonSafe(res)
                   if (!res.ok || !data?.success) {
                     setTestResult(`Failed: ${data?.error || res.statusText}`)
                     return
@@ -256,7 +257,7 @@ export function BrowserNotificationsToggle() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ endpoint }),
                   })
-                  const data = await res.json()
+                  const data = await readJsonSafe(res)
                   if (data?.success) {
                     setTestResult(`Removed ${data.removed ?? 0} other subscription(s).`)
                   } else {

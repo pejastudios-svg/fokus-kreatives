@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -102,7 +103,7 @@ export default function BioTemplatesPage() {
           tier: tierOverride,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to generate')
         return

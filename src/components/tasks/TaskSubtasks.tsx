@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import Link from 'next/link'
 import { Plus, ChevronRight, Trash2 } from 'lucide-react'
 
@@ -60,7 +61,7 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
       const res = await fetch(
         `/api/tasks?clientId=${encodeURIComponent(clientId)}&parentTaskId=${encodeURIComponent(parentTaskId)}`,
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) setSubtasks(data.tasks || [])
     } finally {
       setIsLoading(false)
@@ -81,7 +82,7 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, parentTaskId, name }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         setSubtasks((prev) => [data.task, ...prev])
         setDraftName('')
@@ -95,7 +96,7 @@ export function TaskSubtasks({ parentTaskId, clientId }: Props) {
   const handleDelete = async (id: string) => {
     setSubtasks((prev) => prev.filter((s) => s.id !== id))
     const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) {
       // If it failed, refetch to recover state.
       void refresh()

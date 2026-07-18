@@ -6,6 +6,7 @@
 // surface to the top.
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import Link from 'next/link'
 import Image from 'next/image'
 import { CalendarRange, Loader2, Search, X } from 'lucide-react'
@@ -107,7 +108,7 @@ export default function PlannerIndexPage() {
           const r = await fetch(`/api/planner/slot-stats?clientIds=${encodeURIComponent(ids.join(','))}`, {
             cache: 'no-store',
           })
-          const json = (await r.json()) as {
+          const json = (await readJsonSafe(r)) as {
             success?: boolean
             stats?: Array<{ client_id: string; total: number; approved: number; last_activity: string | null }>
           }
@@ -171,7 +172,7 @@ export default function PlannerIndexPage() {
           `/api/planner/search?q=${encodeURIComponent(q)}&clientIds=${encodeURIComponent(allowedIds.join(','))}`,
           { cache: 'no-store' },
         )
-        const json = (await r.json()) as { success?: boolean; results?: SearchResult[] }
+        const json = (await readJsonSafe(r)) as { success?: boolean; results?: SearchResult[] }
         setSearchResults(json.success ? (json.results ?? []) : [])
       } catch (err) {
         console.warn('[planner search] failed:', err)

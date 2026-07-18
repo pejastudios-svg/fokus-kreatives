@@ -18,6 +18,7 @@
 //     to this number client-side so legitimate bulk work never trips it.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { humanizeUpstreamError } from '@/lib/errors/humanize'
 import { generateScriptForSlot, GenerationLockedError } from '@/lib/planner/generateScript'
 import {
   withClientConcurrency,
@@ -81,7 +82,7 @@ export async function POST(
         { status: 429 },
       )
     }
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = humanizeUpstreamError(err)
     console.error('planner/slot/generate-script error:', err)
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }

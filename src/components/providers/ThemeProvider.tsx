@@ -1,5 +1,6 @@
 'use client'
 
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import {
   createContext,
   useCallback,
@@ -57,7 +58,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch('/api/me/preferences', { cache: 'no-store' })
         if (!res.ok) return
-        const data = await res.json().catch(() => null)
+        const data = await readJsonSafe(res).catch(() => null)
         const serverTheme = data?.preferences?.theme as Theme | undefined
         if (serverTheme && serverTheme !== theme) {
           setThemeState(serverTheme)

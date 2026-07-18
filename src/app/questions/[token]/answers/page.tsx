@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { AlertCircle, ClipboardList, AlertTriangle } from 'lucide-react'
@@ -80,8 +81,8 @@ export default function AnswersViewerPage() {
           fetch(`/api/question-form/answers?token=${encodeURIComponent(token)}`),
           fetch(`/api/question-form/info?token=${encodeURIComponent(token)}`),
         ])
-        const answersData = await answersRes.json()
-        const infoData = await infoRes.json()
+        const answersData = await readJsonSafe(answersRes)
+        const infoData = await readJsonSafe(infoRes)
 
         if (!answersData.success) {
           setError(answersData.error || 'Invalid link')

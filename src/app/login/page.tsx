@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -43,7 +44,7 @@ function LoginForm() {
         setIsChecking(false)
         return
       }
-      const json = (await res.json()) as
+      const json = (await readJsonSafe(res)) as
         | { authed: true; signOut: true }
         | { authed: true; destination: string }
         | { authed: false }
@@ -90,7 +91,7 @@ function LoginForm() {
 
     // Same service-role-backed lookup as the auto-redirect above.
     const res = await fetch('/api/me/landing', { cache: 'no-store' })
-    const json = (await res.json().catch(() => null)) as
+    const json = (await readJsonSafe(res).catch(() => null)) as
       | { authed: true; destination: string }
       | { authed: true; signOut: true }
       | { authed: false }

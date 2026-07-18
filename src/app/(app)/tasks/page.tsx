@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -382,7 +383,7 @@ export default function TasksPage() {
           name,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to create folder')
         return
@@ -410,7 +411,7 @@ export default function TasksPage() {
           name,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to create task')
         return
@@ -433,7 +434,7 @@ export default function TasksPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) throw new Error(data.error || 'Failed to rename folder')
     setFolders((prev) =>
       prev.map((f) => (f.id === renameTarget.id ? { ...f, name } : f)),
@@ -445,7 +446,7 @@ export default function TasksPage() {
   const handleDeleteFolder = async () => {
     if (!deleteFolderTarget) return
     const res = await fetch(`/api/tasks/folders/${deleteFolderTarget.id}`, { method: 'DELETE' })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) throw new Error(data.error || 'Failed to delete folder')
     setFolders((prev) => prev.filter((f) => f.id !== deleteFolderTarget.id))
     if (currentFolderId === deleteFolderTarget.id) {
@@ -457,7 +458,7 @@ export default function TasksPage() {
   const handleDeleteTask = async () => {
     if (!deleteTaskTarget) return
     const res = await fetch(`/api/tasks/${deleteTaskTarget.id}`, { method: 'DELETE' })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) throw new Error(data.error || 'Failed to delete task')
     setTasks((prev) => prev.filter((t) => t.id !== deleteTaskTarget.id))
     setDeleteTaskTarget(null)
@@ -467,7 +468,7 @@ export default function TasksPage() {
     setDuplicatingId(id)
     try {
       const res = await fetch(`/api/tasks/${id}/duplicate`, { method: 'POST' })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to duplicate task')
         return
@@ -484,7 +485,7 @@ export default function TasksPage() {
     setDuplicatingId(id)
     try {
       const res = await fetch(`/api/tasks/folders/${id}/duplicate`, { method: 'POST' })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to duplicate folder')
         return
@@ -507,7 +508,7 @@ export default function TasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t)))
         flash('error', data.error || 'Failed to update status')
@@ -531,7 +532,7 @@ export default function TasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folderId }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         // Revert.
         setTasks((prev) => [task, ...prev])

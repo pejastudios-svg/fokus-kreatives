@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { humanizeUpstreamError } from '@/lib/errors/humanize'
 import { generatePlan } from '@/lib/planner'
 import { proposeStageAdvancement } from '@/lib/contentStage'
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, ...result })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = humanizeUpstreamError(err)
     console.error('planner/generate error:', err)
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }

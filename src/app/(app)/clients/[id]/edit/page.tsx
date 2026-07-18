@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -512,7 +513,7 @@ export default function ClientDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setNotification({ type: 'error', message: data.error || 'Failed to generate link' })
       } else {

@@ -7,6 +7,7 @@
 // Saves to /api/crm/availability-settings.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Toggle } from '@/components/ui/Toggle'
@@ -96,7 +97,7 @@ export function AvailabilityCard({ clientId, canManage }: Props) {
           body: JSON.stringify({ settings }),
         },
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         setSettings(data.settings)
         setSavedAt(Date.now())

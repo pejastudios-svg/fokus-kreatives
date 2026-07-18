@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Camera, Eye, RefreshCw, Trash2, UserCircle, X, Loader2 } from 'lucide-react'
 
 type FallbackKind = 'user' | 'initial'
@@ -107,7 +108,7 @@ export function ProfilePictureUpload({
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         onChange(data.url)
       } else {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -212,7 +213,7 @@ export default function ClientProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         flash('error', data.error || 'Failed to regenerate link')
       } else {

@@ -3,6 +3,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { PortalLayout } from '@/components/portal/PortalLayout'
 import { Header } from '@/components/layout/Header'
@@ -705,7 +706,7 @@ await loadApproval()
         method: 'POST',
         body: formData,
       })
-      const uploadData = await res.json()
+      const uploadData = await readJsonSafe(res)
       if (uploadData.success) {
         fileUrl = uploadData.url
         fileName = commentFile.name
@@ -738,7 +739,7 @@ await loadApproval()
       }),
     })
 
-    const apiData = await res.json()
+    const apiData = await readJsonSafe(res)
     if (!apiData.success) {
       console.error('Send comment API error:', apiData.error)
       alert('Failed to send comment')

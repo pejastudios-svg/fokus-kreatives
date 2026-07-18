@@ -6,6 +6,7 @@
 // no oversized buttons - it should read like a professional document.
 
 import { useEffect, useState, useCallback } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Check, ExternalLink, Loader2 } from 'lucide-react'
 
@@ -69,7 +70,7 @@ export default function InvoicePage() {
     void (async () => {
       try {
         const res = await fetch(`/api/invoices/info?token=${encodeURIComponent(token)}`)
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (cancelled) return
         if (!json.success) {
           setError(json.error || 'Invoice not found')
@@ -96,7 +97,7 @@ export default function InvoicePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       })
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (json.success) setMarked(true)
     } finally {
       setMarking(false)

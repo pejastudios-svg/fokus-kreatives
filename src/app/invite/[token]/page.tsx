@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -53,7 +54,7 @@ export default function InvitePage() {
         const res = await fetch(
           `/api/invite/lookup?token=${encodeURIComponent(tokenClean)}`,
         )
-        const json = (await res.json()) as {
+        const json = (await readJsonSafe(res)) as {
           success: boolean
           error?: string
           // Two response shapes: 'crm' = new crm_invites table,
@@ -133,7 +134,7 @@ export default function InvitePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
       })
-      const acceptJson = (await acceptRes.json()) as {
+      const acceptJson = (await readJsonSafe(acceptRes)) as {
         success: boolean
         error?: string
         email?: string

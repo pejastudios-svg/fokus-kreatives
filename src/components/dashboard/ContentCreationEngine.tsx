@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -437,7 +438,7 @@ export function ContentCreationEngine() {
         }),
       })
 
-      const data = await response.json()
+      const data = await readJsonSafe(response)
 
       if (data.success) {
         setGeneratedContent(data.content)

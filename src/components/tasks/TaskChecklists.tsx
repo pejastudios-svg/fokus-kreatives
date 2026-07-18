@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 
 interface ChecklistItem {
@@ -35,7 +36,7 @@ export function TaskChecklists({ taskId }: Props) {
     setIsLoading(true)
     try {
       const res = await fetch(`/api/tasks/${taskId}/checklists`)
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) setLists(data.checklists || [])
     } finally {
       setIsLoading(false)
@@ -53,7 +54,7 @@ export function TaskChecklists({ taskId }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (data.success) {
       setLists((prev) => [...prev, data.checklist])
       setDraftName('')
@@ -88,7 +89,7 @@ export function TaskChecklists({ taskId }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: label.trim() }),
     })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (data.success) {
       setLists((prev) =>
         prev.map((l) => (l.id === listId ? { ...l, items: [...l.items, data.item] } : l)),

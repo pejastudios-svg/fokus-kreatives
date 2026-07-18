@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createClient } from '@/lib/supabase/client'
 import { useFormPersistence } from '@/hooks/useFormPersistence'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
@@ -166,7 +167,7 @@ export function SeriesFormEngine() {
     setLoadingForms(true)
     try {
       const res = await fetch(`/api/series-form/list?clientId=${encodeURIComponent(clientId)}`)
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) setPastForms(data.forms as PastForm[])
     } finally {
       setLoadingForms(false)
@@ -211,7 +212,7 @@ export function SeriesFormEngine() {
           format,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Generation failed')
       setDraft(data.questions as SeriesQuestion[])
       setShortfall(data.shortfall || 0)
@@ -270,7 +271,7 @@ export function SeriesFormEngine() {
           questions: cleaned,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Save failed')
       setDraft([])
       setTitle('')
@@ -299,7 +300,7 @@ export function SeriesFormEngine() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seriesFormId: formId }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Build failed')
       setBuiltPromptForId(formId)
       setBuiltPrompt(data.prompt)

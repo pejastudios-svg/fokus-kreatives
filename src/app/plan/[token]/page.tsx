@@ -5,6 +5,7 @@
 // and any edit affordances. Renders the calendar in read-only mode.
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -89,7 +90,7 @@ export default function PublicPlanPage() {
     ;(async () => {
       try {
         const res = await fetch(`/api/planner/public-data?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Could not load plan')
         setData(j as PublicData)
       } catch (e) {

@@ -10,6 +10,7 @@
 // because the brand_content_settings RLS policy is service-role-only.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Check, AlertCircle, Loader2 } from 'lucide-react'
@@ -53,7 +54,7 @@ export function BrandDescriptionSettings({ clientId }: Props) {
       setIsLoading(true)
       try {
         const r = await fetch(`/api/clients/${clientId}/brand-description-settings`, { cache: 'no-store' })
-        const json = (await r.json()) as { success?: boolean; settings?: Settings; error?: string }
+        const json = (await readJsonSafe(r)) as { success?: boolean; settings?: Settings; error?: string }
         if (cancelled) return
         if (!json.success || !json.settings) {
           setNotice({ type: 'error', message: json.error || 'Failed to load settings' })
@@ -91,7 +92,7 @@ export function BrandDescriptionSettings({ clientId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       })
-      const json = (await r.json()) as { success?: boolean; settings?: Settings; error?: string }
+      const json = (await readJsonSafe(r)) as { success?: boolean; settings?: Settings; error?: string }
       if (!json.success) {
         setNotice({ type: 'error', message: `Save failed: ${json.error || 'unknown error'}` })
         return

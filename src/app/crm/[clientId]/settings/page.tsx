@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -94,7 +95,7 @@ export default function CRMSettingsPage() {
     void (async () => {
       try {
         const res = await fetch('/api/me/preferences', { cache: 'no-store' })
-        const data = await res.json().catch(() => null)
+        const data = await readJsonSafe(res).catch(() => null)
         if (!cancelled && data?.success && data.preferences) {
           setPrefs({
             theme: data.preferences.theme,

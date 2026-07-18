@@ -11,6 +11,7 @@
 // hides and it behaves as a normal textarea.
 
 import { useEffect, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Mic, Square, Trash2, Loader2 } from 'lucide-react'
 
 // --- Minimal typings for the Web Speech API (absent from the TS DOM lib) ---
@@ -166,7 +167,7 @@ export function VoiceTextarea({
       fd.append('file', file)
       fd.append('folder', uploadFolder)
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data?.success && data?.url) onAudioChange?.(data.url)
       else console.error('voice upload failed:', data?.error)
     } catch (err) {

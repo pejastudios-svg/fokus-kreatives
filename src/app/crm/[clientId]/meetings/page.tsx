@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
@@ -487,7 +488,7 @@ export default function CRMMeetingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dateTimeIso: newDate.toISOString() }),
       })
-      const json = await res.json().catch(() => ({}))
+      const json = await readJsonSafe(res).catch(() => ({}))
       if (!res.ok || !json.success) {
         toast.error(json.error || 'Could not reschedule the meeting.')
         return
@@ -559,7 +560,7 @@ export default function CRMMeetingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      const json = await res.json().catch(() => ({}))
+      const json = await readJsonSafe(res).catch(() => ({}))
 
       if (!res.ok || !json.success) {
         console.error('Failed to update meeting status:', json.error)
@@ -639,7 +640,7 @@ export default function CRMMeetingsPage() {
     void (async () => {
       try {
         const res = await fetch(`/api/crm/meetings/${id}`, { method: 'DELETE' })
-        const json = await res.json().catch(() => ({}))
+        const json = await readJsonSafe(res).catch(() => ({}))
 
         if (!res.ok || !json.success) {
           console.error('Failed to delete meeting:', json.error)

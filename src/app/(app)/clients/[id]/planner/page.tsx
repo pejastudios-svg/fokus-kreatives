@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Calendar as CalendarIcon, Loader2, Share2, X, FileText, ChevronDown, Copy, Check as CheckIcon } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
@@ -1791,25 +1792,6 @@ export default function ClientPlannerPage() {
 function capitalize(s: string): string {
   if (!s) return ''
   return s[0].toUpperCase() + s.slice(1)
-}
-
-// Parse a fetch Response as JSON, translating platform-level failures into
-// a readable message. When a serverless function times out or crashes, the
-// platform returns a plain-text/HTML error page - calling res.json() on it
-// throws "Unexpected token 'A', \"An error o\"... is not valid JSON", which
-// is what users were seeing raw in the error banner.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readJsonSafe(res: Response): Promise<any> {
-  try {
-    const parsed = res.json()
-    return await parsed
-  } catch {
-    throw new Error(
-      res.ok
-        ? 'The server returned an unreadable response. Try again.'
-        : `The server did not complete the request (status ${res.status}). It likely timed out or hit an upstream outage - try again in a minute.`,
-    )
-  }
 }
 
 // Date helpers - YYYY-MM-DD strings (UTC) so they line up with the rest of

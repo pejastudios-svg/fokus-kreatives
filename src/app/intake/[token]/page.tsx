@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -86,7 +87,7 @@ export default function BrandIntakePage() {
     const load = async () => {
       try {
         const res = await fetch(`/api/clients/brand-intake/info?token=${encodeURIComponent(token)}`)
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) {
           setError(data.error || 'Invalid link')
           return
@@ -135,7 +136,7 @@ export default function BrandIntakePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, form }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {

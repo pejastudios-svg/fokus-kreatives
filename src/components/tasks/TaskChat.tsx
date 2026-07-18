@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createClient } from '@/lib/supabase/client'
 import { MessageSquare, Send, X, AtSign } from 'lucide-react'
 
@@ -57,7 +58,7 @@ export function TaskChat({ taskId, members }: Props) {
 
     void (async () => {
       const res = await fetch(`/api/tasks/${taskId}/messages`)
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!cancelled && data.success) {
         setMessages(data.messages)
       }
@@ -181,7 +182,7 @@ export function TaskChat({ taskId, members }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         setDraft('')
         setMentionState(null)

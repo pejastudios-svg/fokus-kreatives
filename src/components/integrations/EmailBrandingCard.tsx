@@ -6,6 +6,7 @@
 // name set here as the sender and route replies to the reply-to address.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -33,7 +34,7 @@ export function EmailBrandingCard({ clientId, canManage }: Props) {
           `/api/crm/email-branding?clientId=${encodeURIComponent(clientId)}`,
           { cache: 'no-store' },
         )
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (cancelled) return
         if (data.success) {
           setFromName(data.fromName || '')
@@ -59,7 +60,7 @@ export function EmailBrandingCard({ clientId, canManage }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, fromName, replyTo }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!res.ok || !data.success) {
         setError(data.error || 'Could not save')
         return

@@ -12,6 +12,7 @@
 // editor. After saving an edit, staff click Recheck on flagged items.
 
 import { useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { CheckCircle2, AlertTriangle, HelpCircle, RefreshCw, Loader2, X } from 'lucide-react'
 import type { ChecklistItem, ChecklistStatus } from '@/lib/checklist/items'
 
@@ -79,7 +80,7 @@ function ChecklistRow({
         `/api/planner/slot/${slotId}/checklist/${item.id}/recheck`,
         { method: 'POST' },
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Recheck failed')
       onChanged(data.item as ChecklistItem)
     } catch (err) {
@@ -116,7 +117,7 @@ function ChecklistRow({
           body: JSON.stringify({ reason: optimisticItem.human_note, human_status: 'waived' }),
         },
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Waive failed')
       // Server-authoritative copy (includes edited_by/at) - sync silently.
       if (data.item) onChanged(data.item as ChecklistItem)
@@ -147,7 +148,7 @@ function ChecklistRow({
           body: JSON.stringify({ human_status: 'fixed', reason: 'Marked fixed by staff' }),
         },
       )
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Failed')
       if (data.item) onChanged(data.item as ChecklistItem)
     } catch (err) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { AssetRenderer, type AssetRendererHandle } from '@/components/approvals/AssetRenderer'
@@ -124,7 +125,7 @@ export default function ReviewPage() {
   const loadState = useCallback(async () => {
     if (!token) return
     const res = await fetch(`/api/review/state?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
-    const data = await res.json().catch(() => ({}))
+    const data = await readJsonSafe(res).catch(() => ({}))
     if (!data.success) {
       setPhase('invalid')
       return
@@ -175,7 +176,7 @@ export default function ReviewPage() {
           `/api/review/state?token=${encodeURIComponent(token)}`,
           { cache: 'no-store' },
         )
-        const data = await res.json().catch(() => null)
+        const data = await readJsonSafe(res).catch(() => null)
         // Don't disturb the page on a transient failure - the user will keep
         // seeing the last good state until the next tick succeeds.
         if (!data?.success || !data.authed) return
@@ -219,7 +220,7 @@ export default function ReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, email: email.trim().toLowerCase() }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         setErrorMsg(data.error || 'Something went wrong')
         return
@@ -271,7 +272,7 @@ export default function ReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, itemId: item.id, approved: next === 'approved' }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: item.status } : i)))
         flash('error', data.error || "Couldn't update - please try again.")
@@ -703,7 +704,7 @@ function ReviewItemCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, commentId: editingCommentId, body: next }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         onError(data.error || "Couldn't save the edit")
         return
@@ -726,7 +727,7 @@ function ReviewItemCard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, commentId: pendingDeleteId }),
     })
-    const data = await res.json().catch(() => ({}))
+    const data = await readJsonSafe(res).catch(() => ({}))
     if (!data.success) {
       throw new Error(data.error || "Couldn't delete the comment")
     }
@@ -748,7 +749,7 @@ function ReviewItemCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, commentId: c.id, resolved: next }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         onCommentEdited({ ...c, resolved: c.resolved })
         onError(data.error || "Couldn't update the comment")
@@ -1001,7 +1002,7 @@ function ReviewItemCard({
     fd.append('folder', 'review-comments')
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         onError(`Upload failed for "${file.name}": ${data.error || 'unknown error'}`)
         return null
@@ -1046,7 +1047,7 @@ function ReviewItemCard({
           parentCommentId: replyTo?.commentId ?? null,
         }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         onError(data.error || "Couldn't post - please try again.")
         return

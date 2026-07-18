@@ -11,6 +11,7 @@
 // upserts are blocked.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { X, Plus, Check, AlertCircle, Loader2 } from 'lucide-react'
@@ -36,7 +37,7 @@ export function StoryDmKeywords({ clientId }: Props) {
       setIsLoading(true)
       try {
         const r = await fetch(`/api/clients/${clientId}/dm-keywords`, { cache: 'no-store' })
-        const json = (await r.json()) as { success?: boolean; keywords?: unknown; error?: string }
+        const json = (await readJsonSafe(r)) as { success?: boolean; keywords?: unknown; error?: string }
         if (cancelled) return
         if (!json.success) {
           setNotice({ type: 'error', message: json.error || 'Failed to load keywords' })
@@ -105,7 +106,7 @@ export function StoryDmKeywords({ clientId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keywords: nextKeywords }),
       })
-      const json = (await r.json()) as { success?: boolean; keywords?: unknown; error?: string }
+      const json = (await readJsonSafe(r)) as { success?: boolean; keywords?: unknown; error?: string }
       if (!json.success) {
         setNotice({ type: 'error', message: `Save failed: ${json.error || 'unknown error'}` })
         return

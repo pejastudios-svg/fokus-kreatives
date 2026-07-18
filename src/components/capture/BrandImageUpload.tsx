@@ -9,6 +9,7 @@
 // BEFORE they upload.
 
 import { useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Upload, ImageIcon, X, Loader2 } from 'lucide-react'
 
 interface Props {
@@ -52,7 +53,7 @@ export function BrandImageUpload({
         method: 'POST',
         body: formData,
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data?.success && data?.url) {
         onChange(data.url)
       } else {

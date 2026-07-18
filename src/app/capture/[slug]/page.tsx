@@ -6,6 +6,7 @@
 // owns state and submission only.
 
 import { useState, useEffect, useMemo } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { CaptureLayout } from '@/components/capture/layouts'
@@ -121,7 +122,7 @@ export default function PublicCapturePage() {
         const res = await fetch(`/api/capture/info?slug=${encodeURIComponent(slug)}`, {
           cache: 'no-store',
         })
-        const data = await res.json()
+        const data = await readJsonSafe(res)
 
         if (!data.success) {
           setError(data.error || 'This page is not available.')
@@ -313,7 +314,7 @@ export default function PublicCapturePage() {
         }),
       })
 
-      const data = await res.json()
+      const data = await readJsonSafe(res)
 
       if (!data.success) {
         setError(data.error || 'Something went wrong. Please try again.')

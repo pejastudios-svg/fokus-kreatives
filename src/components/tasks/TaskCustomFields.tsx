@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import {
   Plus,
   Trash2,
@@ -72,7 +73,7 @@ export function TaskCustomFields({ taskId }: Props) {
     setIsLoading(true)
     try {
       const res = await fetch(`/api/tasks/${taskId}/custom-fields`)
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) setFields(data.fields || [])
     } finally {
       setIsLoading(false)
@@ -100,7 +101,7 @@ export function TaskCustomFields({ taskId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, type: draftType, role: draftRole }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         setFields((prev) => [...prev, data.field])
         setDraftName('')

@@ -7,6 +7,7 @@
 // When a limit is hit, shows a friendly note with when sending resumes.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Gauge, Loader2, AlertTriangle } from 'lucide-react'
 
@@ -42,7 +43,7 @@ export function EmailQuotaCard({ clientId }: { clientId: string }) {
         const res = await fetch(`/api/crm/email-quota?clientId=${encodeURIComponent(clientId)}`, {
           cache: 'no-store',
         })
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (!cancelled && json.success) setData(json as QuotaData)
       } finally {
         if (!cancelled) setLoading(false)

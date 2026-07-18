@@ -6,6 +6,7 @@
 // stream's pieces. Reads /api/planner/readiness.
 
 import { useCallback, useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react'
 import { STREAM_LABEL, type StreamKey } from '@/lib/planner/readiness'
 
@@ -50,7 +51,7 @@ export function ReadinessPanel({ clientId, months }: { clientId: string; months:
       const res = await fetch(`/api/planner/readiness?clientId=${clientId}&months=${months}`, {
         cache: 'no-store',
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (j.success) setReport(j.report as ReadinessReport)
     } catch {
       // Non-blocking - the panel just hides on error.

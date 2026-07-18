@@ -14,6 +14,7 @@
 //   { success: true, mode: 'docx', docxBase64, filename, ... }
 
 import { NextRequest, NextResponse } from 'next/server'
+import { humanizeUpstreamError } from '@/lib/errors/humanize'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { resolveTierConfig, type CustomConfig, type TierKey } from '@/lib/campaignTiers'
@@ -511,7 +512,7 @@ export async function POST(
       missingScriptCount,
     })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = humanizeUpstreamError(err)
     console.error('planner/export error:', err)
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }

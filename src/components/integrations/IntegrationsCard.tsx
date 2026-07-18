@@ -10,6 +10,7 @@
 // makes flow back into the meetings table automatically.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -88,7 +89,7 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
       const res = await fetch(`/api/integrations/list?clientId=${encodeURIComponent(clientId)}`, {
         cache: 'no-store',
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (data.success) {
         setIntegrations(data.integrations || [])
       }
@@ -128,7 +129,7 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
         body: JSON.stringify({ clientId }),
       },
     )
-    const data = await res.json().catch(() => ({}))
+    const data = await readJsonSafe(res).catch(() => ({}))
     if (!res.ok || !data.success) {
       throw new Error(data.error || 'Disconnect failed')
     }
@@ -269,7 +270,7 @@ export function IntegrationsCard({ clientId, canManage }: Props) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ clientId }),
                           })
-                          const data = await res.json().catch(() => ({}))
+                          const data = await readJsonSafe(res).catch(() => ({}))
                           setTestState(data.success ? 'sent' : 'error')
                         } catch {
                           setTestState('error')
@@ -412,7 +413,7 @@ function GmailSmtpConnectModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, address: address.trim(), appPassword }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = await readJsonSafe(res).catch(() => ({}))
       if (!data.success) {
         setError(data.error || 'Connection failed')
         return
@@ -556,7 +557,7 @@ function CalendlyConnectModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, token: token.trim() }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Connection failed')
         return

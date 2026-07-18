@@ -8,6 +8,7 @@
 // (RLS is service-role-only, so the browser cannot write the table directly).
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Check, AlertCircle, Loader2 } from 'lucide-react'
@@ -42,7 +43,7 @@ export function StoryCampaignSettings({ clientId }: Props) {
       setIsLoading(true)
       try {
         const r = await fetch(`/api/clients/${clientId}/story-campaign`, { cache: 'no-store' })
-        const json = (await r.json()) as { success?: boolean; campaign?: Partial<Campaign> | null; error?: string }
+        const json = (await readJsonSafe(r)) as { success?: boolean; campaign?: Partial<Campaign> | null; error?: string }
         if (cancelled) return
         if (!json.success) {
           setNotice({ type: 'error', message: json.error || 'Failed to load campaign' })
@@ -80,7 +81,7 @@ export function StoryCampaignSettings({ clientId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaign: payload }),
       })
-      const json = (await r.json()) as { success?: boolean; campaign?: Partial<Campaign> | null; error?: string }
+      const json = (await readJsonSafe(r)) as { success?: boolean; campaign?: Partial<Campaign> | null; error?: string }
       if (!json.success) {
         setNotice({ type: 'error', message: `Save failed: ${json.error || 'unknown error'}` })
         return

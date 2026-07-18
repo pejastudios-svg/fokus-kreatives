@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
@@ -111,7 +112,7 @@ export default function CRMTeamPage() {
         `/api/crm/members?clientId=${encodeURIComponent(clientId)}`,
         { cache: 'no-store' },
       )
-      const json = (await res.json()) as {
+      const json = (await readJsonSafe(res)) as {
         success: boolean
         error?: string
         members?: Array<{
@@ -152,7 +153,7 @@ export default function CRMTeamPage() {
         `/api/crm/team/invites?clientId=${encodeURIComponent(clientId)}`,
         { cache: 'no-store' },
       )
-      const json = (await res.json()) as {
+      const json = (await readJsonSafe(res)) as {
         success: boolean
         error?: string
         invites?: InviteRow[]
@@ -424,7 +425,7 @@ export default function CRMTeamPage() {
           role: inviteRole,
         }),
       })
-      const json = (await res.json()) as {
+      const json = (await readJsonSafe(res)) as {
         success: boolean
         error?: string
         invite?: { id: string; token: string; expiresAt: string }
@@ -481,7 +482,7 @@ export default function CRMTeamPage() {
         `/api/crm/team/invites/${invite.id}/resend`,
         { method: 'POST' },
       )
-      const json = (await res.json()) as {
+      const json = (await readJsonSafe(res)) as {
         success: boolean
         error?: string
         invite?: {
@@ -543,7 +544,7 @@ export default function CRMTeamPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       })
-      const json = (await res.json()) as { success: boolean; error?: string }
+      const json = (await readJsonSafe(res)) as { success: boolean; error?: string }
       if (!res.ok || !json.success) {
         setNotification({
           type: 'error',
@@ -574,7 +575,7 @@ export default function CRMTeamPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, role }),
       })
-      const json = (await res.json()) as { success: boolean; error?: string }
+      const json = (await readJsonSafe(res)) as { success: boolean; error?: string }
       if (!res.ok || !json.success) {
         setNotification({
           type: 'error',
@@ -598,7 +599,7 @@ export default function CRMTeamPage() {
       const res = await fetch(`/api/crm/team/invites/${invite.id}`, {
         method: 'DELETE',
       })
-      const json = (await res.json()) as { success: boolean; error?: string }
+      const json = (await readJsonSafe(res)) as { success: boolean; error?: string }
       if (!res.ok || !json.success) {
         setNotification({
           type: 'error',
@@ -625,7 +626,7 @@ export default function CRMTeamPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, password: removePassword }),
       })
-      const json = (await res.json()) as { success: boolean; error?: string }
+      const json = (await readJsonSafe(res)) as { success: boolean; error?: string }
       if (!res.ok || !json.success) {
         setNotification({
           type: 'error',

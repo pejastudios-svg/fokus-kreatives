@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -56,7 +57,7 @@ export function ClientAssignees({ clientId }: Props) {
         setTeam((members || []) as AgencyMember[])
 
         const res = await fetch(`/api/clients/${clientId}/assignees`)
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (data.success) {
           const ids = new Set<string>(
             (data.assignees || []).map((a: { id: string }) => a.id),
@@ -121,7 +122,7 @@ export function ClientAssignees({ clientId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userIds: Array.from(selected) }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setNotice({ type: 'error', message: data.error || 'Failed to save assignees' })
         return

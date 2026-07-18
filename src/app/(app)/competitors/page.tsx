@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -87,7 +88,7 @@ export default function CompetitorsPage() {
         }),
       })
 
-      const data = await response.json()
+      const data = await readJsonSafe(response)
 
       if (data.success) {
         setAnalysis(data.analysis as CompetitorAnalysis)

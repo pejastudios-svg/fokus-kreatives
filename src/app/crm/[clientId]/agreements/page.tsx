@@ -5,6 +5,7 @@
 // or more signers, each with their own e-signature link.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
@@ -542,9 +543,9 @@ export default function AgreementsPage() {
           .eq('client_id', clientId)
           .order('position'),
       ])
-      const agJson = await agRes.json()
+      const agJson = await readJsonSafe(agRes)
       if (agJson.success) setAgreements(agJson.agreements as Agreement[])
-      const tplJson = await tplRes.json()
+      const tplJson = await readJsonSafe(tplRes)
       if (tplJson.success) setTemplates(tplJson.templates as Template[])
       void fetch(`/api/crm/avatars?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
         .then((r) => r.json())
@@ -710,7 +711,7 @@ export default function AgreementsPage() {
             }),
           },
         )
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (!json.success) throw new Error(json.error || 'autosave failed')
         lastSavedRef.current = fingerprint
         if (!draft && json.agreement) {
@@ -752,7 +753,7 @@ export default function AgreementsPage() {
           }),
         },
       )
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) throw new Error(json.error || 'autosave failed')
       lastSavedRef.current = fingerprint
       if (!existing && json.template) {
@@ -934,7 +935,7 @@ export default function AgreementsPage() {
           }),
         },
       )
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) {
         toast.error(json.error || 'Could not save the template.')
         return
@@ -956,7 +957,7 @@ export default function AgreementsPage() {
         `clientId=${encodeURIComponent(clientId)}` +
         (pw ? `&password=${encodeURIComponent(pw)}` : '')
       const res = await fetch(`/api/crm/agreements/templates/${t.id}?${qs}`, { method: 'DELETE' })
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) throw new Error(json.error || 'Could not delete the template.')
       setTemplates((prev) => prev.filter((x) => x.id !== t.id))
       setConfirm(null)
@@ -1086,7 +1087,7 @@ export default function AgreementsPage() {
             body: JSON.stringify(payload),
           },
         )
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (!json.success) {
           toast.error(json.error || 'Could not save the agreement.')
           return
@@ -1151,7 +1152,7 @@ export default function AgreementsPage() {
         `clientId=${encodeURIComponent(clientId)}` +
         (pw ? `&password=${encodeURIComponent(pw)}` : '')
       const res = await fetch(`/api/crm/agreements/${a.id}?${qs}`, { method: 'DELETE' })
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) throw new Error(json.error || 'Could not delete the agreement.')
       setAgreements((prev) => prev.filter((x) => x.id !== a.id))
       setConfirm(null)
@@ -1371,7 +1372,7 @@ export default function AgreementsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientId, action: 'unlock', password: pw || '' }),
         })
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (!json.success) throw new Error(json.error || 'Incorrect password.')
         setConfirm(null)
         proceed(json.bodyHtml as string)
@@ -1384,7 +1385,7 @@ export default function AgreementsPage() {
     const res = await fetch(
       `/api/crm/agreements?clientId=${encodeURIComponent(clientId)}&view=deleted`,
     )
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (json.success) setDeletedAgreements(json.agreements as Agreement[])
   }
 
@@ -1432,7 +1433,7 @@ export default function AgreementsPage() {
         invoiceConfig: a.invoice_config,
       }),
     })
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (!json.success) {
       toast.error(json.error || 'Could not create a copy.')
       return null
@@ -1467,7 +1468,7 @@ export default function AgreementsPage() {
           `/api/crm/agreements/${a.id}?clientId=${encodeURIComponent(clientId)}`,
           { method: 'DELETE' },
         )
-        const json = await res.json()
+        const json = await readJsonSafe(res)
         if (!json.success) {
           // The copy exists either way; the worst case is the sent original
           // lingers in the list next to the new draft.
@@ -1533,7 +1534,7 @@ export default function AgreementsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, name: name.trim() || 'Untitled template', bodyHtml }),
     })
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (!json.success) {
       toast.error(json.error || 'Could not save the template.')
       return
@@ -1558,7 +1559,7 @@ export default function AgreementsPage() {
         ccEmails,
       }),
     })
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (!json.success) {
       toast.error(json.error || 'Could not make a copy.')
       return
@@ -1590,7 +1591,7 @@ export default function AgreementsPage() {
               : null
         if (url) {
           const res = await fetch(url, { method: 'DELETE' })
-          const json = await res.json()
+          const json = await readJsonSafe(res)
           if (!json.success) {
             toast.error(json.error || 'Could not delete.')
             return
@@ -2095,7 +2096,7 @@ export default function AgreementsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, templateId, triggerStatus }),
     })
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (!json.success) {
       toast.error(json.error || 'Could not save the trigger.')
       return
@@ -2113,7 +2114,7 @@ export default function AgreementsPage() {
       `/api/crm/agreements/automations?clientId=${encodeURIComponent(clientId)}&id=${encodeURIComponent(id)}`,
       { method: 'DELETE' },
     )
-    const json = await res.json()
+    const json = await readJsonSafe(res)
     if (!json.success) {
       toast.error(json.error || 'Could not remove the trigger.')
       return

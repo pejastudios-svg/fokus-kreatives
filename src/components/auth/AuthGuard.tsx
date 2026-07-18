@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
@@ -49,7 +50,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         router.push('/login')
         return
       }
-      const json = (await res.json()) as
+      const json = (await readJsonSafe(res)) as
         | { authed: false }
         | { authed: true; signOut: true; reason: string }
         | {

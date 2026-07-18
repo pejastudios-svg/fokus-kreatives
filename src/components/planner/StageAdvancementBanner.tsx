@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Sparkles, X } from 'lucide-react'
 
 interface Props {
@@ -25,7 +26,7 @@ export function StageAdvancementBanner({ clientId, currentStage, proposedStage, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
       })
-      const j = await res.json()
+      const j = await readJsonSafe(res)
       if (!j.success) throw new Error(j.error || 'Failed')
       onChange()
     } catch (e) {

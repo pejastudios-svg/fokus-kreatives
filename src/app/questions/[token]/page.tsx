@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -109,7 +110,7 @@ export default function QuestionFormPage() {
     const load = async () => {
       try {
         const res = await fetch(`/api/question-form/info?token=${encodeURIComponent(token)}`)
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (!data.success) {
           setError(data.error || 'Invalid link')
           return
@@ -254,7 +255,7 @@ export default function QuestionFormPage() {
           thinFlags,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to submit')
       } else {

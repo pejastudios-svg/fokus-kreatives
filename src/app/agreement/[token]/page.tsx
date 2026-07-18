@@ -7,6 +7,7 @@
 // personal token) is the interactive one.
 
 import { useCallback, useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams } from 'next/navigation'
 import { Check, Loader2, Clock, Lock } from 'lucide-react'
 import { AGREEMENT_DOC_CSS, DOC_FONTS_URL } from '@/components/agreements/docStyles'
@@ -110,7 +111,7 @@ export default function AgreementSignPage() {
         setGone(true)
         return
       }
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) {
         setError(json.error || 'Agreement not found')
         return
@@ -171,7 +172,7 @@ export default function AgreementSignPage() {
           signatureImage: renderSignaturePng(name.trim()) || undefined,
         }),
       })
-      const json = await res.json()
+      const json = await readJsonSafe(res)
       if (!json.success) {
         setError(json.error || 'Could not sign the agreement.')
         return

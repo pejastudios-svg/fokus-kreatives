@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -319,7 +320,7 @@ export default function TeamPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: member.id, password: password ?? '' }),
     })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) {
       throw new Error(data.error || 'Failed to remove user')
     }
@@ -338,7 +339,7 @@ export default function TeamPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: member.id, origin }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setNotification({ type: 'error', message: data.error || 'Failed to resend invite' })
         return
@@ -359,7 +360,7 @@ export default function TeamPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: member.id, role, password }),
     })
-    const data = await res.json()
+    const data = await readJsonSafe(res)
     if (!data.success) {
       throw new Error(data.error || 'Failed to change role')
     }

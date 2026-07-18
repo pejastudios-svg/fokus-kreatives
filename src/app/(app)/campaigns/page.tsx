@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -167,7 +168,7 @@ export default function CampaignsPage() {
       const res = await fetch(`/api/campaigns?clientId=${encodeURIComponent(clientId)}`, {
         cache: 'no-store',
       })
-      const data = await res.json().catch(() => null)
+      const data = await readJsonSafe(res).catch(() => null)
       if (data?.success) {
         setCampaigns(data.campaigns as CampaignRow[])
       }
@@ -217,7 +218,7 @@ export default function CampaignsPage() {
         `/api/campaigns/next-slot?clientId=${encodeURIComponent(selectedClientId)}`,
         { cache: 'no-store' },
       )
-      const data = await res.json().catch(() => null)
+      const data = await readJsonSafe(res).catch(() => null)
       if (data?.success) {
         setCampaignNumber(data.campaignNumber as number)
         setMonthNumber(data.monthNumber as number)
@@ -251,7 +252,7 @@ export default function CampaignsPage() {
         ...(onDuplicate ? { onDuplicate } : {}),
       }),
     })
-    const data = await res.json().catch(() => null)
+    const data = await readJsonSafe(res).catch(() => null)
 
     if (res.status === 409 && data?.requiresConfirmation) {
       setPendingDuplicate({
@@ -278,7 +279,7 @@ export default function CampaignsPage() {
       `/api/campaigns/next-slot?clientId=${encodeURIComponent(selectedClientId)}`,
       { cache: 'no-store' },
     )
-    const slot = await slotRes.json().catch(() => null)
+    const slot = await readJsonSafe(slotRes).catch(() => null)
     if (slot?.success) {
       setCampaignNumber(slot.campaignNumber as number)
       setMonthNumber(slot.monthNumber as number)
@@ -323,7 +324,7 @@ export default function CampaignsPage() {
       const res = await fetch(`/api/campaigns/${pendingDelete.id}${params}`, {
         method: 'DELETE',
       })
-      const data = await res.json().catch(() => null)
+      const data = await readJsonSafe(res).catch(() => null)
       if (!data?.success) {
         setNotification({ type: 'error', message: data?.error || 'Failed to delete' })
         setDeleteMode(null)

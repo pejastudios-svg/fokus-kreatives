@@ -17,6 +17,7 @@
 // reaching it can't get past the API.
 
 import { useState, useRef, useEffect } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck, Loader2 } from 'lucide-react'
 
@@ -51,7 +52,7 @@ export default function AdminUnlockPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Incorrect password')
         setPassword('')

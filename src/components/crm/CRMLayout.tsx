@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -210,7 +211,7 @@ useEffect(() => {
         return
       }
 
-      const json = (await res.json()) as {
+      const json = (await readJsonSafe(res)) as {
         authorized: boolean
         crmRole?: Role
         isClientUser?: boolean

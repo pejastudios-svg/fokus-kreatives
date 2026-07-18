@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { humanizeUpstreamError } from '@/lib/errors/humanize'
 import { regenerateSlot } from '@/lib/planner'
 
 export const runtime = 'nodejs'
@@ -16,7 +17,7 @@ export async function POST(
     const slot = await regenerateSlot(id)
     return NextResponse.json({ success: true, slot })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = humanizeUpstreamError(err)
     console.error('planner/slot/regenerate error:', err)
     return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }

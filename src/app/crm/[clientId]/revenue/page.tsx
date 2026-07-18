@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Loading'
@@ -535,7 +536,7 @@ export default function CRMRevenue() {
           },
         }),
       })
-      const ok = res.ok && (await res.json().catch(() => ({ success: false }))).success
+      const ok = res.ok && (await readJsonSafe(res).catch(() => ({ success: false }))).success
       if (!ok) {
         alert('Could not send the invoice email. Check the Apps Script invoice_sent template is deployed.')
         return

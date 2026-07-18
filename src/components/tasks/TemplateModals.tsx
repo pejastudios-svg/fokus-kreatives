@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { X, Save, Trash2 } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
@@ -75,7 +76,7 @@ export function SaveTemplateModal({
           isShared,
         }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to save template')
         return
@@ -200,7 +201,7 @@ export function ApplyTemplateModal({
     void (async () => {
       try {
         const res = await fetch('/api/tasks/templates')
-        const data = await res.json()
+        const data = await readJsonSafe(res)
         if (data.success) setTemplates(data.templates || [])
       } finally {
         setIsLoading(false)
@@ -230,7 +231,7 @@ export function ApplyTemplateModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, folderId }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) {
         setError(data.error || 'Failed to apply template')
         return

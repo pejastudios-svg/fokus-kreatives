@@ -5,6 +5,7 @@
 // Includes a "Open planner" link.
 
 import { useEffect, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import Link from 'next/link'
 import { Calendar as CalendarIcon, Sparkles } from 'lucide-react'
 
@@ -37,7 +38,7 @@ export function StageBadge({ clientId }: Props) {
     ;(async () => {
       try {
         const res = await fetch(`/api/planner/stage?clientId=${clientId}`, { cache: 'no-store' })
-        const j = await res.json()
+        const j = await readJsonSafe(res)
         if (!active) return
         if (j.success && j.stage) setData(j.stage as StageData)
       } catch {

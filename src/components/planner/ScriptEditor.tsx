@@ -6,6 +6,7 @@
 // by the parent drawer (separate buttons since they have different costs).
 
 import { useEffect, useRef, useState } from 'react'
+import { readJsonSafe } from '@/lib/http/readJsonSafe'
 import { Loader2, Save } from 'lucide-react'
 
 export interface ScriptEditorProps {
@@ -59,7 +60,7 @@ export function ScriptEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script: draft }),
       })
-      const data = await res.json()
+      const data = await readJsonSafe(res)
       if (!data.success) throw new Error(data.error || 'Save failed')
       setSavedAt(Date.now())
       onSaved?.(draft)
