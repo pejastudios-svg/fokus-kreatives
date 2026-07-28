@@ -440,6 +440,60 @@ CAROUSEL DO NOT:
 - Use voiceover annotations - carousels are silent decks.`
 
 // =============================================================================
+// SHORTFORM_OUTLINE_OVERLAY - bullet-point delivery mode for short-form
+// =============================================================================
+// Appended AFTER SHORTFORM_BUILDOUT when a slot generates in outline mode.
+// The 8-beat structure, teaching-clarity rules, and hard bans all still
+// apply - only the OUTPUT SHAPE changes: instead of a word-for-word script
+// the client reads (and sounds stiff doing), they get hook/CTA variations
+// to pick from and BODY BEATS as QUESTIONS they answer on camera in their
+// own words. Written sections (caption, hashtags) stay fully written
+// because they are posted, not spoken.
+export const SHORTFORM_OUTLINE_OVERLAY = `OUTLINE MODE (OVERRIDES the output sections above - structure stays, wording is the client's):
+
+This script will NOT be read word-for-word. The client films from it like a conversation prompt sheet: they pick a hook, answer the body questions in their own words, and pick a CTA. Everything above about beats, teaching clarity, specificity, and bans still applies - but the OUTPUT SECTIONS are replaced with this exact order:
+
+[TITLE]
+Unchanged: 4-8 words, cold open, specific.
+
+[HOOK OPTIONS]
+EXACTLY 3 numbered hook variations (1. / 2. / 3.), each 1 sentence, each a genuinely different angle on the SAME anchor moment - not three rewordings. These are delivered close to verbatim, so they must be tight and speakable. All three follow the hook rules above.
+
+[REHOOK 1 OPTIONS]
+2 numbered variations, 1 sentence each. One that intensifies, one that pivots to the audience.
+
+[BODY BEATS]
+The same 1-3 beats the format demands, but each beat is written as a QUESTION the client answers on camera - questions are easier to speak to than instructions. Each beat is one bullet:
+- The question, phrased directly at the client ("What did your mornings look like when you were forcing daily posts?")
+- Then on the same bullet, after " - mention: ", the SPECIFIC details from raw material they must include (the number, the name, the moment). The specifics are NOT optional - a beat without its concrete detail loses the teaching value.
+The questions follow the format's beat order and each still passes the WHAT + HOW test: answering the question naturally forces the client to name the concept and show the action.
+
+[CTA OPTIONS]
+2 numbered variations, 1 sentence each. When a brand keyword is locked, EVERY option contains the exact "comment KEYWORD" instruction - the keyword is never optional and never paraphrased.
+
+[REHOOK 2 OPTIONS]
+2 numbered variations, 1 sentence each, following the REHOOK 2 rules above.
+
+[CLOSE OPTIONS]
+2 numbered variations, 1 sentence each - the framing, why it mattered.
+
+[RELOOP]
+1 sentence (optional per the rules above) OR one bullet question that lets the client loop back to their chosen hook in their own words.
+
+[CAPTION]
+Unchanged from the rules above - fully written, it gets posted as-is.
+
+[HASHTAGS]
+Unchanged - fully written.
+
+OUTLINE MODE HARD RULES:
+- Numbered options use plain "1." numbering, one per line.
+- No option is a paraphrase of another option - each earns its slot with a different angle.
+- BODY BEATS are questions + required specifics. Never full spoken sentences the client would read out.
+- The 75-180 word cap does NOT apply to the sheet itself - instead, the beats must be answerable in 30-60 seconds of speaking. 1-3 body questions, never more.
+- Everything else above (bans, voice, anti-invention, anchor rules) applies unchanged.`
+
+// =============================================================================
 // FRAMEWORK_CORE - backward-compat alias
 // =============================================================================
 // Keep existing callers working. New code should call
@@ -791,7 +845,14 @@ export function frameworkBlock(): string {
 export function frameworkBlockForStream(
   stream: 'long_form' | 'short_form' | 'engagement_reel' | 'carousel' | 'story',
   formatSlug?: string,
+  opts?: { outline?: boolean },
 ): string {
+  // Outline (bullet-point) delivery mode - short-form only. The overlay
+  // replaces the output sections with option lists + question beats.
+  if (stream === 'short_form' && opts?.outline) {
+    console.log('[framework] using SHORTFORM_BUILDOUT + OUTLINE_OVERLAY')
+    return `${FRAMEWORK_BASE}\n\n${SHORTFORM_BUILDOUT}\n\n${SHORTFORM_OUTLINE_OVERLAY}`
+  }
   switch (stream) {
     case 'long_form':
       console.log('[framework] using LONGFORM_BUILDOUT')

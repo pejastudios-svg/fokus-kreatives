@@ -34,7 +34,10 @@ interface Props {
   /** Fires script generation for this slot. Tracked in the parent so the
    *  spinner survives closing + reopening the drawer. Returns the new
    *  script + checklist so the drawer can update its local mirror. */
-  onGenerateScript: (slotId: string) => Promise<{ script: string; checklist: ChecklistItem[] }>
+  onGenerateScript: (
+    slotId: string,
+    mode?: 'verbatim' | 'outline',
+  ) => Promise<{ script: string; checklist: ChecklistItem[] }>
   /** True while THIS slot's script generation is in flight (parent-tracked). */
   slotGenerating?: boolean
   /** True while THIS slot's regenerate is in flight (parent-tracked). */
@@ -42,7 +45,7 @@ interface Props {
   /** Bulk-generate every slot in the campaign (same topic_group_id) that
    *  doesn't yet have a script. Parent dispatches N parallel
    *  /generate-script calls and tracks progress in its own state. */
-  onGenerateCampaign: (topicGroupId: string) => Promise<void>
+  onGenerateCampaign: (topicGroupId: string, mode?: 'verbatim' | 'outline') => Promise<void>
   /** How many slots in the slot's campaign still need scripts. The
    *  parent computes this so the drawer can label the bulk button. */
   campaignSlotsRemaining: number
@@ -94,6 +97,29 @@ export function SlotDetailDrawer({
   const [checklist, setChecklist] = useState<ChecklistItem[]>(initialChecklist)
   const [generateError, setGenerateError] = useState<string | null>(null)
 
+  // Delivery mode for short-form generation. 'verbatim' = word-for-word
+  // script; 'outline' = bullet-point prompt sheet (hook/CTA options + body
+  // questions the client answers on camera). Seeded from the slot's last
+  // generation, then the staff's last choice on this device.
+  const [scriptMode, setScriptMode] = useState<'verbatim' | 'outline'>(() => {
+    const prior = initialMeta.script_mode
+    if (prior === 'outline' || prior === 'verbatim') return prior
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('fk.scriptMode')
+      if (stored === 'outline' || stored === 'verbatim') return stored
+    }
+    return 'verbatim'
+  })
+  const pickScriptMode = (m: 'verbatim' | 'outline') => {
+    setScriptMode(m)
+    try {
+      window.localStorage.setItem('fk.scriptMode', m)
+    } catch {
+      // storage unavailable (private mode) - the toggle still works for
+      // this session.
+    }
+  }
+
   // In-flight state is owned by the parent (survives close/reopen). Local
   // `busy` still drives lock/unlock/swap/delete while the drawer is mounted.
   const genInFlight = !!slotGenerating
@@ -106,6 +132,11 @@ export function SlotDetailDrawer({
     const meta = (slot.generation_meta as Record<string, unknown>) ?? {}
     setScript(typeof meta.script === 'string' ? meta.script : '')
     setChecklist(Array.isArray(meta.checklist) ? (meta.checklist as ChecklistItem[]) : [])
+    // Re-seed the delivery mode from the newly-opened slot (fall back to
+    // whatever the toggle already shows).
+    if (meta.script_mode === 'outline' || meta.script_mode === 'verbatim') {
+      setScriptMode(meta.script_mode)
+    }
   }, [slot.id, slot.generation_meta])
 
   useEffect(() => {
@@ -137,7 +168,11 @@ export function SlotDetailDrawer({
     try {
       // The parent owns the fetch + in-flight tracking (so the spinner
       // survives close/reopen) and returns the fresh script + checklist.
-      const data = await onGenerateScript(slot.id)
+      // Mode only applies to short-form; other streams ignore it.
+      const data = await onGenerateScript(
+        slot.id,
+        slot.stream === 'short_form' ? scriptMode : undefined,
+      )
       setScript(data.script)
       setChecklist(data.checklist)
     } catch (err) {
@@ -262,6 +297,45 @@ export function SlotDetailDrawer({
           </div>
 
           <div className="border-t border-[var(--glass-border)] pt-4">
+            {/* Delivery-mode toggle (short-form only): word-for-word script
+                vs a bullet-point prompt sheet the client answers on camera. */}
+            {slot.stream === 'short_form' && !isApproved && (
+              <div className="mb-3">
+                <div className="inline-flex rounded-md border border-[var(--glass-border)] overflow-hidden">
+                  <button
+                    type="button"
+                    disabled={mutating}
+                    onClick={() => pickScriptMode('verbatim')}
+                    className={[
+                      'px-3 py-1.5 text-xs transition-colors',
+                      scriptMode === 'verbatim'
+                        ? 'bg-[#2B79F7] text-white'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]',
+                    ].join(' ')}
+                  >
+                    Word-for-word
+                  </button>
+                  <button
+                    type="button"
+                    disabled={mutating}
+                    onClick={() => pickScriptMode('outline')}
+                    className={[
+                      'px-3 py-1.5 text-xs transition-colors',
+                      scriptMode === 'outline'
+                        ? 'bg-[#2B79F7] text-white'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]',
+                    ].join(' ')}
+                  >
+                    Bullet points
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[11px] text-[var(--text-tertiary)]">
+                  {scriptMode === 'outline'
+                    ? 'Generates hook and CTA options plus body questions the client answers in their own words.'
+                    : 'Generates the full script exactly as it should be spoken.'}
+                </p>
+              </div>
+            )}
             <ScriptEditor
               slotId={slot.id}
               initialScript={script}
@@ -360,7 +434,9 @@ export function SlotDetailDrawer({
                 disabled={mutating || campaignBulkInFlight}
                 onClick={() => {
                   if (slot.topic_group_id) {
-                    void onGenerateCampaign(slot.topic_group_id)
+                    // Mode rides along; the server applies it to short-form
+                    // slots only and ignores it for other streams.
+                    void onGenerateCampaign(slot.topic_group_id, scriptMode)
                   }
                 }}
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md bg-[#2B79F7] text-white hover:bg-[#1f5fcc] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

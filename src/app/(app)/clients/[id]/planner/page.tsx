@@ -306,10 +306,17 @@ export default function ClientPlannerPage() {
   // Fires the script generation for one slot and tracks it in slotInFlight so
   // the drawer's spinner reflects the true state even after close/reopen.
   const handleGenerateScript = useCallback(
-    async (slotId: string): Promise<{ script: string; checklist: ChecklistItem[] }> => {
+    async (
+      slotId: string,
+      mode?: 'verbatim' | 'outline',
+    ): Promise<{ script: string; checklist: ChecklistItem[] }> => {
       markSlotInFlight(slotId, 'generating')
       try {
-        const res = await fetch(`/api/planner/slot/${slotId}/generate-script`, { method: 'POST' })
+        const res = await fetch(`/api/planner/slot/${slotId}/generate-script`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mode ? { mode } : {}),
+        })
         const data = await readJsonSafe(res)
         if (!data.success) throw new Error(data.error || 'Generation failed')
         // Sync generation_meta into parent state so a drawer reopen re-seeds
@@ -609,7 +616,7 @@ export default function ClientPlannerPage() {
   >(new Map())
 
   const handleGenerateCampaign = useCallback(
-    async (topicGroupId: string) => {
+    async (topicGroupId: string, mode?: 'verbatim' | 'outline') => {
       // Identify the slots that need scripts in this campaign - fetched
       // server-side so the list covers the WHOLE campaign, not just the
       // slots inside the visible calendar window. data.slots starts at
@@ -682,6 +689,10 @@ export default function ClientPlannerPage() {
       const fireOne = async (slot: typeof needGeneration[number]) => {
         const res = await fetch(`/api/planner/slot/${slot.id}/generate-script`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Mode applies to short-form slots only; the server ignores it
+          // for other streams in the campaign.
+          body: JSON.stringify(mode ? { mode } : {}),
         })
         const j = await readJsonSafe(res)
         if (!j.success) throw new Error(j.error || 'Generation failed')

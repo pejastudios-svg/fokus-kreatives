@@ -61,6 +61,12 @@ import { plannerAdmin } from './db'
 import { logDbError } from '@/lib/db/logError'
 import type { SlotStream } from './types'
 
+/** How the script is delivered on camera. 'verbatim' = full word-for-word
+ *  script (the default, read as written). 'outline' = bullet-point prompt
+ *  sheet: hook/CTA variations + body beats phrased as QUESTIONS the client
+ *  answers in their own words. Short-form only; other streams ignore it. */
+export type ScriptMode = 'verbatim' | 'outline'
+
 export interface ScriptForSlotResult {
   scriptText: string
   checklist: ChecklistItem[]
@@ -127,6 +133,7 @@ export class GenerationLockedError extends Error {
 
 export async function generateScriptForSlot(
   slotId: string,
+  opts?: { scriptMode?: ScriptMode },
 ): Promise<ScriptForSlotResult> {
   const supabase = plannerAdmin()
 
@@ -159,7 +166,7 @@ export async function generateScriptForSlot(
   }
 
   try {
-    return await generateScriptForSlotInner(slotId, supabase)
+    return await generateScriptForSlotInner(slotId, supabase, opts)
   } finally {
     // Release the lock - token-matched server-side so a stale lock that
     // we replaced doesn't get cleared by the wrong caller.
@@ -173,6 +180,7 @@ export async function generateScriptForSlot(
 async function generateScriptForSlotInner(
   slotId: string,
   supabase: ReturnType<typeof plannerAdmin>,
+  opts?: { scriptMode?: ScriptMode },
 ): Promise<ScriptForSlotResult> {
   // 1. Load the slot + adjacent context.
   const { data: slotData, error: slotErr } = await supabase
@@ -188,8 +196,19 @@ async function generateScriptForSlotInner(
   }
 
   const stream = slotData.stream as SlotStream
+
+  // Delivery mode: explicit request wins, then the mode the slot was last
+  // generated in (so plain regenerates keep it), then verbatim. Short-form
+  // only - other streams always run verbatim structure.
+  const priorMeta = (slotData.generation_meta ?? {}) as Record<string, unknown>
+  const scriptMode: ScriptMode =
+    stream === 'short_form'
+      ? (opts?.scriptMode ??
+        (priorMeta.script_mode === 'outline' ? 'outline' : 'verbatim'))
+      : 'verbatim'
+
   console.log(
-    `[generateScript] slot=${slotId} stream=${stream} format_id=${slotData.format_id} format=${(slotData as { format_id?: string }).format_id ?? 'none'}`,
+    `[generateScript] slot=${slotId} stream=${stream} mode=${scriptMode} format_id=${slotData.format_id}`,
   )
   // Scripts always cover feed-post streams (long_form / short_form /
   // engagement_reel / carousel) - stories are generated separately by
@@ -352,6 +371,7 @@ async function generateScriptForSlotInner(
     stream,
     format,
     brandProfile,
+    outline: scriptMode === 'outline',
   })
   // 7. Pick quality tier per stream. Computed BEFORE the cache call so the
   //    cache key + model match the call we'll make later. Mismatch causes
@@ -390,6 +410,7 @@ async function generateScriptForSlotInner(
     format,
     answers,
     anchor,
+    outline: scriptMode === 'outline',
     brandName,
     creatorName,
     brandWebsite,
@@ -516,7 +537,10 @@ async function generateScriptForSlotInner(
   //     Carousels are 10-slide decks + caption + hashtags - same problem.
   //     Both are constrained by structure (scene count / slide count), not
   //     word ceiling, so skip the tightener for them.
-  if (stream === 'long_form' || stream === 'short_form') {
+  //     Outline-mode short-form is a prompt sheet, not spoken text - word
+  //     counts are meaningless and the tightener's section labels don't
+  //     match the option-list structure. Skip it.
+  if (stream === 'long_form' || (stream === 'short_form' && scriptMode !== 'outline')) {
     const window = lengthTargetWindow(stream, {
       target_length_min: format.target_length_min,
       target_length_max: format.target_length_max,
@@ -548,7 +572,11 @@ async function generateScriptForSlotInner(
   //     line the format bans.
   const skipCtaEnforcement =
     stream === 'long_form' ||
-    (stream === 'engagement_reel' && format.slug !== 'engagement_reel.caption_list')
+    (stream === 'engagement_reel' && format.slug !== 'engagement_reel.caption_list') ||
+    // Outline mode carries MULTIPLE numbered CTA options - the enforcer
+    // expects one CTA line and would mangle the list. The overlay prompt
+    // requires the keyword in every option instead.
+    (stream === 'short_form' && scriptMode === 'outline')
   if (dmKeywords.length > 0 && !skipCtaEnforcement) {
     const enforced = enforceCtaKeyword(finalScript, dmKeywords, ctaPlatform)
     if (enforced.rewrites.length > 0) {
@@ -638,6 +666,11 @@ async function generateScriptForSlotInner(
     }
   }
 
+  // 16d. Layout normalization - every stream. Headers and list items land
+  //      on their own lines in the SAVED script, so the editor and the doc
+  //      export both read clean without downstream re-formatting.
+  cleanScript = normalizeScriptLayout(cleanScript)
+
   // 17. For long-form, evaluate the checklist via a SEPARATE Pro call now
   //     that the script is fully post-processed and sanitized. Replaces
   //     the manual_check defaults from step 10 with real grades. For
@@ -655,11 +688,24 @@ async function generateScriptForSlotInner(
 
   // 18. Apply deterministic length check against the sanitized script.
   //     This OVERRIDES any AI grade for the length item - word-count math
-  //     is not AI judgment.
-  enforceLengthChecklistItem(checklist, cleanScript, stream, {
-    target_length_min: format.target_length_min,
-    target_length_max: format.target_length_max,
-  })
+  //     is not AI judgment. Outline mode has no meaningful word count;
+  //     mark the item manual with a duration target instead.
+  if (scriptMode === 'outline') {
+    const lengthIdx = checklist.findIndex((i) => i.id === 'universal.length_in_target')
+    if (lengthIdx >= 0) {
+      checklist[lengthIdx] = {
+        ...checklist[lengthIdx],
+        status: 'manual_check',
+        ai_note:
+          'Outline mode: no word count applies. Check the body questions are answerable in 30-60 seconds of speaking (1-3 beats).',
+      }
+    }
+  } else {
+    enforceLengthChecklistItem(checklist, cleanScript, stream, {
+      target_length_min: format.target_length_min,
+      target_length_max: format.target_length_max,
+    })
+  }
 
   // 18b. Carousel "teaching, not selling" check - force-flag any teaching
   //      slide that describes the service instead of teaching the viewer.
@@ -702,6 +748,7 @@ async function generateScriptForSlotInner(
     ...meta,
     script: cleanScript,
     checklist,
+    script_mode: scriptMode,
     ...(polishMeta ? { polish: polishMeta } : {}),
     script_generated_at: new Date().toISOString(),
   }
@@ -821,8 +868,17 @@ function maxTokensForStream(stream: SlotStream, quality: 'high' | 'standard' | '
  *  follows whichever instruction is more concrete (usually the output
  *  schema) and ignores the framework. The most common failure mode this
  *  prevents: engagement reels coming out as short-form spoken scripts. */
-function expectedSchemaForStream(stream: SlotStream, formatSlug?: string): string {
+function expectedSchemaForStream(stream: SlotStream, formatSlug?: string, outline?: boolean): string {
   console.log(`[generateScript] expectedSchemaForStream called with stream="${stream}"`)
+  // Short-form outline (bullet-point) mode: option lists + question beats
+  // instead of a word-for-word script. Must mirror SHORTFORM_OUTLINE_OVERLAY.
+  if (stream === 'short_form' && outline) {
+    return `Shape:
+{
+  "script": "Short-form OUTLINE prompt sheet as one string (NOT a word-for-word script). Use these EXACT bracket section labels in this order: [TITLE], [HOOK OPTIONS], [REHOOK 1 OPTIONS], [BODY BEATS], [CTA OPTIONS], [REHOOK 2 OPTIONS], [CLOSE OPTIONS], [RELOOP], [CAPTION], [HASHTAGS]. Option sections hold numbered variations (1. / 2. / 3.), one per line. [BODY BEATS] holds 1-3 bullets, each a QUESTION the client answers on camera followed by ' - mention: ' and the specific details from raw material they must include. [CAPTION] and [HASHTAGS] are fully written as usual - they get posted, not spoken.",
+  "checklist": [ { "id": "...", "status": "pass" | "flag" | "manual_check", "ai_note": "..." } ]
+}`
+  }
   // Engagement reels split by format: caption_list is the ONLY reel with a
   // CTA (it lives in the caption). Every other reel is a story progression
   // with NO CTA - the schema text must match the buildout or the model
@@ -866,16 +922,18 @@ interface BuildSystemPromptInput {
   stream: SlotStream
   format: ContentFormat
   brandProfile: BrandProfile | null
+  /** Short-form outline (bullet-point) delivery mode. */
+  outline?: boolean
 }
 
 function buildSystemPrompt(input: BuildSystemPromptInput): string {
-  const { stream, format, brandProfile } = input
+  const { stream, format, brandProfile, outline } = input
   const sections: string[] = []
 
   // Stream-aware framework. Long-form gets BASE + 5-step LONGFORM_BUILDOUT.
   // Everything else (short-form / engagement-reel / carousel / story) gets
-  // BASE + 8-beat SHORTFORM_BUILDOUT.
-  sections.push(frameworkBlockForStream(stream, format.slug))
+  // BASE + 8-beat SHORTFORM_BUILDOUT (+ the outline overlay in bullet mode).
+  sections.push(frameworkBlockForStream(stream, format.slug, { outline }))
 
   // Long-form ALSO gets the detailed output schema (LONGFORM_FRAMEWORK).
   // Short-form's output schema is baked into SHORTFORM_BUILDOUT itself.
@@ -925,6 +983,8 @@ interface BuildUserPromptInput {
     input_type: string
     thin_flag: boolean
   } | null
+  /** Short-form outline (bullet-point) delivery mode. */
+  outline?: boolean
   brandName: string | null
   /** Creator's personal name (clients.name). Used by the long-form
    *  description for the hook line and "In this video, [Creator]..."
@@ -959,7 +1019,7 @@ interface BuildUserPromptInput {
 }
 
 function buildUserPrompt(input: BuildUserPromptInput): string {
-  const { stream, format, answers, anchor, brandName, creatorName, brandWebsite, midrollCta, descriptionSettings, dmKeywords, ctaPlatform, siblingHooks, checklistDefs } = input
+  const { stream, format, answers, anchor, outline, brandName, creatorName, brandWebsite, midrollCta, descriptionSettings, dmKeywords, ctaPlatform, siblingHooks, checklistDefs } = input
   const sections: string[] = []
 
   if (brandName) sections.push(`BRAND: ${brandName}`)
@@ -1016,11 +1076,15 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
 
   // Hard word ceiling - explicit number per format. AI is bad at counting
   // words from a "75-180 words" rule alone; spelling out the ceiling for
-  // THIS format makes it land more reliably.
-  const lengthWindow = lengthTargetWindow(stream, {
-    target_length_min: format.target_length_min,
-    target_length_max: format.target_length_max,
-  })
+  // THIS format makes it land more reliably. Outline mode has no word
+  // ceiling (the sheet isn't spoken as written) - the overlay's
+  // "answerable in 30-60 seconds" rule governs instead.
+  const lengthWindow = outline
+    ? null
+    : lengthTargetWindow(stream, {
+        target_length_min: format.target_length_min,
+        target_length_max: format.target_length_max,
+      })
   if (lengthWindow) {
     sections.push(
       `WORD BUDGET (HARD): ${lengthWindow.minWords}-${lengthWindow.maxWords} words for this script. ${lengthWindow.maxWords} is the ceiling - if your draft is over, cut a body beat before submitting. Count words before output.`,
@@ -1130,7 +1194,7 @@ function buildUserPrompt(input: BuildUserPromptInput): string {
       `OUTPUT (STRICT JSON):
 The response must be a single JSON object with EXACTLY these two top-level keys: "script" (string) and "checklist" (array). Use these exact key names - do NOT use "scriptText", "content", "output", "qa", or any other variant. No additional top-level keys.
 
-${expectedSchemaForStream(stream, format.slug)}
+${expectedSchemaForStream(stream, format.slug, outline)}
 
 No prose outside the JSON. No markdown code fences. No "Here's the JSON:" preamble. The response must START with { and END with }. Nothing else.`,
     )
@@ -1273,6 +1337,30 @@ function parseScriptOutput(content: string): {
     }
   }
   return { script, checklist: checklistRaw as unknown as ChecklistItem[] }
+}
+
+/** Final layout pass: bracket section headers and list items each on their
+ *  own line. The model glues "[HOOK]" onto the end of the previous
+ *  paragraph and runs numbered options together on one line - unreadable
+ *  in the editor and glued in the doc export. Pure formatting; wording is
+ *  untouched. */
+function normalizeScriptLayout(script: string): string {
+  let s = script
+  // A bracket section header preceded by content moves to its own line,
+  // with a blank line before it.
+  s = s.replace(/([^\n\s])[ \t]*(\[[A-Z][A-Z0-9 \-]*\])/g, '$1\n\n$2')
+  // Content following a header on the same line drops to the next line.
+  s = s.replace(/(\[[A-Z][A-Z0-9 \-]*\])[ \t]+(?=\S)/g, '$1\n')
+  // Numbered options / list items glued after a sentence break: "...over.
+  // 2. If you want..." Each numbered item starts its own line. The lead
+  // charset requires sentence punctuation so "version 2." style prose
+  // never splits.
+  s = s.replace(/([.!?…'’"”):])[ \t]+(\d{1,2}[.)])[ \t]+(?=\S)/g, '$1\n$2 ')
+  // Dash bullets glued after a sentence end (outline body questions).
+  // Requires a capital after the dash so the same-bullet " - mention: ..."
+  // tail stays attached to its question.
+  s = s.replace(/([.!?])[ \t]+-[ \t]+(?=[A-Z])/g, '$1\n- ')
+  return s
 }
 
 /** True when the script has a [CAPTION] section with non-empty content. */
@@ -1428,6 +1516,9 @@ function extractHookLine(script: string): string | null {
   if (!script) return null
   const hookMatch = script.match(/\[HOOK\]\s*\n+([^\n\[]+)/i)
   if (hookMatch && hookMatch[1].trim()) return hookMatch[1].trim()
+  // Outline mode: first numbered option under [HOOK OPTIONS].
+  const optMatch = script.match(/\[HOOK OPTIONS\]\s*\n+\s*(?:1[.)]\s*)?([^\n\[]+)/i)
+  if (optMatch && optMatch[1].trim()) return optMatch[1].trim()
   // Fallback: first non-bracket, non-empty line.
   const lines = script.split('\n').map((l) => l.trim())
   for (const line of lines) {

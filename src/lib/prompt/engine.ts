@@ -375,6 +375,14 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   { re: /\bwhat most people miss is(?:\s+that)?\s+/gi, replace: '' },
   { re: /\bwhat most people don['’]t (?:realize|see|get) is(?:\s+that)?\s+/gi, replace: '' },
   { re: /\bmost people (?:miss|don['’]t see) this[.,]?\s+/gi, replace: '' },
+  // Trailing "most people miss" qualifier bolted onto a noun phrase:
+  // "here's the key pattern most people miss." -> "here's the key pattern."
+  // Same tell, new costume - strip the qualifier, keep the sentence.
+  { re: /\s+(?:that\s+)?most people (?:miss|overlook|never notice)(?=[.,!?:])/gi, replace: '' },
+  // Question mark inside a quoted "how to ..." noun phrase: the model ends
+  // statements like «teaching 'how to blow up on social media?'» with a ?
+  // that belongs to nothing - a quoted topic is not a question.
+  { re: /((['‘"“])how to [^'"’”\n?]{2,60})\?(['’"”])/gi, replace: '$1$3' },
   // Generic empathy beats - drop entirely when they appear as standalone clauses.
   { re: /\b(?:if\s+you['’]ve\s+been\s+there|if\s+you['’]ve\s+felt\s+this|we['’]ve\s+all\s+been\s+there)[,.]?\s+/gi, replace: '' },
   // a/an article repair for common offenders. The AI occasionally writes

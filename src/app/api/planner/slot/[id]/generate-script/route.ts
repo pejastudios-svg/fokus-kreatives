@@ -34,7 +34,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -60,8 +60,18 @@ export async function POST(
     }
     const clientId = slotRow.client_id as string
 
+    // Optional body: { mode: 'verbatim' | 'outline' }. Omitted = keep the
+    // slot's previous mode (or verbatim for a first generation).
+    let scriptMode: 'verbatim' | 'outline' | undefined
+    try {
+      const body = (await req.json()) as { mode?: string }
+      if (body.mode === 'outline' || body.mode === 'verbatim') scriptMode = body.mode
+    } catch {
+      // no body is fine
+    }
+
     const result = await withClientConcurrency(clientId, () =>
-      generateScriptForSlot(id),
+      generateScriptForSlot(id, { scriptMode }),
     )
     return NextResponse.json({
       success: true,
