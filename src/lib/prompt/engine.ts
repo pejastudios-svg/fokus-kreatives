@@ -183,6 +183,23 @@ export const HARD_BANS = [
   "hit the bell so you",
   "hit that bell",
   "so you don't miss what's coming",
+  // "Same X, different Y." - fragment-as-conclusion tell, flagged on live
+  // carousel output ("Same events, different engine."). The REPAIR_REGEX
+  // BELOW strips the general sentence-initial form; these literals are the
+  // backstop for surgicalBanRemoval when it survives the repair pass (e.g.
+  // the construction landing mid-sentence). Each entry requires the comma,
+  // so ordinary uses of "the same story" / "the same words" are untouched.
+  "same story, different",
+  "same events, different",
+  "same script, different",
+  "same words, different",
+  "same content, different",
+  "same message, different",
+  "same game, different",
+  // NOTE: the clipped-fragment-as-dramatic-setup tell ("Watch one die.",
+  // "Now the reveal.") is a CADENCE, not a fixed phrase, so it cannot be
+  // enumerated here without false positives. It is enforced at generation
+  // time by the DO NOT block in FRAMEWORK_BASE (framework.ts).
 ]
 
 type RepairReplacer = string | ((substring: string, ...args: string[]) => string)
@@ -201,6 +218,17 @@ const REPAIR_REGEX: Array<{ re: RegExp; replace: RepairReplacer }> = [
   // Targets ONLY the em-dash char (U+2014), never the hyphen-minus, so
   // compound modifiers ("5-part intro", "lead-generating") are untouched.
   { re: /\s*—\s*/g, replace: ', ' },
+  // "Same X, different Y." as a standalone sentence - fragment-as-conclusion
+  // tell. Deletes the sentence rather than rewriting it, because the line is
+  // always a redundant restatement of the explanation that precedes it.
+  // Anchored to a sentence boundary and required to END on a period, so
+  // "I told the same story, different framing, to two clients" (comma
+  // continuation, mid-sentence) is NOT touched. X and Y are capped at three
+  // words each to keep the match tight.
+  {
+    re: /(^|[.!?]['"’”)\]]*\s+|\n\s*)Same\s+[\w'’-]+(?:\s+[\w'’-]+){0,2},\s+different\s+[\w'’-]+(?:\s+[\w'’-]+){0,2}\.\s*/gi,
+    replace: '$1',
+  },
   // "X is not Y. It's Z." / "X isn't Y. It's Z." → drop the negation clause, keep the positive claim
   { re: /\b(\w[\w\s]{0,30})\s+is\s+not\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
   { re: /\b(\w[\w\s]{0,30})\s+isn['’]t\s+[^.?!]{1,80}[.?!]\s*[Ii]t['’]s\s+/gi, replace: '$1 is ' },
